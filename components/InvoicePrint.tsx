@@ -1,10 +1,55 @@
 import React from 'react';
-import { Invoice, PrintTheme, Person } from '../types';
+import { Invoice, PrintTheme, Person, InvoiceType } from '../types';
 import { toPersianDigits, formatCurrency, formatAmountOnly, getCurrencyLabel, getQrCodeUrl, generateBarcodeSvg, generateLocalQrSvg } from '../utils';
 import { useStore } from '../store';
-import { ShieldCheck, Phone, MapPin, ScrollText, PenTool, UserCheck, CreditCard, Wallet, Layers, Box, Hexagon, Command, Feather, Briefcase, Zap, Hash, Coins, Building2, HelpCircle, Sparkles, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Phone, MapPin, ScrollText, PenTool, UserCheck, CreditCard, Wallet, Layers, Box, Hexagon, Command, Feather, Briefcase, Zap, Hash, Coins, Building2, HelpCircle, Sparkles, CheckCircle2, ShieldAlert, AlertCircle, QrCode } from 'lucide-react';
 import { PersianWatermarkCanvas, PersianHeaderBanner, PersianCard, PersianHashtiSeal, IslimiCornerSvg } from './PersianArtCanvas';
 import { DocumentTrialWatermarkFooter } from './DocumentTrialWatermarkFooter';
+import { DynamicPaymentQrService } from '../services/dynamicPaymentQrService';
+
+export const PROFORMA_STANDARD_NOTE = 'توجه: این سند صرفاً به عنوان پیش‌فاکتور و برآورد قیمت صادر گردیده و به منزله فاکتور قطعی، بیع نهایی یا رزرو کالا نمی‌باشد. در صورت نوسان بازار، تغییر نرخ ارز یا تغییر بهای تمام‌شده مواد اولیه تا زمان قطعی‌شدن فاکتور، این پیش‌فاکتور فاقد اعتبار بوده و قیمت‌ها در زمان قطعی‌شدن سفارش به‌روز محاسبه خواهد شد.';
+
+export const InvoicePaymentQrBox: React.FC<{ invoice: Invoice; company?: any; compact?: boolean }> = ({ invoice, company, compact = false }) => {
+    const qrInfo = DynamicPaymentQrService.generateInvoicePaymentQr(invoice, company);
+    if (compact) {
+        return (
+            <div className="flex flex-col items-center justify-center p-2 bg-slate-50 border border-slate-300 rounded-lg text-center my-1.5" dir="rtl">
+                <img src={qrInfo.qrSvg} alt="بارکد پرداخت پویا" className="w-16 h-16 object-contain" />
+                <span className="text-[8.5px] font-black text-slate-900 mt-1">بارکد پرداخت مستقیم و سریع</span>
+                <span className="text-[7.5px] text-slate-600">اسکن با دوربین موبایل یا اپ بانکی</span>
+            </div>
+        );
+    }
+    return (
+        <div className="border border-slate-200 rounded-xl p-2.5 bg-slate-50 min-h-[90px] flex items-center justify-center gap-3 text-right" dir="rtl">
+            <img src={qrInfo.qrSvg} alt="بارکد پرداخت سریع" className="w-14 h-14 object-contain shrink-0" />
+            <div className="text-[10px] space-y-0.5">
+                <span className="font-black text-slate-900 block flex items-center gap-1">
+                    <CreditCard size={12} className="text-teal-600" />
+                    پرداخت سریع فاکتور
+                </span>
+                <span className="text-slate-500 block text-[9px]">اسکن بارکد با دوربین / همراه بانک</span>
+                {qrInfo.shebaNumber && (
+                    <span className="font-mono text-[8px] text-slate-700 block dir-ltr truncate max-w-[130px]">
+                        {qrInfo.shebaNumber}
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+};
+
+export const ProformaNoticeBox: React.FC<{ description?: string; compact?: boolean }> = ({ description, compact = false }) => (
+    <div className={`bg-amber-50/90 border-2 border-amber-300 rounded-xl ${compact ? 'p-2 my-1' : 'p-3 my-2'} text-right`} dir="rtl">
+        <div className="flex items-center gap-1.5 text-amber-900 font-black text-[11px] mb-0.5">
+            <ShieldAlert size={14} className="text-amber-700 shrink-0" />
+            <span>پانویس و شرایط حقوقی پیش‌فاکتور:</span>
+        </div>
+        <p className={`${compact ? 'text-[8.5px] leading-tight' : 'text-[9.5px] leading-relaxed'} text-amber-950 font-bold whitespace-pre-line`}>
+            {description || PROFORMA_STANDARD_NOTE}
+        </p>
+    </div>
+);
 
 interface Props { 
     data: Invoice; 
@@ -136,8 +181,8 @@ const ModernCorporateTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCo
                         </div>
                     </div>
                     <div className="text-left flex flex-col items-end">
-                        <div className="bg-blue-600 text-white px-6 py-2 rounded-xl text-lg font-black shadow-md mb-2">
-                            فاکتور {data.type}
+                        <div className={`${data.type === InvoiceType.PROFORMA ? 'bg-amber-600' : 'bg-blue-600'} text-white px-6 py-2 rounded-xl text-lg font-black shadow-md mb-2`}>
+                            {data.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور رسمی' : `فاکتور ${data.type}`}
                         </div>
                         <div className="text-xs text-slate-600 font-bold space-y-1">
                             <div>شماره فاکتور: <span className="font-black text-slate-950 text-sm font-mono">{invoiceNumDisplay}</span></div>
@@ -235,10 +280,14 @@ const ModernCorporateTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCo
                             </div>
                         )}
                     </div>
-                    {data.description && (
-                        <div className="bg-white p-2 rounded-xl border border-slate-200 text-[9.5px] text-slate-600 leading-4 font-normal text-right" style={{ letterSpacing: 'normal' }}>
-                            <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>{data.description}
-                        </div>
+                    {data.type === InvoiceType.PROFORMA ? (
+                        <ProformaNoticeBox description={data.description} />
+                    ) : (
+                        data.description && (
+                            <div className="bg-white p-2 rounded-xl border border-slate-200 text-[9.5px] text-slate-600 leading-4 font-normal text-right" style={{ letterSpacing: 'normal' }}>
+                                <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>{data.description}
+                            </div>
+                        )
                     )}
                 </div>
                 <div className="col-span-5 bg-blue-50/80 border border-blue-200 rounded-2xl p-4 text-xs space-y-2 text-right" dir="rtl">
@@ -274,13 +323,7 @@ const ModernCorporateTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCo
                     </div>
                     <span className="text-[10px] font-black text-slate-700">مهر و امضای فروشنده {docCompany?.branchName ? `(${docCompany.branchName})` : ''}</span>
                 </div>
-                <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 min-h-[90px] flex items-center justify-center gap-3">
-                    <img src={generateLocalQrSvg(`INV:${data.id}:${data.finalTotal}`)} alt="PayQR" className="w-12 h-12" />
-                    <div className="text-right text-[10px]">
-                        <span className="font-black text-slate-900 block">پرداخت سریع</span>
-                        <span className="text-slate-500">اسکن با همراه بانک</span>
-                    </div>
-                </div>
+                <InvoicePaymentQrBox invoice={data} company={docCompany} />
                 <div className="border border-slate-200 rounded-xl p-3 bg-slate-50 min-h-[90px] flex flex-col justify-between">
                     <div className="h-14 flex items-center justify-center">
                         {data.signature && <img src={data.signature} className="max-h-full max-w-full object-contain" alt="امضا" />}
@@ -310,8 +353,8 @@ const CreativeBrightTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCod
                         </div>
                     </div>
                     <div className="text-left flex flex-col items-end">
-                        <div className="bg-indigo-600 text-white px-5 py-2 rounded-2xl text-lg font-black shadow-md mb-2 flex items-center gap-2">
-                            <span>فاکتور {data.type}</span>
+                        <div className={`${data.type === InvoiceType.PROFORMA ? 'bg-amber-600' : 'bg-indigo-600'} text-white px-5 py-2 rounded-2xl text-lg font-black shadow-md mb-2 flex items-center gap-2`}>
+                            <span>{data.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور فروش' : `فاکتور ${data.type}`}</span>
                             <span className="bg-white/20 px-2 py-0.5 rounded-lg text-xs font-mono">{invoiceNumDisplay}</span>
                         </div>
                         <div className="text-xs text-slate-700 font-bold space-y-1">
@@ -404,11 +447,15 @@ const CreativeBrightTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCod
                             </div>
                         )}
                     </div>
-                    {data.description && (
-                        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-[9.5px] text-slate-600 font-normal leading-4 text-right" style={{ letterSpacing: 'normal' }}>
-                            <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>
-                            {data.description}
-                        </div>
+                    {data.type === InvoiceType.PROFORMA ? (
+                        <ProformaNoticeBox description={data.description} />
+                    ) : (
+                        data.description && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-[9.5px] text-slate-600 font-normal leading-4 text-right" style={{ letterSpacing: 'normal' }}>
+                                <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>
+                                {data.description}
+                            </div>
+                        )
                     )}
                 </div>
 
@@ -444,13 +491,7 @@ const CreativeBrightTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCod
                     </div>
                     <span className="text-[10px] font-black text-slate-700">مهر و امضای فروشنده {docCompany?.branchName ? `(${docCompany.branchName})` : ''}</span>
                 </div>
-                <div className="border border-slate-200 rounded-2xl p-3 bg-slate-50/50 min-h-[90px] flex items-center justify-center gap-3">
-                    <img src={generateLocalQrSvg(`INV:${data.id}:${data.finalTotal}`)} alt="PayQR" className="w-12 h-12" />
-                    <div className="text-right text-[10px]">
-                        <span className="font-black text-indigo-950 block">درگاه پرداخت سریع</span>
-                        <span className="text-slate-500">اسکن بارکد بانکی</span>
-                    </div>
-                </div>
+                <InvoicePaymentQrBox invoice={data} company={docCompany} />
                 <div className="border border-slate-200 rounded-2xl p-3 bg-slate-50/50 min-h-[90px] flex flex-col justify-between">
                     <div className="h-14 flex items-center justify-center">
                         {data.signature && <img src={data.signature} className="max-h-full max-w-full object-contain" alt="امضا" />}
@@ -474,7 +515,9 @@ const OfficialCleanTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCode
                     </div>
                     <div className="text-center flex-1">
                         <h1 className="text-xl font-black text-slate-950" style={{ letterSpacing: 'normal' }}>{docCompany?.name || 'فروشنده'}</h1>
-                        <p className="text-sm font-black text-slate-800 mt-1">صورتحساب فروش کالا و خدمات ({data.type})</p>
+                        <p className="text-sm font-black text-slate-800 mt-1">
+                            {data.type === InvoiceType.PROFORMA ? 'صورت استعلام و پیش‌فاکتور رسمی کالا و خدمات' : `صورتحساب فروش کالا و خدمات (${data.type})`}
+                        </p>
                     </div>
                     <div className="w-48 text-left text-xs space-y-1 font-bold">
                         <div>شماره فاکتور: <span className="font-mono text-sm text-slate-950 font-black">{invoiceNumDisplay}</span></div>
@@ -543,10 +586,14 @@ const OfficialCleanTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCode
                                 <div className="flex justify-between border-t border-slate-300 pt-1 font-black"><span>مانده تسویه فاکتور:</span><span className="font-mono text-blue-900">{formatCurrency(Math.max(0, data.finalTotal - thisInvoicePaid), currency)}</span></div>
                             </>
                         )}
-                        {data.description && (
-                            <div className="pt-2 border-t border-slate-200 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
-                                <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>{data.description}
-                            </div>
+                        {data.type === InvoiceType.PROFORMA ? (
+                            <ProformaNoticeBox description={data.description} compact={true} />
+                        ) : (
+                            data.description && (
+                                <div className="pt-2 border-t border-slate-200 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
+                                    <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>{data.description}
+                                </div>
+                            )
                         )}
                     </div>
                     <div className="space-y-1.5">
@@ -588,7 +635,9 @@ const IndustrialCrispTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCo
                     <p className="text-xs font-bold text-slate-700 mt-0.5">{docCompany?.address} | تلفن: {toPersianDigits(docCompany?.phone || '')}</p>
                 </div>
                 <div className="text-left">
-                    <div className="bg-slate-950 text-white px-4 py-1.5 font-black text-base">فاکتور {data.type}</div>
+                    <div className={`${data.type === InvoiceType.PROFORMA ? 'bg-amber-700' : 'bg-slate-950'} text-white px-4 py-1.5 font-black text-base`}>
+                        {data.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور' : `فاکتور ${data.type}`}
+                    </div>
                     <div className="text-xs font-mono font-black mt-1">NO: {invoiceNumDisplay}</div>
                 </div>
             </div>
@@ -649,10 +698,14 @@ const IndustrialCrispTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCo
                             <div className="flex justify-between border-t border-slate-300 pt-1 font-black"><span>مانده تسویه فاکتور:</span><span className="font-mono text-blue-900">{formatCurrency(Math.max(0, data.finalTotal - thisInvoicePaid), currency)}</span></div>
                         </>
                     )}
-                    {data.description && (
-                        <div className="pt-2 border-t border-slate-200 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
-                            <span className="font-bold text-slate-800 text-[10px]">توضیحات و مشخصات فنی: </span>{data.description}
-                        </div>
+                    {data.type === InvoiceType.PROFORMA ? (
+                        <ProformaNoticeBox description={data.description} compact={true} />
+                    ) : (
+                        data.description && (
+                            <div className="pt-2 border-t border-slate-200 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
+                                <span className="font-bold text-slate-800 text-[10px]">توضیحات و مشخصات فنی: </span>{data.description}
+                            </div>
+                        )
                     )}
                 </div>
                 <div className="border-4 border-slate-950 p-3 space-y-1.5 bg-slate-50">
@@ -695,7 +748,10 @@ const MinimalLightTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCode,
                     <p className="text-xs text-slate-700 mt-1">{docCompany?.address} | {toPersianDigits(docCompany?.phone || '')}</p>
                 </div>
                 <div className="text-left text-xs font-bold space-y-0.5">
-                    <div>شماره: #{invoiceNumDisplay}</div>
+                    <div>
+                        {data.type === InvoiceType.PROFORMA && <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded font-black text-xs ml-2">پیش‌فاکتور</span>}
+                        شماره: #{invoiceNumDisplay}
+                    </div>
                     <div>تاریخ: {toPersianDigits(data.date)}</div>
                 </div>
             </div>
@@ -754,10 +810,14 @@ const MinimalLightTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCode,
                         </>
                     )}
                 </div>
-                {data.description && (
-                    <div className="pt-2 mt-2 border-t border-slate-300 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
-                        <b>توضیحات و پانویس: </b>{data.description}
-                    </div>
+                {data.type === InvoiceType.PROFORMA ? (
+                    <ProformaNoticeBox description={data.description} compact={true} />
+                ) : (
+                    data.description && (
+                        <div className="pt-2 mt-2 border-t border-slate-300 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
+                            <b>توضیحات و پانویس: </b>{data.description}
+                        </div>
+                    )
                 )}
             </div>
 
@@ -785,7 +845,9 @@ const ExecutiveIvoryTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCod
                     </div>
                 </div>
                 <div className="text-left">
-                    <div className="bg-[#b38728] text-white px-5 py-2 rounded-xl text-base font-black shadow mb-1.5">فاکتور {data.type}</div>
+                    <div className={`${data.type === InvoiceType.PROFORMA ? 'bg-amber-600' : 'bg-[#b38728]'} text-white px-5 py-2 rounded-xl text-base font-black shadow mb-1.5`}>
+                        {data.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور اختصاصی' : `فاکتور ${data.type}`}
+                    </div>
                     <div className="text-xs font-mono font-black text-slate-800">شماره: {invoiceNumDisplay}</div>
                     <div className="text-xs text-slate-600">تاریخ: {toPersianDigits(data.date)}</div>
                 </div>
@@ -851,10 +913,14 @@ const ExecutiveIvoryTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCod
                             </div>
                         </div>
                     )}
-                    {data.description && (
-                        <div className="mt-3 pt-2 border-t border-slate-200 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
-                            <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>{data.description}
-                        </div>
+                    {data.type === InvoiceType.PROFORMA ? (
+                        <ProformaNoticeBox description={data.description} />
+                    ) : (
+                        data.description && (
+                            <div className="mt-3 pt-2 border-t border-slate-200 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
+                                <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>{data.description}
+                            </div>
+                        )
                     )}
                 </div>
                 <div className="col-span-5 bg-white border-2 border-[#d4af37] rounded-2xl p-4 text-xs space-y-1.5 text-right" dir="rtl">
@@ -993,10 +1059,10 @@ const PersianHeritageTheme = ({
                 {/* سربرگ کتیبه‌ای سلطنتی با نقوش اسلیمی و رنگ لاجوردی و زرین */}
                 <PersianHeaderBanner
                     title={docCompany?.name || 'مجموعه تجاری و صنعتی اشک قلم'}
-                    subtitle="صورتحساب رسمی فروش کالا و خدمات • نظام جامع هوشمند"
+                    subtitle={data.type === InvoiceType.PROFORMA ? 'صورت برآورد و پیش‌فاکتور رسمی کالا و خدمات • نظام جامع هوشمند' : 'صورتحساب رسمی فروش کالا و خدمات • نظام جامع هوشمند'}
                     code={invoiceNumDisplay}
                     date={toPersianDigits(data.date)}
-                    typeBadge="طرح اصیل ایرانی"
+                    typeBadge={data.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور' : 'طرح اصیل ایرانی'}
                 />
 
                 {/* بخش اطلاعات طرفین فاکتور در دو کادر تذهیب متقارن */}
@@ -1146,10 +1212,16 @@ const PersianHeritageTheme = ({
                                     </div>
                                 </div>
                             )}
-                            {data.description && (
-                                <div className="mt-auto pt-2 text-[9.5px] text-slate-600 font-normal leading-4 bg-white/90 p-2 rounded-lg border border-[#e2d7be]">
-                                    <strong className="text-[#0f172a] text-[10px]">یادداشت و شرایط فاکتور: </strong>{data.description}
+                            {data.type === InvoiceType.PROFORMA ? (
+                                <div className="mt-auto pt-2">
+                                    <ProformaNoticeBox description={data.description} compact={true} />
                                 </div>
+                            ) : (
+                                data.description && (
+                                    <div className="mt-auto pt-2 text-[9.5px] text-slate-600 font-normal leading-4 bg-white/90 p-2 rounded-lg border border-[#e2d7be]">
+                                        <strong className="text-[#0f172a] text-[10px]">یادداشت و شرایط فاکتور: </strong>{data.description}
+                                    </div>
+                                )
                             )}
                         </PersianCard>
                     </div>
@@ -1289,7 +1361,7 @@ export const Thermal80mmTheme = ({
             {/* اطلاعات فاکتور */}
             <div className="border-b border-dashed border-black pb-2 mb-2 text-[10px] space-y-1">
                 <div className="flex justify-between items-center font-bold">
-                    <span>فاکتور: {data.type || 'فروش'}</span>
+                    <span>نوع سند: {data.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور' : (data.type || 'فروش')}</span>
                     <span>شماره: {invoiceNumDisplay}</span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -1390,25 +1462,27 @@ export const Thermal80mmTheme = ({
             </div>
 
             {/* پانویس یا توضیحات */}
-            {data.description && (
-                <div className="text-[9px] text-slate-800 pb-2 mb-2 border-b border-dotted border-black leading-relaxed whitespace-pre-line">
-                    {data.description}
+            {data.type === InvoiceType.PROFORMA ? (
+                <div className="text-[8px] text-amber-950 bg-amber-50 p-1.5 rounded border border-amber-300 pb-1.5 mb-2 leading-relaxed whitespace-pre-line font-bold text-right" dir="rtl">
+                    ⚠️ {data.description || PROFORMA_STANDARD_NOTE}
                 </div>
+            ) : (
+                data.description && (
+                    <div className="text-[9px] text-slate-800 pb-2 mb-2 border-b border-dotted border-black leading-relaxed whitespace-pre-line">
+                        {data.description}
+                    </div>
+                )
             )}
 
-            {/* بارکد و کیوآر اصالت */}
-            <div className="text-center space-y-2 py-1">
+            {/* بارکد و کیوآر پرداخت و اصالت */}
+            <div className="text-center space-y-1.5 py-1">
+                <InvoicePaymentQrBox invoice={data} company={docCompany} compact={true} />
                 {barcodeUrl && (
                     <div className="flex justify-center my-1">
                         <img src={barcodeUrl} alt="بارکد" className="max-h-8 object-contain" />
                     </div>
                 )}
                 <div className="text-[8px] font-mono text-slate-600">{trackingCode}</div>
-                {qrCode && (
-                    <div className="flex justify-center">
-                        <img src={qrCode} alt="QR" className="w-16 h-16 object-contain" />
-                    </div>
-                )}
                 <div className="text-[8.5px] font-bold text-slate-700">از حسن اعتماد و خرید شما سپاسگزاریم</div>
                 <div className="text-[7.5px] text-slate-500">سامانه مالی و صدور فاکتور ابری و همراه اشک قلم</div>
             </div>

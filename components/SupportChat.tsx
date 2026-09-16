@@ -1,10 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   MessageCircle, X, Send, Bot, Phone, Mail, Minimize2, Maximize2, 
-  CheckCircle2, Cloud, RefreshCw, Smartphone, ShieldCheck, Sparkles, User
+  CheckCircle2, Cloud, RefreshCw, Smartphone, ShieldCheck, Sparkles, User,
+  Bell, BellRing, PhoneCall, Volume2, ShieldAlert
 } from 'lucide-react';
 import { useStore } from '../store';
 import { notificationService } from '../services/notificationService';
+import { adminChatNotificationService, SupportChatMessage } from '../services/adminChatNotificationService';
 import { toPersianDigits } from '../utils';
 
 interface ChatMessage {
@@ -24,7 +26,13 @@ const SupportChat: React.FC = () => {
   const [isMinimized, setIsMinimized] = useState(false);
   const [serverOnline, setServerOnline] = useState<boolean>(true);
   const [isCheckingServer, setIsCheckingServer] = useState(false);
-  
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [notifPermissionGranted, setNotifPermissionGranted] = useState<boolean>(false);
+
+  // بررسی وضعیت ادمین
+  const isAdmin = currentUser?.roleId === 'admin' || currentUser?.username === 'admin' || currentUser?.roleId === 'MANAGER';
+  const [sendAsAdmin, setSendAsAdmin] = useState<boolean>(isAdmin);
+
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem('ashk_support_chat_history');
@@ -47,7 +55,36 @@ const SupportChat: React.FC = () => {
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // ذخیره در لوکال‌استوریج
+  // اشتراک در سرویس نوتیفیکیشن ادمین
+  useEffect(() => {
+    const unsub = adminChatNotificationService.subscribe((count) => {
+      setUnreadCount(count);
+    });
+
+    // بررسی وضعیت اولیه دسترسی به نوتیفیکیشن
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotifPermissionGranted(Notification.permission === 'granted');
+    }
+
+    const handleNewMessage = (e: any) => {
+      const newMsg = e.detail;
+      if (newMsg) {
+        setMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      }
+    };
+
+    window.addEventListener('ashk_new_support_chat_received', handleNewMessage);
+
+    return () => {
+      unsub();
+      window.removeEventListener('ashk_new_support_chat_received', handleNewMessage);
+    };
+  }, []);
+
+  // ذخیره پیام‌ها در لوکال‌استوریج
   useEffect(() => {
     try {
       localStorage.setItem('ashk_support_chat_history', JSON.stringify(messages));
@@ -61,8 +98,23 @@ const SupportChat: React.FC = () => {
   useEffect(() => {
     if (isOpen && !isMinimized) {
       scrollToBottom();
+      // وقتی ادمین چت را باز کرد، شمارنده پیام‌های خوانده‌نشده صفر شود
+      if (isAdmin) {
+        adminChatNotificationService.markAllAsRead();
+      }
     }
-  }, [messages, isOpen, isMinimized, scrollToBottom]);
+  }, [messages, isOpen, isMinimized, scrollToBottom, isAdmin]);
+
+  // درخواست مجوز نوتیفیکیشن
+  const handleRequestNotification = async () => {
+    const granted = await adminChatNotificationService.requestPermission();
+    setNotifPermissionGranted(granted);
+    if (granted) {
+      notificationService.notify('success', '🔔 نوتیفیکیشن‌های زنده پیام پشتیبانی با موفقیت فعال شدند.');
+    } else {
+      notificationService.notify('warning', 'مجوز ارسال نوتیفیکیشن توسط سیستم صادر نشد.');
+    }
+  };
 
   // بررسی وضعیت اتصال به وب‌سرور مادر و دریافت پیام‌های جدید
   const checkServerAndSync = useCallback(async () => {
@@ -90,18 +142,17 @@ const SupportChat: React.FC = () => {
         setServerOnline(false);
       }
     } catch {
-      // سرور لوکال یا آفلاین
       setServerOnline(false);
     } finally {
       setIsCheckingServer(false);
     }
   }, []);
 
-  // چک کردن سرور هنگام باز کردن چت
+  // بررسی دوره‌ای سرور
   useEffect(() => {
     if (isOpen) {
       checkServerAndSync();
-      const interval = setInterval(checkServerAndSync, 15000);
+      const interval = setInterval(checkServerAndSync, 10000);
       return () => clearInterval(interval);
     }
   }, [isOpen, checkServerAndSync]);
@@ -116,11 +167,15 @@ const SupportChat: React.FC = () => {
     }
 
     const localMsgId = 'msg_' + Date.now();
+    const isSendingAsSupport = isAdmin && sendAsAdmin;
+
     const userMsg: ChatMessage = {
       id: localMsgId,
       text: textToSend,
-      sender: 'user',
-      senderName: currentUser?.fullName || 'کاربر سیستم',
+      sender: isSendingAsSupport ? 'support' : 'user',
+      senderName: isSendingAsSupport 
+        ? `${currentUser?.fullName || 'ادمین پشتیبانی'} (سرور مادر)`
+        : (currentUser?.fullName || 'کاربر سیستم'),
       phone: phoneToSave,
       timestamp: new Date().toISOString(),
       synced_to_mother: false
@@ -137,23 +192,21 @@ const SupportChat: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: textToSend,
-          sender: 'user',
-          senderName: currentUser?.fullName || 'کاربر سیستم',
+          sender: isSendingAsSupport ? 'support' : 'user',
+          senderName: userMsg.senderName,
           phone: phoneToSave
         })
       });
 
       if (res.ok) {
-        const data = await res.json();
         setServerOnline(true);
         setMessages(prev => prev.map(m => m.id === localMsgId ? { ...m, synced_to_mother: true } : m));
         notificationService.addCenterNotification(
           'info',
-          'پیام پشتیبانی ارسال شد',
-          'پیام شما با موفقیت در وب‌سرور مادر ذخیره شد و به کارشناسان اطلاع داده شد.'
+          isSendingAsSupport ? 'پاسخ ادمین ارسال شد' : 'پیام پشتیبانی ارسال شد',
+          'پیام در پایگاه داده سرور مادر ثبت گردید.'
         );
       } else {
-        // حالت ذخیره محلی با هشدار
         notificationService.notify('warning', 'پیام در حافظه محلی ذخیره شد (عدم دسترسی موقت به هاست مادر)');
       }
     } catch {
@@ -162,19 +215,21 @@ const SupportChat: React.FC = () => {
       setIsSending(false);
     }
 
-    // پاسخ هوشمند پشتیبان / تاییدیه سرور
-    setTimeout(() => {
-      const replyMsg: ChatMessage = {
-        id: 'reply_' + Date.now(),
-        text: 'پیام شما دریافت و در پایگاه هاست مرکزی ثبت گردید. کارشناسان فنی در سریع‌ترین زمان از طریق پیامک یا همین پنجره چت پاسخگو خواهند بود.',
-        sender: 'support',
-        senderName: 'کارشناس پشتیبانی',
-        timestamp: new Date().toISOString(),
-        synced_to_mother: true
-      };
-      setMessages(prev => [...prev, replyMsg]);
-      notificationService.notify('info', '💬 پاسخ جدید در مرکز پشتیبانی دریافت شد');
-    }, 1800);
+    // پاسخ هوشمند ربات پشتیبان فقط در صورتی که پیام از سوی کاربر عادی باشد
+    if (!isSendingAsSupport) {
+      setTimeout(() => {
+        const replyMsg: ChatMessage = {
+          id: 'reply_' + Date.now(),
+          text: 'پیام شما دریافت و در پایگاه هاست مرکزی ثبت گردید. کارشناسان فنی در سریع‌ترین زمان از طریق پیامک یا همین پنجره چت پاسخگو خواهند بود.',
+          sender: 'support',
+          senderName: 'کارشناس پشتیبانی',
+          timestamp: new Date().toISOString(),
+          synced_to_mother: true
+        };
+        setMessages(prev => [...prev, replyMsg]);
+        notificationService.notify('info', '💬 پاسخ جدید در مرکز پشتیبانی دریافت شد');
+      }, 1800);
+    }
   };
 
   const quickReplies = [
@@ -184,7 +239,7 @@ const SupportChat: React.FC = () => {
     'درخواست قابلیت جدید در سیستم'
   ];
 
-  // دکمه بازکردن چت (موقعیت‌دهی دقیق و تفکیک شده از FAB دسترسی سریع)
+  // دکمه بازکردن چت
   if (!isOpen) {
     return (
       <div className="fixed bottom-20 left-20 sm:left-24 md:bottom-8 md:left-28 z-[190] no-print">
@@ -196,6 +251,13 @@ const SupportChat: React.FC = () => {
         >
           <MessageCircle size={28} className="transition-transform group-hover:scale-110" />
           
+          {/* بج نوتیفیکیشن پیام‌های خوانده‌نشده برای ادمین */}
+          {unreadCount > 0 && (
+            <span className="absolute -top-2 -left-2 bg-rose-500 text-white font-black text-[11px] min-w-[22px] h-[22px] px-1 rounded-full flex items-center justify-center border-2 border-slate-950 shadow-lg animate-bounce">
+              {toPersianDigits(unreadCount)}
+            </span>
+          )}
+
           {/* نشانگر آنلاین بودن سرور مادر */}
           <span className="absolute -top-1 -right-1 flex h-4 w-4">
             <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -208,7 +270,7 @@ const SupportChat: React.FC = () => {
 
           {/* متن شناور راهنما در هاور دسکتاپ */}
           <span className="hidden md:group-hover:block absolute bottom-full mb-2 right-0 whitespace-nowrap bg-slate-900/95 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl border border-white/10 shadow-2xl backdrop-blur-md">
-            پشتیبانی و سرور مادر
+            {isAdmin ? `پنل پشتیبانی ادمین ${unreadCount > 0 ? `(${unreadCount} جدید)` : ''}` : 'پشتیبانی و سرور مادر'}
           </span>
         </button>
       </div>
@@ -218,20 +280,22 @@ const SupportChat: React.FC = () => {
   // پنجره چت باز شده
   return (
     <div 
-      className={`fixed bottom-20 left-4 sm:left-8 md:bottom-8 md:left-28 w-[calc(100vw-2rem)] sm:w-96 md:w-[420px] bg-slate-950/98 backdrop-blur-2xl border border-blue-500/30 rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-[250] flex flex-col overflow-hidden animate-slide-up no-print transition-all duration-300 ${
-        isMinimized ? 'h-16' : 'h-[520px] max-h-[85vh]'
+      className={`fixed bottom-20 left-4 sm:left-8 md:bottom-8 md:left-28 w-[calc(100vw-2rem)] sm:w-96 md:w-[440px] bg-slate-950/98 backdrop-blur-2xl border border-blue-500/30 rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-[250] flex flex-col overflow-hidden animate-slide-up no-print transition-all duration-300 ${
+        isMinimized ? 'h-16' : 'h-[540px] max-h-[85vh]'
       }`}
       dir="rtl"
     >
       {/* هدر چت */}
-      <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-white/10 bg-gradient-to-r from-blue-900/60 to-indigo-900/60 text-white shrink-0">
+      <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-white/10 bg-gradient-to-r from-blue-900/70 via-indigo-900/60 to-slate-900 text-white shrink-0">
         <div className="flex items-center gap-2.5 min-w-0">
           <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0">
-            <Bot size={22} className="text-blue-400" />
+            {isAdmin ? <ShieldCheck size={22} className="text-teal-400" /> : <Bot size={22} className="text-blue-400" />}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <h3 className="font-black text-xs sm:text-sm text-white truncate">مرکز پیام و پشتیبانی هاست مادر</h3>
+              <h3 className="font-black text-xs sm:text-sm text-white truncate">
+                {isAdmin ? 'کنسول مدیریت پیام‌های کاربران (ادمین)' : 'مرکز پیام و پشتیبانی هاست مادر'}
+              </h3>
               {/* تگ وضعیت آنلاین */}
               <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 ${
                 isOnline && serverOnline 
@@ -243,7 +307,7 @@ const SupportChat: React.FC = () => {
               </span>
             </div>
             <p className="text-[10px] text-slate-300 truncate mt-0.5">
-              ذخیره‌سازی در هاست، ارسال نوتیفیکیشن و اطلاع‌رسانی به موبایل
+              متصل به سرور مرکزی: <span className="font-mono text-teal-300 font-bold">acc.ashkghalam.ir</span>
             </p>
           </div>
         </div>
@@ -279,20 +343,55 @@ const SupportChat: React.FC = () => {
 
       {!isMinimized && (
         <>
-          {/* نوار اطلاعات ارتباط با موبایل و وب‌سرور */}
-          <div className="bg-slate-900/90 border-b border-white/5 px-3.5 py-2 flex items-center justify-between gap-2 text-[10px] text-slate-400 shrink-0">
-            <div className="flex items-center gap-1 text-slate-300">
-              <Smartphone size={13} className="text-teal-400" />
-              <span>شماره تماس جهت پیگیری:</span>
+          {/* نوار ویژه ادمین جهت فعال‌سازی نوتیفیکیشن‌ها و تغییر حالت ارسال */}
+          {isAdmin && (
+            <div className="bg-gradient-to-r from-teal-950/60 to-indigo-950/60 border-b border-white/10 px-3.5 py-2 flex items-center justify-between gap-2 text-[10px] text-slate-300 shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRequestNotification}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg font-bold border transition ${
+                    notifPermissionGranted 
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                      : 'bg-amber-500/20 text-amber-300 border-amber-500/30 animate-pulse'
+                  }`}
+                  title="فعال‌سازی نوتیفیکیشن نیتیو و اعلان‌های چت"
+                >
+                  {notifPermissionGranted ? <BellRing size={12} /> : <Bell size={12} />}
+                  <span>{notifPermissionGranted ? 'نوتیفیکیشن فعال است' : 'فعال‌سازی نوتیفیکیشن زنده'}</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px]">
+                  <input
+                    type="checkbox"
+                    checked={sendAsAdmin}
+                    onChange={(e) => setSendAsAdmin(e.target.checked)}
+                    className="accent-teal-500 rounded"
+                  />
+                  <span className="font-bold text-teal-300">ارسال به عنوان ادمین</span>
+                </label>
+              </div>
             </div>
-            <input
-              type="tel"
-              value={userPhone}
-              onChange={(e) => setUserPhone(e.target.value)}
-              placeholder="مثلاً ۰۹۱۲۳۴۵۶۷۸۹"
-              className="bg-black/30 border border-white/10 text-white rounded-lg px-2 py-0.5 text-[10px] w-32 font-mono text-center focus:outline-none focus:border-teal-400"
-            />
-          </div>
+          )}
+
+          {/* نوار شماره تماس کاربر عادی */}
+          {!isAdmin && (
+            <div className="bg-slate-900/90 border-b border-white/5 px-3.5 py-2 flex items-center justify-between gap-2 text-[10px] text-slate-400 shrink-0">
+              <div className="flex items-center gap-1 text-slate-300">
+                <Smartphone size={13} className="text-teal-400" />
+                <span>شماره تماس جهت پیگیری پشتیبان:</span>
+              </div>
+              <input
+                type="tel"
+                value={userPhone}
+                onChange={(e) => setUserPhone(e.target.value)}
+                placeholder="مثلاً ۰۹۱۲۳۴۵۶۷۸۹"
+                className="bg-black/30 border border-white/10 text-white rounded-lg px-2 py-0.5 text-[10px] w-32 font-mono text-center focus:outline-none focus:border-teal-400"
+              />
+            </div>
+          )}
 
           {/* لیست پیام‌ها */}
           <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto space-y-3 custom-scrollbar">
@@ -305,8 +404,21 @@ const SupportChat: React.FC = () => {
                 >
                   <div className="flex items-center gap-1.5 mb-1 px-1">
                     <span className="text-[10px] text-slate-400 font-bold">
-                      {message.senderName || (isUser ? 'شما' : 'پشتیبانی')}
+                      {message.senderName || (isUser ? 'کاربر' : 'پشتیبانی')}
                     </span>
+                    
+                    {/* نمایش شماره کاربر و دکمه تماس سریع برای ادمین */}
+                    {isAdmin && message.phone && (
+                      <a
+                        href={`tel:${message.phone}`}
+                        className="text-[9px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.5 rounded flex items-center gap-1 hover:bg-emerald-500/30 transition"
+                        title="تماس مستقیم با کاربر"
+                      >
+                        <PhoneCall size={9} />
+                        <span className="font-mono">{message.phone}</span>
+                      </a>
+                    )}
+
                     {message.synced_to_mother && (
                       <span className="text-[9px] text-teal-400 flex items-center gap-0.5" title="ذخیره شده در سرور مادر">
                         <CheckCircle2 size={10} />
@@ -325,7 +437,7 @@ const SupportChat: React.FC = () => {
                     <p className="whitespace-pre-wrap">{message.text}</p>
                     <div className="flex items-center justify-between gap-3 mt-1.5 pt-1 border-t border-white/10 text-[9px] opacity-75">
                       <span>{new Date(message.timestamp).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}</span>
-                      {isUser && <span>{message.synced_to_mother ? '✔️ ثبت هاست' : '⏳ در صف'}</span>}
+                      <span>{message.synced_to_mother ? '✔️ ثبت سرور' : '⏳ در صف'}</span>
                     </div>
                   </div>
                 </div>
@@ -334,8 +446,8 @@ const SupportChat: React.FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* پیشنهادات سریع */}
-          {messages.length <= 2 && (
+          {/* پیشنهادات سریع برای کاربران عادی */}
+          {!isAdmin && messages.length <= 2 && (
             <div className="px-3 py-1.5 bg-slate-900/60 border-t border-white/5 shrink-0">
               <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar pb-1">
                 {quickReplies.map((reply, idx) => (
@@ -365,7 +477,7 @@ const SupportChat: React.FC = () => {
                     sendMessage();
                   }
                 }}
-                placeholder="پیام یا درخواست پشتیبانی خود را بنویسید..."
+                placeholder={isAdmin && sendAsAdmin ? 'پاسخ ادمین به کاربر...' : 'پیام یا درخواست پشتیبانی خود را بنویسید...'}
                 className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
               />
               <button
@@ -382,9 +494,9 @@ const SupportChat: React.FC = () => {
             <div className="flex items-center justify-between mt-2 px-1 text-[9px] text-slate-400 font-mono">
               <span className="flex items-center gap-1">
                 <Cloud size={10} className="text-teal-400" />
-                ذخیره روی SQLite و سرور مادر
+                ذخیره روی هاست مادر (acc.ashkghalam.ir)
               </span>
-              <span>تلفن پشتیبانی: ۰۲۱-۸۸۸۸۱۰۰۰</span>
+              <span>تلفن پشتیبانی: ۰۹۳۵۳۱۰۸۷۶۳</span>
             </div>
           </div>
         </>

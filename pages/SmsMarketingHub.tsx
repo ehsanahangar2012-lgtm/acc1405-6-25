@@ -358,18 +358,24 @@ export default function SmsMarketingHub() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-2">ارائه‌دهنده وب‌سرویس پیامک</label>
+              <label className="block text-xs font-bold text-slate-700 mb-2">روش و ارائه‌دهنده ارسال پیامک</label>
               <select
                 value={config.provider}
                 onChange={e => setConfig({ ...config, provider: e.target.value as SmsProvider })}
                 className="w-full p-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:outline-none"
               >
+                <option value="ANDROID_DEVICE">📱 برنامه پیامک گوشی اندروید (سیم‌کارت - رایگان و بدون وب‌سرویس)</option>
                 <option value="KAVEHNEGAR">کاوه‌نگار (Kavehnegar API)</option>
                 <option value="MELLI_SMS">ملی‌پیامک (MelliSMS)</option>
                 <option value="SMS_IR">سامانه پیامک ایران (SMS.ir)</option>
                 <option value="FARAPAYAMAK">فراپیامک (Farapayamak)</option>
                 <option value="CUSTOM_REST">وب‌سرویس دلخواه / REST Webhook</option>
               </select>
+              {config.provider === 'ANDROID_DEVICE' && (
+                <p className="text-[11px] text-emerald-600 font-bold mt-1.5 bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                  ✓ در این حالت پیامک‌ها مستقیماً با برنامه پیام‌رسان گوشی همراه یا سیم‌کارت ارسال می‌شوند و نیازی به خرید پنل یا شارژ اعتباری ندارید.
+                </p>
+              )}
             </div>
 
             <div>

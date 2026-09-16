@@ -17,6 +17,7 @@ import { NumberInput, JalaliDatePicker, ConfirmModal, FullScreenSignatureModal }
 import { PrintTemplate } from '../components/PrintTemplates';
 import { simpleSignatureService } from '../services/simpleSignatureService';
 import { OfflineOcrEngine } from '../services/offlineOcrEngine';
+import { CameraService } from '../services/cameraService';
 import JalaliDueCalendar from '../components/JalaliDueCalendar';
 
 const STATUS_CONFIG: any = {
@@ -250,6 +251,29 @@ ${url}
           } catch {}
       } catch (err) {
           console.error("Error reading check image file:", err);
+      }
+  };
+
+  const handleRowCameraCapture = async (idx: number) => {
+      try {
+          const b64 = await CameraService.capturePhoto({ quality: 90 });
+          if (b64) {
+              const updated = [...batchChecks];
+              updated[idx].imageUrl = b64;
+              setBatchChecks(updated);
+
+              try {
+                  const res = await OfflineOcrEngine.processCheckOffline(b64);
+                  const refreshed = [...updated];
+                  if (res.sayadId && !refreshed[idx].sayadId) refreshed[idx].sayadId = res.sayadId;
+                  if (res.amount && !refreshed[idx].amount) refreshed[idx].amount = res.amount;
+                  if (res.bankName && !refreshed[idx].bankName) refreshed[idx].bankName = res.bankName;
+                  if (res.dueDate && !refreshed[idx].dueDate) refreshed[idx].dueDate = res.dueDate;
+                  setBatchChecks(refreshed);
+              } catch {}
+          }
+      } catch (err) {
+          console.error("Camera capture error:", err);
       }
   };
 
@@ -736,19 +760,15 @@ ${url}
                                                 />
                                             </label>
                                             {/* Camera Scan Button */}
-                                            <label className="cursor-pointer bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 hover:text-white px-3 py-1.5 rounded-xl border border-indigo-500/30 text-xs font-bold flex items-center gap-1.5 transition-all">
+                                            <button 
+                                                type="button"
+                                                onClick={() => handleRowCameraCapture(idx)}
+                                                className="cursor-pointer bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 hover:text-white px-3 py-1.5 rounded-xl border border-indigo-500/30 text-xs font-bold flex items-center gap-1.5 transition-all"
+                                                title="تصویربرداری مستقیم با دوربین یا اسکنر"
+                                            >
                                                 <Camera size={13} className="text-indigo-400"/>
                                                 <span>اسکن با دوربین</span>
-                                                <input 
-                                                    type="file" 
-                                                    accept="image/*" 
-                                                    capture="environment" 
-                                                    className="hidden" 
-                                                    onChange={e => {
-                                                        if (e.target.files?.[0]) handleRowImageUpload(idx, e.target.files[0]);
-                                                    }} 
-                                                />
-                                            </label>
+                                            </button>
                                         </div>
                                     )}
 

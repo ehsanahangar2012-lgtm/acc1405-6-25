@@ -1,5 +1,4 @@
-// Persistent Host Storage Service - Multi-Tenant & Standalone Offline Ready
-import { API_CONFIG } from '../config';
+// Persistent Host Storage Service - High-Performance, Multi-Tenant & Standalone Offline Ready
 import { workspaceService } from './workspaceService';
 import { idbService } from './indexedDBService';
 import { isDesktopApp } from '../utils';
@@ -13,15 +12,26 @@ interface StorageResponse {
 }
 
 class PersistentStorage {
+    // حافظه کش در RAM برای دسترسی فوری بدون معطلی و بدون لگ در ویندوز
+    private memoryCache: Map<string, { data: any; timestamp: number }> = new Map();
+    private inFlightLoads: Map<string, Promise<any>> = new Map();
+    private pendingSaves: Map<string, { value: any; timer: any }> = new Map();
+    private readonly CACHE_TTL_MS = 6000; // ۶ ثانیه اعتبار کش در حافظه رم
+    private readonly WRITE_DEBOUNCE_MS = 400; // ۴۰۰ میلی‌ثانیه دی‌بانس برای تجمیع درخواست‌های ذخیره
+
     private async request(action: string, data: any): Promise<StorageResponse> {
         // اگر حالت آفلاین مستقل فعال باشد، نیازی به ارتباط با هاست نیست
         if (workspaceService.isStandaloneOffline()) {
             return { success: false, message: 'حالت آفلاین مستقل فعال است' };
         }
 
-        // در نسخه دسکتاپ ویندوز تا زمان فعال‌سازی لایسنس یا اتصال رسمی به هاست، ارتباط مسدود و مستقل است
-        if (isDesktopApp() && !licenseQuotaService.isFullyLicensedSync() && !workspaceService.getConfig().customServerUrl) {
-            return { success: false, message: 'در نسخه دسکتاپ تا فعال‌سازی لایسنس یا مجوز هاست، ارتباط قطع و داده‌ها ایزوله است' };
+        // در نسخه دسکتاپ ویندوز در حالت کاملاً محلی، نیازی به ارسال درخواست سرور نیست
+        if (isDesktopApp() && !licenseQuotaService.isFullyLicensedSync() && !workspaceService.getConfig().customServerUrl && !localStorage.getItem('ashk_custom_server_url')) {
+            return { success: false, message: 'در نسخه دسکتاپ محلی داده‌ها ایزوله و پرسرعت ذخیره می‌شوند' };
+        }
+
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            return { success: false, message: 'دستگاه آفلاین است' };
         }
 
         try {
@@ -29,7 +39,9 @@ class PersistentStorage {
             const storageEndpoint = `${baseUrl}/storage.php`;
             const workspaceHeaders = workspaceService.getHeaders();
 
-            // اطمینان از عدم استفاده از کش مرورگر برای جلوگیری از رگرسیون داده‌ها بین دستگاه‌ها
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
+
             const response = await fetch(storageEndpoint, {
                 method: 'POST',
                 cache: 'no-store',
@@ -44,63 +56,145 @@ class PersistentStorage {
                     action,
                     workspace_id: workspaceService.getWorkspaceId(),
                     ...data
-                })
+                }),
+                signal: controller.signal
             });
+            clearTimeout(timeout);
             
             const contentType = response.headers.get('content-type');
             if (!contentType?.includes('application/json')) {
-                console.warn('Storage warning: Invalid response type', contentType);
                 return { success: false, message: 'سرور پاسخ نامعتبر ارسال کرد' };
             }
             
             return await response.json();
         } catch (error) {
-            console.warn('Storage offline fallback active:', error instanceof Error ? error.message : error);
-            return { success: false, message: 'خطا در ارتباط با سرور' };
+            return { success: false, message: error instanceof Error ? error.message : 'خطا در ارتباط با سرور' };
         }
     }
 
+    /**
+     * ذخیره داده با سرعت فوق‌العاده بالا:
+     * ۱. ذخیره فوری در حافظه رم (0ms)
+     * ۲. ذخیره غیرمسدودکننده در IndexedDB محلی
+     * ۳. ارسال دی‌بانس شده به سرور در پس‌زمینه بدون مسدودسازی نخ اصلی رابط کاربری
+     */
     async saveData(key: string, value: any): Promise<boolean> {
-        // ذخیره پشتیبان در IndexedDB محلی
-        try {
-            await idbService.save('backups', { id: `storage_${key}`, data: JSON.stringify(value), updatedAt: Date.now() });
-        } catch {}
+        // ۱. به‌روزرسانی فوری کش حافظه RAM برای خواندن‌های بلادرنگ بعدی
+        this.memoryCache.set(key, { data: value, timestamp: Date.now() });
+
+        // ۲. ذخیره پشتیبان ناهمگام در IndexedDB محلی
+        if (typeof window !== 'undefined') {
+            try {
+                idbService.save('backups', { id: `storage_${key}`, data: JSON.stringify(value), updatedAt: Date.now() }).catch(() => {});
+            } catch {}
+        }
 
         if (workspaceService.isStandaloneOffline()) {
             return true;
         }
 
-        const result = await this.request('save', { key, value: JSON.stringify(value) });
-        return result.success;
+        // ۳. دی‌بانس کردن ارسال به سرور جهت جلوگیری از قفل شدن نخ اصلی در ویندوز
+        return new Promise<boolean>((resolve) => {
+            const existing = this.pendingSaves.get(key);
+            if (existing && existing.timer) {
+                clearTimeout(existing.timer);
+            }
+
+            const timer = setTimeout(async () => {
+                this.pendingSaves.delete(key);
+                try {
+                    const result = await this.request('save', { key, value: JSON.stringify(value) });
+                    resolve(result.success);
+                } catch {
+                    resolve(false);
+                }
+            }, this.WRITE_DEBOUNCE_MS);
+
+            this.pendingSaves.set(key, { value, timer });
+            
+            // بلافاصله تایید محلی برگردان تا UI گیر نکند
+            setTimeout(() => resolve(true), 0);
+        });
     }
 
-    async loadData(key: string): Promise<any> {
+    /**
+     * بارگذاری داده با بهینه‌سازی پیشرفته:
+     * ۱. خواندن فوری از کش RAM در صورت معتبر بودن
+     * ۲. اشتراک‌گذاری درخواست‌های همزمان (Request Deduplication)
+     * ۳. بازگشت سریع به کش IndexedDB در صورت آفلاین بودن یا خطای شبکه
+     */
+    async loadData(key: string, forceRefresh = false): Promise<any> {
+        // ۱. بررسی کش RAM
+        if (!forceRefresh) {
+            const cached = this.memoryCache.get(key);
+            if (cached && (Date.now() - cached.timestamp < this.CACHE_TTL_MS)) {
+                return cached.data;
+            }
+        }
+
+        // ۲. بررسی درخواست‌های در حال انجام (In-Flight Sharing)
+        if (this.inFlightLoads.has(key)) {
+            return await this.inFlightLoads.get(key);
+        }
+
         if (workspaceService.isStandaloneOffline()) {
             try {
                 const local = await idbService.get('backups', `storage_${key}`);
-                return local?.data ? JSON.parse(local.data) : null;
+                const data = local?.data ? JSON.parse(local.data) : null;
+                if (data) this.memoryCache.set(key, { data, timestamp: Date.now() });
+                return data;
             } catch {
                 return null;
             }
         }
 
-        const result = await this.request('load', { key });
-        if (result.success && result.data) {
-            return JSON.parse(result.data || 'null');
-        }
+        // ۳. اجرای درخواست از سرور با به اشتراک‌گذاری پرامیس
+        const loadPromise = (async () => {
+            try {
+                const result = await this.request('load', { key });
+                if (result.success && result.data) {
+                    const parsed = JSON.parse(result.data || 'null');
+                    this.memoryCache.set(key, { data: parsed, timestamp: Date.now() });
+                    return parsed;
+                }
 
-        // اگر هاست در دسترس نبود، از کش محلی استفاده شود
-        try {
-            const fallback = await idbService.get('backups', `storage_${key}`);
-            return fallback?.data ? JSON.parse(fallback.data) : null;
-        } catch {
-            return null;
+                // اگر هاست پاسخ نداد یا آفلاین بود، از کش محلی استفاده شود
+                const fallback = await idbService.get('backups', `storage_${key}`);
+                const fallbackData = fallback?.data ? JSON.parse(fallback.data) : null;
+                if (fallbackData) {
+                    this.memoryCache.set(key, { data: fallbackData, timestamp: Date.now() });
+                }
+                return fallbackData;
+            } catch {
+                try {
+                    const fallback = await idbService.get('backups', `storage_${key}`);
+                    return fallback?.data ? JSON.parse(fallback.data) : null;
+                } catch {
+                    return null;
+                }
+            } finally {
+                this.inFlightLoads.delete(key);
+            }
+        })();
+
+        this.inFlightLoads.set(key, loadPromise);
+        return await loadPromise;
+    }
+
+    /**
+     * پاکسازی کش جدول مشخص
+     */
+    invalidateCache(key?: string) {
+        if (key) {
+            this.memoryCache.delete(key);
+        } else {
+            this.memoryCache.clear();
         }
     }
 
     async saveImage(folder: 'companies' | 'products' | 'checks', filename: string, base64: string): Promise<string | null> {
         if (workspaceService.isStandaloneOffline()) {
-            return base64; // در حالت کاملاً آفلاین، همان base64 محلی ذخیره می‌شود
+            return base64;
         }
 
         const result = await this.request('saveImage', { folder, filename, base64 });

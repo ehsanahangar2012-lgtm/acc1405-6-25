@@ -52,14 +52,20 @@ zip.file('QUICK_START_HOST.txt', quickDeployGuide);
 
 const targetZipPath = path.resolve('ashke-ghalam-host-package.zip');
 
-zip.generateAsync({
-    type: 'nodebuffer',
-    compression: 'DEFLATE',
-    compressionOptions: { level: 9 }
-}).then(content => {
+try {
+    const content = await zip.generateAsync({
+        type: 'nodebuffer',
+        compression: 'DEFLATE',
+        compressionOptions: { level: 9 }
+    });
+
     fs.writeFileSync(targetZipPath, content);
-    // یک کپی با نام dist.zip هم ایجاد می‌کنیم تا کاربر با هر اسمی راحت‌تر است استفاده کند
     fs.writeFileSync(path.resolve('dist.zip'), content);
+
+    if (fs.existsSync(distDir)) {
+        fs.writeFileSync(path.join(distDir, 'ashke-ghalam-host-package.zip'), content);
+        fs.writeFileSync(path.join(distDir, 'dist.zip'), content);
+    }
     
     const sizeInMB = (content.length / (1024 * 1024)).toFixed(2);
     console.log(`\n✅ فایل زیپ با موفقیت در بدنه پروژه ایجاد گردید:`);
@@ -67,7 +73,7 @@ zip.generateAsync({
     console.log(`📁 فایل جایگزین: ${path.resolve('dist.zip')}`);
     console.log(`📊 حجم بسته نهایی: ${sizeInMB} مگابایت`);
     console.log('====================================================\n');
-}).catch(err => {
+} catch (err) {
     console.error('❌ خطا در ساخت فایل ZIP:', err);
     process.exit(1);
-});
+}

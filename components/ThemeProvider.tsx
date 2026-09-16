@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useStore } from '../store';
 
 interface Theme {
   primary: string;
@@ -108,6 +109,7 @@ export const useThemeClasses = () => {
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentColor, setCurrentColor] = useState<keyof typeof themes>('blue');
+  const appTheme = useStore(state => state.config?.appTheme);
   const [currentMode, setCurrentMode] = useState<'light' | 'dark'>(() => {
     try {
       const stored = localStorage.getItem('ashke-ghalam-theme') || localStorage.getItem('theme-mode') || 'dark';
@@ -118,6 +120,18 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     } catch {}
     return 'dark';
   });
+
+  useEffect(() => {
+    if (appTheme) {
+      const mode = appTheme.toLowerCase();
+      if (mode === 'system') {
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        setCurrentMode(isDark ? 'dark' : 'light');
+      } else if (mode === 'light' || mode === 'dark') {
+        setCurrentMode(mode);
+      }
+    }
+  }, [appTheme]);
 
   const theme = themes[currentColor][currentMode];
 

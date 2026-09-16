@@ -3,9 +3,11 @@ import React, { useState, useRef } from 'react';
 import { useStore } from '../store';
 import { Transaction, InvoiceType } from '../types';
 import { generateId, getPersianDate, toPersianDigits, formatCurrency } from '../utils';
-import { Wallet, Briefcase, MinusCircle, PlusCircle, CreditCard, User, FileText, Send, Landmark, Trash2, PenTool, Eye, Share2, Printer, X, CheckCircle2, ArrowLeft, Image as ImageIcon, ShieldCheck, Scale, UserPlus } from 'lucide-react';
+import { Wallet, Briefcase, MinusCircle, PlusCircle, CreditCard, User, FileText, Send, Landmark, Trash2, PenTool, Eye, Share2, Printer, X, CheckCircle2, ArrowLeft, Image as ImageIcon, ShieldCheck, Scale, UserPlus, Camera, Upload } from 'lucide-react';
 import { NumberInput, JalaliDatePicker, FullScreenSignatureModal, ConfirmModal } from '../components/Shared';
 import { PrintTemplate } from '../components/PrintTemplates';
+import { CameraService } from '../services/cameraService';
+import { CameraGuide } from '../components/CameraGuide';
 import html2canvas from 'html2canvas';
 
 const Finance = () => {
@@ -44,6 +46,9 @@ const Finance = () => {
     const [genInvoiceId, setGenInvoiceId] = useState('');
     const [showSignaturePad, setShowSignaturePad] = useState(false);
     const [signatureImage, setSignatureImage] = useState<string | null>(null);
+    const [receiptImage, setReceiptImage] = useState<string | null>(null);
+    const [showCameraGuide, setShowCameraGuide] = useState(false);
+    const [viewReceiptModalImage, setViewReceiptModalImage] = useState<string | null>(null);
 
     // States for quick add person
     const [showAddPersonModal, setShowAddPersonModal] = useState(false);
@@ -54,6 +59,25 @@ const Finance = () => {
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
     const printRef = useRef<HTMLDivElement>(null);
+
+    const handleCameraCaptureSlip = async () => {
+        try {
+            const b64 = await CameraService.capturePhoto({ quality: 85 });
+            if (b64) setReceiptImage(b64);
+        } catch (err) {
+            console.error('Capture slip error:', err);
+            setShowCameraGuide(true);
+        }
+    };
+
+    const handleGalleryPickSlip = async () => {
+        try {
+            const b64 = await CameraService.pickPhotoFromGallery();
+            if (b64) setReceiptImage(b64);
+        } catch (err) {
+            console.error('Gallery pick slip error:', err);
+        }
+    };
 
     const handleQuickAddPerson = () => {
         if (!newPersonName.trim()) return;
@@ -103,7 +127,8 @@ const Finance = () => {
             genDesc, 
             genPersonId || undefined, 
             signatureImage || undefined,
-            genInvoiceId || undefined
+            genInvoiceId || undefined,
+            receiptImage || undefined
         );
         setSelectedTransaction(trans);
         setView('preview');
@@ -112,6 +137,7 @@ const Finance = () => {
         setGenPersonId(''); 
         setGenInvoiceId('');
         setSignatureImage(null);
+        setReceiptImage(null);
     };
 
     const handleExportImage = async () => {
@@ -148,7 +174,21 @@ const Finance = () => {
                         {selectedTransaction.signature && (
                             <div className="mt-8 text-center">
                                 <p className="text-sm text-slate-500 mb-2">امضا:</p>
-                                <img src={selectedTransaction.signature} className="h-24 mx-auto grayscale" />
+                                <img src={selectedTransaction.signature} className="h-24 mx-auto grayscale" alt="امضا" />
+                            </div>
+                        )}
+                        {selectedTransaction.receiptImage && (
+                            <div className="mt-8 border-t border-slate-200 pt-6 text-center">
+                                <p className="text-sm font-black text-slate-700 mb-3 flex items-center justify-center gap-1.5">
+                                    <ImageIcon size={16} className="text-indigo-600" />
+                                    تصویر پیوست فیش بانکی / عکس حواله:
+                                </p>
+                                <img 
+                                    src={selectedTransaction.receiptImage} 
+                                    alt="پیوست سند" 
+                                    className="max-h-72 max-w-md mx-auto rounded-xl border border-slate-300 shadow-md object-contain cursor-pointer hover:opacity-95" 
+                                    onClick={() => setViewReceiptModalImage(selectedTransaction.receiptImage!)}
+                                />
                             </div>
                         )}
                     </div>
@@ -304,6 +344,55 @@ const Finance = () => {
                                     })()}
                                 </div>
                                 <div>
+                                    <div className="flex items-center justify-between mb-1.5 pr-2">
+                                        <label className="text-xs text-slate-400 font-bold">تصویر فیش واریزی / عکس حواله</label>
+                                        {receiptImage && (
+                                            <button 
+                                                type="button" 
+                                                onClick={() => setReceiptImage(null)} 
+                                                className="text-[10px] text-rose-400 hover:text-rose-300 font-bold flex items-center gap-1"
+                                            >
+                                                <Trash2 size={12} /> حذف تصویر
+                                            </button>
+                                        )}
+                                    </div>
+                                    
+                                    {receiptImage ? (
+                                        <div className="relative group rounded-xl overflow-hidden border border-white/10 bg-black/40 p-2 flex items-center justify-center">
+                                            <img src={receiptImage} alt="فیش حواله" className="max-h-36 rounded-lg object-contain" />
+                                            <button
+                                                type="button"
+                                                onClick={() => setViewReceiptModalImage(receiptImage)}
+                                                className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1.5 text-white text-xs font-bold transition-opacity"
+                                            >
+                                                <Eye size={16} /> بزرگنمایی تصویر
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button 
+                                                type="button" 
+                                                onClick={handleCameraCaptureSlip} 
+                                                className="p-3 rounded-xl bg-teal-500/10 hover:bg-teal-500/20 border border-teal-500/20 text-teal-300 flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                                                title="تصویربرداری مستقیم با دوربین گوشی یا سیستم"
+                                            >
+                                                <Camera size={18} className="text-teal-400" />
+                                                <span className="text-[11px] font-bold">عکس با دوربین</span>
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                onClick={handleGalleryPickSlip} 
+                                                className="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-white/5 text-slate-300 flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                                                title="انتخاب از گالری تصاویر یا فایل"
+                                            >
+                                                <ImageIcon size={18} className="text-indigo-400" />
+                                                <span className="text-[11px] font-bold">انتخاب از گالری</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div>
                                     <label className="text-xs text-slate-400 font-bold pr-2 mb-1.5 block">امضا</label>
                                     <button onClick={() => setShowSignaturePad(true)} className="w-full h-24 rounded-xl bg-black/40 border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-1 text-slate-500">
                                         {signatureImage ? <img src={signatureImage} className="h-full w-full object-contain p-2 grayscale" /> : <><PenTool size={18}/><span className="text-xs font-bold">ثبت امضا</span></>}
@@ -328,7 +417,20 @@ const Finance = () => {
                                             {t.isDebit ? <MinusCircle size={18}/> : <PlusCircle size={18}/>}
                                         </div>
                                         <div className="min-w-0 flex-1">
-                                            <div className="text-white font-bold text-sm truncate">{t.description}</div>
+                                            <div className="flex items-center gap-2">
+                                                <div className="text-white font-bold text-sm truncate">{t.description}</div>
+                                                {t.receiptImage && (
+                                                    <button 
+                                                        type="button"
+                                                        onClick={() => setViewReceiptModalImage(t.receiptImage!)}
+                                                        className="px-2 py-0.5 rounded-md bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 text-[10px] font-bold flex items-center gap-1 border border-teal-500/30 shrink-0 transition-colors"
+                                                        title="مشاهده فیش پیوست"
+                                                    >
+                                                        <Camera size={11} />
+                                                        فیش پیوست
+                                                    </button>
+                                                )}
+                                            </div>
                                             <div className="flex gap-2 text-[10px] text-slate-500 font-mono">
                                                 <span>{toPersianDigits(t.trackingCode)}</span>
                                                 <span>{toPersianDigits(t.date)}</span>
@@ -351,6 +453,45 @@ const Finance = () => {
 
             <ConfirmModal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} onConfirm={() => { deleteTransaction(deleteTarget!); setDeleteTarget(null); }} title="حذف سند" message="آیا مطمئن هستید؟" />
             <FullScreenSignatureModal isOpen={showSignaturePad} onClose={() => setShowSignaturePad(false)} onSave={setSignatureImage} />
+
+            {/* --- CAMERA GUIDE MODAL --- */}
+            {showCameraGuide && (
+                <CameraGuide
+                    title="ثبت عکس فیش بانکی یا حواله"
+                    description="فیش بانکی یا رسید حواله را در کادر قرار دهید"
+                    onCapture={(b64) => {
+                        setReceiptImage(b64);
+                        setShowCameraGuide(false);
+                    }}
+                    onClose={() => setShowCameraGuide(false)}
+                />
+            )}
+
+            {/* --- RECEIPT IMAGE LIGHTBOX MODAL --- */}
+            {viewReceiptModalImage && (
+                <div className="fixed inset-0 z-[9900] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 no-print animate-fade-in" dir="rtl">
+                    <div className="relative max-w-2xl w-full bg-slate-900 border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-4 flex flex-col items-center">
+                        <div className="w-full flex items-center justify-between mb-3 pb-2 border-b border-white/10">
+                            <span className="text-white text-xs font-bold flex items-center gap-1.5">
+                                <ImageIcon size={16} className="text-teal-400" />
+                                تصویر فیش بانکی / حواله
+                            </span>
+                            <button 
+                                type="button"
+                                onClick={() => setViewReceiptModalImage(null)}
+                                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <img 
+                            src={viewReceiptModalImage} 
+                            alt="تصویر فیش حواله" 
+                            className="max-h-[70vh] w-auto max-w-full rounded-xl object-contain shadow-lg" 
+                        />
+                    </div>
+                </div>
+            )}
 
             {/* --- QUICK ADD PERSON/EMPLOYEE MODAL --- */}
             {showAddPersonModal && (

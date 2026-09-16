@@ -13,10 +13,14 @@ import {
     Gift, 
     ArrowUpRight,
     Volume2,
-    CheckCircle2
+    CheckCircle2,
+    Monitor,
+    Smartphone,
+    Globe
 } from 'lucide-react';
-import { isDesktopApp } from '../utils';
+import { isDesktopApp, isAndroidApp, getAppPlatform } from '../utils';
 import { persistentStorage } from '../services/persistentStorage';
+import { PlatformContentService } from '../services/platformContentService';
 
 export interface NewsBroadcastItem {
     id: string;
@@ -28,53 +32,115 @@ export interface NewsBroadcastItem {
     linkUrl?: string;
     linkText?: string;
     isImportant?: boolean;
+    platform?: 'all' | 'windows' | 'android' | 'web';
 }
 
-const DEFAULT_DESKTOP_NEWS: NewsBroadcastItem[] = [
-    {
-        id: 'news-1',
-        title: 'همگام‌سازی ابری و امضای دیجیتال سامانه مالی اشک قلم',
-        message: 'قابلیت همگام‌سازی لحظه‌ای داده‌ها با پایگاه داده هاست و کارکرد آفلاین پایدار در دسترس است.',
-        type: 'UPDATE',
-        senderName: 'بخش IT اشک قلم | www.ashkghalam.ir',
-        date: 'امروز',
-        isImportant: true
+const getDefaultPlatformNews = (): NewsBroadcastItem[] => {
+    const platform = getAppPlatform();
+    const details = PlatformContentService.getDetails(platform);
+
+    if (platform === 'windows') {
+        return [
+            {
+                id: 'news-win-1',
+                title: 'بهینه‌سازی سرعت فوق‌سریع در نسخه ویندوز دسکتاپ',
+                message: 'عملکرد نرم‌افزار در حالت متصل و آفلاین با حافظه کش RAM و ذخیره‌سازی غیرمسدودکننده بهینه‌سازی شد. سرعت اجرای برنامه‌ها به حداکثر رسیده است.',
+                type: 'UPDATE',
+                senderName: 'پشتیبانی فنی اشک قلم — دسکتاپ ویندوز',
+                date: 'امروز',
+                isImportant: true,
+                platform: 'windows'
+            },
+            {
+                id: 'news-win-2',
+                title: 'کلیدهای میانبر سریع ویندوز',
+                message: 'با کلیدهای Alt+1 (پیشخوان) تا Alt+6 (اشخاص) و Alt+7 (گزارشات) با نهایت سرعت بین بخش‌های مختلف جابجا شوید.',
+                type: 'NOTICE',
+                senderName: 'راهنمای کاربری ویندوز',
+                date: 'امروز',
+                isImportant: false,
+                platform: 'windows'
+            }
+        ];
+    } else if (platform === 'android') {
+        return [
+            {
+                id: 'news-and-1',
+                title: 'ارسال مستقیم پیامک با سیم‌کارت گوشی اندروید',
+                message: 'در نسخه همراه اندروید، فاکتورها و صورتحساب‌ها را مستقیماً با سیم‌کارت داخلی گوشی و بدون نیاز به خرید اعتبار پیامکی برای مشتریان ارسال فرمایید.',
+                type: 'UPDATE',
+                senderName: 'واحد موبایل اشک قلم',
+                date: 'امروز',
+                isImportant: true,
+                platform: 'android'
+            },
+            {
+                id: 'news-and-2',
+                title: 'اسکنر بارکد با دوربین تلفن همراه',
+                message: 'در بخش انبار و صدور فاکتور با لمس دکمه دوربین، بارکد کالاها را به سرعت اسکن و ثبت نمایید.',
+                type: 'NOTICE',
+                senderName: 'راهنمای اندروید',
+                date: 'امروز',
+                isImportant: false,
+                platform: 'android'
+            }
+        ];
+    } else {
+        return [
+            {
+                id: 'news-web-1',
+                title: 'سامانه ابری و وب‌سرویس یکپارچه مالی اشک قلم',
+                message: 'پایگاه داده متمرکز، پشتیبان‌گیری خودکار ابری، تعریف دسترسی کاربران و اتصال یکپارچه با اپلیکیشن اندروید و ویندوز فعال است.',
+                type: 'UPDATE',
+                senderName: 'مرکز سرور و هاست اشک قلم',
+                date: 'امروز',
+                isImportant: true,
+                platform: 'web'
+            }
+        ];
     }
-];
+};
 
 export const DesktopNewsBanner: React.FC = () => {
-    const [newsList, setNewsList] = useState<NewsBroadcastItem[]>(DEFAULT_DESKTOP_NEWS);
+    const [newsList, setNewsList] = useState<NewsBroadcastItem[]>(getDefaultPlatformNews());
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isDismissed, setIsDismissed] = useState(false);
     const [isPaused, setIsPaused] = useState(false);
     const [selectedNews, setSelectedNews] = useState<NewsBroadcastItem | null>(null);
 
-    const isDesktop = isDesktopApp();
+    const platform = getAppPlatform();
 
     const fetchAnnouncements = async () => {
         try {
-            // ۱. اولویت نخست: فراخوانی از persistentStorage سرور
             const remote = await persistentStorage.loadData('announcements');
             const source = (Array.isArray(remote) && remote.length > 0) 
                 ? remote 
                 : JSON.parse(localStorage.getItem('ashk_server_broadcasts') || '[]');
 
             if (Array.isArray(source) && source.length > 0) {
-                const mapped: NewsBroadcastItem[] = source.map((item: any, idx: number) => ({
-                    id: item.id || `bc-${idx}`,
-                    title: item.title || 'اطلاعیه سامانه',
-                    message: item.message || item.content || '',
-                    type: item.type === 'DISCOUNT' ? 'DISCOUNT' : item.type === 'ALERT' ? 'ALERT' : item.type === 'UPDATE' ? 'UPDATE' : 'NOTICE',
-                    senderName: item.author || item.senderName || 'بخش IT اشک قلم | www.ashkghalam.ir',
-                    date: item.date || item.createdAt || 'اخیر',
-                    linkUrl: item.linkUrl,
-                    linkText: item.linkText,
-                    isImportant: !!item.isImportant
-                }));
-                setNewsList(mapped);
+                const currentPlat = getAppPlatform();
+                const filtered = source.filter((item: any) => !item.platform || item.platform === 'all' || item.platform === currentPlat);
+                
+                if (filtered.length > 0) {
+                    const mapped: NewsBroadcastItem[] = filtered.map((item: any, idx: number) => ({
+                        id: item.id || `bc-${idx}`,
+                        title: item.title || 'اطلاعیه سامانه',
+                        message: item.message || item.content || '',
+                        type: item.type === 'DISCOUNT' ? 'DISCOUNT' : item.type === 'ALERT' ? 'ALERT' : item.type === 'UPDATE' ? 'UPDATE' : 'NOTICE',
+                        senderName: item.author || item.senderName || 'پشتیبانی سامانه اشک قلم',
+                        date: item.date || item.createdAt || 'امروز',
+                        linkUrl: item.linkUrl,
+                        linkText: item.linkText,
+                        isImportant: !!item.isImportant,
+                        platform: item.platform || 'all'
+                    }));
+                    setNewsList(mapped);
+                    return;
+                }
             }
+            setNewsList(getDefaultPlatformNews());
         } catch (e) {
-            console.warn('Failed to load news banner items:', e);
+            setNewsList(getDefaultPlatformNews());
         }
     };
 
@@ -91,12 +157,12 @@ export const DesktopNewsBanner: React.FC = () => {
         };
     }, []);
 
-    // چرخش خودکار پیام‌ها هر ۷ ثانیه
+    // چرخش خودکار پیام‌ها هر ۸ ثانیه
     useEffect(() => {
         if (isPaused || newsList.length <= 1 || isDismissed) return;
         const interval = setInterval(() => {
             setCurrentIndex(prev => (prev + 1) % newsList.length);
-        }, 7000);
+        }, 8000);
         return () => clearInterval(interval);
     }, [isPaused, newsList.length, isDismissed]);
 
@@ -144,7 +210,6 @@ export const DesktopNewsBanner: React.FC = () => {
                 dir="rtl"
             >
                 <div className="px-4 py-2.5 flex items-center justify-between gap-3">
-                    {/* برچسب دسته‌بندی و عنوان خبر */}
                     <div className="flex items-center gap-2.5 overflow-hidden flex-1 min-w-0">
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-bold border shrink-0 ${badge.bg}`}>
                             {badge.icon}
@@ -163,7 +228,6 @@ export const DesktopNewsBanner: React.FC = () => {
                         </button>
                     </div>
 
-                    {/* دکمه‌های کنترل اسلاید و اقدامات */}
                     <div className="flex items-center gap-1.5 shrink-0">
                         {newsList.length > 1 && (
                             <div className="flex items-center gap-0.5 bg-slate-950/60 border border-slate-800 rounded-xl px-1 py-0.5">
@@ -194,7 +258,7 @@ export const DesktopNewsBanner: React.FC = () => {
                             onClick={() => setSelectedNews(currentItem)}
                             className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/30 rounded-xl text-[11px] font-bold transition cursor-pointer"
                         >
-                            <span>مطالعه متن کامل</span>
+                            <span>مطالعه کامل</span>
                             <ArrowUpRight size={12} />
                         </button>
 
@@ -210,7 +274,6 @@ export const DesktopNewsBanner: React.FC = () => {
                 </div>
             </div>
 
-            {/* پنجره پاپ‌آپ متن کامل خبر */}
             {selectedNews && (
                 <div 
                     className="fixed inset-0 z-[999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
@@ -249,7 +312,7 @@ export const DesktopNewsBanner: React.FC = () => {
 
                         <div className="flex items-center justify-between pt-2">
                             <span className="text-xs text-slate-400">
-                                فرستنده: <strong className="text-slate-200">{selectedNews.senderName || 'پشتیبانی نرم‌افزار'}</strong>
+                                مرجع: <strong className="text-slate-200">{selectedNews.senderName || 'سامانه حسابداری اشک قلم'}</strong>
                             </span>
                             <button
                                 type="button"

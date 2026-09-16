@@ -5,14 +5,16 @@ import {
     Terminal, Download, CheckCircle2, Copy, RefreshCw, Layers, ArrowLeftRight,
     HardDrive, Cpu, Code, Calculator, CheckSquare, Sparkles, Scale, Landmark,
     CreditCard, Network, AlertCircle, ArrowRight, ChevronDown, ChevronUp, Search,
-    PhoneCall, Send, Headphones
+    PhoneCall, Send, Headphones, Globe
 } from 'lucide-react';
-import { getPersianDate, toPersianDigits, isDesktopApp } from '../utils';
+import { getPersianDate, toPersianDigits, isDesktopApp, getAppPlatform } from '../utils';
+import { PlatformContentService } from '../services/platformContentService';
 
 export const Help = () => {
     const isDesktop = isDesktopApp();
-    const [activeTab, setActiveTab] = useState<'accounting-guide' | 'modules' | 'shortcuts' | 'faq'>(
-        'accounting-guide'
+    const currentPlatform = getAppPlatform();
+    const [activeTab, setActiveTab] = useState<'platform' | 'accounting-guide' | 'modules' | 'shortcuts' | 'faq'>(
+        'platform'
     );
     const [expandedModule, setExpandedModule] = useState<string | null>('invoices');
     const [searchQuery, setSearchQuery] = useState('');
@@ -58,161 +60,126 @@ export const Help = () => {
             color: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
             summary: 'مدیریت چک‌های دریافتی و پرداختی با کد صیاد ۱۶ رقمی، خواباندن به حساب، وصول، خرج چک، استعلام شناسه صیادی و هشدار موعد سررسید.',
             steps: [
-                '۱. چک‌های دریافتی یا صادره را با شناسه صیادی، تاریخ سررسید، مبلغ و بانک ثبت کنید.',
-                '۲. وضعیت هر چک را می‌توانید به «نزد صندوق»، «در جریان وصول»، «وصول‌شده»، «خرج‌شده» یا «برگشتی» تغییر دهید.',
-                '۳. در صورت خواباندن چک به حساب بانکی، سند حسابداری انتقال از صندوق به بانک خودکار صادر می‌شود.',
-                '۴. در پیشخوان روزانه، چک‌های سررسید امروز و روزهای آینده به رنگ برجسته هشدار داده می‌شوند.'
+                '۱. در بخش چک‌ها، چک جدید را با شناسه صیادی، نام بانک، مبلغ و تاریخ سررسید ثبت کنید.',
+                '۲. سیستم ۳ روز قبل از موعد سررسید در پیشخوان و لیست چک‌ها وضعیت زرد هشدار را نمایش می‌دهد.',
+                '۳. در صورت وصول چک، روی دکمه «وصول» کلیک کنید تا سند حسابداری و افزایش موجودی بانک خودکار ثبت شود.',
+                '۴. قابلیت انتقال چک به شخص ثالث (خرج چک) با یک کلیک و ثبت زنجیره انتقال فراهم است.'
             ],
-            tip: 'نکته طلایی: با ثبت چک در بخش تسویه فاکتور، وضعیت حساب مشتری و شماره چک مستقیماً به فاکتور متصل می‌گردد.'
+            tip: 'نکته طلایی: وضعیت چک به صورت اتوماتیک در گزارش گردش حساب شخص و تراز مالی منعکس می‌گردد.'
         },
         {
-            id: 'moadian',
-            title: 'سامانه مؤدیان و کارپوشه مالیاتی (Moadian Tax Hub)',
-            icon: Calculator,
-            color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-            summary: 'ارسال آنلاین صورتحساب‌های الکترونیکی به سامانه امور مالیاتی با الگوریتم ورهوف، کلید خصوصی RSA، شناسه حافظه مالیاتی و استعلام وضعیت صورتحساب.',
-            steps: [
-                '۱. در منوی سامانه مؤدیان، شناسه یکتای حافظه مالیاتی و کلید خصوصی شرکت را وارد کنید.',
-                '۲. فاکتورهای فروش تأیید شده را با شناسه کالا و خدمات مالیاتی (۱۳ رقمی) تطبیق دهید.',
-                '۳. با کلیک روی «ارسال به کارپوشه مالیاتی»، صورتحساب با الگوریتم ورهوف رمزنگاری و به سازمان ارسال می‌شود.',
-                '۴. شناسه ۲۲ رقمی مالیاتی اختصاص یافته و وضعیت تأیید/ابطال در جدول زنده نمایش می‌یابد.'
-            ],
-            tip: 'نکته طلایی: سیستم به طور خودکار شماره منحصر به فرد مالیاتی ۲۲ رقمی را مطابق آخرین استاندارد ۱۴۰۳ تولید می‌کند.'
-        },
-        {
-            id: 'pos',
-            title: 'کارتخوان بانکی متصل به کامپیوتر (PC-POS)',
-            icon: CreditCard,
+            id: 'finance',
+            title: 'اسناد دوبل، دریافت/پرداخت و دفاتر (General Ledger)',
+            icon: Landmark,
             color: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
-            summary: 'ارسال خودکار مبلغ فاکتور به کارتخوان‌های سداد، به‌پرداخت، سامان‌کیش، پاسارگاد و ایران‌کیش جهت حذف خطای انسانی و تسویه فوق‌سریع.',
+            summary: 'صدور اسناد دوبل با رعایت بالانس بدهکار/بستانکار، مدیریت حساب‌های بانکی و صندوق‌ها، کدینگ کل/معین/تفصیلی و تراز آزمایشی.',
             steps: [
-                '۱. در منوی کارتخوان بانکی (PC-POS)، مدل PSP و پورت اتصال (LAN یا کابل سریال COM) را تنظیم کنید.',
-                '۲. در زمان صدور فاکتور یا دریافت وجه، دکمه «ارسال به کارتخوان» را فشار دهید.',
-                '۳. مشتری کارت می‌کشد و رمز را وارد می‌کند؛ پس از موفقیت، شماره پیگیری و ارجاع در فاکتور ثبت می‌شود.'
+                '۱. تمامی فاکتورها و دریافت/پرداخت‌ها به طور خودکار سند دوبل متناظر را ایجاد می‌کنند.',
+                '۲. برای ثبت هزینه‌های جاری (اجاره، حقوق، آب و برق)، از منوی امور مالی «ثبت هزینه/دریافت» را انتخاب فرمایید.',
+                '۳. در بخش تراز آزمایشی می‌توانید برابری گردش بدهکار و بستانکار کل و معین را در هر بازه زمانی ارزیابی کنید.'
             ],
-            tip: 'نکته طلایی: نیازی به وارد کردن دستی مبلغ توسط صندوق‌دار نیست و خطر اشتباه در صفرهای مبلغ به صفر می‌رسد.'
+            tip: 'نکته طلایی: موتور انطباق مالی از ثبت اسناد ناتراز جلوگیری می‌کند تا ترازنامه شما همواره استاندارد و دقیق باشد.'
         },
         {
-            id: 'backup-lan',
-            title: 'گاوصندوق ابری و شبکه محلی چندکاربره (Cloud & LAN)',
-            icon: Cloud,
-            color: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
-            summary: 'پشتیبان‌گیری رمزنگاری‌شده روزانه و کار همزمان چند کاربر در فروشگاه با قفل هوشمند اسناد جهت پیشگیری از بازنویسی داده‌ها.',
+            id: 'customers',
+            title: 'اشخاص، مشتریان و پرونده مالی (CRM & Ledger)',
+            icon: Users,
+            color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+            summary: 'ثبت اطلاعات هویتی و مالیاتی اشخاص، سقف اعتبار، ریز صورتحساب طرف‌حساب، ارسال پیامک مانده و لینک پرداخت.',
             steps: [
-                '۱. در منوی گاوصندوق ابری (Cloud Vault)، پشتیبان‌گیری خودکار روزانه را فعال کنید تا همواره نسخه امن ذخیره شود.',
-                '۲. در محیط‌های با چند سیستم، از ماژول «شبکه محلی چندکاربره» جهت همگام‌سازی لحظه‌ای استفاده فرمایید.',
-                '۳. سیستم به طور خودکار قفل ویرایش روی فاکتور در حال تغییر قرار می‌دهد تا از تداخل چند کاربر جلوگیری شود.'
+                '۱. اشخاص را در دسته‌های مشتری، تأمین‌کننده، یا پرسنل با کد اقتصادی/ملی تعریف کنید.',
+                '۲. برای هر مشتری سقف اعتبار تعیین کنید تا در صورت بدهی بیش از حد مجاز، سیستم هشدار دهد.',
+                '۳. با فشردن دکمه «پرونده مالی»، کاردکس ریز خریدها، واریزی‌ها و مانده نهایی شخص را در قالب PDF چاپ یا ارسال کنید.'
             ],
-            tip: 'نکته طلایی: در حالت آفلاین کامل نیز تمامی تراکنش‌ها ثبت شده و به محض اتصال شبکه خودکار همگام می‌گردند.'
+            tip: 'نکته طلایی: ارسال صورتحساب به صورت لینک آنلاین از طریق پیامک یا واتساپ برای مشتری مقدور است.'
         }
     ];
 
     const shortcutsList = [
-        { key: 'Alt + 1', desc: 'انتقال سریع به پیشخوان مدیریتی (Dashboard)' },
-        { key: 'Alt + 2', desc: 'صدور و مدیریت فاکتورهای فروش و خرید' },
-        { key: 'Alt + 3', desc: 'انبارداری، کاردکس و کنترل موجودی کالاها' },
-        { key: 'Alt + 4', desc: 'خزانه‌داری و مدیریت چک‌های صیادی' },
-        { key: 'Alt + 5', desc: 'مدیریت اشخاص، طرف‌حساب‌ها و بدهکار/بستانکار' },
-        { key: 'Alt + 6', desc: 'گزارشات جامع سود و زیان، دفاتر و ترازنامه' },
-        { key: 'Alt + 7', desc: 'دستیار هوش مصنوعی تحلیل مالی' },
-        { key: 'Alt + 8', desc: 'مدیریت کاربران و سطوح دسترسی (RBAC)' },
-        { key: 'Alt + 9', desc: 'تنظیمات عمومی، شرکت و سال مالی' },
-        { key: 'Alt + S', desc: 'ذخیره و ثبت فوری فاکتور/سند در حال ویرایش' },
-        { key: 'Ctrl + P', desc: 'چاپ فاکتور یا سند با قالب اختصاصی شرکت' },
-        { key: 'Esc', desc: 'بستن پنجره‌ها و مودال‌های باز جاری' }
+        { key: 'Alt + 1', desc: 'انتقال سریع به پیشخوان اصلی (Dashboard)' },
+        { key: 'Alt + 2', desc: 'ورود به بخش فاکتورها و صدور فاکتور جدید' },
+        { key: 'Alt + 3', desc: 'انتقال به انبارداری و لیست کالاها' },
+        { key: 'Alt + 4', desc: 'ورود به مدیریت خزانه‌داری و چک‌های صیادی' },
+        { key: 'Alt + 5', desc: 'ورود به امور مالی، حساب‌ها و اسناد دوبل' },
+        { key: 'Alt + 6', desc: 'انتقال به دفتر اشخاص و طرف‌حساب‌ها' },
+        { key: 'Alt + S', desc: 'ثبت و ذخیره سریع فرم یا سند فعال' },
+        { key: 'Alt + P', desc: 'ارسال سند جاری به چاپگر و پیش‌نمایش پرینت' },
+        { key: 'Esc', desc: 'بستن پنجره‌ها و مودال‌های فعال' }
     ];
 
     const faqs = [
         {
-            q: 'چگونه سال مالی جدید باز کنم و مانده حساب‌ها را انتقال دهم؟',
-            a: 'از منوی «تنظیمات و سیستم» گزینه «سال مالی» را انتخاب کنید. پس از وارد کردن عنوان سال جدید (مثلا ۱۴۰۴)، با زدن دکمه «بستن حساب‌ها و صدور سند افتتاحیه»، تمام مانده‌حساب‌ها، موجودی انبار و چک‌های باز به صورت اتوماتیک به سال جدید منتقل می‌شوند.'
+            q: 'آیا نرم‌افزار بدون اینترنت (آفلاین) کار می‌کند؟',
+            a: 'بله، ۱۰۰٪. نرم‌افزار حسابداری اشک قلم دارای پایگاه داده محلی مستقل است و کلیه عملیات ثبت فاکتور، انبار، پرینت و گزارشات بدون نیاز به اینترنت با نهایت سرعت انجام می‌شود. به محض اتصال به اینترنت، اطلاعات به صورت امن با سرور همگام خواهند شد.'
         },
         {
-            q: 'آیا در صورت قطع اینترنت اطلاعات برنامه ذخیره می‌شود؟',
-            a: 'بله، نرم‌افزار اشک قلم کاملاً آفلاین-اول (Offline First) طراحی شده است. تمام اطلاعات در دیتابیس امن محلی سیستم شما ذخیره شده و هیچ وابستگی حیاتی به اتصال اینترنت ندارد.'
+            q: 'چگونه پیامک فاکتور را بدون هزینه برای مشتری ارسال کنم؟',
+            a: 'در نسخه موبایل اندروید یا با انتخاب گزینه «ارسال با سیم‌کارت گوشی»، سیستم مستقیماً برنامه پیامک گوشی شما را با متن آماده و لینک صورتحساب باز می‌کند و می‌توانید با سیم‌کارت خود بدون کسر شارژ پنل ارسال فرمایید.'
         },
         {
-            q: 'نحوه اعمال تخفیف ردیفی و کلی در فاکتور چگونه است؟',
-            a: 'در جدول اقلام فاکتور می‌توانید برای هر قلم کالا درصد یا مبلغ تخفیف مشخص کنید. همچنین در انتهای فاکتور کادر «تخفیف کلی» وجود دارد که به صورت خودکار از جمع ناخالص کسر می‌گردد.'
+            q: 'آیا سرعت سیستم در نسخه ویندوز با اتصال به سرور کاهش می‌یابد؟',
+            a: 'خیر. در نسخه جدید، تمامی عملیات همگام‌سازی به صورت غیرمسدودکننده (Non-blocking) و در زمان‌های بیکاری سیستم در پس‌زمینه اجرا می‌شوند؛ بنابراین کار با فرم‌ها و باز کردن صفحات همواره با سرعت 0ms و حداکثر فریم‌ریت انجام می‌شود.'
         },
         {
-            q: 'چطور می‌توانم لوگو و مشخصات فروشگاه را روی سربرگ فاکتور قرار دهم؟',
-            a: 'به منوی «تنظیمات عمومی» -> «اطلاعات شرکت/فروشگاه» بروید. در آنجا می‌توانید لوگو، نام تجاری، شماره ثبت، تلفن، آدرس و متن پاورقی فاکتور را به راحتی تنظیم کنید.'
+            q: 'چگونه از اطلاعات حسابداری فایل پشتیبان (بک‌آپ) تهیه کنم؟',
+            a: 'از منوی تنظیمات یا پیشخوان روی «مدیریت پشتیبان‌گیری» کلیک کرده و دکمه «پشتیبان‌گیری کامل» را بفشارید. فایل فشرده امن با رمزنگاری اختصاصی در هارد یا حافظه ذخیره می‌شود.'
         }
     ];
 
-    const filteredModules = accountingModules.filter(m => 
-        m.title.includes(searchQuery) || 
-        m.summary.includes(searchQuery) || 
-        m.steps.some(s => s.includes(searchQuery))
-    );
+    const winDetails = PlatformContentService.getDetails('windows');
+    const andDetails = PlatformContentService.getDetails('android');
+    const webDetails = PlatformContentService.getDetails('web');
 
     return (
-        <div className="space-y-6 animate-fade-in pb-20" dir="rtl">
-            {/* هدر صفحه آموزش و راهنما */}
-            <header className="flex flex-col md:flex-row justify-between items-start md:items-center bg-slate-900/80 backdrop-blur-2xl p-6 md:p-8 rounded-[2rem] border border-white/5 shadow-2xl gap-4">
-                <div className="space-y-1.5">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/10 border border-teal-500/20 text-teal-400 text-xs font-bold">
-                        <Sparkles size={14} /> مرجع جامع آموزشی و راهنمای کاربری نرم‌افزار
-                    </div>
-                    <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">
-                        آموزش حسابداری و راهنمای بخش‌های اشک قلم
-                    </h1>
-                    <p className="text-slate-400 text-xs md:text-sm font-medium">
-                        آشنایی با گردش کار مالی، نحوه صدور اسناد، ماژول‌های تجاری و کلیدهای میانبر
-                    </p>
-                </div>
-                <div className="bg-gradient-to-r from-teal-600 to-indigo-600 p-3.5 rounded-2xl shadow-lg shrink-0">
-                    <BookOpen className="text-white" size={28}/>
-                </div>
-            </header>
-
-            {/* کارت راه‌های ارتباطی و پشتیبانی رسمی */}
-            <div className="bg-gradient-to-r from-teal-950/60 via-slate-900 to-indigo-950/60 border border-teal-500/30 p-5 md:p-6 rounded-[2rem] shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400 shrink-0">
-                        <Headphones className="w-6 h-6" />
-                    </div>
-                    <div>
+        <div className="space-y-8 pb-16 animate-fade-in" dir="rtl">
+            {/* سربرگ اصلی صفحه راهنما */}
+            <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 border border-white/10 p-6 md:p-8 rounded-[2.5rem] shadow-2xl space-y-4">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                            <h3 className="text-sm md:text-base font-black text-white">پشتیبانی فنی، لایسنس و پاسخگویی آنلاین</h3>
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                                فعال و در دسترس
+                            <div className="p-2.5 bg-teal-500/20 text-teal-300 rounded-xl border border-teal-500/30">
+                                <BookOpen size={22} />
+                            </div>
+                            <span className="text-xs font-black uppercase text-teal-400 tracking-wider">
+                                پایگاه دانش و راهنمای تخصصی
                             </span>
                         </div>
-                        <p className="text-xs text-slate-300 mt-1">
-                            جهت راهنمایی نصب، فعال‌سازی لایسنس و رفع سوالات فنی حسابداری از طریق ایتا یا تماس تلفنی با کارشناسان ما در ارتباط باشید:
+                        <h1 className="text-2xl md:text-3xl font-black text-white">راهنمای جامع سامانه حسابداری اشک قلم</h1>
+                        <p className="text-xs md:text-sm text-slate-300 max-w-3xl leading-relaxed">
+                            مرجع استاندارد کاربری، تفکیک قابلیت‌های ویندوز، اندروید و وب‌سرویس، و کلیدهای میانبر سریع.
                         </p>
                     </div>
-                </div>
 
-                <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-                    <a
-                        href="tel:09353108763"
-                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 font-black text-xs border border-slate-700 shadow-md transition"
-                    >
-                        <PhoneCall size={16} />
-                        <span className="font-mono text-sm">۰۹۳۵۳۱۰۸۷۶۳</span>
-                    </a>
-                    <a
-                        href="https://eitaa.com/ashkghalamCo"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-xs shadow-lg shadow-teal-900/40 transition"
-                    >
-                        <Send size={16} />
-                        <span>پیام در ایتا: @ashkghalamCo</span>
-                    </a>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <a
+                            href="tel:09120000000"
+                            className="flex items-center gap-2 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-bold border border-white/10 transition"
+                        >
+                            <PhoneCall size={15} className="text-teal-400" />
+                            <span>پشتیبانی تلفنی</span>
+                        </a>
+                    </div>
                 </div>
             </div>
 
-            {/* تب‌های اصلی صفحه راهنما */}
+            {/* تب‌های ناوبری صفحه */}
             <div className="flex flex-wrap gap-2 p-1.5 bg-slate-950/70 border border-white/5 rounded-2xl">
+                <button
+                    onClick={() => setActiveTab('platform')}
+                    className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
+                        activeTab === 'platform'
+                            ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-lg shadow-teal-900/30'
+                            : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    }`}
+                >
+                    <Monitor size={16} /> تفکیک پلتفرم‌ها (ویندوز / اندروید / وب)
+                </button>
+
                 <button
                     onClick={() => setActiveTab('accounting-guide')}
                     className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-xs transition-all cursor-pointer ${
                         activeTab === 'accounting-guide'
-                            ? 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-lg shadow-teal-900/30'
+                            ? 'bg-gradient-to-r from-teal-600 to-indigo-600 text-white shadow-lg'
                             : 'text-slate-400 hover:text-white hover:bg-white/5'
                     }`}
                 >
@@ -227,7 +194,7 @@ export const Help = () => {
                             : 'text-slate-400 hover:text-white hover:bg-white/5'
                     }`}
                 >
-                    <Layers size={16} /> راهنمای گام‌به‌گام ماژول‌ها ({toPersianDigits(accountingModules.length)})
+                    <Layers size={16} /> راهنمای ماژول‌ها ({toPersianDigits(accountingModules.length)})
                 </button>
 
                 <button
@@ -253,10 +220,112 @@ export const Help = () => {
                 </button>
             </div>
 
+            {/* محتوای تفکیک پلتفرم‌ها */}
+            {activeTab === 'platform' && (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* کارت ویندوز دسکتاپ */}
+                        <div className="bg-slate-900/90 border border-teal-500/30 rounded-3xl p-6 space-y-5 shadow-xl relative overflow-hidden">
+                            <div className="flex items-center justify-between">
+                                <div className="p-3 bg-teal-500/20 text-teal-400 rounded-2xl border border-teal-500/30">
+                                    <Monitor size={26} />
+                                </div>
+                                <span className="text-[10px] font-black uppercase text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-full border border-teal-500/20">
+                                    {currentPlatform === 'windows' ? '🟢 نسخه فعال شما' : 'نسخه Win64'}
+                                </span>
+                            </div>
+
+                            <div>
+                                <h3 className="text-lg font-black text-white">{winDetails.title}</h3>
+                                <p className="text-xs text-slate-300 mt-1 leading-relaxed">{winDetails.subtitle}</p>
+                            </div>
+
+                            <div className="space-y-3 pt-2 text-xs text-slate-300">
+                                <div className="bg-slate-950/70 p-3 rounded-xl border border-white/5 space-y-1">
+                                    <strong className="text-teal-400 block">⚡ معماری پردازش:</strong>
+                                    <span>{winDetails.engineDescription}</span>
+                                </div>
+                                <div className="bg-slate-950/70 p-3 rounded-xl border border-white/5 space-y-1">
+                                    <strong className="text-teal-400 block">🖨️ چاپ و تجهیزات جانبی:</strong>
+                                    <span>{winDetails.printerCapability}</span>
+                                </div>
+                                <div className="bg-slate-950/70 p-3 rounded-xl border border-white/5 space-y-1">
+                                    <strong className="text-teal-400 block">🔄 همگام‌سازی سرور:</strong>
+                                    <span>{winDetails.syncCapability}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* کارت اندروید موبایل */}
+                        <div className="bg-slate-900/90 border border-emerald-500/30 rounded-3xl p-6 space-y-5 shadow-xl relative overflow-hidden">
+                            <div className="flex items-center justify-between">
+                                <div className="p-3 bg-emerald-500/20 text-emerald-400 rounded-2xl border border-emerald-500/30">
+                                    <Smartphone size={26} />
+                                </div>
+                                <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                                    {currentPlatform === 'android' ? '🟢 نسخه فعال شما' : 'نسخه Mobile APK'}
+                                </span>
+                            </div>
+
+                            <div>
+                                <h3 className="text-lg font-black text-white">{andDetails.title}</h3>
+                                <p className="text-xs text-slate-300 mt-1 leading-relaxed">{andDetails.subtitle}</p>
+                            </div>
+
+                            <div className="space-y-3 pt-2 text-xs text-slate-300">
+                                <div className="bg-slate-950/70 p-3 rounded-xl border border-white/5 space-y-1">
+                                    <strong className="text-emerald-400 block">📱 ارسال پیامک مستقیم (Native SIM):</strong>
+                                    <span>{andDetails.smsCapability}</span>
+                                </div>
+                                <div className="bg-slate-950/70 p-3 rounded-xl border border-white/5 space-y-1">
+                                    <strong className="text-emerald-400 block">📷 بارکدخوان و امضا:</strong>
+                                    <span>اسکن بارکد با دوربین گوشی و ثبت امضای لمسی خریدار پای فاکتور</span>
+                                </div>
+                                <div className="bg-slate-950/70 p-3 rounded-xl border border-white/5 space-y-1">
+                                    <strong className="text-emerald-400 block">⚡ مصرف دیتا:</strong>
+                                    <span>{andDetails.syncCapability}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* کارت وب و هاست */}
+                        <div className="bg-slate-900/90 border border-sky-500/30 rounded-3xl p-6 space-y-5 shadow-xl relative overflow-hidden">
+                            <div className="flex items-center justify-between">
+                                <div className="p-3 bg-sky-500/20 text-sky-400 rounded-2xl border border-sky-500/30">
+                                    <Globe size={26} />
+                                </div>
+                                <span className="text-[10px] font-black uppercase text-sky-400 bg-sky-500/10 px-2.5 py-1 rounded-full border border-sky-500/20">
+                                    {currentPlatform === 'web' ? '🟢 نسخه فعال شما' : 'نسخه Cloud SaaS'}
+                                </span>
+                            </div>
+
+                            <div>
+                                <h3 className="text-lg font-black text-white">{webDetails.title}</h3>
+                                <p className="text-xs text-slate-300 mt-1 leading-relaxed">{webDetails.subtitle}</p>
+                            </div>
+
+                            <div className="space-y-3 pt-2 text-xs text-slate-300">
+                                <div className="bg-slate-950/70 p-3 rounded-xl border border-white/5 space-y-1">
+                                    <strong className="text-sky-400 block">👥 دسترسی چندکاربره (RBAC):</strong>
+                                    <span>تعریف کاربران متعدد با سطوح دسترسی دقیق و نظارت همزمان شعبات</span>
+                                </div>
+                                <div className="bg-slate-950/70 p-3 rounded-xl border border-white/5 space-y-1">
+                                    <strong className="text-sky-400 block">☁️ پشتیبان‌گیری متمرکز:</strong>
+                                    <span>ذخیره خودکار بک‌آپ در دیتابیس هاست مرکزی با امنیت کامل</span>
+                                </div>
+                                <div className="bg-slate-950/70 p-3 rounded-xl border border-white/5 space-y-1">
+                                    <strong className="text-sky-400 block">💼 سامانه مودیان:</strong>
+                                    <span>تولید کدهای استاندارد مالیاتی و اتصال به کارپوشه سازمان مالیاتی</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* محتوای تب اصول گردش کار حسابداری */}
             {activeTab === 'accounting-guide' && (
                 <div className="space-y-6">
-                    {/* کارت چرخه ۵ مرحله‌ای حسابداری */}
                     <div className="bg-slate-900/60 border border-white/5 p-6 md:p-8 rounded-[2rem] space-y-6 shadow-xl">
                         <div className="flex items-center gap-3">
                             <div className="p-3 bg-teal-500/10 rounded-2xl border border-teal-500/20 text-teal-400">
@@ -279,121 +348,65 @@ export const Help = () => {
                                 </p>
                             </div>
 
-                            <div className="bg-slate-950/70 border border-blue-500/20 rounded-2xl p-4 space-y-2 relative overflow-hidden">
-                                <div className="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 font-black text-sm flex items-center justify-center border border-blue-500/30">
+                            <div className="bg-slate-950/70 border border-teal-500/20 rounded-2xl p-4 space-y-2 relative overflow-hidden">
+                                <div className="w-8 h-8 rounded-xl bg-teal-600/20 text-teal-400 font-black text-sm flex items-center justify-center border border-teal-500/30">
                                     ۲
                                 </div>
-                                <h3 className="text-sm font-bold text-white">صدور فاکتور / حواله</h3>
+                                <h3 className="text-sm font-bold text-white">صدور فاکتور</h3>
                                 <p className="text-slate-400 text-xs leading-relaxed">
-                                    ثبت فاکتور فروش یا خرید با محاسبه ارزش‌افزوده، تخفیف، بارکدخوان و چاپ فوری.
+                                    صدور فاکتور خرید/فروش و اثرگذاری خودکار بر موجودی انبار و حساب شخص.
                                 </p>
                             </div>
 
-                            <div className="bg-slate-950/70 border border-amber-500/20 rounded-2xl p-4 space-y-2 relative overflow-hidden">
-                                <div className="w-8 h-8 rounded-xl bg-amber-600/20 text-amber-400 font-black text-sm flex items-center justify-center border border-amber-500/30">
+                            <div className="bg-slate-950/70 border border-teal-500/20 rounded-2xl p-4 space-y-2 relative overflow-hidden">
+                                <div className="w-8 h-8 rounded-xl bg-teal-600/20 text-teal-400 font-black text-sm flex items-center justify-center border border-teal-500/30">
                                     ۳
                                 </div>
-                                <h3 className="text-sm font-bold text-white">تسویه و خزانه‌داری</h3>
+                                <h3 className="text-sm font-bold text-white">خزانه‌داری</h3>
                                 <p className="text-slate-400 text-xs leading-relaxed">
-                                    دریافت وجه از طریق کارتخوان بانکی (PC-POS)، نقد یا ثبت چک صیادی ۱۶ رقمی.
+                                    ثبت دریافت و پرداخت نقدی، کارتخوان بانکی و ثبت چک‌های صیادی.
                                 </p>
                             </div>
 
-                            <div className="bg-slate-950/70 border border-purple-500/20 rounded-2xl p-4 space-y-2 relative overflow-hidden">
-                                <div className="w-8 h-8 rounded-xl bg-purple-600/20 text-purple-400 font-black text-sm flex items-center justify-center border border-purple-500/30">
+                            <div className="bg-slate-950/70 border border-teal-500/20 rounded-2xl p-4 space-y-2 relative overflow-hidden">
+                                <div className="w-8 h-8 rounded-xl bg-teal-600/20 text-teal-400 font-black text-sm flex items-center justify-center border border-teal-500/30">
                                     ۴
                                 </div>
-                                <h3 className="text-sm font-bold text-white">صدور سند اتوماتیک</h3>
+                                <h3 className="text-sm font-bold text-white">اسناد دوبل</h3>
                                 <p className="text-slate-400 text-xs leading-relaxed">
-                                    تولید خودکار سند دوبل حسابداری (بدهکار/بستانکار) بدون نیاز به دانش تخصصی مالی.
+                                    صدور اتوماتیک سند مالی و ثبت هزینه‌ها و استهلاک در سرفصل‌های معین.
                                 </p>
                             </div>
 
-                            <div className="bg-slate-950/70 border border-emerald-500/20 rounded-2xl p-4 space-y-2 relative overflow-hidden">
-                                <div className="w-8 h-8 rounded-xl bg-emerald-600/20 text-emerald-400 font-black text-sm flex items-center justify-center border border-emerald-500/30">
+                            <div className="bg-slate-950/70 border border-teal-500/20 rounded-2xl p-4 space-y-2 relative overflow-hidden">
+                                <div className="w-8 h-8 rounded-xl bg-teal-600/20 text-teal-400 font-black text-sm flex items-center justify-center border border-teal-500/30">
                                     ۵
                                 </div>
-                                <h3 className="text-sm font-bold text-white">گزارشات و کارپوشه</h3>
+                                <h3 className="text-sm font-bold text-white">گزارشات و بستن</h3>
                                 <p className="text-slate-400 text-xs leading-relaxed">
-                                    مشاهده سود و زیان، تراز آزمایشی، کاردکس انبار و ارسال مستقیم به سامانه مؤدیان.
+                                    گزارش سود و زیان، تراز آزمایشی، ترازنامه، کاردکس و بستن سال مالی.
                                 </p>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* اصول کلیدی برای مدیریت مالی بدون خطا */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-slate-900/60 border border-white/5 p-6 rounded-3xl space-y-4">
-                            <div className="flex items-center gap-2 text-teal-400 font-bold text-sm">
-                                <CheckCircle2 size={18} /> نکات کلیدی جهت پیشگیری از خطای محاسباتی
-                            </div>
-                            <ul className="space-y-3 text-xs text-slate-300 leading-relaxed">
-                                <li className="flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 shrink-0" />
-                                    <span><strong>تنظیم صحیح واحد پولی:</strong> در تنظیمات مشخص کنید مبالغ با «ریال» یا «تومان» درج شوند تا تمامی محاسبات و گزارشات مطابق واحد انتخابی هماهنگ گردند.</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 shrink-0" />
-                                    <span><strong>تعیین سقف اعتبار اشخاص:</strong> برای مشتریان نسیه، سقف اعتبار معین کنید تا در زمان ثبت فاکتور فراتر از سقف به صندوق‌دار هشدار داده شود.</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5 shrink-0" />
-                                    <span><strong>نقطه سفارش انبار:</strong> با فعال‌سازی نقطه سفارش، قبل از اتمام موجودی فیزیکی کالا، هشدار خرید دریافت خواهید کرد.</span>
-                                </li>
-                            </ul>
-                        </div>
-
-                        <div className="bg-slate-900/60 border border-white/5 p-6 rounded-3xl space-y-4">
-                            <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm">
-                                <ShieldCheck size={18} /> امنیت اطلاعات و بستن سال مالی
-                            </div>
-                            <ul className="space-y-3 text-xs text-slate-300 leading-relaxed">
-                                <li className="flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                                    <span><strong>پشتیبان‌گیری ابری و فلش:</strong> در پایان هر روز کاری یک فایل خروجی پشتیبان روی حافظه جانبی ذخیره فرمایید یا گزینه گاوصندوق ابری را فعال کنید.</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                                    <span><strong>سند افتتاحیه و اختتامیه:</strong> در پایان اسفندماه هر سال، با یک کلیک حساب‌های موقت بسته شده و سند افتتاحیه سال جدید خودکار ایجاد می‌شود.</span>
-                                </li>
-                                <li className="flex items-start gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                                    <span><strong>سطوح دسترسی کاربران (RBAC):</strong> برای کاربران صندوق، انباردار و حسابدار نقش‌های محدود تعریف کنید تا امنیت اسناد حفظ گردد.</span>
-                                </li>
-                            </ul>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* محتوای تب راهنمای گام‌به‌گام ماژول‌ها */}
+            {/* محتوای تب ماژول‌ها */}
             {activeTab === 'modules' && (
                 <div className="space-y-4">
-                    {/* فیلد جستجوی سریع در ماژول‌ها */}
-                    <div className="relative">
-                        <input
-                            type="text"
-                            placeholder="جستجو در آموزش ماژول‌ها (مثال: فاکتور، چک، مالیات، کارتخوان...)"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="w-full bg-slate-900/80 border border-white/10 rounded-2xl py-3.5 pr-12 pl-4 text-white text-xs outline-none focus:border-teal-500 placeholder:text-slate-500"
-                        />
-                        <Search className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                    </div>
-
                     <div className="space-y-3">
-                        {filteredModules.map((mod) => {
-                            const Icon = mod.icon;
+                        {accountingModules.map(mod => {
                             const isExpanded = expandedModule === mod.id;
-
+                            const Icon = mod.icon;
                             return (
                                 <div 
-                                    key={mod.id} 
-                                    className="bg-slate-900/60 border border-white/5 rounded-2xl overflow-hidden transition-all shadow-md"
+                                    key={mod.id}
+                                    className="bg-slate-900/70 border border-white/5 hover:border-white/10 rounded-2xl overflow-hidden transition-all shadow-md"
                                 >
-                                    <div
+                                    <div 
                                         onClick={() => toggleModule(mod.id)}
-                                        className="p-5 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-all select-none"
+                                        className="p-5 flex items-center justify-between cursor-pointer select-none"
                                     >
                                         <div className="flex items-center gap-3">
                                             <div className={`p-2.5 rounded-xl border ${mod.color}`}>

@@ -13,8 +13,9 @@ import { securityService } from '../services/securityService';
 import { autoBackupService } from '../services/autoBackupService';
 import { backupMigrationService } from '../services/backupMigrationService';
 import { smartStorage } from '../services/smartStorageService';
+import { TripleBackupService, TripleBackupReport } from '../services/tripleBackupService';
 
-type ActiveTab = 'stats' | 'cloud' | 'local_snap' | 'desktop' | 'file' | 'sync' | 'diagnostics' | 'reset';
+type ActiveTab = 'triple' | 'stats' | 'cloud' | 'local_snap' | 'desktop' | 'file' | 'sync' | 'diagnostics' | 'reset';
 
 const BackupManager = () => {
     const { 
@@ -24,7 +25,9 @@ const BackupManager = () => {
     } = useStore();
 
     // UI States
-    const [activeTab, setActiveTab] = useState<ActiveTab>('stats');
+    const [activeTab, setActiveTab] = useState<ActiveTab>('triple');
+    const [tripleLoading, setTripleLoading] = useState(false);
+    const [tripleReport, setTripleReport] = useState<TripleBackupReport | null>(null);
     const [localLoading, setLocalLoading] = useState(false);
     const [cloudLoading, setCloudLoading] = useState(false);
     const [hostBackups, setHostBackups] = useState<HostBackupEntry[]>([]);
@@ -108,9 +111,35 @@ const BackupManager = () => {
         }
     };
 
+    const loadTripleReport = async () => {
+        try {
+            const report = await TripleBackupService.getLastReport();
+            setTripleReport(report);
+        } catch {}
+    };
+
+    const handleRunTripleBackup = async () => {
+        setTripleLoading(true);
+        try {
+            const state = useStore.getState();
+            const report = await TripleBackupService.executeTripleBackup(state);
+            setTripleReport(report);
+            if (addNotification) {
+                addNotification('success', 'پشتیبان‌گیری ۳ گانه همزمان (ویندوز + اندروید + هاست) با موفقیت کامل شد.');
+            } else {
+                alert('پشتیبان‌گیری ۳ گانه همزمان با موفقیت انجام شد.');
+            }
+        } catch (error: any) {
+            alert(`خطا در پشتیبان‌گیری ۳ گانه: ${error?.message || error}`);
+        } finally {
+            setTripleLoading(false);
+        }
+    };
+
     useEffect(() => {
         loadHostBackups();
         loadLocalSnapshots();
+        loadTripleReport();
     }, []);
 
     // Storage Mode handlers
@@ -763,6 +792,15 @@ const BackupManager = () => {
             {/* Main Segmented Tab Control */}
             <div className="flex flex-wrap gap-2 p-1.5 bg-slate-950/80 rounded-2xl border border-white/5">
                 <button
+                    onClick={() => setActiveTab('triple')}
+                    className={`flex-grow md:flex-initial py-3 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${
+                        activeTab === 'triple' ? 'bg-gradient-to-r from-teal-600 to-indigo-600 text-white shadow-lg shadow-indigo-600/20 ring-1 ring-white/20' : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                    <ShieldCheck size={14} className="text-teal-300 animate-pulse" />
+                    <span>پشتیبان ۳ گانه هوشمند</span>
+                </button>
+                <button
                     onClick={() => setActiveTab('stats')}
                     className={`flex-grow md:flex-initial py-3 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${
                         activeTab === 'stats' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white'
@@ -839,6 +877,115 @@ const BackupManager = () => {
             </div>
 
             {/* TAB CONTENT */}
+
+            {/* 0. Triple Redundant Auto Backup */}
+            {activeTab === 'triple' && (
+                <div className="space-y-6 animate-fade-in">
+                    <div className="bg-gradient-to-r from-slate-900 via-indigo-950/80 to-slate-900 border border-teal-500/20 rounded-[2.5rem] p-6 lg:p-8 shadow-2xl space-y-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h3 className="text-white font-black text-lg flex items-center gap-2">
+                                    <ShieldCheck size={22} className="text-teal-400" />
+                                    <span>پشتیبان‌گیری ۳ گانه هوشمند و ایزوله (Triple Redundancy)</span>
+                                </h3>
+                                <p className="text-xs text-slate-300 mt-1">
+                                    حفاظت پایدار در ۳ لایه مستقل: هارد ویندوز/کش مرورگر، حافظه امن اپلیکیشن موبایل، و مخزن ابری هاست متمرکز
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={handleRunTripleBackup}
+                                disabled={tripleLoading}
+                                className="px-6 py-3.5 bg-gradient-to-r from-teal-500 to-indigo-600 hover:from-teal-400 hover:to-indigo-500 text-white rounded-2xl font-black text-xs shadow-xl shadow-teal-500/20 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
+                            >
+                                {tripleLoading ? (
+                                    <>
+                                        <Loader2 size={16} className="animate-spin" />
+                                        <span>در حال ذخیره در ۳ لایه...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Sparkles size={16} />
+                                        <span>اجرای پشتیبان‌گیری ۳ گانه همزمان</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+
+                        {/* Tiers Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                            {/* لایه ۱ */}
+                            <div className="bg-slate-950/60 border border-white/5 p-5 rounded-3xl space-y-3 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
+                                <div className="flex items-center justify-between">
+                                    <div className="w-10 h-10 rounded-xl bg-teal-500/20 text-teal-400 flex items-center justify-center font-black text-sm">
+                                        ۱
+                                    </div>
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20">
+                                        {tripleReport?.tiers[0]?.status === 'SYNCED' ? 'همگام و ایمن ✓' : 'فعال و محلی'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-black text-white">هارد دیسک و دیتابیس محلی</h4>
+                                    <p className="text-[11px] text-slate-400 mt-1">
+                                        ذخیره‌سازی با پاسخگویی آنی 0ms در ویندوز و مرورگر
+                                    </p>
+                                </div>
+                                <div className="pt-2 border-t border-white/5 text-[10px] text-slate-500 space-y-1 font-mono">
+                                    <div>هش یکپارچگی: <span className="text-teal-400 font-bold">{tripleReport?.sha256 ? tripleReport.sha256.substring(0, 12) + '...' : 'تولید خودکار'}</span></div>
+                                    <div>آخرین همگامی: <span className="text-slate-300 font-sans">{tripleReport?.persianDate || 'به‌روز'}</span></div>
+                                </div>
+                            </div>
+
+                            {/* لایه ۲ */}
+                            <div className="bg-slate-950/60 border border-white/5 p-5 rounded-3xl space-y-3 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none" />
+                                <div className="flex items-center justify-between">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-black text-sm">
+                                        ۲
+                                    </div>
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                                        {tripleReport?.tiers[1]?.status === 'SYNCED' ? 'همگام و ایمن ✓' : 'آماده ذخیره'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-black text-white">حافظه ایزوله اپلیکیشن اندروید</h4>
+                                    <p className="text-[11px] text-slate-400 mt-1">
+                                        نگهداری بک‌آپ مستقل در حافظه امن گوشی برای شرایط اضطراری
+                                    </p>
+                                </div>
+                                <div className="pt-2 border-t border-white/5 text-[10px] text-slate-500 space-y-1 font-mono">
+                                    <div>ایزولاسیون: <span className="text-indigo-400 font-bold">فعال (محیط محلی)</span></div>
+                                    <div>آخرین همگامی: <span className="text-slate-300 font-sans">{tripleReport?.persianDate || 'به‌روز'}</span></div>
+                                </div>
+                            </div>
+
+                            {/* لایه ۳ */}
+                            <div className="bg-slate-950/60 border border-white/5 p-5 rounded-3xl space-y-3 relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/10 rounded-full blur-2xl pointer-events-none" />
+                                <div className="flex items-center justify-between">
+                                    <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center font-black text-sm">
+                                        ۳
+                                    </div>
+                                    <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                        {tripleReport?.tiers[2]?.status === 'SYNCED' ? 'همگام و ایمن ✓' : 'مخزن ابری'}
+                                    </span>
+                                </div>
+                                <div>
+                                    <h4 className="text-sm font-black text-white">مخزن ابری و هاست متمرکز</h4>
+                                    <p className="text-[11px] text-slate-400 mt-1">
+                                        پشتیبان‌گیری در سرور امن ابری جهت جلوگیری از مفقودی در خرابی سخت‌افزار
+                                    </p>
+                                </div>
+                                <div className="pt-2 border-t border-white/5 text-[10px] text-slate-500 space-y-1 font-mono">
+                                    <div>امنیت انتقال: <span className="text-purple-400 font-bold">SHA-256 + TLS</span></div>
+                                    <div>آخرین همگامی: <span className="text-slate-300 font-sans">{tripleReport?.persianDate || 'به‌روز'}</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 1. Database Health & Collections Stats */}
             {activeTab === 'stats' && (

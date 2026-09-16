@@ -27,10 +27,11 @@ if (!fs.existsSync(distDir) || !fs.existsSync(path.join(distDir, 'index.html')))
 }
 
 // ۲. بررسی فایل تنظیمات Capacitor
+const APP_NAME_PERSIAN = "حسابداری اشک قلم";
 if (!fs.existsSync(capacitorConfigPath)) {
     const defaultConfig = {
         appId: "ir.ashkghalam.acc",
-        appName: "AshkeGhalam",
+        appName: APP_NAME_PERSIAN,
         webDir: "dist",
         bundledWebRuntime: false
     };
@@ -39,6 +40,10 @@ if (!fs.existsSync(capacitorConfigPath)) {
 }
 
 const capacitorConfig = JSON.parse(fs.readFileSync(capacitorConfigPath, 'utf-8'));
+if (capacitorConfig.appName !== APP_NAME_PERSIAN) {
+    capacitorConfig.appName = APP_NAME_PERSIAN;
+    fs.writeFileSync(capacitorConfigPath, JSON.stringify(capacitorConfig, null, 2), 'utf-8');
+}
 console.log(`📌 شناسه برنامه (AppID): ${capacitorConfig.appId}`);
 console.log(`📌 نام برنامه: ${capacitorConfig.appName}`);
 
@@ -52,6 +57,52 @@ if (!fs.existsSync(androidDir)) {
         console.log('✅ پوشه پلتفرم اندروید با موفقیت ایجاد شد.');
     } catch (err) {
         console.warn('⚠️ افزودن اندروید با هشدار مواجه شد:', err.message);
+    }
+}
+
+// تنظیم نام برنامه در منابع محلی اندروید (strings.xml) و مجوزهای دوربین (AndroidManifest.xml)
+const stringsXmlPath = path.join(androidDir, 'app', 'src', 'main', 'res', 'values', 'strings.xml');
+if (fs.existsSync(stringsXmlPath)) {
+    try {
+        let stringsContent = fs.readFileSync(stringsXmlPath, 'utf-8');
+        stringsContent = stringsContent.replace(/<string name="app_name">.*?<\/string>/g, `<string name="app_name">${APP_NAME_PERSIAN}</string>`);
+        stringsContent = stringsContent.replace(/<string name="title_activity_main">.*?<\/string>/g, `<string name="title_activity_main">${APP_NAME_PERSIAN}</string>`);
+        fs.writeFileSync(stringsXmlPath, stringsContent, 'utf-8');
+        console.log('✅ نام برنامه در strings.xml به «حسابداری اشک قلم» تنظیم گردید.');
+    } catch (e) {
+        console.warn('⚠️ خطا در ویرایش strings.xml:', e.message);
+    }
+}
+
+const manifestPath = path.join(androidDir, 'app', 'src', 'main', 'AndroidManifest.xml');
+if (fs.existsSync(manifestPath)) {
+    try {
+        let manifestContent = fs.readFileSync(manifestPath, 'utf-8');
+        const requiredPermissions = [
+            '<uses-permission android:name="android.permission.CAMERA" />',
+            '<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />',
+            '<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />',
+            '<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />',
+            '<uses-feature android:name="android.hardware.camera" android:required="false" />',
+            '<uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />'
+        ];
+        let permissionsToAdd = [];
+        for (const perm of requiredPermissions) {
+            const permMatch = perm.match(/name="([^"]+)"/);
+            if (permMatch && !manifestContent.includes(`name="${permMatch[1]}"`)) {
+                permissionsToAdd.push(`    ${perm}`);
+            }
+        }
+        if (permissionsToAdd.length > 0) {
+            manifestContent = manifestContent.replace(
+                '</manifest>',
+                `${permissionsToAdd.join('\n')}\n</manifest>`
+            );
+            fs.writeFileSync(manifestPath, manifestContent, 'utf-8');
+            console.log('✅ مجوزهای دوربین و گالری در AndroidManifest.xml ثبت شدند.');
+        }
+    } catch (e) {
+        console.warn('⚠️ خطا در ویرایش AndroidManifest.xml:', e.message);
     }
 }
 

@@ -25,6 +25,7 @@ import { realConnectionService } from './services/realConnectionService';
 import { realtimeSyncService } from './services/realtimeSyncService';
 import { syncQueue } from './services/syncQueueService';
 import { tauriExitManager } from './services/tauriExitManager';
+import { adminChatNotificationService } from './services/adminChatNotificationService';
 import { AuthService } from './services/authService';
 import { ActivationDashboard } from './components/ActivationDashboard';
 import { DesktopSetupWizard } from './components/DesktopSetupWizard';
@@ -91,6 +92,9 @@ const AIFinancialAssistant = lazy(() => import('./pages/AIFinancialAssistant'));
 const DataSyncManager = lazy(() => import('./pages/DataSyncManager'));
 const AdvancedSettings = lazy(() => import('./pages/AdvancedSettings'));
 const AccountingWorkflowRules = lazy(() => import('./pages/AccountingWorkflowRules'));
+const MobileCatalog = lazy(() => import('./pages/MobileCatalog'));
+const CashFlowPredictor = lazy(() => import('./pages/CashFlowPredictor'));
+import { AndroidSmsRelayModal } from './components/AndroidSmsRelayModal';
 
 const LoadingFallback = () => (
     <div className="flex-1 flex flex-col items-center justify-center min-h-[60vh] text-teal-400 animate-fade-in">
@@ -482,6 +486,9 @@ const MainAppLayout: React.FC = () => {
                             <Route path="/client-broadcast" element={<ClientBroadcastHub />} />
                             
                             {/* ماژول‌های تجاری و ابری */}
+                            <Route path="/mobile-catalog" element={<MobileCatalog />} />
+                            <Route path="/sales-rep" element={<MobileCatalog />} />
+                            <Route path="/cashflow-predictor" element={<CashFlowPredictor />} />
                             <Route path="/moadian" element={<MoadianTaxHub />} />
                             <Route path="/pos-terminal" element={<PosTerminalManagement />} />
                             <Route path="/cloud-vault" element={<CloudBackupVault />} />
@@ -495,6 +502,7 @@ const MainAppLayout: React.FC = () => {
                     </Suspense>
                 </ErrorBoundary>
             </main>
+            <AndroidSmsRelayModal />
             <MobileNav />
             <QuickActionFAB />
             <SupportChat />
@@ -583,6 +591,11 @@ const App = () => {
     // راه‌اندازی مدیر خروج دسکتاپ و تاوری
     tauriExitManager.init(() => useStore.getState());
 
+    // پایش هوشمند پیام‌های چت پشتیبانی و نوتیفیکیشن زنده برای ادمین و سیستم
+    if (currentUser) {
+      adminChatNotificationService.startMonitoring(12000);
+    }
+
     // شروع پردازش دوره‌ای صف سینک - هر ۲ دقیقه
     const queueTimer = setInterval(() => {
       if (navigator.onLine) {
@@ -604,6 +617,7 @@ const App = () => {
         autoSyncService.stop();
       }
       realtimeSyncService.stop();
+      adminChatNotificationService.stopMonitoring();
       realConnectionService.stopMonitoring();
     };
   }, [currentUser]);

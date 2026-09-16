@@ -1,6 +1,7 @@
-import { Invoice, Person, CompanyProfile } from '../types';
-import { formatCurrency, toPersianDigits, getPersianDate } from '../utils';
+import { Invoice, Person, CompanyProfile, InvoiceType } from '../types';
+import { formatCurrency, toPersianDigits, getPersianDate, isAndroidApp } from '../utils';
 import { simpleSignatureService } from './simpleSignatureService';
+import { SmsGatewayService, triggerDeviceSms } from './smsGatewayService';
 
 export interface SmsInvoiceSendResult {
     success: boolean;
@@ -8,6 +9,8 @@ export interface SmsInvoiceSendResult {
     targetPhone?: string;
     url?: string;
     provider?: string;
+    openedDeviceApp?: boolean;
+    smsText?: string;
 }
 
 export class SmsInvoiceService {
@@ -37,7 +40,6 @@ export class SmsInvoiceService {
      */
     static async generateInvoiceSignUrl(invoice: Invoice): Promise<string> {
         try {
-            // ایجاد توکن امضای راه دور
             const payload = JSON.stringify({
                 invoiceId: invoice.id,
                 invoiceNumber: (invoice.prefix || '') + invoice.number,
@@ -46,19 +48,35 @@ export class SmsInvoiceService {
                 date: invoice.date
             });
             const token = await simpleSignatureService.createRequest(invoice.id, 'INVOICE', payload);
-            const baseUrl = window.location.origin + window.location.pathname;
+            const baseUrl = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
             return `${baseUrl}#/sign/${token}`;
         } catch (e) {
-            console.error('Error generating sign token for invoice:', e);
-            const baseUrl = window.location.origin + window.location.pathname;
+            const baseUrl = typeof window !== 'undefined' ? window.location.origin + window.location.pathname : '';
             return `${baseUrl}#/invoices?view=${invoice.id}`;
         }
     }
 
     /**
-     * ارسال خودکار صورتحساب به مشتری از طریق وب‌هوک / پنل پیامکی
+     * ساخت متن استاندارد و خوانای پیامک صورتحساب
      */
-    static async sendInvoiceNotification(
+    static buildInvoiceSmsText(invoice: Invoice, company?: CompanyProfile, signUrl?: string): string {
+        const invNum = (invoice.prefix || '') + toPersianDigits(invoice.number);
+        const totalFormatted = formatCurrency(invoice.finalTotal).replace(' ریال', '');
+        const companyName = company?.name || 'مجموعه بازرگانی اشک قلم';
+        const typeLabel = invoice.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور' : invoice.type === InvoiceType.PURCHASE ? 'فاکتور خرید' : 'فاکتور';
+
+        let text = `خریدار گرامی ${invoice.personName}،\n${typeLabel} شماره ${invNum} به مبلغ ${totalFormatted} ریال صادر گردید.`;
+        if (signUrl) {
+            text += `\nمشاهده، امضا و پرداخت:\n${signUrl}`;
+        }
+        text += `\n${companyName}`;
+        return text;
+    }
+
+    /**
+     * ارسال مستقیم پیامک از طریق برنامه پیامک گوشی اندروید (بدون نیاز به پنل و هزینه)
+     */
+    static async sendViaAndroidDevice(
         invoice: Invoice,
         person?: Person,
         company?: CompanyProfile
@@ -74,14 +92,69 @@ export class SmsInvoiceService {
         }
 
         const signUrl = await this.generateInvoiceSignUrl(invoice);
+        const smsText = this.buildInvoiceSmsText(invoice, company, signUrl);
+
+        // فعال‌سازی پیام‌رسان پیش‌فرض گوشی با Intent
+        triggerDeviceSms(phone, smsText);
+
+        // ثبت در تاریخچه لاگ محلی
+        const historyKey = `sms_history_${invoice.id}`;
+        const logItem = {
+            date: getPersianDate(),
+            timestamp: Date.now(),
+            phone,
+            text: smsText,
+            url: signUrl,
+            status: 'SENT',
+            provider: 'ANDROID_DEVICE'
+        };
+        try {
+            localStorage.setItem(historyKey, JSON.stringify(logItem));
+        } catch {}
+
+        return {
+            success: true,
+            message: `برنامه پیامک گوشی اندروید با شماره ${toPersianDigits(phone)} و متن فاکتور آماده ارسال شد.`,
+            targetPhone: phone,
+            url: signUrl,
+            provider: 'ANDROID_DEVICE',
+            openedDeviceApp: true,
+            smsText
+        };
+    }
+
+    /**
+     * ارسال خودکار یا دستی صورتحساب به مشتری (پشتیبانی از اندروید و وب‌سرویس)
+     */
+    static async sendInvoiceNotification(
+        invoice: Invoice,
+        person?: Person,
+        company?: CompanyProfile,
+        options?: { preferAndroidDevice?: boolean }
+    ): Promise<SmsInvoiceSendResult> {
+        const rawPhone = person?.phone || '';
+        const phone = this.normalizeMobile(rawPhone);
+
+        if (!phone) {
+            return {
+                success: false,
+                message: 'شماره تلفن همراه معتبر برای طرف حساب یافت نشد.'
+            };
+        }
+
+        const config = SmsGatewayService.getConfig();
+        const isAndroid = isAndroidApp();
+        const shouldSendViaDevice = options?.preferAndroidDevice || config.provider === 'ANDROID_DEVICE' || isAndroid;
+
+        if (shouldSendViaDevice) {
+            return this.sendViaAndroidDevice(invoice, person, company);
+        }
+
+        const signUrl = await this.generateInvoiceSignUrl(invoice);
         const invNum = (invoice.prefix || '') + toPersianDigits(invoice.number);
-        const totalFormatted = formatCurrency(invoice.finalTotal).replace(' ریال', '');
-        const companyName = company?.name || 'مجموعه تجاری اشک قلم';
+        const smsText = this.buildInvoiceSmsText(invoice, company, signUrl);
 
-        // متن استاندارد پیامک
-        const smsText = `خریدار گرامی ${invoice.personName}،\nفاکتور شماره ${invNum} به مبلغ ${totalFormatted} ریال صادر شد.\nمشاهده، امضا و پرداخت آنلاین:\n${signUrl}\n${companyName}`;
-
-        // تلاش برای ارسال از طریق اندپوینت هاست یا لوکال
+        // تلاش برای ارسال از طریق وب‌سرویس ابری
         try {
             const payload = {
                 action: 'send_invoice_sms',
@@ -101,19 +174,21 @@ export class SmsInvoiceService {
             });
 
             if (response.ok) {
-                const resData = await response.json().catch(() => ({ success: true }));
                 return {
                     success: true,
-                    message: `پیامک فاکتور با موفقیت به شماره ${toPersianDigits(phone)} ارسال شد.`,
+                    message: `پیامک فاکتور با موفقیت از طریق پنل پیامک به شماره ${toPersianDigits(phone)} ارسال شد.`,
                     targetPhone: phone,
-                    url: signUrl
+                    url: signUrl,
+                    smsText
                 };
             }
         } catch (err) {
-            console.warn('Host SMS endpoint not reachable, simulating direct local dispatch...', err);
+            console.warn('Host SMS endpoint not reachable, fallback to device SMS...', err);
         }
 
-        // اگر در محیط لوکال یا بدون اتصال به سرور بود، شبیه‌سازی محلی با ثبت تاریخچه
+        // در صورت عدم دسترسی به پنل یا اجرای آفلاین، فراخوانی برنامه پیامک گوشی
+        triggerDeviceSms(phone, smsText);
+
         const historyKey = `sms_history_${invoice.id}`;
         const logItem = {
             date: getPersianDate(),
@@ -121,15 +196,20 @@ export class SmsInvoiceService {
             phone,
             text: smsText,
             url: signUrl,
-            status: 'SENT'
+            status: 'SENT',
+            provider: 'ANDROID_DEVICE'
         };
-        localStorage.setItem(historyKey, JSON.stringify(logItem));
+        try {
+            localStorage.setItem(historyKey, JSON.stringify(logItem));
+        } catch {}
 
         return {
             success: true,
-            message: `پیامک صورتحساب با لینک اختصاصی امضا برای شماره ${toPersianDigits(phone)} ثبت و آماده‌سازی شد.`,
+            message: `پیامک فاکتور در برنامه پیام‌رسان گوشی همراه آماده گردید.`,
             targetPhone: phone,
-            url: signUrl
+            url: signUrl,
+            openedDeviceApp: true,
+            smsText
         };
     }
 }

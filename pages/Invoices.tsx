@@ -4,18 +4,43 @@ import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import { Person, Product, Invoice, InvoiceItem, InvoiceType, Check, IRANIAN_BANKS, PrintTheme, CompanyBranch } from '../types';
 import { formatCurrency, generateId, toPersianDigits, generateTrackingCode, getPersianDate, getPersianTime, generateLocalQrSvg, getNextCustomerCode, getNextProductCode, copyToClipboard, generatePdfBlob, downloadPdfBlob, sendInvoicePdf } from '../utils';
-import { Plus, Trash2, Printer, X, Save, CreditCard, UserPlus, PackagePlus, ShoppingBag, PlusCircle, Edit, ArrowLeft, Eye, Wallet, Landmark, CheckCircle2, ShieldCheck, Workflow, BookmarkPlus, Calculator, Banknote, BookMarked, Info, Barcode as BarcodeIcon, QrCode, ScrollText, Share2, UserCheck, Smartphone, Truck, PenTool, TextQuote, Link as LinkIcon, Calendar, Send, FileText, Download, Camera, MessageSquare, HelpCircle, Building2, Store } from 'lucide-react';
+import { Plus, Trash2, Printer, X, Save, CreditCard, UserPlus, PackagePlus, ShoppingBag, PlusCircle, Edit, ArrowLeft, Eye, Wallet, Landmark, CheckCircle2, ShieldCheck, Workflow, BookmarkPlus, Calculator, Banknote, BookMarked, Info, Barcode as BarcodeIcon, QrCode, ScrollText, Share2, UserCheck, Smartphone, Truck, PenTool, TextQuote, Link as LinkIcon, Calendar, Send, FileText, Download, Camera, MessageSquare, HelpCircle, Building2, Store, ShieldAlert, ArrowUpDown, Shuffle, RotateCcw, Sparkles, Copy, ExternalLink, ArrowDown, ArrowUp } from 'lucide-react';
 import { NumberInput, JalaliDatePicker, FullScreenSignatureModal, ConfirmModal, useKeyboardShortcut } from '../components/Shared';
-import { InvoicePrint } from '../components/InvoicePrint';
+import { InvoicePrint, PROFORMA_STANDARD_NOTE } from '../components/InvoicePrint';
 import { RequestSignatureButton } from '../components/RequestSignatureButton';
 import { ShareModal } from '../components/ShareModal';
 import { simpleSignatureService } from '../services/simpleSignatureService';
 import { SmsInvoiceService } from '../services/smsInvoiceService';
+import { triggerDeviceSms, SmsGatewayService } from '../services/smsGatewayService';
 import { licenseQuotaService } from '../services/licenseQuotaService';
 import { PcPosPaymentModal } from '../components/PcPosPaymentModal';
 import { InvoiceReceiptModal } from '../components/InvoiceReceiptModal';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+
+/**
+ * تعیین پیش‌فرض‌های هوشمند پیشوند و شماره فاکتور بر اساس نوع سند
+ * - فاکتور فروش: شروع از 1001 با پیشوند INV-
+ * - پیش‌فاکتور: شروع از 2001 با پیشوند PRO-
+ * - فاکتور خرید: شروع از 3001 با پیشوند PUR-
+ * - مرجوعی: شروع از 4001 با پیشوند RET-
+ */
+export const getInvoiceTypeDefaults = (targetType: InvoiceType, allInvoices: Invoice[]) => {
+  const filtered = allInvoices.filter(i => i.type === targetType);
+  if (targetType === InvoiceType.SALE) {
+    const maxNum = filtered.reduce((max, inv) => Math.max(max, Number(inv.number) || 0), 1000);
+    return { prefix: 'INV-', number: maxNum >= 1000 ? maxNum + 1 : 1001 };
+  } else if (targetType === InvoiceType.PROFORMA) {
+    const maxNum = filtered.reduce((max, inv) => Math.max(max, Number(inv.number) || 0), 2000);
+    return { prefix: 'PRO-', number: maxNum >= 2000 ? maxNum + 1 : 2001 };
+  } else if (targetType === InvoiceType.PURCHASE) {
+    const maxNum = filtered.reduce((max, inv) => Math.max(max, Number(inv.number) || 0), 3000);
+    return { prefix: 'PUR-', number: maxNum >= 3000 ? maxNum + 1 : 3001 };
+  } else {
+    const maxNum = filtered.reduce((max, inv) => Math.max(max, Number(inv.number) || 0), 1000);
+    return { prefix: 'INV-', number: maxNum >= 1000 ? maxNum + 1 : 1001 };
+  }
+};
 
 const Invoices = () => {
   const { invoices, products, people, checks, addInvoice, updateInvoice, deleteInvoice, addPerson, addProduct, setInvoiceSignature, companies, defaultInvoiceFooter, savedDescriptions, addSavedDescription, removeSavedDescription, addCheck, addBranch } = useStore();
@@ -87,9 +112,67 @@ const Invoices = () => {
   const [cashAmount, setCashAmount] = useState<number>(0);
   const [checkPayment, setCheckPayment] = useState<Partial<Check>[]>([]);
   const [taxId, setTaxId] = useState('');
-  const [invoicePrefix, setInvoicePrefix] = useState<string>('');
-  const [invoiceNumber, setInvoiceNumber] = useState<number>(1);
+  
+  // پیشوند و شماره فاکتور با پیش‌فرض‌های هوشمند
+  const [invoicePrefix, setInvoicePrefix] = useState<string>('INV-');
+  const [invoiceNumber, setInvoiceNumber] = useState<number>(1001);
   const [showPosModal, setShowPosModal] = useState(false);
+  const [filterType, setFilterType] = useState<'ALL' | InvoiceType>('ALL');
+
+  // سورت لیست فاکتورها (پیش‌فرض: تاریخ صدور)
+  const [sortBy, setSortBy] = useState<'date' | 'number' | 'finalTotal' | 'personName' | 'dueDate'>('date');
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
+
+  // مودال ارسال مستقیم پیامک اندروید / درگاه پیامک
+  const [smsModalInvoice, setSmsModalInvoice] = useState<Invoice | null>(null);
+  const [smsTargetPhone, setSmsTargetPhone] = useState<string>('');
+  const [smsPreviewText, setSmsPreviewText] = useState<string>('');
+  const [smsSignUrl, setSmsSignUrl] = useState<string>('');
+
+  const handleConvertToSale = (inv: Invoice) => {
+    if (confirm(`آیا مایلید پیش‌فاکتور شماره ${(inv.prefix || '') + toPersianDigits(inv.number)} به فاکتور فروش قطعی تبدیل شود؟\n\nبا تایید شما، سند مالی و حسابداری این فاکتور رسماً در دفاتر و مانده حساب مشتری ثبت خواهد شد.`)) {
+      updateInvoice(inv.id, {
+        ...inv,
+        type: InvoiceType.SALE
+      });
+    }
+  };
+
+  const displayedInvoices = useMemo(() => {
+    return invoices
+      .filter(inv => filterType === 'ALL' || inv.type === filterType)
+      .sort((a, b) => {
+        let comparison = 0;
+        if (sortBy === 'date') {
+          const dateA = a.date || '';
+          const dateB = b.date || '';
+          comparison = dateA.localeCompare(dateB);
+          if (comparison === 0) {
+            comparison = (a.number || 0) - (b.number || 0);
+          }
+        } else if (sortBy === 'number') {
+          comparison = (a.number || 0) - (b.number || 0);
+        } else if (sortBy === 'finalTotal') {
+          comparison = (a.finalTotal || 0) - (b.finalTotal || 0);
+        } else if (sortBy === 'personName') {
+          comparison = (a.personName || '').localeCompare(b.personName || '');
+        } else if (sortBy === 'dueDate') {
+          const dueA = a.dueDate || a.date || '';
+          const dueB = b.dueDate || b.date || '';
+          comparison = dueA.localeCompare(dueB);
+        }
+        return sortOrder === 'desc' ? -comparison : comparison;
+      });
+  }, [invoices, filterType, sortBy, sortOrder]);
+
+  const handleToggleSort = (field: 'date' | 'number' | 'finalTotal' | 'personName' | 'dueDate') => {
+    if (sortBy === field) {
+      setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortBy(field);
+      setSortOrder('desc');
+    }
+  };
   
   // Driver Info
   const [driverName, setDriverName] = useState('');
@@ -180,12 +263,102 @@ const Invoices = () => {
     setView('list'); setEditingId(null); setSelectedInvoiceId(null); setItems([]); setSelectedPerson('');
     setCashAmount(0); setCheckPayment([]); setDescription(defaultInvoiceFooter || ''); 
     setTax(0); setDiscount(0); setDriverName(''); setDriverPhone(''); setVehiclePlate('');
-    setTaxId(''); setInvoicePrefix(''); 
+    setTaxId(''); 
     setShowPreviousBalance(true);
     setSelectedCompanyId(activeCompany?.id || 'default');
     setSelectedBranchId(activeCompany?.branches?.[0]?.id || '');
-    const nextNum = invoices.length > 0 ? Math.max(...invoices.map(i => i.number || 0)) + 1 : 1;
-    setInvoiceNumber(nextNum);
+    const defaults = getInvoiceTypeDefaults(InvoiceType.SALE, invoices);
+    setType(InvoiceType.SALE);
+    setInvoicePrefix(defaults.prefix);
+    setInvoiceNumber(defaults.number);
+  };
+
+  const handleOpenCreateForm = (targetType: InvoiceType = InvoiceType.SALE) => {
+    setEditingId(null); setSelectedInvoiceId(null); setItems([]); setSelectedPerson('');
+    setCashAmount(0); setCheckPayment([]); setDescription(defaultInvoiceFooter || ''); 
+    setTax(0); setDiscount(0); setDriverName(''); setDriverPhone(''); setVehiclePlate('');
+    setTaxId(''); 
+    setShowPreviousBalance(true);
+    setSelectedCompanyId(activeCompany?.id || 'default');
+    setSelectedBranchId(activeCompany?.branches?.[0]?.id || '');
+    
+    const defaults = getInvoiceTypeDefaults(targetType, invoices);
+    setType(targetType);
+    setInvoicePrefix(defaults.prefix);
+    setInvoiceNumber(defaults.number);
+    if (targetType === InvoiceType.PROFORMA) {
+      setDescription(PROFORMA_STANDARD_NOTE);
+    }
+    setView('create');
+  };
+
+  const handleSelectInvoiceType = (newType: InvoiceType) => {
+    setType(newType);
+    if (!editingId) {
+      const defaults = getInvoiceTypeDefaults(newType, invoices);
+      setInvoicePrefix(defaults.prefix);
+      setInvoiceNumber(defaults.number);
+      if (newType === InvoiceType.PROFORMA && (!description || description === defaultInvoiceFooter)) {
+        setDescription(PROFORMA_STANDARD_NOTE);
+      }
+    }
+  };
+
+  const handleGenerateRandomNumber = () => {
+    const randomNum = Math.floor(1001 + Math.random() * 89999);
+    setInvoiceNumber(randomNum);
+  };
+
+  const handleResetToAutoDefaults = () => {
+    const defaults = getInvoiceTypeDefaults(type, invoices);
+    setInvoicePrefix(defaults.prefix);
+    setInvoiceNumber(defaults.number);
+  };
+
+  const handleOpenSmsModal = async (inv: Invoice) => {
+    const person = people.find(p => p.id === inv.personId);
+    const targetPhone = person?.phone || '';
+    setSmsModalInvoice(inv);
+    setSmsTargetPhone(targetPhone);
+    const targetComp = companies.find(c => c.id === inv.companyId) || activeCompany;
+    const signUrl = await SmsInvoiceService.generateInvoiceSignUrl(inv);
+    setSmsSignUrl(signUrl);
+    const preview = SmsInvoiceService.buildInvoiceSmsText(inv, targetComp, signUrl);
+    setSmsPreviewText(preview);
+  };
+
+  const handleSendViaAndroidDirect = () => {
+    if (!smsTargetPhone.trim()) {
+      alert('لطفاً شماره تلفن همراه خریدار را وارد نمایید.');
+      return;
+    }
+    triggerDeviceSms(smsTargetPhone, smsPreviewText);
+    setSmsModalInvoice(null);
+  };
+
+  const handleSendViaGateway = async () => {
+    if (!smsModalInvoice) return;
+    if (!smsTargetPhone.trim()) {
+      alert('لطفاً شماره تلفن همراه خریدار را وارد نمایید.');
+      return;
+    }
+    setIsSendingSms(true);
+    try {
+      const res = await SmsGatewayService.sendSms({
+        toPhone: smsTargetPhone,
+        recipientName: smsModalInvoice.personName,
+        message: smsPreviewText,
+        type: 'INVOICE'
+      });
+      alert(res.message);
+      if (res.success) {
+        setSmsModalInvoice(null);
+      }
+    } catch (e: any) {
+      alert('خطا در ارسال پیامک: ' + (e?.message || 'نامشخص'));
+    } finally {
+      setIsSendingSms(false);
+    }
   };
 
   const handleAddCheck = () => {
@@ -793,10 +966,84 @@ ${url}
       </div>
 
       {view === 'list' ? (
-        <div className="bg-transparent md:bg-slate-900/60 border-none md:border border-white/5 rounded-[2.5rem] overflow-hidden shadow-none md:shadow-2xl">
-          {/* Mobile Card View */}
-          <div className="md:hidden space-y-4">
-            {invoices.sort((a,b)=>b.number-a.number).map(inv => (
+        <div className="space-y-4">
+          {/* نوار فیلتر و سورت فاکتورها */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 px-2">
+            {/* تب‌های نوع فاکتور */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-900/80 p-1.5 rounded-2xl border border-white/5">
+              <button
+                onClick={() => setFilterType('ALL')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${filterType === 'ALL' ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+              >
+                همه ({toPersianDigits(invoices.length)})
+              </button>
+              <button
+                onClick={() => setFilterType(InvoiceType.SALE)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${filterType === InvoiceType.SALE ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+              >
+                فروش ({toPersianDigits(invoices.filter(i => i.type === InvoiceType.SALE).length)})
+              </button>
+              <button
+                onClick={() => setFilterType(InvoiceType.PROFORMA)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${filterType === InvoiceType.PROFORMA ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+              >
+                پیش‌فاکتور ({toPersianDigits(invoices.filter(i => i.type === InvoiceType.PROFORMA).length)})
+              </button>
+              <button
+                onClick={() => setFilterType(InvoiceType.PURCHASE)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${filterType === InvoiceType.PURCHASE ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+              >
+                خرید ({toPersianDigits(invoices.filter(i => i.type === InvoiceType.PURCHASE).length)})
+              </button>
+            </div>
+
+            {/* کنترل‌های مرتب‌سازی (پیش‌فرض: تاریخ صدور) */}
+            <div className="flex items-center gap-2 bg-slate-900/80 p-1.5 rounded-2xl border border-white/5">
+              <span className="text-xs text-slate-400 font-bold flex items-center gap-1 pr-2">
+                <ArrowUpDown size={14} className="text-teal-400" />
+                مرتب‌سازی:
+              </span>
+              <select
+                value={sortBy}
+                onChange={e => setSortBy(e.target.value as any)}
+                className="bg-slate-950 text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-white/10 outline-none focus:border-teal-500"
+              >
+                <option value="date">تاریخ صدور (پیش‌فرض)</option>
+                <option value="number">شماره فاکتور</option>
+                <option value="finalTotal">مبلغ کل فاکتور</option>
+                <option value="personName">نام طرف حساب</option>
+                <option value="dueDate">تاریخ سررسید</option>
+              </select>
+              <button
+                onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                className="px-2.5 py-1.5 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl text-xs font-bold flex items-center gap-1 border border-white/5 transition-all"
+                title={sortOrder === 'desc' ? 'ترتیب: نزولی (جدیدترین / بیشترین)' : 'ترتیب: صعودی (قدیمی‌ترین / کمترین)'}
+              >
+                {sortOrder === 'desc' ? (
+                  <>
+                    <ArrowDown size={14} className="text-amber-400" />
+                    <span>نزولی</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowUp size={14} className="text-emerald-400" />
+                    <span>صعودی</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {filterType === InvoiceType.PROFORMA && (
+            <div className="text-amber-400 text-xs font-bold bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-xl flex items-center gap-1.5 mx-2">
+              <ShieldAlert size={15} /> پیش‌فاکتورها سند برآورد هستند و در تراز مالی و مانده بدهی مشتری منظور نمی‌شوند.
+            </div>
+          )}
+
+          <div className="bg-transparent md:bg-slate-900/60 border-none md:border border-white/5 rounded-[2.5rem] overflow-hidden shadow-none md:shadow-2xl">
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+              {displayedInvoices.map(inv => (
                 <div key={inv.id} className="bg-slate-900/80 border border-white/10 p-5 rounded-4xl shadow-lg flex flex-col gap-4 active:scale-[0.98] transition-transform">
                     <div className="flex justify-between items-start">
                         <div>
@@ -806,53 +1053,112 @@ ${url}
                                 {inv.branchName ? `${inv.companyName || 'اشک قلم'} - ${inv.branchName}` : (inv.companyName || 'شعبه مرکزی')}
                             </span>
                         </div>
-                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black ${inv.type === InvoiceType.SALE ? 'bg-teal-500/20 text-teal-400' : 'bg-amber-500/20 text-amber-500'}`}>{inv.type}</span>
+                        <span className={`px-3 py-1 rounded-lg text-[10px] font-black ${
+                          inv.type === InvoiceType.SALE 
+                            ? 'bg-teal-500/20 text-teal-400' 
+                            : inv.type === InvoiceType.PROFORMA 
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                            : 'bg-indigo-500/20 text-indigo-400'
+                        }`}>
+                          {inv.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور' : inv.type}
+                        </span>
                     </div>
                     <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl">
                         <span className="text-xs text-slate-400 flex items-center gap-1"><Calendar size={12}/> {toPersianDigits(inv.date)}</span>
                         <span className="text-white font-mono font-black text-lg">{formatCurrency(inv.finalTotal)}</span>
                     </div>
+                    {inv.type === InvoiceType.PROFORMA && (
+                      <button 
+                        onClick={() => handleConvertToSale(inv)} 
+                        className="w-full min-h-[44px] bg-amber-600/20 hover:bg-amber-600 text-amber-300 hover:text-white py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all border border-amber-500/30 shadow-sm"
+                        title="تبدیل به فاکتور فروش قطعی و ثبت در سیستم حسابداری"
+                      >
+                        <CheckCircle2 size={16}/> تبدیل به فاکتور فروش قطعی
+                      </button>
+                    )}
                     <div className="flex flex-wrap gap-2 pt-1">
                         <button onClick={() => setReceiptInvoice(inv)} className="flex-1 min-h-[44px] bg-teal-600/20 hover:bg-teal-600 text-teal-300 hover:text-white py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all" title="ثبت دریافت یا پرداخت وجه بابت این فاکتور"><Banknote size={16}/> ثبت دریافتی</button>
                         <button onClick={() => handlePreview(inv)} className="flex-1 min-h-[44px] bg-blue-600/20 hover:bg-blue-600 text-blue-300 hover:text-white py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all"><Eye size={16}/> نمایش و چاپ</button>
                         <button onClick={() => handleEdit(inv)} className="flex-1 min-h-[44px] bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all"><Edit size={16}/> ویرایش</button>
-                        <button onClick={() => handleSendSmsForInvoice(inv)} className="w-11 min-h-[44px] bg-emerald-600/20 text-emerald-400 rounded-xl flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all active:scale-95" title="ارسال پیامک با لینک امضا"><MessageSquare size={16}/></button>
+                        <button onClick={() => handleOpenSmsModal(inv)} className="w-11 min-h-[44px] bg-emerald-600/20 text-emerald-400 rounded-xl flex items-center justify-center hover:bg-emerald-600 hover:text-white transition-all active:scale-95" title="ارسال پیامک مستقیم اندروید / وب‌سرویس"><Smartphone size={16}/></button>
                         <button onClick={() => handleShareLink(inv.id)} className="w-11 min-h-[44px] bg-indigo-600/20 text-indigo-400 rounded-xl flex items-center justify-center hover:bg-indigo-600 hover:text-white transition-all active:scale-95" title="اشتراک‌گذاری"><Share2 size={16}/></button>
                         <button onClick={() => setDeleteTarget(inv.id)} className="w-11 min-h-[44px] bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white rounded-xl flex items-center justify-center active:scale-95 transition-all" title="حذف فاکتور"><Trash2 size={17}/></button>
                     </div>
                 </div>
-            ))}
-          </div>
+              ))}
+            </div>
 
           {/* Desktop Table View */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-right" dir="rtl">
-              <thead className="bg-white/5 text-slate-500 text-[10px] uppercase font-black">
+              <thead className="bg-white/5 text-slate-400 text-[11px] font-black">
                 <tr>
-                  <th className="p-6">شماره</th>
-                  <th className="p-6">طرف حساب و شعبه</th>
-                  <th className="p-6">نوع</th>
-                  <th className="p-6 text-right">مبلغ نهایی</th>
-                  <th className="p-6 text-center">عملیات و ارتباط</th>
+                  <th onClick={() => handleToggleSort('number')} className="p-5 cursor-pointer hover:text-teal-300 transition-colors select-none">
+                    <div className="flex items-center gap-1">
+                      <span>شماره</span>
+                      {sortBy === 'number' && (sortOrder === 'desc' ? <ArrowDown size={13} className="text-teal-400"/> : <ArrowUp size={13} className="text-teal-400"/>)}
+                    </div>
+                  </th>
+                  <th onClick={() => handleToggleSort('date')} className="p-5 cursor-pointer hover:text-teal-300 transition-colors select-none">
+                    <div className="flex items-center gap-1">
+                      <span>تاریخ صدور</span>
+                      {sortBy === 'date' && (sortOrder === 'desc' ? <ArrowDown size={13} className="text-teal-400"/> : <ArrowUp size={13} className="text-teal-400"/>)}
+                    </div>
+                  </th>
+                  <th onClick={() => handleToggleSort('personName')} className="p-5 cursor-pointer hover:text-teal-300 transition-colors select-none">
+                    <div className="flex items-center gap-1">
+                      <span>طرف حساب و شعبه</span>
+                      {sortBy === 'personName' && (sortOrder === 'desc' ? <ArrowDown size={13} className="text-teal-400"/> : <ArrowUp size={13} className="text-teal-400"/>)}
+                    </div>
+                  </th>
+                  <th className="p-5">نوع سند</th>
+                  <th onClick={() => handleToggleSort('finalTotal')} className="p-5 text-right cursor-pointer hover:text-teal-300 transition-colors select-none">
+                    <div className="flex items-center justify-end gap-1">
+                      <span>مبلغ نهایی</span>
+                      {sortBy === 'finalTotal' && (sortOrder === 'desc' ? <ArrowDown size={13} className="text-teal-400"/> : <ArrowUp size={13} className="text-teal-400"/>)}
+                    </div>
+                  </th>
+                  <th className="p-5 text-center">عملیات و ارتباط</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-slate-200 text-sm">
-                {invoices.sort((a,b)=>b.number-a.number).map(inv => (
+                {displayedInvoices.map(inv => (
                   <tr key={inv.id} className="hover:bg-white/5 transition-colors group">
-                    <td className="p-6 font-mono text-slate-400 font-black">{(inv.prefix || '') + toPersianDigits(inv.number)}</td>
-                    <td className="p-6">
+                    <td className="p-5 font-mono text-slate-400 font-black">{(inv.prefix || '') + toPersianDigits(inv.number)}</td>
+                    <td className="p-5 text-xs text-slate-300 font-mono">{toPersianDigits(inv.date)}</td>
+                    <td className="p-5">
                       <div className="font-black text-white">{inv.personName}</div>
                       <div className="text-[11px] text-teal-400/80 font-bold mt-0.5">
                         {inv.branchName ? `${inv.companyName || 'اشک قلم'} (${inv.branchName})` : (inv.companyName || 'شعبه مرکزی')}
                       </div>
                     </td>
-                    <td className="p-6"><span className={`px-3 py-1 rounded-lg text-[10px] font-black ${inv.type === InvoiceType.SALE ? 'bg-teal-500/20 text-teal-400' : 'bg-amber-500/20 text-amber-500'}`}>{inv.type}</span></td>
-                    <td className="p-6 text-right font-mono font-black text-white">{formatCurrency(inv.finalTotal)}</td>
+                    <td className="p-5">
+                      <span className={`px-3 py-1 rounded-lg text-[10px] font-black ${
+                        inv.type === InvoiceType.SALE 
+                          ? 'bg-teal-500/20 text-teal-400' 
+                          : inv.type === InvoiceType.PROFORMA 
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' 
+                          : 'bg-indigo-500/20 text-indigo-400'
+                      }`}>
+                        {inv.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور' : inv.type}
+                      </span>
+                    </td>
+                    <td className="p-5 text-right font-mono font-black text-white">{formatCurrency(inv.finalTotal)}</td>
                     <td className="p-4 flex justify-center gap-2">
+                      {inv.type === InvoiceType.PROFORMA && (
+                        <button 
+                          onClick={() => handleConvertToSale(inv)} 
+                          className="p-3 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-xl hover:bg-amber-600 hover:text-white transition-all font-bold flex items-center gap-1 text-xs" 
+                          title="تبدیل پیش‌فاکتور به فاکتور فروش قطعی و ثبت حسابداری"
+                        >
+                          <CheckCircle2 size={18}/>
+                          <span className="hidden xl:inline">تبدیل به فروش</span>
+                        </button>
+                      )}
                       <button onClick={() => setReceiptInvoice(inv)} className="p-3 bg-teal-500/10 text-teal-400 rounded-xl hover:bg-teal-600 hover:text-white transition-all" title="ثبت دریافت وجه / تسویه بابت این فاکتور"><Banknote size={18}/></button>
                       <button onClick={() => handlePreview(inv)} className="p-3 bg-blue-500/10 text-blue-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all" title="پیش‌نمایش و چاپ"><Eye size={18}/></button>
                       <button onClick={() => handleEdit(inv)} className="p-3 bg-white/5 text-slate-400 rounded-xl hover:bg-indigo-600 hover:text-white transition-all" title="ویرایش"><Edit size={18}/></button>
-                      <button onClick={() => handleSendSmsForInvoice(inv)} className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl hover:bg-emerald-600 hover:text-white transition-all" title="ارسال پیامک با وب‌هوک محلی"><MessageSquare size={18}/></button>
+                      <button onClick={() => handleOpenSmsModal(inv)} className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl hover:bg-emerald-600 hover:text-white transition-all" title="ارسال پیامک مستقیم اندروید / وب‌سرویس"><Smartphone size={18}/></button>
                       <button onClick={() => handleShareLink(inv.id)} className="p-3 bg-indigo-500/10 text-indigo-400 rounded-xl hover:bg-indigo-600 hover:text-white transition-all" title="اشتراک‌گذاری"><Share2 size={18}/></button>
                       <button onClick={() => setDeleteTarget(inv.id)} className="p-3 bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all" title="حذف"><Trash2 size={18}/></button>
                     </td>
@@ -862,12 +1168,61 @@ ${url}
             </table>
           </div>
         </div>
-      ) : (
+      </div>
+    ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-32">
           {/* ... (Create/Edit Form remains mostly same, just ensuring responsiveness) ... */}
           <div className="lg:col-span-8 space-y-4">
             <div className="bg-slate-900 border border-white/10 rounded-2xl p-4 md:p-10 shadow-2xl space-y-4">
               <div className="space-y-3">
+                {/* انتخاب نوع سند: فروش / پیش‌فاکتور / خرید */}
+                <div className="bg-slate-950/90 p-4 rounded-2xl border border-white/10 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <span className="text-slate-400 text-xs font-black">نوع سند فاکتور:</span>
+                    <div className="grid grid-cols-3 gap-2 bg-slate-900 p-1.5 rounded-xl border border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectInvoiceType(InvoiceType.SALE)}
+                        className={`py-2 px-3 rounded-lg text-xs font-black transition-all ${type === InvoiceType.SALE ? 'bg-teal-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        فاکتور فروش (INV-)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectInvoiceType(InvoiceType.PROFORMA)}
+                        className={`py-2 px-3 rounded-lg text-xs font-black transition-all ${type === InvoiceType.PROFORMA ? 'bg-amber-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        پیش‌فاکتور (PRO-)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSelectInvoiceType(InvoiceType.PURCHASE)}
+                        className={`py-2 px-3 rounded-lg text-xs font-black transition-all ${type === InvoiceType.PURCHASE ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                      >
+                        فاکتور خرید (PUR-)
+                      </button>
+                    </div>
+                  </div>
+
+                  {type === InvoiceType.PROFORMA && (
+                    <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-right" dir="rtl">
+                      <div className="flex items-start gap-2">
+                        <ShieldAlert size={18} className="text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-amber-200 leading-relaxed">
+                          <strong>پیش‌فاکتور سندی غیرمالی است:</strong> تا زمان تبدیل به فاکتور قطعی، هیچ‌گونه سند مالی، بدهکاری یا بستانکاری در دفاتر حسابداری ثبت نمی‌گردد. پانویس قانونی عدم تعهد قیمت در صورت تغییر بهای تمام‌شده و نوسان بازار به صورت خودکار به برگه چاپی پیوست می‌شود.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setDescription(PROFORMA_STANDARD_NOTE)}
+                        className="shrink-0 bg-amber-600/30 hover:bg-amber-600/50 text-amber-200 border border-amber-400/40 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all"
+                      >
+                        درج پانویس استاندارد در متن
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {/* انتخاب شرکت و شعبه جهت سربرگ، مهر و امضا */}
                 <div className="bg-slate-950/80 p-4 md:p-5 rounded-2xl border border-teal-500/20 shadow-lg space-y-3">
                   <div className="flex items-center justify-between">
@@ -975,30 +1330,68 @@ ${url}
                   </div>
                 </div>
 
-                {/* شماره فاکتور و پیشوند سفارشی */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-3 bg-slate-950/60 p-3.5 rounded-2xl border border-white/5">
-                  <div className="md:col-span-4">
-                    <label className="text-slate-400 text-xs font-bold pr-1 mb-1.5 block">پیشوند فاکتور (اختیاری)</label>
-                    <input 
-                      className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white font-mono text-sm tracking-wider outline-none focus:border-teal-500 uppercase"
-                      value={invoicePrefix}
-                      onChange={e => setInvoicePrefix(e.target.value)}
-                      placeholder="مثال: INV- یا ف-"
-                    />
-                  </div>
-                  <div className="md:col-span-8">
-                    <label className="text-slate-400 text-xs font-bold pr-1 mb-1.5 block">شماره فاکتور (قابل ویرایش)</label>
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="number"
-                        min="1"
-                        className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white font-mono font-black text-base outline-none focus:border-teal-500"
-                        value={invoiceNumber}
-                        onChange={e => setInvoiceNumber(parseInt(e.target.value) || 1)}
-                      />
-                      <span className="shrink-0 text-xs font-bold bg-white/5 text-slate-400 px-3 py-3 rounded-xl border border-white/5 font-mono">
-                        نمایش: {(invoicePrefix || '') + toPersianDigits(invoiceNumber)}
+                {/* شماره فاکتور و پیشوند سفارشی با قابلیت رندوم و پیش‌فرض هوشمند */}
+                <div className="bg-slate-950/60 p-4 rounded-2xl border border-white/5 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/5 pb-2.5">
+                    <div>
+                      <span className="text-white text-xs font-black flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-amber-400" />
+                        شماره‌گذاری و پیشوند فاکتور
                       </span>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {type === InvoiceType.SALE && 'پیش‌فرض فاکتور فروش: پیشوند INV- و شماره از 1001 به بالا'}
+                        {type === InvoiceType.PROFORMA && 'پیش‌فرض پیش‌فاکتور: پیشوند PRO- و شماره از 2001 به بالا'}
+                        {type === InvoiceType.PURCHASE && 'پیش‌فرض فاکتور خرید: پیشوند PUR- و شماره از 3001 به بالا'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleGenerateRandomNumber}
+                        className="px-3 py-1.5 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-purple-500/30 active:scale-95 transition-all"
+                        title="تولید شماره فاکتور تصادفی و یکتا"
+                      >
+                        <Shuffle size={14} />
+                        <span>شماره رندوم</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleResetToAutoDefaults}
+                        className="px-3 py-1.5 bg-teal-600/20 hover:bg-teal-600 text-teal-300 hover:text-white rounded-xl text-xs font-bold flex items-center gap-1.5 border border-teal-500/30 active:scale-95 transition-all"
+                        title="بازنشانی به شماره ترتیبی و پیشوند استاندارد این نوع فاکتور"
+                      >
+                        <RotateCcw size={14} />
+                        <span>پیش‌فرض هوشمند</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                    <div className="md:col-span-4">
+                      <label className="text-slate-400 text-xs font-bold pr-1 mb-1.5 block">پیشوند فاکتور (اختیاری)</label>
+                      <input 
+                        className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white font-mono text-sm tracking-wider outline-none focus:border-teal-500 uppercase"
+                        value={invoicePrefix}
+                        onChange={e => setInvoicePrefix(e.target.value)}
+                        placeholder="مثال: INV- یا PRO-"
+                      />
+                    </div>
+                    <div className="md:col-span-8">
+                      <label className="text-slate-400 text-xs font-bold pr-1 mb-1.5 block">شماره فاکتور (پیشنهادی / قابل ویرایش دستی)</label>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="number"
+                          min="1"
+                          className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-white font-mono font-black text-base outline-none focus:border-teal-500"
+                          value={invoiceNumber}
+                          onChange={e => setInvoiceNumber(parseInt(e.target.value) || 1)}
+                        />
+                        <span className="shrink-0 text-xs font-bold bg-white/5 text-slate-300 px-3.5 py-3 rounded-xl border border-white/5 font-mono whitespace-nowrap">
+                          شناسه ثبت: {(invoicePrefix || '') + toPersianDigits(invoiceNumber)}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1679,6 +2072,100 @@ ${url}
           invoice={receiptInvoice}
           onClose={() => setReceiptInvoice(null)}
         />
+      )}
+
+      {/* مودال ارسال پیامک مستقیم اندروید یا وب‌سرویس ابری */}
+      {smsModalInvoice && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-lg w-full shadow-2xl space-y-5 animate-scale-in">
+            <div className="flex justify-between items-start border-b border-white/10 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-2xl flex items-center justify-center border border-emerald-500/30">
+                  <Smartphone size={24} />
+                </div>
+                <div>
+                  <h3 className="text-white font-black text-base">ارسال پیامک صورتحساب</h3>
+                  <p className="text-slate-400 text-xs mt-0.5">
+                    فاکتور {(smsModalInvoice.prefix || '') + toPersianDigits(smsModalInvoice.number)} | طرف حساب: {smsModalInvoice.personName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSmsModalInvoice(null)}
+                className="text-slate-400 hover:text-white p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-slate-300 text-xs font-bold block mb-1.5">شماره موبایل گیرنده</label>
+                <input
+                  type="text"
+                  value={smsTargetPhone}
+                  onChange={e => setSmsTargetPhone(e.target.value)}
+                  placeholder="09123456789"
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-white font-mono text-sm outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <div className="flex justify-between items-center mb-1.5">
+                  <label className="text-slate-300 text-xs font-bold">متن پیامک (قابل ویرایش)</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      copyToClipboard(smsPreviewText);
+                      alert('متن پیامک در کلیپ‌بورد کپی شد.');
+                    }}
+                    className="text-[11px] text-teal-400 hover:text-teal-300 flex items-center gap-1 font-bold"
+                  >
+                    <Copy size={13} /> کپی متن
+                  </button>
+                </div>
+                <textarea
+                  rows={6}
+                  value={smsPreviewText}
+                  onChange={e => setSmsPreviewText(e.target.value)}
+                  className="w-full bg-slate-950 border border-white/10 rounded-xl p-3 text-slate-200 text-xs font-mono leading-relaxed outline-none focus:border-teal-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              {/* ارسال مستقیم اندروید */}
+              <button
+                type="button"
+                onClick={handleSendViaAndroidDirect}
+                className="w-full py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-2xl font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-all border border-emerald-400/30"
+              >
+                <Smartphone size={20} />
+                <span>ارسال مستقیم با برنامه پیامک گوشی اندروید (سیم‌کارت - رایگان)</span>
+              </button>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleSendViaGateway}
+                  disabled={isSendingSms}
+                  className="py-2.5 px-3 bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 border border-purple-500/30 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  <Send size={15} />
+                  <span>{isSendingSms ? 'در حال ارسال...' : 'ارسال با وب‌سرویس ابری'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSmsModalInvoice(null)}
+                  className="py-2.5 px-3 bg-white/5 hover:bg-white/10 text-slate-300 rounded-xl font-bold text-xs transition-all"
+                >
+                  انصراف
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

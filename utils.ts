@@ -428,6 +428,7 @@ export const isDesktopApp = (): boolean => {
   if (typeof window === 'undefined') return false;
   const isElectron = Boolean(
     (window as any).electron ||
+    (window as any).electronDesktopAPI ||
     (window as any).process?.versions?.electron ||
     (window as any).__TAURI__ ||
     navigator.userAgent.toLowerCase().includes('electron')
@@ -435,5 +436,79 @@ export const isDesktopApp = (): boolean => {
   const isLocalStorageFlag = localStorage.getItem('ashk_is_desktop') === 'true';
   return isElectron || isLocalStorageFlag;
 };
+
+/**
+ * Detect if running inside Android application (Capacitor Native APK or Android Mobile)
+ */
+export const isAndroidApp = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  if (isDesktopApp()) return false;
+  const isCapacitor = Boolean(
+    (window as any).Capacitor?.isNativePlatform?.() ||
+    (window as any).Capacitor?.getPlatform?.() === 'android' ||
+    ((window as any).Capacitor !== undefined && window.location.protocol === 'capacitor:')
+  );
+  const userAgent = (navigator.userAgent || '').toLowerCase();
+  const isAndroidUA = userAgent.includes('ashkeghalam-android') || userAgent.includes('android');
+  const isStorageFlag = localStorage.getItem('ashk_is_android') === 'true';
+  return isCapacitor || isAndroidUA || isStorageFlag;
+};
+
+/**
+ * Detect if running as installed PWA
+ */
+export const isPwaApp = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia?.('(display-mode: standalone)').matches || false;
+};
+
+export type AppPlatform = 'windows' | 'android' | 'web' | 'pwa';
+
+/**
+ * Get the current operating platform
+ */
+export const getAppPlatform = (): AppPlatform => {
+  if (isDesktopApp()) return 'windows';
+  if (isAndroidApp()) return 'android';
+  if (isPwaApp()) return 'pwa';
+  return 'web';
+};
+
+/**
+ * Get Persian platform name and description
+ */
+export const getPlatformLabel = (platform: AppPlatform = getAppPlatform()): string => {
+  switch (platform) {
+    case 'android':
+      return 'نسخه موبایل اندروید (APK)';
+    case 'windows':
+      return 'نسخه دسکتاپ ویندوز (EXE)';
+    case 'pwa':
+      return 'نسخه تحت وب پیش‌رونده (PWA)';
+    case 'web':
+    default:
+      return 'سامانه ابری و سرور مادر (Web)';
+  }
+};
+
+/**
+ * Get dynamic application name according to user platform requirement:
+ * Android -> حسابداری اشک قلم
+ * Windows -> نرم‌افزار حسابداری اشک قلم
+ * Web -> سامانه ابری حسابداری اشک قلم
+ */
+export const getAppTitleForPlatform = (platform: AppPlatform = getAppPlatform()): string => {
+  switch (platform) {
+    case 'android':
+      return 'حسابداری اشک قلم';
+    case 'windows':
+      return 'نرم‌افزار حسابداری اشک قلم';
+    case 'pwa':
+    case 'web':
+    default:
+      return 'سامانه ابری حسابداری اشک قلم';
+  }
+};
+
 
 

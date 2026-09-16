@@ -3,23 +3,26 @@ import { useNavigate } from 'react-router-dom';
 import { 
   ShieldCheck, Settings, HardDrive, Clock, Building2, 
   KeyRound, Database, FileSpreadsheet, CheckCircle2, 
-  X, ArrowLeft, Lock, AlertTriangle, Sparkles, Cpu
+  X, ArrowLeft, Lock, AlertTriangle, Sparkles, Cpu,
+  Camera, Smartphone, Bell
 } from 'lucide-react';
-import { isDesktopApp } from '../utils';
+import { isDesktopApp, isAndroidApp, getAppPlatform, getAppTitleForPlatform, getPlatformLabel } from '../utils';
 import { AccountingLogo } from './AccountingLogo';
 
 export const WindowsSafetyOnboardingModal: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const navigate = useNavigate();
+  const platform = getAppPlatform();
+  const isAndroid = isAndroidApp();
+  const isDesktop = isDesktopApp();
 
   useEffect(() => {
     // Check if user has permanently dismissed this popup
-    const isDismissed = localStorage.getItem('ashk_windows_safety_guide_dismissed');
+    const isDismissed = localStorage.getItem('ashk_platform_safety_guide_dismissed') || localStorage.getItem('ashk_windows_safety_guide_dismissed');
     if (isDismissed === 'true') {
       return;
     }
 
-    // Show on Windows / Desktop environment or initial launch
     const timer = setTimeout(() => {
       setIsOpen(true);
     }, 1500);
@@ -28,6 +31,7 @@ export const WindowsSafetyOnboardingModal: React.FC = () => {
   }, []);
 
   const handleDismissPermanently = () => {
+    localStorage.setItem('ashk_platform_safety_guide_dismissed', 'true');
     localStorage.setItem('ashk_windows_safety_guide_dismissed', 'true');
     setIsOpen(false);
   };
@@ -39,7 +43,46 @@ export const WindowsSafetyOnboardingModal: React.FC = () => {
 
   if (!isOpen) return null;
 
-  const safetyItems = [
+  const androidSafetyItems = [
+    {
+      icon: <Camera className="w-5 h-5 text-emerald-400" />,
+      title: '۱. دسترسی به دوربین جهت ثبت چک‌ها و فیش‌های حواله',
+      desc: 'امکان اسکن مستقیم چک‌های صیادی و تصویربرداری از فیش‌های بانکی، حواله‌ها و بارکد محصولات با دوربین گوشی.',
+      action: 'منوی چک‌ها / مالی > اسکن با دوربین'
+    },
+    {
+      icon: <Smartphone className="w-5 h-5 text-teal-400" />,
+      title: '۲. پایگاه داده کاملاً آفلاین روی حافظه دستگاه',
+      desc: 'کلیه فاکتورها، انبارداری و اشخاص در فضای ایزوله و امن گوشی ذخیره شده و بدون اینترنت با بالاترین سرعت کار می‌کند.',
+      action: 'پشتیبان‌گیری > ذخیره نسخه آفلاین'
+    },
+    {
+      icon: <Database className="w-5 h-5 text-indigo-400" />,
+      title: '۳. همگام‌سازی دوطرفه با هاست مادر (acc.ashkghalam.ir)',
+      desc: 'امکان همگام‌سازی خودکار اسناد با سرور مرکزی ابری و انتقال آسان داده‌ها بین موبایل و نسخه ویندوز.',
+      action: 'تنظیمات > همگام‌سازی ابری'
+    },
+    {
+      icon: <Bell className="w-5 h-5 text-amber-400" />,
+      title: '۴. دریافت اعلان‌ها و پشتیبانی برخط',
+      desc: 'قابلیت دریافت نوتیفیکیشن‌های زنده چت کاربران، هشدار سررسید چک‌ها و اطلاعیه‌های مهم سیستمی.',
+      action: 'پشتیبانی برخط > اعلان‌های چت'
+    },
+    {
+      icon: <Building2 className="w-5 h-5 text-cyan-400" />,
+      title: '۵. تعریف مشخصات شرکت، لوگو و مهر رسمی',
+      desc: 'تنظیم سربرگ فاکتور جهت صدور PDF و ارسال سریع فاکتور از طریق شبکه‌های اجتماعی و پیام‌رسان‌ها به مشتری.',
+      action: 'تنظیمات > مشخصات شرکت'
+    },
+    {
+      icon: <FileSpreadsheet className="w-5 h-5 text-purple-400" />,
+      title: '۶. گزارشات مالی و خروجی اکسل در گوشی',
+      desc: 'مشاهده کاردکس کالا، صورت‌حساب طرف‌حساب‌ها و دریافت خروجی استاندارد اکسل (Excel) روی موبایل.',
+      action: 'گزارشات مالی / خروجی اکسل'
+    }
+  ];
+
+  const windowsSafetyItems = [
     {
       icon: <Building2 className="w-5 h-5 text-emerald-400" />,
       title: '۱. تعریف مشخصات شرکت و اطلاعات مالیاتی',
@@ -78,6 +121,8 @@ export const WindowsSafetyOnboardingModal: React.FC = () => {
     }
   ];
 
+  const safetyItems = isAndroid ? androidSafetyItems : windowsSafetyItems;
+
   return (
     <div 
       className="fixed inset-0 z-[9500] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 animate-fade-in select-none no-print"
@@ -93,10 +138,10 @@ export const WindowsSafetyOnboardingModal: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="font-black text-base sm:text-lg text-white">
-                  اطلاعیه و چک‌لیست ضروری راه‌اندازی (نسخه ویندوز)
+                  {isAndroid ? 'راهنمای راه‌اندازی و امکانات حسابداری اشک قلم (نسخه اندروید)' : isDesktop ? 'اطلاعیه و چک‌لیست ضروری راه‌اندازی (نسخه ویندوز)' : 'راهنمای راه‌اندازی سامانه ابری حسابداری اشک قلم'}
                 </h2>
                 <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[9px] font-black px-2 py-0.5 rounded-full">
-                  امنیت اطلاعات
+                  {getPlatformLabel()}
                 </span>
               </div>
               <p className="text-[11px] text-teal-300 font-bold mt-1">
@@ -119,7 +164,10 @@ export const WindowsSafetyOnboardingModal: React.FC = () => {
           <div className="p-3.5 rounded-2xl bg-teal-500/10 border border-teal-500/20 text-teal-200 flex items-start gap-3">
             <ShieldCheck className="w-5 h-5 text-teal-400 shrink-0 mt-0.5" />
             <p className="leading-relaxed text-[11px] sm:text-xs">
-              کاربر گرامی، جهت حصول اطمینان از حفظ کامل اسناد مالی، انبار و امنیت اطلاعات در سیستم‌های ویندوزی، توصیه اکید می‌شود اقدامات زیر را در بخش تنظیمات سامانه بررسی فرمایید:
+              {isAndroid
+                ? 'کاربر گرامی نسخه اندروید «حسابداری اشک قلم»، جهت بهره‌برداری کامل از ویژگی‌های اختصاصی موبایل مانند فعالسازی دوربین برای ثبت چک‌ها و عکس حواله، عملکرد آفلاین و اتصال به هاست مادر، موارد زیر را بررسی فرمایید:'
+                : 'کاربر گرامی، جهت حصول اطمینان از حفظ کامل اسناد مالی، انبار و امنیت اطلاعات، توصیه اکید می‌شود اقدامات زیر را در بخش تنظیمات سامانه بررسی فرمایید:'
+              }
             </p>
           </div>
 
@@ -184,3 +232,4 @@ export const WindowsSafetyOnboardingModal: React.FC = () => {
 };
 
 export default WindowsSafetyOnboardingModal;
+

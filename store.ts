@@ -109,7 +109,7 @@ interface AppState {
   addLogisticsProfile: (lp: LogisticsProfile) => void;
   deleteLogisticsProfile: (id: string) => void;
   
-  addGeneralFinance: (type: 'INCOME' | 'EXPENSE', amount: number, desc: string, personId?: string, signature?: string, relatedInvoiceId?: string) => Transaction;
+  addGeneralFinance: (type: 'INCOME' | 'EXPENSE', amount: number, desc: string, personId?: string, signature?: string, relatedInvoiceId?: string, receiptImage?: string) => Transaction;
   addInvoicePayment: (invoiceId: string, payment: {
       amount: number;
       date: string;
@@ -529,7 +529,7 @@ export const useStore = create<AppState>()(
           const personIndex = s.people.findIndex(p => p.id === i.personId);
           let updatedPeople = [...s.people];
           
-          if (personIndex !== -1) {
+          if (personIndex !== -1 && i.type !== InvoiceType.PROFORMA) {
               newTransactions.push({
                   id: generateId(),
                   date: i.date,
@@ -695,7 +695,7 @@ export const useStore = create<AppState>()(
           const filteredTransactions = s.transactions.filter(t => t.referenceId !== id && t.relatedInvoiceId !== id);
           const newTransList: Transaction[] = [];
 
-          if (finalUpdated.personId) {
+          if (finalUpdated.personId && finalUpdated.type !== InvoiceType.PROFORMA) {
               newTransList.push({
                   id: generateId(),
                   date: finalUpdated.date,
@@ -1309,7 +1309,7 @@ export const useStore = create<AppState>()(
           };
       }),
 
-      addGeneralFinance: (type, amount, desc, personId, signature, relatedInvoiceId) => {
+      addGeneralFinance: (type, amount, desc, personId, signature, relatedInvoiceId, receiptImage) => {
           const { currentUser } = get();
           if (currentUser && !currentUser.permissions.finance.create) {
               set(s => ({ notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ثبت تراکنش مالی را ندارید.' }] }));
@@ -1337,6 +1337,7 @@ export const useStore = create<AppState>()(
               relatedInvoiceId: relatedInvoiceId,
               referenceId: relatedInvoiceId,
               signature, 
+              receiptImage,
               trackingCode 
           };
 

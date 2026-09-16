@@ -112,6 +112,9 @@ export interface CompanyProfile {
     stamp?: string;
     signature?: string;
     managerName?: string;
+    shebaNumber?: string;
+    cardNumber?: string;
+    accountOwner?: string;
     branches?: CompanyBranch[];
 }
 
@@ -354,6 +357,7 @@ export interface Transaction {
     referenceId?: string;
     relatedInvoiceId?: string; // For nesting in Cardex
     signature?: string;
+    receiptImage?: string;
     trackingCode?: string;
     metadata?: any;
 }

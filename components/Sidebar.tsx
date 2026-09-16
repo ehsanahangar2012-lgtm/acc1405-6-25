@@ -13,6 +13,7 @@ import { useStore } from '../store';
 import { UserPermissions } from '../types';
 import { isDesktopApp } from '../utils';
 import { AccountingLogo } from './AccountingLogo';
+import { PlatformCopyService } from '../services/platformCopyService';
 
 interface SidebarNavItem {
   to: string;
@@ -81,6 +82,7 @@ const Sidebar = () => {
       perm: 'finance',
       items: [
         { to: '/accounting', icon: BookOpen, label: 'حسابداری دوبل', perm: 'finance' },
+        { to: '/cashflow-predictor', icon: TrendingUp, label: 'پیش‌بینی جریان نقدینگی', perm: 'finance', badge: '۳۰-۹۰ روز' },
         { to: '/cashflow', icon: TrendingUp, label: 'جریان نقدینگی', perm: 'finance' },
         { to: '/tax', icon: Calculator, label: 'مدیریت مالیات', perm: 'finance' },
         { to: '/loans', icon: CreditCard, label: 'وام‌ها', perm: 'finance' },
@@ -121,6 +123,7 @@ const Sidebar = () => {
         { to: '/sms-center', icon: MessageSquare, label: 'پنل پیامک هوشمند', perm: 'finance' },
         { to: '/multi-user-lan', icon: Network, label: 'شبکه محلی چندکاربره', perm: 'settings' },
         { to: '/client-broadcast', icon: Megaphone, label: isDesktop ? 'اطلاعیه‌ها و تخفیف‌ها' : 'انتشار اطلاعیه به کلاینت‌ها', perm: 'settings' },
+        { to: '/mobile-catalog', icon: BookOpen, label: 'کاتالوگ ویزیتوری همراه + امضای لمسی', badge: 'ویزیتور' },
         { to: '/catalog', icon: BookOpen, label: 'کاتالوگ و معرفی محصول', badge: 'کاتالوگ' },
         { to: '/support-sla', icon: Headphones, label: 'پشتیبانی و تمدید سالانه', perm: 'settings' },
       ]
@@ -204,9 +207,9 @@ const Sidebar = () => {
     }
   };
 
-  // ارسال رویداد اسکرول ماوس از سراسر منو به بخش اسکرول‌شونده
+  // ارسال رویداد اسکرول ماوس تنها از بخش‌های خارج از nav به بخش اسکرول‌شونده
   const handleAsideWheel = (e: React.WheelEvent<HTMLElement>) => {
-    if (navRef.current) {
+    if (navRef.current && !navRef.current.contains(e.target as Node)) {
       navRef.current.scrollTop += e.deltaY;
     }
   };
@@ -300,7 +303,7 @@ const Sidebar = () => {
   return (
     <aside 
       onWheel={handleAsideWheel}
-      className="fixed right-0 top-8 bottom-0 h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] w-64 bg-[#0d1527] border-l border-white/5 z-[100] hidden md:flex flex-col no-print shadow-2xl overflow-hidden"
+      className="fixed right-0 top-8 bottom-0 w-64 bg-[#0d1527] border-l border-white/5 z-[100] hidden md:flex flex-col no-print shadow-2xl overflow-hidden"
     >
       {/* Header */}
       <div className="p-3.5 sm:p-4 flex items-center justify-between border-b border-white/5 shrink-0 bg-[#0d1527]">
@@ -310,7 +313,9 @@ const Sidebar = () => {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="font-black text-xs sm:text-sm text-white truncate">{activeCompany?.name || 'اشک قلم'}</span>
-            <span className="text-[8px] text-teal-400 font-black uppercase tracking-widest mt-0.5">SMART ERP PRO</span>
+            <span className="text-[8px] text-teal-400 font-bold truncate mt-0.5">
+              {PlatformCopyService.getCopy().platformBadge}
+            </span>
           </div>
         </div>
 
@@ -319,7 +324,7 @@ const Sidebar = () => {
           title="مدیریت لایسنس و قفل سخت‌افزاری HWID"
           className="text-[9px] bg-teal-500/20 hover:bg-teal-500/40 text-teal-300 px-1.5 py-1 rounded-lg font-bold font-mono transition cursor-pointer shrink-0"
         >
-          v16.22
+          v16.24
         </button>
       </div>
 

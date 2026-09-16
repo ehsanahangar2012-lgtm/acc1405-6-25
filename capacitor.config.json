@@ -1,6 +1,6 @@
 {
   "appId": "ir.ashkghalam.acc",
-  "appName": "اشک قلم",
+  "appName": "حسابداری اشک قلم",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "server": {

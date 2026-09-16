@@ -48,68 +48,24 @@ class HostDatabaseService {
         }
     }
 
-    // ذخیره داده با version control و پشتیبانی از کلود استوریج
+    // ذخیره داده با version control به صورت کاملاً ناهمگام و بدون لگ در ویندوز
     async save(table: string, data: any, skipQueue = false) {
-        try {
-            // ۱. ذخیره از طریق persistentStorage (سرور storage.php هاست)
-            const currentList = await persistentStorage.loadData(table);
-            const list: any[] = Array.isArray(currentList) ? [...currentList] : [];
-            const index = list.findIndex(item => item && (item.id === data.id || (item.data && item.data.id === data.id)));
-            
-            const recordToSave = {
-                ...data,
-                updatedAt: data.updatedAt || new Date().toISOString(),
-                synced_at: Date.now()
-            };
+        // ثبت شناسه و تاریخ آخرین تغییر برای سینک اتوماتیک
+        const recordToSave = {
+            ...data,
+            updatedAt: data.updatedAt || new Date().toISOString(),
+            synced_at: Date.now()
+        };
 
-            if (index >= 0) {
-                list[index] = recordToSave;
-            } else {
-                list.push(recordToSave);
-            }
+        this.syncMetadata.set(`${table}:${data.id}`, {
+            lastSync: Date.now(),
+            version: Date.now()
+        });
+        this.saveMetadata();
 
-            const ok = await persistentStorage.saveData(table, list);
-            if (ok) {
-                this.syncMetadata.set(`${table}:${data.id}`, {
-                    lastSync: Date.now(),
-                    version: Date.now()
-                });
-                this.saveMetadata();
-                return { success: true, version: Date.now() };
-            }
-        } catch (cloudErr) {
-            console.warn('PersistentStorage save warning:', cloudErr);
-        }
-
-        // ۲. تلاش ثانویه از طریق API دیتابیس در صورت لزوم
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
-        try {
-            const response = await fetch(this.baseUrl, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': this.token
-                },
-                body: JSON.stringify({ action: 'save', table, data }),
-                signal: controller.signal
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                this.syncMetadata.set(`${table}:${data.id}`, {
-                    lastSync: Date.now(),
-                    version: result.version || 1
-                });
-                this.saveMetadata();
-                return result;
-            }
-        } catch (error) {
-            if (!skipQueue) {
-                syncQueue.enqueue('save', table, data, 'hostDB');
-            }
-        } finally {
-            clearTimeout(timeout);
+        // ثبت در صف سینک هوشمند به صورت کاملاً غیرمسدودکننده
+        if (!skipQueue) {
+            syncQueue.enqueue('save', table, recordToSave, 'hostDB');
         }
 
         return { success: true, version: Date.now() };

@@ -1,83 +1,31 @@
 {
   "name": "ashke-ghalam-cloud",
-  "description": "نرم‌افزار جامع حسابداری و اتوماسیون اشک قلم",
-  "author": "Ashke Ghalam IT Team",
-  "private": true,
-  "version": "16.22.0",
-  "type": "module",
+  "productName": "AshkeGhalam",
+  "description": "Ashke Ghalam Accounting Software",
+  "author": "Ehsan Ahangar",
   "main": "electron/main.cjs",
-  "build": {
-    "appId": "ir.ashkghalam.acc",
-    "productName": "AshkeGhalam",
-    "copyright": "Copyright © 2026 Ashke Ghalam IT Team",
-    "directories": {
-      "output": "dist_electron",
-      "buildResources": "build"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "public/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "public/app-config.example.json",
-        "to": "app-config.example.json"
-      }
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "public/icon-512.png"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "perMachine": false,
-      "allowElevation": true,
-      "createDesktopShortcut": "always",
-      "createStartMenuShortcut": true,
-      "shortcutName": "AshkeGhalam",
-      "uninstallDisplayName": "AshkeGhalam Accounting - سامانه یکپارچه مالی اشک قلم",
-      "deleteAppDataOnUninstall": false,
-      "runAfterFinish": true
-    },
-    "portable": {
-      "artifactName": "${productName}-Portable-${version}.${ext}"
-    }
-  },
+  "private": true,
+  "version": "16.24.0",
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "lint": "tsc --noEmit",
-    "build": "tsc && vite build && node prepare-dist.js && node scripts/create-host-zip.js",
-    "build:check": "tsc --noEmit",
-    "build:zip": "node scripts/create-host-zip.js",
-    "build:exe": "npm run build && node scripts/build-windows.js",
-    "build:installer": "node scripts/build-windows.js --installer",
+    "build": "vite build && node prepare-dist.js && node scripts/create-host-zip.js",
+    "build:zip": "node prepare-dist.js && node scripts/create-host-zip.js",
+    "build:installer": "node scripts/build-windows.js",
+    "build:exe": "node scripts/build-windows.js",
     "build:portable": "node scripts/build-windows.js --portable",
     "build:all": "node scripts/build-windows.js --all",
     "build:apk": "node scripts/build-apk.js",
-    "cap:sync": "npx cap sync android",
-    "cap:open": "npx cap open android",
-    "preview": "vite preview",
-    "prepare-dist": "node prepare-dist.js"
+    "apk": "node scripts/build-apk.js",
+    "prepare-dist": "node prepare-dist.js",
+    "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/camera": "^8.2.4",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/local-notifications": "^8.3.1",
     "@google/genai": "^1.38.0",
-    "@types/diff": "^8.0.0",
     "crypto-js": "^4.2.0",
     "diff": "^9.0.0",
     "html2canvas": "^1.4.1",
@@ -85,18 +33,18 @@
     "jspdf": "^2.5.1",
     "jszip": "^3.10.1",
     "lucide-react": "^0.563.0",
-    "puppeteer": "^25.1.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.13.0",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^3.7.0",
-    "tesseract.js": "^5.1.1",
     "xlsx": "^0.18.5",
     "zustand": "^5.0.10"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/crypto-js": "^4.2.2",
     "@types/node": "^22.14.0",
@@ -105,11 +53,38 @@
     "@types/react-dom": "^19.0.6",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.24",
-    "electron": "^44.2.0",
-    "electron-builder": "^25.1.8",
+    "electron": "^44.4.1",
+    "electron-builder": "^26.15.3",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
+  },
+  "build": {
+    "appId": "ir.ashkghalam.acc",
+    "productName": "AshkeGhalam",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "public/favicon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AshkeGhalam",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }
