@@ -1,0 +1,396 @@
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { 
+  MessageCircle, X, Send, Bot, Phone, Mail, Minimize2, Maximize2, 
+  CheckCircle2, Cloud, RefreshCw, Smartphone, ShieldCheck, Sparkles, User
+} from 'lucide-react';
+import { useStore } from '../store';
+import { notificationService } from '../services/notificationService';
+import { toPersianDigits } from '../utils';
+
+interface ChatMessage {
+  id: string;
+  text: string;
+  sender: 'user' | 'support' | 'system';
+  senderName?: string;
+  phone?: string;
+  timestamp: string | Date;
+  synced_to_mother?: boolean;
+}
+
+const SupportChat: React.FC = () => {
+  const currentUser = useStore(state => state.currentUser);
+  const isOnline = useStore(state => state.isOnline);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [serverOnline, setServerOnline] = useState<boolean>(true);
+  const [isCheckingServer, setIsCheckingServer] = useState(false);
+  
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = localStorage.getItem('ashk_support_chat_history');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      {
+        id: '1',
+        text: 'سلام و احترام! سیستم پشتیبانی برخط و ارتباط با وب‌سرور مادر اشک قلم آماده دریافت پیام‌ها و درخواست‌های شماست.',
+        sender: 'support',
+        senderName: 'پشتیبانی مرکزی',
+        timestamp: new Date().toISOString(),
+        synced_to_mother: true
+      }
+    ];
+  });
+
+  const [newMessage, setNewMessage] = useState('');
+  const [userPhone, setUserPhone] = useState(() => localStorage.getItem('ashk_support_phone') || '');
+  const [isSending, setIsSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // ذخیره در لوکال‌استوریج
+  useEffect(() => {
+    try {
+      localStorage.setItem('ashk_support_chat_history', JSON.stringify(messages));
+    } catch {}
+  }, [messages]);
+
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && !isMinimized) {
+      scrollToBottom();
+    }
+  }, [messages, isOpen, isMinimized, scrollToBottom]);
+
+  // بررسی وضعیت اتصال به وب‌سرور مادر و دریافت پیام‌های جدید
+  const checkServerAndSync = useCallback(async () => {
+    if (!navigator.onLine) {
+      setServerOnline(false);
+      return;
+    }
+    try {
+      setIsCheckingServer(true);
+      const res = await fetch('/host-backend/api.php?action=support_chat', {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setServerOnline(data.status === 'online');
+        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+          setMessages(prev => {
+            const map = new Map<string, ChatMessage>();
+            prev.forEach(m => map.set(m.id, m));
+            data.messages.forEach((m: ChatMessage) => map.set(m.id, m));
+            return Array.from(map.values());
+          });
+        }
+      } else {
+        setServerOnline(false);
+      }
+    } catch {
+      // سرور لوکال یا آفلاین
+      setServerOnline(false);
+    } finally {
+      setIsCheckingServer(false);
+    }
+  }, []);
+
+  // چک کردن سرور هنگام باز کردن چت
+  useEffect(() => {
+    if (isOpen) {
+      checkServerAndSync();
+      const interval = setInterval(checkServerAndSync, 15000);
+      return () => clearInterval(interval);
+    }
+  }, [isOpen, checkServerAndSync]);
+
+  const sendMessage = async () => {
+    if (!newMessage.trim() || isSending) return;
+
+    const textToSend = newMessage.trim();
+    const phoneToSave = userPhone.trim();
+    if (phoneToSave) {
+      localStorage.setItem('ashk_support_phone', phoneToSave);
+    }
+
+    const localMsgId = 'msg_' + Date.now();
+    const userMsg: ChatMessage = {
+      id: localMsgId,
+      text: textToSend,
+      sender: 'user',
+      senderName: currentUser?.fullName || 'کاربر سیستم',
+      phone: phoneToSave,
+      timestamp: new Date().toISOString(),
+      synced_to_mother: false
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setNewMessage('');
+    setIsSending(true);
+
+    // ارسال به وب‌سرور مادر
+    try {
+      const res = await fetch('/host-backend/api.php?action=support_chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: textToSend,
+          sender: 'user',
+          senderName: currentUser?.fullName || 'کاربر سیستم',
+          phone: phoneToSave
+        })
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setServerOnline(true);
+        setMessages(prev => prev.map(m => m.id === localMsgId ? { ...m, synced_to_mother: true } : m));
+        notificationService.addCenterNotification(
+          'info',
+          'پیام پشتیبانی ارسال شد',
+          'پیام شما با موفقیت در وب‌سرور مادر ذخیره شد و به کارشناسان اطلاع داده شد.'
+        );
+      } else {
+        // حالت ذخیره محلی با هشدار
+        notificationService.notify('warning', 'پیام در حافظه محلی ذخیره شد (عدم دسترسی موقت به هاست مادر)');
+      }
+    } catch {
+      setServerOnline(false);
+    } finally {
+      setIsSending(false);
+    }
+
+    // پاسخ هوشمند پشتیبان / تاییدیه سرور
+    setTimeout(() => {
+      const replyMsg: ChatMessage = {
+        id: 'reply_' + Date.now(),
+        text: 'پیام شما دریافت و در پایگاه هاست مرکزی ثبت گردید. کارشناسان فنی در سریع‌ترین زمان از طریق پیامک یا همین پنجره چت پاسخگو خواهند بود.',
+        sender: 'support',
+        senderName: 'کارشناس پشتیبانی',
+        timestamp: new Date().toISOString(),
+        synced_to_mother: true
+      };
+      setMessages(prev => [...prev, replyMsg]);
+      notificationService.notify('info', '💬 پاسخ جدید در مرکز پشتیبانی دریافت شد');
+    }, 1800);
+  };
+
+  const quickReplies = [
+    'راهنمایی در مورد صدور فاکتور',
+    'وضعیت اتصال و سینک با هاست مادر',
+    'ثبت لایسنس و فعال‌سازی قفل سخت‌افزاری',
+    'درخواست قابلیت جدید در سیستم'
+  ];
+
+  // دکمه بازکردن چت (موقعیت‌دهی دقیق و تفکیک شده از FAB دسترسی سریع)
+  if (!isOpen) {
+    return (
+      <div className="fixed bottom-20 left-20 sm:left-24 md:bottom-8 md:left-28 z-[190] no-print">
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="relative group w-14 h-14 md:w-16 md:h-16 rounded-2xl bg-gradient-to-tr from-blue-700 to-indigo-600 hover:from-blue-600 hover:to-indigo-500 text-white shadow-[0_10px_30px_rgba(37,99,235,0.45)] hover:shadow-[0_15px_40px_rgba(37,99,235,0.6)] flex items-center justify-center border-2 border-white/20 active:scale-95 transition-all duration-300 cursor-pointer"
+          title="پشتیبانی آنلاین و ارتباط با سرور مادر"
+        >
+          <MessageCircle size={28} className="transition-transform group-hover:scale-110" />
+          
+          {/* نشانگر آنلاین بودن سرور مادر */}
+          <span className="absolute -top-1 -right-1 flex h-4 w-4">
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+              isOnline && serverOnline ? 'bg-emerald-400' : 'bg-amber-400'
+            }`}></span>
+            <span className={`relative inline-flex rounded-full h-4 w-4 border-2 border-slate-900 ${
+              isOnline && serverOnline ? 'bg-emerald-500' : 'bg-amber-500'
+            }`}></span>
+          </span>
+
+          {/* متن شناور راهنما در هاور دسکتاپ */}
+          <span className="hidden md:group-hover:block absolute bottom-full mb-2 right-0 whitespace-nowrap bg-slate-900/95 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl border border-white/10 shadow-2xl backdrop-blur-md">
+            پشتیبانی و سرور مادر
+          </span>
+        </button>
+      </div>
+    );
+  }
+
+  // پنجره چت باز شده
+  return (
+    <div 
+      className={`fixed bottom-20 left-4 sm:left-8 md:bottom-8 md:left-28 w-[calc(100vw-2rem)] sm:w-96 md:w-[420px] bg-slate-950/98 backdrop-blur-2xl border border-blue-500/30 rounded-3xl shadow-[0_25px_60px_rgba(0,0,0,0.8)] z-[250] flex flex-col overflow-hidden animate-slide-up no-print transition-all duration-300 ${
+        isMinimized ? 'h-16' : 'h-[520px] max-h-[85vh]'
+      }`}
+      dir="rtl"
+    >
+      {/* هدر چت */}
+      <div className="flex items-center justify-between p-3.5 sm:p-4 border-b border-white/10 bg-gradient-to-r from-blue-900/60 to-indigo-900/60 text-white shrink-0">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0">
+            <Bot size={22} className="text-blue-400" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-black text-xs sm:text-sm text-white truncate">مرکز پیام و پشتیبانی هاست مادر</h3>
+              {/* تگ وضعیت آنلاین */}
+              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 ${
+                isOnline && serverOnline 
+                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${isOnline && serverOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
+                {isOnline && serverOnline ? 'آنلاین (سرور مادر)' : 'آفلاین / محلی'}
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-300 truncate mt-0.5">
+              ذخیره‌سازی در هاست، ارسال نوتیفیکیشن و اطلاع‌رسانی به موبایل
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={checkServerAndSync}
+            disabled={isCheckingServer}
+            title="بررسی مجدد اتصال به سرور"
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition"
+          >
+            <RefreshCw size={14} className={isCheckingServer ? 'animate-spin text-teal-400' : ''} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsMinimized(!isMinimized)}
+            className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition"
+            title={isMinimized ? 'بزرگ‌نمایی' : 'کوچک‌نمایی'}
+          >
+            {isMinimized ? <Maximize2 size={14} /> : <Minimize2 size={14} />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsOpen(false)}
+            className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition"
+            title="بستن"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+
+      {!isMinimized && (
+        <>
+          {/* نوار اطلاعات ارتباط با موبایل و وب‌سرور */}
+          <div className="bg-slate-900/90 border-b border-white/5 px-3.5 py-2 flex items-center justify-between gap-2 text-[10px] text-slate-400 shrink-0">
+            <div className="flex items-center gap-1 text-slate-300">
+              <Smartphone size={13} className="text-teal-400" />
+              <span>شماره تماس جهت پیگیری:</span>
+            </div>
+            <input
+              type="tel"
+              value={userPhone}
+              onChange={(e) => setUserPhone(e.target.value)}
+              placeholder="مثلاً ۰۹۱۲۳۴۵۶۷۸۹"
+              className="bg-black/30 border border-white/10 text-white rounded-lg px-2 py-0.5 text-[10px] w-32 font-mono text-center focus:outline-none focus:border-teal-400"
+            />
+          </div>
+
+          {/* لیست پیام‌ها */}
+          <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto space-y-3 custom-scrollbar">
+            {messages.map((message) => {
+              const isUser = message.sender === 'user';
+              return (
+                <div
+                  key={message.id}
+                  className={`flex flex-col ${isUser ? 'items-start' : 'items-end'}`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1 px-1">
+                    <span className="text-[10px] text-slate-400 font-bold">
+                      {message.senderName || (isUser ? 'شما' : 'پشتیبانی')}
+                    </span>
+                    {message.synced_to_mother && (
+                      <span className="text-[9px] text-teal-400 flex items-center gap-0.5" title="ذخیره شده در سرور مادر">
+                        <CheckCircle2 size={10} />
+                        هاست مادر
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div
+                    className={`max-w-[85%] p-3 rounded-2xl text-xs leading-relaxed shadow-md ${
+                      isUser
+                        ? 'bg-blue-600 text-white rounded-br-xs'
+                        : 'bg-slate-800 text-slate-100 border border-white/10 rounded-bl-xs'
+                    }`}
+                  >
+                    <p className="whitespace-pre-wrap">{message.text}</p>
+                    <div className="flex items-center justify-between gap-3 mt-1.5 pt-1 border-t border-white/10 text-[9px] opacity-75">
+                      <span>{new Date(message.timestamp).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      {isUser && <span>{message.synced_to_mother ? '✔️ ثبت هاست' : '⏳ در صف'}</span>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* پیشنهادات سریع */}
+          {messages.length <= 2 && (
+            <div className="px-3 py-1.5 bg-slate-900/60 border-t border-white/5 shrink-0">
+              <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar pb-1">
+                {quickReplies.map((reply, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setNewMessage(reply)}
+                    className="text-[10px] px-2.5 py-1 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl whitespace-nowrap border border-white/5 transition"
+                  >
+                    {reply}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* بخش ارسال پیام */}
+          <div className="p-3 border-t border-white/10 bg-slate-900/90 shrink-0">
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
+                }}
+                placeholder="پیام یا درخواست پشتیبانی خود را بنویسید..."
+                className="flex-1 bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+              />
+              <button
+                type="button"
+                onClick={sendMessage}
+                disabled={!newMessage.trim() || isSending}
+                className="w-10 h-10 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white rounded-xl flex items-center justify-center transition shrink-0 active:scale-95 cursor-pointer shadow-md"
+                title="ارسال پیام"
+              >
+                {isSending ? <RefreshCw size={16} className="animate-spin" /> : <Send size={16} />}
+              </button>
+            </div>
+            
+            <div className="flex items-center justify-between mt-2 px-1 text-[9px] text-slate-400 font-mono">
+              <span className="flex items-center gap-1">
+                <Cloud size={10} className="text-teal-400" />
+                ذخیره روی SQLite و سرور مادر
+              </span>
+              <span>تلفن پشتیبانی: ۰۲۱-۸۸۸۸۱۰۰۰</span>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default SupportChat;

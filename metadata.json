@@ -1,0 +1,10 @@
+{
+  "name": "سامانه ابری حسابداری و مدیریت اشک قلم",
+  "description": "سامانه یکپارچه حسابداری، انبارداری، نسخه بومی اندروید (Native APK Capacitor)، فیش پرینتر حرارتی و لایسنسینگ نسخه ۱۶.۲۲.۰",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

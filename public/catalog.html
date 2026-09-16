@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>کاتالوگ و شناسنامه رسمی سامانه یکپارچه حسابداری اشک قلم</title>
+    <meta name="description" content="کاتالوگ رسمی و معرفی کامل ویژگی‌های واقعی، معماری آفلاین، سامانه مؤدیان، اتصال به کارتخوان و هوش مصنوعی نرم‌افزار حسابداری اشک قلم">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        teal: {
+                            50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4', 300: '#5eead4',
+                            400: '#2dd4bf', 500: '#14b8a6', 600: '#0d9488', 700: '#0f766e',
+                            800: '#115e59', 900: '#134e4a', 950: '#042f2e'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Vazirmatn', 'Tahoma', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Vazirmatn Persian Font -->
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <style>
+        body {
+            font-family: 'Vazirmatn', Tahoma, sans-serif;
+            background-color: #090d16;
+            color: #f1f5f9;
+        }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; color: black !important; }
+            .page-break { page-break-after: always; break-after: page; }
+            .print-card { border: 1px solid #cbd5e1 !important; background: white !important; color: black !important; box-shadow: none !important; }
+        }
+        .glow-teal {
+            box-shadow: 0 0 25px -5px rgba(20, 184, 166, 0.3);
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .light .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen antialiased selection:bg-teal-500 selection:text-white">
+
+    <!-- Top Navigation Bar -->
+    <header class="sticky top-0 z-50 glass-panel border-b border-slate-800/80 px-4 py-3 no-print">
+        <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-400 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-teal-500/20">
+                    ✍️
+                </div>
+                <div>
+                    <h1 class="text-base font-bold text-white flex items-center gap-2">
+                        کاتالوگ معرفی اشک قلم
+                        <span class="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-mono">v16.15.0</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">سامانه یکپارچه حسابداری، مدیریت و هوش مصنوعی</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="openSmartGuideModal()" class="w-9 h-9 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 text-teal-300 border border-teal-500/40 text-base font-black transition flex items-center justify-center cursor-pointer shadow-lg shadow-teal-500/10" title="راهنمای هوشمند این بخش">
+                    ❓
+                </button>
+                <button onclick="window.print()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer">
+                    🖨️ <span>چاپ / دانلود PDF</span>
+                </button>
+                <button onclick="toggleTheme()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition cursor-pointer" title="تغییر تم (روشن / تاریک)">
+                    🌙 / ☀️
+                </button>
+                <a href="https://web.eitaa.com/#@ashkghalamco" target="_blank" rel="noreferrer" class="px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-black text-xs transition shadow-lg shadow-teal-500/25 flex items-center gap-1.5">
+                    🚀 <span>ارتباط با پشتیبانی در ایتا</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Banner -->
+    <section class="relative overflow-hidden py-16 px-4 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border-b border-slate-800/50">
+        <div class="max-w-5xl mx-auto text-center space-y-6">
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-400 text-xs font-bold">
+                ✨ کاتالوگ ۱۲ صفحه‌ای و شناسنامه فنی تاییدشده
+            </div>
+            <h2 class="text-3xl md:text-5xl font-black text-white leading-tight">
+                سامانه یکپارچه حسابداری و مدیریت <span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 via-emerald-300 to-cyan-400">«اشک قلم»</span>
+            </h2>
+            <p class="text-slate-300 text-sm md:text-base leading-relaxed max-w-3xl mx-auto font-normal">
+                نسل جدید راهکارهای مالی با معماری پیشرفته <strong class="text-teal-300">Offline-First</strong> (ثبت بی‌وقفه اسناد حتی بدون اینترنت)، لایسنس دیجیتال سخت‌افزاری <strong class="text-teal-300">HWID</strong> بدون نیاز به دانگل فیزیکی، اتصال مستقیم به کارتخوان بانکی، سامانه مؤدیان و دستیار هوش مصنوعی.
+            </p>
+
+            <!-- Quick Key Metrics -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto pt-6 text-right">
+                <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
+                    <div class="text-xs text-slate-400">معماری سیستم</div>
+                    <div class="text-sm font-bold text-teal-300 mt-1">۱۰۰٪ کارکرد آفلاین + ابری</div>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
+                    <div class="text-xs text-slate-400">امنیت لایسنس</div>
+                    <div class="text-sm font-bold text-teal-300 mt-1">امضای دیجیتال HWID</div>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
+                    <div class="text-xs text-slate-400">سامانه مؤدیان</div>
+                    <div class="text-sm font-bold text-teal-300 mt-1">اتصال مستقیم و داخلی</div>
+                </div>
+                <div class="p-4 rounded-2xl bg-slate-900/80 border border-slate-800">
+                    <div class="text-xs text-slate-400">هوش مصنوعی</div>
+                    <div class="text-sm font-bold text-teal-300 mt-1">تحلیلگر پیش‌بین مالی</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main 12-Page Catalog Display -->
+    <main class="max-w-7xl mx-auto px-4 py-12 space-y-16">
+
+        <div class="text-center space-y-2">
+            <h3 class="text-2xl font-black text-white">صفحات ۱۲گانه کاتالوگ معرفی نرم‌افزار</h3>
+            <p class="text-xs text-slate-400">هر صفحه نشان‌دهنده یک بخش عملیاتی واقعی و ارزش‌آفرین برای مدیران و حسابداران است.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+            <!-- Page 1: روی جلد -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 glow-teal flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۱ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">روی جلد کاتالوگ</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">معرفی سامانه یکپارچه اشک قلم</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        نسل جدید نرم‌افزارهای مالی؛ کارکرد ۱۰۰٪ آفلاین با قدرت همگام‌سازی ابری و هوش مصنوعی پیش‌بین.
+                    </p>
+                    <!-- Screen Mockup -->
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page1.jpg" alt="پیشخوان مدیریت اشک قلم" class="w-full h-36 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                            <div class="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-slate-950/80 backdrop-blur-sm border border-slate-700 text-[10px] text-teal-300 font-mono">
+                                ASHK GHALAM v16.15
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-[11px]">
+                            <div class="p-2 bg-slate-950 border border-slate-800 rounded-xl text-right">فروش ماه: ۴۲۵,۰۰۰,۰۰۰ تومان</div>
+                            <div class="p-2 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 text-right">سود خالص: ۳۲٪</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«مدیریت مالی بدون مرز را از امروز تجربه کنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 2: معماری Offline-First -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۲ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">معماری آفلاین-اول</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">کسب‌وکارتان با قطعی اینترنت تعطیل نمی‌شود!</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        پایگاه‌داده محلی سریع روی مرورگر/دسکتاپ (IndexedDB) ثبت بی‌وقفه اسناد را بدون نیاز به اینترنت تضمین می‌کند.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page2.jpg" alt="معماری پایگاه داده محلی و همگام‌سازی ابری" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] text-teal-400 font-mono text-right">
+                            ⚡ ذخیره محلی IndexedDB + همگام‌سازی ابری AES-256
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«بدون دغدغه قطعی شبکه، با سرعت فاکتور بزنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 3: لایسنس HWID -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۳ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">قفل دیجیتال</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">خداحافظی با دانگل‌های فیزیکی دست‌وپاگیر</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        لایسنس هوشمند سخت‌افزاری بر پایه الگوریتم رمزنوشت HMAC-SHA256 و اثرانگشت اختصاصی سیستم (HWID).
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page3.jpg" alt="قفل هوشمند دیجیتال HWID" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] text-cyan-300 font-mono text-right">
+                            🛡️ HWID: AG-WIN-89A4-F29D (HMAC-SHA256 Validated)
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«همین امروز لایسنس دیجیتال خود را آنی دریافت کنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 4: فاکتور و PC-POS -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۴ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">فروش و کارتخوان</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">صدور فاکتور و ارسال مستقیم به کارتخوان</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        اتصال به پوز بانکی (PC-POS) جهت حذف خطای انسانی کاربر در وارد کردن مبالغ به همراه چاپ حرارتی ۸۰mm.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page4.jpg" alt="اتصال کارتخوان و فاکتور فروش" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="p-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-300 text-[11px] text-right font-bold">
+                            💳 ارسال مستقیم به کارتخوان بانکی... موفق
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«خطای انسانی در ورود مبالغ به کارتخوان را به صفر برسانید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 5: سامانه مؤدیان -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۵ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">سامانه مؤدیان</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">تکالیف مالیاتی شما، سریع‌تر و آسان‌تر</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        ارسال مستقیم فاکتورهای فروش به سامانه مالیاتی با مدیریت کلیدهای RSA اختصاصی بدون نرم‌افزار واسط.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page5.jpg" alt="صدور فاکتور و سامانه مودیان" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] text-right text-emerald-400 font-mono">
+                            ✔ تایید شده در سامانه امور مالیاتی (Tax ID)
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«بدون جریمه مالیاتی و هزینه واسطه فاکتور ارسال کنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 6: هوش مصنوعی -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۶ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">هوش مصنوعی AI</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">دستیار پیش‌بین و هوشمند مالی شما</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        تحلیل سود و زیان، پیش‌بینی جریان نقدینگی و هشدارهای هوشمند رفتار مشتریان متکی بر API Gemini.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page6.jpg" alt="دستیار پیش‌بین هوش مصنوعی" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] text-right text-indigo-300 font-sans">
+                            🤖 Gemini Intelligent Engine: تحلیل پیش‌بین نقدینگی و سودآوری
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«کسب‌وکارتان را بر اساس تحلیل‌های هوشمند هدایت کنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 7: انبارداری -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۷ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">انبارداری چابک</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">تسلط کامل بر موجودی ریالی و کالاها</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        کنترل موجودی انبار، انبارگردانی، سیستم هشدار نقطه سفارش و ورود سریع کالا با بارکدخوان.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page7.jpg" alt="مدیریت انبار و موجودی کالا" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] text-right text-rose-400 font-mono">
+                            📦 انبارگردانی چابک و کنترل بارکدی موجودی ریالی
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«با کنترل هوشمند انبار، سودآوری خود را حداکثر کنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 8: اسناد و چک -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۸ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">چک و اقساط</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">مدیریت چک صیادی و سررسید اقساط</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        تقویم جلالی سررسید اسناد دریافتنی/پرداختی، وضعیت وصول، برگشت و ثبت صیادی.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page8.jpg" alt="تقویم سررسید چک و اسناد" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] text-right text-purple-300 font-mono">
+                            📅 تقویم سررسید خورشیدی و استعلام صیادی چک‌ها
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«نقدینگی و چک‌های خود را با اطمینان خاطر مدیریت کنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 9: قراردادها و امضا -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۹ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">امضای الکترونیکی</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">ثبت امضای آنلاین و تایید پیامکی (OTP)</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        بستن قراردادها از راه دور با ثبت امضای لمسی مشتری، رمز یکبارمصرف پیامکی و محاسبه هش SHA-256.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page9.jpg" alt="امضای الکترونیکی و OTP" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] text-right text-emerald-400 font-mono">
+                            ✍️ امضای آنلاین با کد تایید پیامکی (OTP) & SHA-256
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«قراردادهای خود را در لحظه و از راه دور نهایی کنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 10: گزارشات مالی -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۱۰ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">گزارشات و اکسل</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">گزارشات کامل مالی و خروجی اکسل</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        دفاتر روزنامه، معین، صورت سود و زیان، ترازنامه و خروجی استاندارد اکسل تنها با یک کلیک.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page10.jpg" alt="گزارشات کامل مالی و خروجی اکسل" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] text-right text-blue-300 font-mono">
+                            📊 دفاتر معین، تراز ۴ ستونی و خروجی مستقیم Excel
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«تنها با یک کلیک گزارشات مالی خود را به اکسل منتقل کنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 11: مقایسه رقابتی -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۱۱ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">جدول مقایسه</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">اشک قلم در برابر نرم‌افزارهای سنتی</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        برتری در سرعت، عدم نیاز به دانگل سخت‌افزاری، کارکرد آفلاین و رابط کاربری مدرن تاریک/روشن.
+                    </p>
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page11.jpg" alt="جدول مقایسه اشک قلم" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-[11px] text-right text-amber-300 font-mono">
+                            ⭐ برتری کامل تکنولوژی اشک قلم در برابر سیستم‌های سنتی
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«ارتقا به نسل جدید نرم‌افزارهای مالی را از امروز آغاز کنید.»</div>
+                </div>
+            </div>
+
+            <!-- Page 12: پشت جلد -->
+            <div class="print-card bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4 hover:border-teal-500/50 transition duration-300 glow-teal flex flex-col justify-between">
+                <div class="space-y-3">
+                    <div class="flex items-center justify-between text-xs font-bold text-teal-400">
+                        <span>صفحه ۱۲ از ۱۲</span>
+                        <span class="px-2 py-0.5 rounded-md bg-teal-500/10 border border-teal-500/20">پشت جلد</span>
+                    </div>
+                    <h4 class="text-lg font-bold text-white">ارتباط با ما و ثبت سفارش لایسنس</h4>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        پشتیبانی سریع در ایتا، دریافت مشاوره تخصصی و فعال‌سازی آنلاین لایسنس.
+                    </p>
+
+                    <div class="space-y-2">
+                        <div class="relative overflow-hidden rounded-2xl border border-slate-800 shadow-xl group">
+                            <img src="/images/page12.jpg" alt="پشتیبانی و ثبت سفارش اشک قلم" class="w-full h-32 object-cover group-hover:scale-105 transition duration-500" referrerPolicy="no-referrer" />
+                        </div>
+                        <div class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-center text-xs space-y-1">
+                            <a href="https://web.eitaa.com/#@ashkghalamco" target="_blank" class="inline-block px-4 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition">
+                                💬 پشتیبانی رسمی ایتا: ashkghalamco@
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="pt-4 border-t border-slate-800/80 space-y-2">
+                    <div class="text-[11px] font-bold text-amber-400">فراخوان اقدام (CTA):</div>
+                    <div class="text-xs text-slate-300">«جهت دریافت مشاوره و فعال‌سازی با ما در ایتا در ارتباط باشید.»</div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Section: Verified Marketing Messages -->
+        <section class="space-y-8 pt-12 border-t border-slate-800">
+            <div class="text-center space-y-2">
+                <h3 class="text-2xl font-black text-white">پیام‌های تبلیغاتی اثربخش و تأییدشده</h3>
+                <p class="text-xs text-slate-400">قابل استفاده در پوسترها، بنرها، کاتالوگ و پست‌های شبکه‌های اجتماعی</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Professional Messages -->
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+                    <h4 class="text-base font-bold text-teal-400 flex items-center gap-2">
+                        <span>🏛️</span> ۵ پیام تبلیغاتی حرفه‌ای / سازمانی
+                    </h4>
+                    <ul class="space-y-3 text-xs text-slate-300 leading-relaxed list-disc list-inside">
+                        <li><strong class="text-white">انضباط مالی و سامانه مؤدیان:</strong> با ماژول داخلی سامانه مؤدیان در اشک قلم، فاکتورها را مستقیماً به سازمان امور مالیاتی ارسال کنید.</li>
+                        <li><strong class="text-white">معماری Offline-First:</strong> ثبت اسناد در پایگاه‌داده محلی بدون وابستگی به اینترنت، و همگام‌سازی خودکار و رمزنگاری‌شده ابری.</li>
+                        <li><strong class="text-white">قفل هوشمند HWID:</strong> با دانگل‌های فیزیکی USB خداحافظی کنید؛ سیستم لایسنس دیجیتال HWID امنیت شما را تضمین می‌کند.</li>
+                        <li><strong class="text-white">تحلیل با هوش مصنوعی:</strong> داده‌های مالی خود را به راهکارهای عملیاتی تبدیل کنید؛ دستیار Gemini روند سود و نقدینگی را شفاف می‌سازد.</li>
+                        <li><strong class="text-white">امضای آنلاین و پیامک OTP:</strong> بستن سریع قراردادها با ثبت امضای لمسی، محاسبه هش امنیتی SHA-256 و اعتبارسنجی پیامکی.</li>
+                    </ul>
+                </div>
+
+                <!-- Retailer Messages -->
+                <div class="bg-slate-900 border border-slate-800 rounded-3xl p-6 space-y-4">
+                    <h4 class="text-base font-bold text-emerald-400 flex items-center gap-2">
+                        <span>🏪</span> ۵ پیام ساده (مختص صاحبان کسب‌وکار و فروشگاه‌ها)
+                    </h4>
+                    <ul class="space-y-3 text-xs text-slate-300 leading-relaxed list-disc list-inside">
+                        <li><strong class="text-white">حسابداری بدون اینترنت:</strong> حتی اگر اینترنت قطع شود، اشک قلم بدون کوچک‌ترین وقفه‌ای کار می‌کند. فاکتور بزنید و انبار را مدیریت کنید!</li>
+                        <li><strong class="text-white">ارسال مستقیم به کارتخوان:</strong> دیگر قیمت را دستی روی پوز نزنید؛ با یک کلیک در اشک قلم، مبلغ فاکتور روی کارتخوان می‌افتد.</li>
+                        <li><strong class="text-white">سررسید چک‌ها فراموش نمی‌شود:</strong> چک‌های دریافتی و پرداختی را روی تقویم شمسی ببینید تا چکتان برگشت نخورد.</li>
+                        <li><strong class="text-white">فاکتور بزنید و فوری چاپ کنید:</strong> از فیش‌پرینتر حرارتی تا A4؛ فاکتور مشتری را سریع و با ظاهر شیک چاپ کنید.</li>
+                        <li><strong class="text-white">حسابداری روی گوشی و لپ‌تاپ:</strong> فرقی نمی‌کند پشت مغازه باشید یا در سفر؛ همیشه حساب و کتاب دستتان است.</li>
+                    </ul>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-900 border-t border-slate-800 py-8 px-4 text-center text-xs text-slate-400 no-print space-y-2">
+        <div>سامانه یکپارچه حسابداری و مدیریت اشک قلم © ۲۰۲۶</div>
+        <div>طراحی شده جهت اجرا روی ویندوز، مک، لینوکس، اندروید و iOS با معماری Offline-First</div>
+    </footer>
+
+    <!-- Theme Toggle & Smart Guide Script -->
+    <script>
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            document.documentElement.classList.toggle('light');
+        }
+
+        function openSmartGuideModal() {
+            const modal = document.getElementById('smart-guide-modal');
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        function closeSmartGuideModal() {
+            const modal = document.getElementById('smart-guide-modal');
+            if (modal) modal.classList.add('hidden');
+        }
+    </script>
+
+    <!-- Modal dialog for Smart Guide ? -->
+    <div id="smart-guide-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 no-print">
+        <div class="bg-slate-900 border border-teal-500/30 rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl relative text-right">
+            <button onclick="closeSmartGuideModal()" class="absolute top-4 left-4 text-slate-400 hover:text-white text-lg font-bold">✕</button>
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-2xl bg-teal-500/20 border border-teal-500/40 text-teal-300 flex items-center justify-center font-bold text-xl">❓</div>
+                <div>
+                    <h3 class="text-base font-bold text-white">راهنمای هوشمند بخش کاتالوگ</h3>
+                    <p class="text-xs text-teal-400">شناسنامه رسمی و معرفی قابلیت‌های نرم‌افزار اشک قلم (نسخه ۱۶.۱۵.۰)</p>
+                </div>
+            </div>
+            <div class="space-y-3 text-xs text-slate-300 leading-relaxed border-t border-slate-800 pt-4">
+                <p>در این کاتالوگ ۱۲ صفحه‌ای، کلیه ویژگی‌های کاربردی و عملیاتی نرم‌افزار اشک قلم به صورت شفاف و واقعی مستند گردیده است:</p>
+                <ul class="space-y-2 list-disc list-inside text-slate-200">
+                    <li><strong class="text-teal-300">معماری Offline-First:</strong> امکان ادامه کار کامل سیستم بدون نیاز به اینترنت و بدون افت سرعت.</li>
+                    <li><strong class="text-teal-300">لایسنس سخت‌افزاری HWID:</strong> فعال‌سازی بدون نیاز به دانگل USB و قفل‌های فیزیکی.</li>
+                    <li><strong class="text-teal-300">اتصال به پوز بانکی:</strong> انتقال خودکار مبلغ فاکتور روی دستگاه کارتخوان.</li>
+                    <li><strong class="text-teal-300">سامانه مؤدیان و هوش مصنوعی:</strong> ارسال مستقیم صورتحساب به سازمان مالیاتی و تحلیلگر هوشمند.</li>
+                </ul>
+            </div>
+            <div class="pt-3 border-t border-slate-800 flex justify-between items-center text-xs">
+                <span class="text-slate-400">تاریخ بروزرسانی: ۱۴۰۴/۱۲/۲۴</span>
+                <button onclick="closeSmartGuideModal()" class="px-4 py-2 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold transition">متوجه شدم</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
