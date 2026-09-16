@@ -44,56 +44,75 @@ import { isDesktopApp } from './utils';
 import { FEATURES } from './config';
 import { Lock, User as UserIcon, LogIn, PenTool, Loader2, WifiOff, Cloud, RefreshCw, KeyRound, ShieldCheck } from 'lucide-react';
 
+// Helper to retry lazy loaded components on dynamic import failure
+const lazyWithRetry = <T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) =>
+    lazy(async () => {
+        const pageKey = 'chunk_reload_' + window.location.hash;
+        const pageHasBeenReloaded = sessionStorage.getItem(pageKey);
+        try {
+            const component = await factory();
+            sessionStorage.removeItem(pageKey);
+            return component;
+        } catch (error) {
+            if (!pageHasBeenReloaded) {
+                sessionStorage.setItem(pageKey, 'true');
+                window.location.reload();
+                return new Promise(() => {}) as any;
+            }
+            throw error;
+        }
+    });
+
 // Lazy loaded components
-const Dashboard = lazy(() => import('./pages/Dashboard'));
-const Invoices = lazy(() => import('./pages/Invoices'));
-const Inventory = lazy(() => import('./pages/Inventory'));
-const Checks = lazy(() => import('./pages/Checks'));
-const Customers = lazy(() => import('./pages/Customers'));
-const Finance = lazy(() => import('./pages/Finance'));
-const Reports = lazy(() => import('./pages/Reports'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Users = lazy(() => import('./pages/Users'));
-const Help = lazy(() => import('./pages/Help'));
-const InstallAndroid = lazy(() => import('./pages/InstallAndroid'));
-const SimpleSignaturePage = lazy(() => import('./pages/SimpleSignaturePage'));
-const RemoteSignaturePage = lazy(() => import('./pages/RemoteSignaturePage'));
-const SignatureManagement = lazy(() => import('./pages/SignatureManagement'));
-const SignatureManagementDashboard = lazy(() => import('./pages/SignatureManagementDashboard'));
-const Contracts = lazy(() => import('./pages/Contracts'));
-const FiscalYear = lazy(() => import('./pages/FiscalYear'));
-const MarketingHub = lazy(() => import('./pages/MarketingHub'));
-const CatalogPage = lazy(() => import('./pages/CatalogPage'));
-const ImportCenter = lazy(() => import('./pages/ImportCenter'));
-const DebugCenter = lazy(() => import('./pages/DebugCenter'));
-const LicenseManager = lazy(() => import('./pages/LicenseManager'));
+const Dashboard = lazyWithRetry(() => import('./pages/Dashboard'));
+const Invoices = lazyWithRetry(() => import('./pages/Invoices'));
+const Inventory = lazyWithRetry(() => import('./pages/Inventory'));
+const Checks = lazyWithRetry(() => import('./pages/Checks'));
+const Customers = lazyWithRetry(() => import('./pages/Customers'));
+const Finance = lazyWithRetry(() => import('./pages/Finance'));
+const Reports = lazyWithRetry(() => import('./pages/Reports'));
+const Settings = lazyWithRetry(() => import('./pages/Settings'));
+const Users = lazyWithRetry(() => import('./pages/Users'));
+const Help = lazyWithRetry(() => import('./pages/Help'));
+const InstallAndroid = lazyWithRetry(() => import('./pages/InstallAndroid'));
+const SimpleSignaturePage = lazyWithRetry(() => import('./pages/SimpleSignaturePage'));
+const RemoteSignaturePage = lazyWithRetry(() => import('./pages/RemoteSignaturePage'));
+const SignatureManagement = lazyWithRetry(() => import('./pages/SignatureManagement'));
+const SignatureManagementDashboard = lazyWithRetry(() => import('./pages/SignatureManagementDashboard'));
+const Contracts = lazyWithRetry(() => import('./pages/Contracts'));
+const FiscalYear = lazyWithRetry(() => import('./pages/FiscalYear'));
+const MarketingHub = lazyWithRetry(() => import('./pages/MarketingHub'));
+const CatalogPage = lazyWithRetry(() => import('./pages/CatalogPage'));
+const ImportCenter = lazyWithRetry(() => import('./pages/ImportCenter'));
+const DebugCenter = lazyWithRetry(() => import('./pages/DebugCenter'));
+const LicenseManager = lazyWithRetry(() => import('./pages/LicenseManager'));
 
 // ماژول‌های تجاری و ابری پیشرفته
-const MoadianTaxHub = lazy(() => import('./pages/MoadianTaxHub'));
-const PosTerminalManagement = lazy(() => import('./pages/PosTerminalManagement'));
-const CloudBackupVault = lazy(() => import('./pages/CloudBackupVault'));
-const SmsMarketingHub = lazy(() => import('./pages/SmsMarketingHub'));
-const MultiUserLanHub = lazy(() => import('./pages/MultiUserLanHub'));
-const SlaSupportContracts = lazy(() => import('./pages/SlaSupportContracts'));
+const MoadianTaxHub = lazyWithRetry(() => import('./pages/MoadianTaxHub'));
+const PosTerminalManagement = lazyWithRetry(() => import('./pages/PosTerminalManagement'));
+const CloudBackupVault = lazyWithRetry(() => import('./pages/CloudBackupVault'));
+const SmsMarketingHub = lazyWithRetry(() => import('./pages/SmsMarketingHub'));
+const MultiUserLanHub = lazyWithRetry(() => import('./pages/MultiUserLanHub'));
+const SlaSupportContracts = lazyWithRetry(() => import('./pages/SlaSupportContracts'));
 
 // صفحات مالی حرفهای
-const DoubleEntryAccounting = lazy(() => import('./pages/DoubleEntryAccounting'));
-const CashFlowManagement = lazy(() => import('./pages/CashFlowManagement'));
-const TaxManagement = lazy(() => import('./pages/TaxManagement'));
-const ProjectManagement = lazy(() => import('./pages/ProjectManagement'));
-const FixedAssetsManagement = lazy(() => import('./pages/FixedAssetsManagement'));
-const BudgetManagement = lazy(() => import('./pages/BudgetManagement'));
-const LoanManagement = lazy(() => import('./pages/LoanManagement'));
-const JalaliDueCalendar = lazy(() => import('./components/JalaliDueCalendar'));
-const BankReconciliation = lazy(() => import('./pages/BankReconciliation'));
-const MultiCurrencyManagement = lazy(() => import('./pages/MultiCurrencyManagement'));
-const AdvancedFinancialReports = lazy(() => import('./pages/AdvancedFinancialReports'));
-const AIFinancialAssistant = lazy(() => import('./pages/AIFinancialAssistant'));
-const DataSyncManager = lazy(() => import('./pages/DataSyncManager'));
-const AdvancedSettings = lazy(() => import('./pages/AdvancedSettings'));
-const AccountingWorkflowRules = lazy(() => import('./pages/AccountingWorkflowRules'));
-const MobileCatalog = lazy(() => import('./pages/MobileCatalog'));
-const CashFlowPredictor = lazy(() => import('./pages/CashFlowPredictor'));
+const DoubleEntryAccounting = lazyWithRetry(() => import('./pages/DoubleEntryAccounting'));
+const CashFlowManagement = lazyWithRetry(() => import('./pages/CashFlowManagement'));
+const TaxManagement = lazyWithRetry(() => import('./pages/TaxManagement'));
+const ProjectManagement = lazyWithRetry(() => import('./pages/ProjectManagement'));
+const FixedAssetsManagement = lazyWithRetry(() => import('./pages/FixedAssetsManagement'));
+const BudgetManagement = lazyWithRetry(() => import('./pages/BudgetManagement'));
+const LoanManagement = lazyWithRetry(() => import('./pages/LoanManagement'));
+const JalaliDueCalendar = lazyWithRetry(() => import('./components/JalaliDueCalendar'));
+const BankReconciliation = lazyWithRetry(() => import('./pages/BankReconciliation'));
+const MultiCurrencyManagement = lazyWithRetry(() => import('./pages/MultiCurrencyManagement'));
+const AdvancedFinancialReports = lazyWithRetry(() => import('./pages/AdvancedFinancialReports'));
+const AIFinancialAssistant = lazyWithRetry(() => import('./pages/AIFinancialAssistant'));
+const DataSyncManager = lazyWithRetry(() => import('./pages/DataSyncManager'));
+const AdvancedSettings = lazyWithRetry(() => import('./pages/AdvancedSettings'));
+const AccountingWorkflowRules = lazyWithRetry(() => import('./pages/AccountingWorkflowRules'));
+const MobileCatalog = lazyWithRetry(() => import('./pages/MobileCatalog'));
+const CashFlowPredictor = lazyWithRetry(() => import('./pages/CashFlowPredictor'));
 import { AndroidSmsRelayModal } from './components/AndroidSmsRelayModal';
 
 const LoadingFallback = () => (
