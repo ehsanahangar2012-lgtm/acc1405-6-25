@@ -561,8 +561,8 @@ const Invoices = () => {
   };
 
   const getInvoiceShareText = (inv: Invoice, url: string) => {
-    const company = companies.find(c => c.isActive) || companies[0];
-    const companyName = company ? company.name : 'اشک قلم';
+    const invCompany = companies.find(c => c.id === inv.companyId) || companies.find(c => c.isActive) || companies[0];
+    const companyName = inv.companySnapshot?.name || inv.companyName || invCompany?.name || 'اشک قلم';
     
     const itemsList = inv.items
       .map(item => `🔹 ${item.productName} (${toPersianDigits(item.quantity)})`)

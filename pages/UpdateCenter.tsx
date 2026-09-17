@@ -80,7 +80,8 @@ export const UpdateCenter: React.FC = () => {
         setUpdateSuccess(false);
 
         try {
-            await otaService.performDeltaUpdate((percent, status) => {
+            const targetVer = updateInfo?.latestVersion || APP_CURRENT_VERSION;
+            await otaService.performDeltaUpdate(targetVer, (percent, status) => {
                 setUpdateProgress(percent);
                 setUpdateStatusText(status);
             });

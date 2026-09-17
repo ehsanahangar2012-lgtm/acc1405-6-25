@@ -113,6 +113,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, documen
           number: parsed.number || '',
           date: parsed.date || '',
           customer: parsed.personName || parsed.customer || (parsed.person ? parsed.person.name : ''),
+          companyName: parsed.companySnapshot?.name || parsed.companyName || (parsed.company ? parsed.company.name : '') || 'اشک قلم',
           finalTotal: parsed.finalTotal !== undefined ? parsed.finalTotal : (parsed.total || 0),
           items: parsed.items || []
         };
@@ -135,7 +136,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ isOpen, onClose, documen
       const formattedDate = toPersianDigits(invoiceInfo.date);
       const currentTime = toPersianDigits(getPersianTime());
       
-      return `📄 فاکتور رسمی اشک قلم
+      return `📄 فاکتور دیجیتال ${invoiceInfo.companyName}
 ━━━━━━━━━━━━━━━━━━━━
 👤 خریدار / مشتری: ${invoiceInfo.customer}
 🔢 شماره فاکتور: ${toPersianDigits(invoiceInfo.number)}

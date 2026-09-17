@@ -1,6 +1,6 @@
 import { idbService } from './indexedDBService';
 import { API_CONFIG } from '../config';
-import { generateUUID } from '../utils';
+import { generateUUID, packPayloadToToken, unpackPayloadFromToken } from '../utils';
 import { persistentStorage } from './persistentStorage';
 
 export interface SignatureRequest {
@@ -19,13 +19,13 @@ export interface SignatureRequest {
 
 class SimpleSignatureService {
   async createRequest(documentId: string, documentType: string, documentPreview?: string): Promise<string> {
-    const token = generateUUID();
+    const rawToken = generateUUID();
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 48);
 
     const request: SignatureRequest = {
       id: generateUUID(),
-      token,
+      token: rawToken,
       documentId,
       documentType,
       documentPreview,
@@ -33,6 +33,18 @@ class SimpleSignatureService {
       expiresAt: expiresAt.toISOString(),
       status: 'PENDING'
     };
+
+    // Pack request data into smart resilient token
+    const fullToken = packPayloadToToken(rawToken, {
+      id: request.id,
+      docId: documentId,
+      type: documentType,
+      preview: documentPreview,
+      exp: request.expiresAt,
+      created: request.createdAt
+    });
+
+    request.token = fullToken;
 
     // ۱. ذخیره محلی در IndexedDB
     await idbService.save('signature_requests', request).catch(() => {});
@@ -53,23 +65,29 @@ class SimpleSignatureService {
 
     // ۳. ذخیره در مخزن امن و پایدار ابری (Persistent Cloud Storage) به عنوان کانال تضمین‌شده
     try {
-      await persistentStorage.saveData('sig_' + token, request);
+      await persistentStorage.saveData('sig_' + rawToken, request);
+      await persistentStorage.saveData('sig_' + fullToken, request);
     } catch (e) {
       console.warn('خطا در ذخیره ابری درخواست امضا:', e);
     }
 
-    return token;
+    return fullToken;
   }
 
   async getRequest(token: string): Promise<SignatureRequest | null> {
     try {
+      const rawUuid = token.split('~')[0];
+
       // ۱. ابتدا تلاش برای خواندن از دیتابیس محلی
-      let request = await idbService.getByIndex('signature_requests', 'token', token) as SignatureRequest;
+      let request = (await idbService.getByIndex('signature_requests', 'token', token).catch(() => null)) as SignatureRequest;
+      if (!request) {
+        request = (await idbService.getByIndex('signature_requests', 'token', rawUuid).catch(() => null)) as SignatureRequest;
+      }
       
       // ۲. در صورتی که رکورد محلی وجود نداشت، تلاش از سرور امضا
       if (!request || !request.documentPreview) {
         try {
-          const response = await fetch(`${API_CONFIG.SIGNATURE_API}?action=getRequest&token=${token}`);
+          const response = await fetch(`${API_CONFIG.SIGNATURE_API}?action=getRequest&token=${encodeURIComponent(token)}`);
           if (response.ok) {
             const result = await response.json();
             if (result.success && result.request) {
@@ -84,12 +102,33 @@ class SimpleSignatureService {
       // ۳. بررسی کانال تضمین‌شده ابری persistentStorage در صورت عدم دریافت
       if (!request || !request.documentPreview) {
         try {
-          const cloudReq = await persistentStorage.loadData('sig_' + token);
-          if (cloudReq && cloudReq.token === token) {
+          let cloudReq = await persistentStorage.loadData('sig_' + token);
+          if (!cloudReq) {
+            cloudReq = await persistentStorage.loadData('sig_' + rawUuid);
+          }
+          if (cloudReq && (cloudReq.token === token || cloudReq.token === rawUuid)) {
             request = cloudReq;
           }
         } catch (e) {
           console.warn('خطا در دریافت ابری امضا:', e);
+        }
+      }
+
+      // ۴. Unpack embedded payload from token if offline / remote client without DB access
+      if (!request || !request.documentPreview) {
+        const unpacked = unpackPayloadFromToken(token);
+        if (unpacked && unpacked.payload) {
+          const p = unpacked.payload;
+          request = {
+            id: p.id || unpacked.uuid,
+            token: token,
+            documentId: p.docId || 'DOC-1',
+            documentType: p.type || 'فاکتور',
+            documentPreview: typeof p.preview === 'string' ? p.preview : JSON.stringify(p.preview || {}),
+            createdAt: p.created || new Date().toISOString(),
+            expiresAt: p.exp || new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+            status: 'PENDING'
+          };
         }
       }
 

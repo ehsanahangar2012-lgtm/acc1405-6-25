@@ -29,11 +29,40 @@ export interface UpdateCheckResult {
     isDesktop: boolean;
 }
 
-export const APP_CURRENT_VERSION = '16.22.0';
-export const APP_BUILD_NUMBER = '20260915';
+export const APP_CURRENT_VERSION = '16.24.0';
+export const APP_BUILD_NUMBER = '20260916';
 
 // پایگاه‌داده تاریخچه نسخه‌ها به‌صورت پیش‌فرض برای زمان‌های آفلاین
 const DEFAULT_RELEASES: ReleaseInfo[] = [
+    {
+        version: '16.24.0',
+        date: '۱۴۰۵/۰۶/۲۵',
+        type: 'minor',
+        title: 'بهینه‌سازی پرفورمنس پایگاه‌داده دسکتاپ ویندوز، پل پیامک اندروید و بروزرسانی خودکار OTA',
+        size: '1.6 MB (وصله آنی دلتا)',
+        downloadUrl: 'https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.24.0.exe',
+        isCurrent: true,
+        changes: [
+            { category: 'بهبود', desc: 'بهینه‌سازی موتور پایگاه‌داده دسکتاپ ویندوز و رفع کامل کندی در اتصال به وب‌سرور هاست' },
+            { category: 'ویژگی جدید', desc: 'پل ارتباطی ارسال مستقیم پیامک از گوشی اندروید به صورت آفلاین و سیم‌کارتی' },
+            { category: 'ویژگی جدید', desc: 'تولید بارکد پرداخت پویا بر روی کلیه قالب‌های چاپ فاکتور و رسید' },
+            { category: 'ویژگی جدید', desc: 'کاتالوگ لمسی همراه ویزیتوری با دریافت امضای الکترونیک مشتریان' },
+            { category: 'ویژگی جدید', desc: 'ماژول پیش‌بینی هوشمند نقدینگی ۳۰، ۶۰ و ۹۰ روز آینده' },
+            { category: 'همگام‌سازی', desc: 'همگام‌سازی لحظه‌ای مرکز بروزرسانی OTA کلاینت‌های دسکتاپ ویندوز با سرور مادر' }
+        ]
+    },
+    {
+        version: '16.23.0',
+        date: '۱۴۰۵/۰۶/۲۵',
+        type: 'patch',
+        title: 'ارتقای ماژول‌های حسابداری، کاتالوگ ویزیتوری و پیش‌بینی جریان وجوه نقد',
+        size: '1.1 MB',
+        downloadUrl: 'https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.23.0.exe',
+        changes: [
+            { category: 'ویژگی جدید', desc: 'سامانه پشتیبان‌گیری خودکار ۳ گانه آنلاین، دیسک محلی و رم' },
+            { category: 'بهبود', desc: 'تفکیک کامل متون و قابلیت‌های پلتفرم‌های ویندوز، اندروید و وب ابری' }
+        ]
+    },
     {
         version: '16.22.0',
         date: '۱۴۰۵/۰۶/۲۵',
@@ -41,7 +70,6 @@ const DEFAULT_RELEASES: ReleaseInfo[] = [
         title: 'ارتقای جامع ماژول کاردکس اشخاص، پاپ‌آپ اسناد، مرکز OTA هوشمند و رسید رسمی',
         size: '1.4 MB (فقط پچ تغییرات)',
         downloadUrl: 'https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.22.0.exe',
-        isCurrent: true,
         changes: [
             { category: 'ویژگی جدید', desc: 'نمایش پاپ‌آپ هوشمند اسناد، فاکتورها، چک‌ها و رسیدهای واریز در جدول کاردکس اشخاص' },
             { category: 'ویژگی جدید', desc: 'مرکز بروزرسانی هوشمند (OTA) با قابلیت تشخیص تفاضلی فایل‌ها و پاکسازی خودکار کش' },
@@ -95,13 +123,26 @@ class OtaUpdateService {
      * دریافت نسخه فعلی برنامه
      */
     getCurrentVersion(): string {
+        const appliedOta = localStorage.getItem('ashk_ota_version_applied');
         const desktopApi = (window as any).electronDesktopAPI;
+        let desktopVer = '';
         if (desktopApi && typeof desktopApi.getVersion === 'function') {
             try {
-                const v = desktopApi.getVersion();
-                if (v && v !== '16.12.0') return v;
+                desktopVer = desktopApi.getVersion();
             } catch {}
         }
+
+        // If an OTA update was applied locally, prioritize it if >= desktop package version
+        if (appliedOta) {
+            if (!desktopVer || this.compareVersions(appliedOta, desktopVer) >= 0) {
+                return appliedOta;
+            }
+        }
+
+        if (desktopVer && desktopVer !== '16.12.0' && desktopVer !== '16.22.0') {
+            return desktopVer;
+        }
+
         return APP_CURRENT_VERSION;
     }
 
@@ -200,8 +241,10 @@ class OtaUpdateService {
      * اجرای بروزرسانی تفاضلی دلتا (OTA Delta Update)
      * فایل‌های تغییر یافته را دریافت کرده و بدون حذف دیتابیس، اپ را نوسازی می‌کند
      */
-    async performDeltaUpdate(onProgress?: (percent: number, statusText: string) => void): Promise<boolean> {
+    async performDeltaUpdate(targetVersion?: string, onProgress?: (percent: number, statusText: string) => void): Promise<boolean> {
         try {
+            const versionToApply = targetVersion || APP_CURRENT_VERSION;
+
             // مرحله ۱: بررسی اتصال و آماده‌سازی
             onProgress?.(15, 'در حال برقراری ارتباط با هاست و دریافت مانیفست پچ...');
             await new Promise(r => setTimeout(r, 400));
@@ -242,7 +285,7 @@ class OtaUpdateService {
             // مرحله ۴: ذخیره زمان و وضعیت موفقیت‌آمیز آپدیت
             onProgress?.(90, 'در حال آماده‌سازی و بازنشانی امن برنامه...');
             localStorage.setItem('ashk_last_ota_update', Date.now().toString());
-            localStorage.setItem('ashk_ota_version_applied', this.getCurrentVersion());
+            localStorage.setItem('ashk_ota_version_applied', versionToApply);
             await new Promise(r => setTimeout(r, 400));
 
             // مرحله ۵: تکمیل

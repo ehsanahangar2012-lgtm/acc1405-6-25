@@ -62,7 +62,7 @@ export class SmsInvoiceService {
     static buildInvoiceSmsText(invoice: Invoice, company?: CompanyProfile, signUrl?: string): string {
         const invNum = (invoice.prefix || '') + toPersianDigits(invoice.number);
         const totalFormatted = formatCurrency(invoice.finalTotal).replace(' ریال', '');
-        const companyName = company?.name || 'مجموعه بازرگانی اشک قلم';
+        const companyName = invoice.companySnapshot?.name || invoice.companyName || company?.name || 'مجموعه بازرگانی اشک قلم';
         const typeLabel = invoice.type === InvoiceType.PROFORMA ? 'پیش‌فاکتور' : invoice.type === InvoiceType.PURCHASE ? 'فاکتور خرید' : 'فاکتور';
 
         let text = `خریدار گرامی ${invoice.personName}،\n${typeLabel} شماره ${invNum} به مبلغ ${totalFormatted} ریال صادر گردید.`;

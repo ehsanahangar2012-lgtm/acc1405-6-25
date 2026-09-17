@@ -1,9 +1,10 @@
 import CryptoJS from 'crypto-js';
 import type { SignatureRequest, DigitalSignature, AuthLog, OTPResponse, SignatureVerification, SignatureReport, DocumentType, SignatureStatus } from '../types-signature';
 import { hostUrlService } from './hostUrlService';
-import { fetchWithTimeout, safeFetchJson } from '../utils';
+import { fetchWithTimeout, safeFetchJson, unpackPayloadFromToken } from '../utils';
 
 const API_BASE = '/remote-signature-api.php';
+
 const ENCRYPTION_KEY = 'ashke-ghalam-signature-2024';
 
 class RemoteSignatureService {
@@ -84,8 +85,53 @@ class RemoteSignatureService {
 
   // دریافت اطلاعات درخواست با توکن
   async getRequestByToken(token: string): Promise<SignatureRequest | null> {
-    const res = await safeFetchJson(`${API_BASE}?action=get_by_token&token=${token}`);
-    return res?.data || res || null;
+    try {
+      const res = await safeFetchJson(`${API_BASE}?action=get_by_token&token=${encodeURIComponent(token)}`);
+      if (res && (res.data || res.id || res.signatureToken)) {
+        return res.data || res;
+      }
+    } catch (e) {
+      console.warn('remoteSignatureService API fetch failed:', e);
+    }
+
+    // Fallback: unpack token payload directly
+    const unpacked = unpackPayloadFromToken(token);
+    if (unpacked && unpacked.payload) {
+      const p = unpacked.payload;
+      const previewStr = typeof p.preview === 'string' ? p.preview : JSON.stringify(p.preview || {});
+      let docTitle = p.type || 'سند رسمی';
+      let signerName = 'مشتری گرامی';
+      let signerPhone = '';
+      
+      try {
+        if (previewStr) {
+          const parsed = JSON.parse(previewStr);
+          signerName = parsed.personName || parsed.customer || signerName;
+          signerPhone = parsed.phone || parsed.personPhone || '';
+          docTitle = `${p.type || 'فاکتور'} شماره ${parsed.number || ''}`;
+        }
+      } catch {}
+
+      return {
+        id: p.id || unpacked.uuid,
+        signatureToken: token,
+        documentId: p.docId || 'DOC-1',
+        documentType: (p.type || 'INVOICE') as any,
+        documentTitle: docTitle,
+        documentUrl: typeof window !== 'undefined' ? `${window.location.origin}/#/sign/${token}` : '',
+        signerName: signerName,
+        signerNationalId: '---',
+        signerPhone: signerPhone || '---',
+        authMethod: 'link',
+        requesterName: 'مجموعه تجاری',
+        requesterUserId: '1',
+        status: 'pending',
+        expiresAt: p.exp || new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+        createdAt: p.created || new Date().toISOString()
+      };
+    }
+
+    return null;
   }
 
   // امضای سند

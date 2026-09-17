@@ -510,5 +510,44 @@ export const getAppTitleForPlatform = (platform: AppPlatform = getAppPlatform())
   }
 };
 
+/**
+ * Pack payload into token with base64 url-safe string for 100% offline remote signature link resilience
+ */
+export const packPayloadToToken = (uuid: string, payload: any): string => {
+  try {
+    const jsonStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
+    const base64 = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))));
+    const urlSafe = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return `${uuid}~${urlSafe}`;
+  } catch (e) {
+    return uuid;
+  }
+};
+
+/**
+ * Unpack payload from token for 100% remote signature link resilience
+ */
+export const unpackPayloadFromToken = (token: string): { uuid: string; payload: any } | null => {
+  if (!token) return null;
+  const parts = token.split('~');
+  if (parts.length < 2) return null;
+  const uuid = parts[0];
+  const urlSafe = parts[1];
+  try {
+    let base64 = urlSafe.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) {
+      base64 += '=';
+    }
+    const jsonStr = decodeURIComponent(
+      Array.prototype.map.call(atob(base64), (c: string) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    );
+    const payload = JSON.parse(jsonStr);
+    return { uuid, payload };
+  } catch (e) {
+    return null;
+  }
+};
+
+
 
 
