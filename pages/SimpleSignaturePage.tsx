@@ -33,27 +33,36 @@ export const SimpleSignaturePage: React.FC = () => {
             // بارگذاری سند کامل از documentPreview
             if (req.documentPreview) {
               try {
-                console.log('Parsing documentPreview:', req.documentPreview.substring(0, 100));
-                const doc = JSON.parse(req.documentPreview);
-                console.log('Document parsed:', doc);
-                setFullDocument(doc);
+                let doc = typeof req.documentPreview === 'string' ? JSON.parse(req.documentPreview) : req.documentPreview;
                 
                 const customerName = doc.personName || (doc.person && doc.person.name) || (typeof doc.person === 'string' ? doc.person : '');
+                const normalizedDoc = {
+                  ...doc,
+                  number: doc.number || doc.invoiceNumber || doc.id || '101',
+                  personName: customerName || doc.personName || 'مشتری محترم',
+                  items: Array.isArray(doc.items) ? doc.items : [],
+                  finalTotal: doc.finalTotal !== undefined ? doc.finalTotal : (doc.total || 0),
+                  date: doc.date || doc.createdAt || new Date().toLocaleDateString('fa-IR'),
+                  type: doc.type || req.documentType || 'INVOICE'
+                };
+
+                setFullDocument(normalizedDoc);
                 if (customerName) {
                   setSignerName(prev => prev || customerName);
                 }
                 
-                if (doc.number) {
+                const docNum = normalizedDoc.number;
+                if (docNum) {
                   try {
                     const QRCode = await import('qrcode');
-                    const cleanDate = (doc.date || doc.createdAt || '').replace(/\//g, '');
-                    const barcodeData = doc.type === 'voucher' 
-                      ? `VCH-${doc.number}-${cleanDate}` 
-                      : (doc.type === 'CHECK_TRANSFER' || req.documentType === 'CHECK_TRANSFER' || req.documentType === 'رسید واگذاری')
-                      ? `TRF-${doc.number}-${cleanDate}`
-                      : (doc.type === 'contract' || req.documentType === 'قرارداد')
-                      ? `CON-${doc.number}-${cleanDate}`
-                      : `INV-${doc.number}-${cleanDate}`;
+                    const cleanDate = String(normalizedDoc.date || '').replace(/\//g, '');
+                    const barcodeData = normalizedDoc.type === 'voucher' 
+                      ? `VCH-${docNum}-${cleanDate}` 
+                      : (normalizedDoc.type === 'CHECK_TRANSFER' || req.documentType === 'CHECK_TRANSFER' || req.documentType === 'رسید واگذاری')
+                      ? `TRF-${docNum}-${cleanDate}`
+                      : (normalizedDoc.type === 'contract' || req.documentType === 'قرارداد')
+                      ? `CON-${docNum}-${cleanDate}`
+                      : `INV-${docNum}-${cleanDate}`;
                     const barcode = await QRCode.default.toDataURL(barcodeData, { width: 200, margin: 1 });
                     setBarcodeUrl(barcode);
                   } catch (barcodeError) {

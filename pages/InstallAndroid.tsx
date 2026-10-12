@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store';
 import { hardwareIdService } from '../services/hardwareIdService';
+import { androidCommercialService } from '../services/androidCommercialService';
+import { workspaceService } from '../services/workspaceService';
 
 const InstallAndroid: React.FC = () => {
     const { addNotification } = useStore();
@@ -18,9 +20,13 @@ const InstallAndroid: React.FC = () => {
     const [showHelpModal, setShowHelpModal] = useState(false);
 
     // Host & Sync settings
-    const [hostUrl, setHostUrl] = useState(typeof window !== 'undefined' ? window.location.origin : 'https://acc.yourdomain.ir');
+    const [hostUrl, setHostUrl] = useState(() => {
+        if (typeof window === 'undefined') return '';
+        return localStorage.getItem('ashk_host_url') || localStorage.getItem('ashk_custom_server_url') || '';
+    });
     const [syncToken, setSyncToken] = useState(() => {
-        return localStorage.getItem('ashk_host_sync_token') || 'AG-HOST-VAULT-9821-SYNC-X72A';
+        if (typeof window === 'undefined') return '';
+        return localStorage.getItem('ashk_host_sync_token') || localStorage.getItem('ashk_cloud_token') || '';
     });
 
     useEffect(() => {
@@ -56,10 +62,23 @@ const InstallAndroid: React.FC = () => {
         setDeferredPrompt(null);
     };
 
-    const handleSaveAndroidSync = () => {
-        localStorage.setItem('ashk_host_url', hostUrl.trim());
-        localStorage.setItem('ashk_host_sync_token', syncToken.trim());
-        addNotification('success', 'تنظیمات همگام‌سازی اندروید با موفقیت ذخیره شد.');
+    const handleSaveAndroidSync = async () => {
+        const trimmedUrl = hostUrl.trim();
+        const trimmedToken = syncToken.trim();
+        if (trimmedUrl) {
+            localStorage.setItem('ashk_host_url', trimmedUrl);
+            localStorage.setItem('ashk_custom_server_url', trimmedUrl);
+        }
+        if (trimmedToken) {
+            localStorage.setItem('ashk_host_sync_token', trimmedToken);
+            localStorage.setItem('ashk_cloud_token', trimmedToken);
+        }
+        await workspaceService.updateConfig({
+            customServerUrl: trimmedUrl,
+            workspaceToken: trimmedToken,
+            standaloneOfflineMode: false
+        }).catch(() => {});
+        addNotification('success', 'تنظیمات ارتباط با سرور با موفقیت ذخیره شد.');
     };
 
     const currentLiveUrl = typeof window !== 'undefined' ? window.location.origin : 'https://acc.yourdomain.ir';
@@ -580,6 +599,50 @@ pause`;
                             <Copy size={16} />
                             <span>کپی شناسه جهت صدور لایسنس</span>
                         </button>
+                    </div>
+
+                    {/* Link to PWA and Mother Server License Card */}
+                    <div className="bg-gradient-to-r from-teal-950/60 via-slate-900 to-slate-900 border border-teal-500/30 rounded-2xl p-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-white flex items-center gap-2">
+                                <Globe size={18} className="text-teal-400" />
+                                <span>پیوند مستقیم با سیستم PWA و فعال‌سازی با لایسنس سرور اصلی</span>
+                            </span>
+                            <span className="text-[10px] bg-teal-500/20 text-teal-300 px-3 py-1 rounded-full font-bold border border-teal-500/30">
+                                نسخه ۵۰ سندی ➔ نامحدود
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-300 leading-relaxed">
+                            این اپلیکیشن پلتفرم همراه و بخشی از سامانه PWA است که در حالت پیش‌فرض با سقف ۵۰ سند فعال می‌شود. با برقراری پیوند، مشخصات لایسنس فعال در سرور اصلی روی این دستگاه اعمال شده و محدودیت سند و مشتری به طور کامل حذف می‌گردد.
+                        </p>
+                        <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                            <button
+                                onClick={async () => {
+                                    const res = await androidCommercialService.linkToPwaAndActivate(hostUrl, syncToken);
+                                    if (res.success) {
+                                        addNotification('success', res.message);
+                                    } else {
+                                        addNotification('error', res.message);
+                                    }
+                                }}
+                                className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/30 w-full sm:w-auto"
+                            >
+                                <RefreshCw size={16} />
+                                <span>پیوند به سیستم PWA و فعال‌سازی با لایسنس سرور</span>
+                            </button>
+
+                            <button
+                                onClick={() => {
+                                    if (window.confirm('آیا از بازنشانی کامل دیتابیس به حالت خام محلی اطمینان دارید؟ کلیه اطلاعات ناخواسته حذف و سقف به ۵۰ سند بازمی‌گردد.')) {
+                                        androidCommercialService.resetToCleanLocalDatabase();
+                                        addNotification('success', 'دیتابیس به حالت کاملاً خام محلی با سقف ۵۰ سند بازنشانی گردید.');
+                                    }
+                                }}
+                                className="bg-rose-950/40 hover:bg-rose-900/60 border border-rose-500/30 text-rose-300 px-5 py-3 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer w-full sm:w-auto"
+                            >
+                                <span>🧹 پاکسازی و بازنشانی به داده‌های خام</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

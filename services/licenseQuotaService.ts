@@ -2,9 +2,13 @@
 // مدیریت سقف نسخه پایه و مستقل: حداکثر ۳۰ طرف حساب و حداکثر ۱۰۰ سند حسابداری
 import { encryptedStorageService, AppManifest } from './encryptedStorageService';
 import { hardwareIdService } from './hardwareIdService';
+import { isAndroidApp } from '../utils';
 
 export const MAX_TRIAL_CUSTOMERS = 30;
 export const MAX_TRIAL_DOCUMENTS = 100;
+
+export const MAX_ANDROID_DEFAULT_CUSTOMERS = 30;
+export const MAX_ANDROID_DEFAULT_DOCUMENTS = 50;
 
 export const MAX_HEMAYAT_CUSTOMERS = 70;
 export const MAX_HEMAYAT_DOCUMENTS = 450;
@@ -56,10 +60,119 @@ class LicenseQuotaService {
     }
 
     /**
+     * بررسی فعال بودن لایسنس یا پیوند با PWA / سرور اصلی در نسخه اندروید
+     */
+    isAndroidActivatedOrLinked(): boolean {
+        if (typeof window === 'undefined') return false;
+
+        // ۱. پیوند صریح با سیستم PWA یا هاست سرور اصلی
+        if (localStorage.getItem('ashk_pwa_linked') === 'true') {
+            return true;
+        }
+
+        // ۲. فعال‌سازی صریح پلتفرم اندروید
+        if (localStorage.getItem('ashk_android_activated') === 'true') {
+            return true;
+        }
+
+        // ۳. بررسی لایسنس فعال با کلید اختصاصی یا داده‌های سرور اصلی
+        const localStatus = localStorage.getItem('ashk_license_status');
+        const hasLicenseKey = Boolean(localStorage.getItem('ashk_license_key') || localStorage.getItem('ashk_activation_code'));
+        if (localStatus === 'ACTIVATED' && (hasLicenseKey || localStorage.getItem('ashk_server_license_data'))) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * فعال‌سازی اپلیکیشن همراه با مشخصات لایسنس ثبت‌شده در سرور اصلی (Mother Server / PWA Host)
+     */
+    activateWithServerLicense(details?: {
+        companyName?: string;
+        plan?: string;
+        expireDate?: string;
+        licenseKey?: string;
+        hostUrl?: string;
+        syncToken?: string;
+    }): void {
+        if (typeof window === 'undefined') return;
+
+        const companyName = details?.companyName || localStorage.getItem('ashk_company_name') || 'شرکت تجاری فعال سرور اصلی';
+        const plan = details?.plan || 'UNLIMITED';
+        const expireDate = details?.expireDate || 'دائمی (۱۰ ساله - متصل به سرور اصلی)';
+        const licenseKey = details?.licenseKey || `PWA-HOST-LIC-${Date.now().toString(36).toUpperCase()}`;
+
+        localStorage.setItem('ashk_pwa_linked', 'true');
+        localStorage.setItem('ashk_android_activated', 'true');
+        localStorage.setItem('ashk_license_status', 'ACTIVATED');
+        localStorage.setItem('ashk_license_plan', plan);
+        localStorage.setItem('ashk_company_name', companyName);
+        localStorage.setItem('ashk_license_key', licenseKey);
+
+        const serverData = {
+            companyName,
+            plan,
+            planTitle: 'نسخه تجاری همراه (فعال‌شده با لایسنس سرور اصلی - نامحدود)',
+            expireDate,
+            licenseKey,
+            hostUrl: details?.hostUrl || localStorage.getItem('ashk_host_url') || '',
+            syncToken: details?.syncToken || localStorage.getItem('ashk_host_sync_token') || '',
+            linkedAt: new Date().toISOString()
+        };
+        localStorage.setItem('ashk_server_license_data', JSON.stringify(serverData));
+
+        try {
+            const manifest = encryptedStorageService.createManifestObject({
+                licenseKey,
+                hardwareId: 'ANDROID-PWA-LINKED',
+                workspaceId: 'default',
+                companyName,
+                expireDate,
+                isUnlimited: true
+            });
+            encryptedStorageService.saveAppManifest(manifest).catch(() => {});
+        } catch (_) {}
+
+        window.dispatchEvent(new CustomEvent('ashk-license-updated'));
+        this.notifyListeners();
+    }
+
+    /**
+     * دریافت مشخصات لایسنس فعال سرور اصلی
+     */
+    getMainServerLicenseInfo(): {
+        companyName: string;
+        planTitle: string;
+        expireDate: string;
+        isUnlimited: boolean;
+        hostUrl: string;
+    } {
+        let serverData: any = {};
+        try {
+            const raw = localStorage.getItem('ashk_server_license_data');
+            if (raw) serverData = JSON.parse(raw);
+        } catch (_) {}
+
+        return {
+            companyName: serverData.companyName || localStorage.getItem('ashk_company_name') || 'سامانه مرکزی اشک قلم',
+            planTitle: serverData.planTitle || 'نسخه تجاری متصل به سرور اصلی (نامحدود)',
+            expireDate: serverData.expireDate || 'دائمی (معتبر در سرور اصلی)',
+            isUnlimited: true,
+            hostUrl: serverData.hostUrl || localStorage.getItem('ashk_host_url') || ''
+        };
+    }
+
+    /**
      * بررسی سریع اینکه آیا لایسنس کامل و معتبر روی سیستم فعال شده است یا خیر
      */
     async isFullyLicensed(): Promise<boolean> {
         if (typeof window === 'undefined') return false;
+
+        // پلتفرم اندروید: در حالت پیش‌فرض محدود به ۵۰ سند، با فعال‌سازی یا لینک به PWA فعال می‌شود
+        if (isAndroidApp()) {
+            return this.isAndroidActivatedOrLinked();
+        }
 
         // بررسی کش سریع
         const localStatus = localStorage.getItem('ashk_license_status');
@@ -85,6 +198,12 @@ class LicenseQuotaService {
      */
     isFullyLicensedSync(): boolean {
         if (typeof window === 'undefined') return false;
+
+        // ۰. پلتفرم اندروید: در حالت پیش‌فرض سقف ۵۰ سند دارد و با فعال‌سازی یا لینک به PWA فعال می‌شود
+        if (isAndroidApp()) {
+            return this.isAndroidActivatedOrLinked();
+        }
+
         // ۱. در حالت سیستم مادر (Mother Server)، سیستم به صورت لایسنس کامل و بدون محدودیت عمل می‌کند
         if (localStorage.getItem('ashk_mother_server') === 'true') {
             return true;
@@ -109,6 +228,15 @@ class LicenseQuotaService {
      */
     getCurrentPlan(): string {
         if (typeof window === 'undefined') return 'UNLIMITED';
+
+        // پلتفرم اندروید
+        if (isAndroidApp()) {
+            if (this.isAndroidActivatedOrLinked()) {
+                return 'COMMERCIAL_ANDROID_LINKED';
+            }
+            return 'ANDROID_TRIAL_50';
+        }
+
         if (localStorage.getItem('ashk_mother_server') === 'true') {
             return 'UNLIMITED';
         }
@@ -137,6 +265,28 @@ class LicenseQuotaService {
         const documentCount = docCount;
 
         if (isLicensed) {
+            // نسخه همراه متصل به PWA یا فعال‌شده با لایسنس سرور اصلی
+            if (isAndroidApp() || currentPlan === 'COMMERCIAL_ANDROID_LINKED' || currentPlan === 'COMMERCIAL_ANDROID') {
+                const serverLicense = this.getMainServerLicenseInfo();
+                return {
+                    isLicensed: true,
+                    isTrial: false,
+                    customerCount,
+                    maxCustomers: -1,
+                    remainingCustomers: 999999,
+                    isCustomerLimitReached: false,
+                    documentCount,
+                    maxDocuments: -1,
+                    remainingDocuments: 999999,
+                    isDocumentLimitReached: false,
+                    isExceeded: false,
+                    planTitle: serverLicense.planTitle || 'نسخه تجاری همراه (فعال‌شده با لایسنس سرور اصلی - نامحدود)',
+                    companyName: serverLicense.companyName || localStorage.getItem('ashk_company_name') || 'نسخه تجاری فعال سرور اصلی',
+                    expireDate: serverLicense.expireDate || 'دائمی (بدون محدودیت سند و طرف حساب)',
+                    hwid: hwidStr || 'ANDROID-COMMERCIAL-UNLIMITED'
+                };
+            }
+
             // پلن حمایتی کسب‌وکارهای خرد و نوپا
             if (currentPlan === 'HEMAYAT') {
                 const maxCust = MAX_HEMAYAT_CUSTOMERS;
@@ -183,6 +333,31 @@ class LicenseQuotaService {
             };
         }
 
+        // پلتفرم اندروید در حالت پیش‌فرض (نسخه محدود با سقف ۵۰ سند)
+        if (isAndroidApp() || currentPlan === 'ANDROID_TRIAL_50') {
+            const isCustomerLimitReached = customerCount >= MAX_ANDROID_DEFAULT_CUSTOMERS;
+            const isDocumentLimitReached = documentCount >= MAX_ANDROID_DEFAULT_DOCUMENTS;
+            const isExceeded = isCustomerLimitReached || isDocumentLimitReached;
+
+            return {
+                isLicensed: false,
+                isTrial: true,
+                customerCount,
+                maxCustomers: MAX_ANDROID_DEFAULT_CUSTOMERS,
+                remainingCustomers: Math.max(0, MAX_ANDROID_DEFAULT_CUSTOMERS - customerCount),
+                isCustomerLimitReached,
+                documentCount,
+                maxDocuments: MAX_ANDROID_DEFAULT_DOCUMENTS,
+                remainingDocuments: Math.max(0, MAX_ANDROID_DEFAULT_DOCUMENTS - documentCount),
+                isDocumentLimitReached,
+                isExceeded,
+                planTitle: `نسخه پیش‌فرض همراه (محدود به ۵۰ سند)`,
+                companyName: localStorage.getItem('ashk_company_name') || 'نسخه همراه اشک قلم',
+                expireDate: 'سقف آزمایشی ۵۰ سند (جهت نامحدودسازی فعال یا به PWA لینک کنید)',
+                hwid: hwidStr
+            };
+        }
+
         const isCustomerLimitReached = customerCount >= MAX_TRIAL_CUSTOMERS;
         const isDocumentLimitReached = documentCount >= MAX_TRIAL_DOCUMENTS;
         const isExceeded = isCustomerLimitReached || isDocumentLimitReached;
@@ -210,6 +385,30 @@ class LicenseQuotaService {
      * اعتبارسنجی ثبت مشتری جدید در استور
      */
     canAddPerson(currentPeopleCount: number): { allowed: boolean; reason?: string } {
+        // پلتفرم اندروید: در حالت پیش‌فرض دارای سقف، و پس از فعال‌سازی یا لینک به PWA نامحدود
+        if (isAndroidApp()) {
+            if (this.isAndroidActivatedOrLinked()) {
+                return { allowed: true };
+            }
+            if (currentPeopleCount >= MAX_ANDROID_DEFAULT_CUSTOMERS) {
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
+                        detail: { 
+                            reason: 'CUSTOMERS_LIMIT', 
+                            current: currentPeopleCount, 
+                            max: MAX_ANDROID_DEFAULT_CUSTOMERS,
+                            platform: 'android'
+                        }
+                    }));
+                }
+                return {
+                    allowed: false,
+                    reason: `سقف ثبت طرف حساب در نسخه پیش‌فرض همراه (${MAX_ANDROID_DEFAULT_CUSTOMERS} نفر) تکمیل شده است. جهت ارتقا، لطفاً لایسنس را فعال کرده یا با پیوند به سیستم PWA / سرور اصلی آن را نامحدود نمایید.`
+                };
+            }
+            return { allowed: true };
+        }
+
         if (this.isFullyLicensedSync()) {
             const currentPlan = this.getCurrentPlan();
             if (currentPlan === 'HEMAYAT') {
@@ -249,6 +448,30 @@ class LicenseQuotaService {
      * اعتبارسنجی ثبت سند جدید در استور (فاکتور، حواله انبار، چک، تراکنش)
      */
     canAddDocument(currentDocCount: number): { allowed: boolean; reason?: string } {
+        // پلتفرم اندروید: در حالت پیش‌فرض سقف ۵۰ سند، و پس از فعال‌سازی یا لینک به PWA نامحدود
+        if (isAndroidApp()) {
+            if (this.isAndroidActivatedOrLinked()) {
+                return { allowed: true };
+            }
+            if (currentDocCount >= MAX_ANDROID_DEFAULT_DOCUMENTS) {
+                if (typeof window !== 'undefined') {
+                    window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
+                        detail: { 
+                            reason: 'DOCUMENTS_LIMIT', 
+                            current: currentDocCount, 
+                            max: MAX_ANDROID_DEFAULT_DOCUMENTS,
+                            platform: 'android'
+                        }
+                    }));
+                }
+                return {
+                    allowed: false,
+                    reason: `سقف ثبت اسناد در نسخه پیش‌فرض همراه (${MAX_ANDROID_DEFAULT_DOCUMENTS} سند) تکمیل شده است. برای ثبت اسناد بیشتر، لطفاً با فعال‌سازی لایسنس یا پیوند به سیستم PWA / سرور اصلی، برنامه را فعال فرمایید.`
+                };
+            }
+            return { allowed: true };
+        }
+
         if (this.isFullyLicensedSync()) {
             const currentPlan = this.getCurrentPlan();
             if (currentPlan === 'HEMAYAT') {

@@ -1,6 +1,7 @@
 // Workspace & Multi-Tenant Management Service
 // مدیریت فضاهای کاری مجزا، استقلال نسخه دسکتاپ و پیکربندی بدون تداخل با سایر مشتریان
 import { HOST_BASE_URL } from '../config';
+import { isAndroidApp, isDesktopApp } from '../utils';
 
 export interface WorkspaceConfig {
     workspaceId: string;           // شناسه یکتای فضای کاری (مثلاً client_rahimi یا default)
@@ -100,10 +101,61 @@ class WorkspaceService {
         return Boolean(this.config.standaloneOfflineMode);
     }
 
-    public getBaseUrl(): string {
-        if (this.config.customServerUrl && this.config.customServerUrl.trim()) {
-            return this.config.customServerUrl.trim().replace(/\/+$/, '');
+    /**
+     * بررسی دسترسی به سرور هاست:
+     * در نسخه اندروید و ویندوز در حالت نصب خام، دسترسی به هاست مسدود است و داده‌ها کاملاً محلی و ایزوله هستند.
+     * اتصال فقط و فقط در صورتی برقرار می‌شود که:
+     * ۱. آدرس سرور مشخص (customServerUrl یا ashk_custom_server_url یا ashk_host_url) وارد شده باشد.
+     * ۲. توکن ابری (workspaceToken یا ashk_cloud_token یا ashk_host_sync_token) یا لایسنس فعال سرور وارد شده باشد.
+     */
+    public isRemoteCloudConfigured(): boolean {
+        if (typeof window === 'undefined') return false;
+        if (this.isStandaloneOffline()) return false;
+
+        const customUrl = (
+            this.config.customServerUrl || 
+            localStorage.getItem('ashk_custom_server_url') || 
+            localStorage.getItem('ashk_host_url') || 
+            ''
+        ).trim();
+
+        const token = (
+            this.config.workspaceToken || 
+            localStorage.getItem('ashk_cloud_token') || 
+            localStorage.getItem('ashk_host_sync_token') || 
+            ''
+        ).trim();
+
+        const isLinkedOrLicensed = 
+            localStorage.getItem('ashk_pwa_linked') === 'true' || 
+            localStorage.getItem('ashk_android_activated') === 'true' ||
+            Boolean(localStorage.getItem('ashk_server_license_data'));
+
+        // در اندروید و ویندوز، بدون ورود صریح آدرس سرور و (توکن ابری یا لایسنس معتبر)، دسترسی به هاست مسدود است و دیتابیس کاملاً محلی است
+        if (isAndroidApp() || isDesktopApp()) {
+            return Boolean(customUrl && (token || isLinkedOrLicensed));
         }
+
+        // در وب عادی تنها در صورتی که هاست مشخص و توکن وجود داشته باشد سینک مجاز است
+        return Boolean(customUrl && token);
+    }
+
+    public getBaseUrl(): string {
+        const custom = (
+            this.config.customServerUrl || 
+            (typeof window !== 'undefined' ? localStorage.getItem('ashk_custom_server_url') || localStorage.getItem('ashk_host_url') : '') || 
+            ''
+        ).trim();
+
+        if (custom) {
+            return custom.replace(/\/+$/, '');
+        }
+
+        // در اندروید و ویندوز در حالت نصب خام، هیچ ارتباط پیش‌فرضی به سایت اصلی برقرار نمی‌شود
+        if (isAndroidApp() || isDesktopApp()) {
+            return '';
+        }
+
         return HOST_BASE_URL;
     }
 
@@ -111,8 +163,9 @@ class WorkspaceService {
         const headers: Record<string, string> = {
             'X-Workspace-ID': this.getWorkspaceId()
         };
-        if (this.config.workspaceToken) {
-            headers['X-Workspace-Token'] = this.config.workspaceToken;
+        const token = this.config.workspaceToken || (typeof window !== 'undefined' ? localStorage.getItem('ashk_cloud_token') || localStorage.getItem('ashk_host_sync_token') : '');
+        if (token) {
+            headers['X-Workspace-Token'] = token;
         }
         return headers;
     }
@@ -144,7 +197,7 @@ class WorkspaceService {
         }
     }
 
-    // تست اتصال به فضای کاری هاست
+    // تست اتصال به هاست (فقط بررسی سلامت و پینگ بدون فراخوانی و دریافت داده‌های بیزینس)
     public async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
         if (this.isStandaloneOffline()) {
             return {
@@ -155,35 +208,45 @@ class WorkspaceService {
 
         try {
             const baseUrl = this.getBaseUrl();
-            const response = await fetch(`${baseUrl}/storage.php`, {
+            // درخواست سبک سلامت سرور (Health Check / Ping) بدون بارگذاری رکوردها
+            const healthUrl = `${baseUrl.replace(/\/$/, '')}/api.php?action=health`;
+            const response = await fetch(healthUrl, {
+                method: 'GET',
+                cache: 'no-store'
+            }).catch(() => null);
+
+            if (response && response.ok) {
+                const data = await response.json().catch(() => null);
+                return {
+                    success: true,
+                    message: `اتصال به هاست با موفقیت برقرار شد. (${data?.company_name || 'سرور مرکزی'})`,
+                    details: data
+                };
+            }
+
+            // تلاش جایگزین سبک با storage.php و اکشن ping
+            const responsePing = await fetch(`${baseUrl}/storage.php`, {
                 method: 'POST',
                 cache: 'no-store',
                 headers: {
                     'Content-Type': 'application/json',
                     ...this.getHeaders()
                 },
-                body: JSON.stringify({ action: 'checkWorkspace' })
-            });
+                body: JSON.stringify({ action: 'ping' })
+            }).catch(() => null);
 
-            if (!response.ok) {
-                return {
-                    success: false,
-                    message: `سرور وضعیت ${response.status} را بازگرداند.`
-                };
-            }
-
-            const data = await response.json();
-            if (data && data.success) {
+            if (responsePing && responsePing.ok) {
+                const pingData = await responsePing.json().catch(() => null);
                 return {
                     success: true,
-                    message: `اتصال به فضای کاری ${data.workspace} در هاست با موفقیت برقرار شد. (${data.record_count} رکورد ثبت شده)`,
-                    details: data
+                    message: `ارتباط با هاست برقرار شد. (وضعیت سرور فعال است)`,
+                    details: pingData
                 };
             }
 
             return {
                 success: false,
-                message: data.message || 'خطا در احراز هویت فضای کاری'
+                message: 'هاست پاسخگو نیست یا مسیر ارتباطی برقرار نشد.'
             };
         } catch (e) {
             return {

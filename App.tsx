@@ -30,6 +30,7 @@ import { AuthService } from './services/authService';
 import { ActivationDashboard } from './components/ActivationDashboard';
 import { DesktopSetupWizard } from './components/DesktopSetupWizard';
 import { TrialLimitModal } from './components/TrialLimitModal';
+import { AndroidCommercialHubModal } from './components/AndroidCommercialHubModal';
 import { SplashScreen } from './components/SplashScreen';
 import { ClientBroadcastHub } from './components/ClientBroadcastHub';
 import { SmartPasswordRecoveryModal } from './components/SmartPasswordRecoveryModal';
@@ -40,7 +41,8 @@ import { AppDialogModal } from './components/AppDialogModal';
 import { AccountingLogo } from './components/AccountingLogo';
 import { dialogService } from './services/dialogService';
 import { UpdateCenter } from './pages/UpdateCenter';
-import { isDesktopApp } from './utils';
+import { workspaceService } from './services/workspaceService';
+import { isDesktopApp, isAndroidApp } from './utils';
 import { FEATURES } from './config';
 import { Lock, User as UserIcon, LogIn, PenTool, Loader2, WifiOff, Cloud, RefreshCw, KeyRound, ShieldCheck } from 'lucide-react';
 
@@ -151,11 +153,11 @@ const LoginPage = () => {
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
     const [showRecoveryModal, setShowRecoveryModal] = useState(false);
 
-    // همگام‌سازی خودکار حساب‌های کاربری با سرور مرکزی ابری هنگام بارگذاری
+    // همگام‌سازی خودکار حساب‌های کاربری با سرور مرکزی ابری هنگام بارگذاری (صرفاً در صورت اتصال و پیکربندی صریح سرور)
     useEffect(() => {
         let isMounted = true;
         const fetchRemoteUsers = async () => {
-            if (!navigator.onLine) return;
+            if (!navigator.onLine || !workspaceService.isRemoteCloudConfigured()) return;
             try {
                 setIsSyncing(true);
                 await autoSyncService.syncUsersOnly();
@@ -174,6 +176,10 @@ const LoginPage = () => {
     }, []);
 
     const handleManualSync = async () => {
+        if (!workspaceService.isRemoteCloudConfigured()) {
+            setSyncMessage('برنامه در حالت محلی مستقل و خام است (جهت اتصال، ابتدا آدرس سرور و توکن را وارد نمایید)');
+            return;
+        }
         setIsSyncing(true);
         setSyncMessage('در حال اتصال به سرور و دریافت اطلاعات...');
         try {
@@ -200,8 +206,8 @@ const LoginPage = () => {
             let currentUsers = useStore.getState().users || [];
             let user = AuthService.validateCredentials(username, password, currentUsers);
 
-            // ۲. اگر در این دستگاه یافت نشد (دستگاه جدید یا دوم)، فوراً از هاست دریافت کن
-            if (!user && navigator.onLine) {
+            // ۲. اگر در این دستگاه یافت نشد (دستگاه جدید یا دوم)، فقط در صورت پیکربندی سرور از هاست دریافت کن
+            if (!user && navigator.onLine && workspaceService.isRemoteCloudConfigured()) {
                 setSyncMessage('کاربر در این سیستم یافت نشد. در حال بررسی با سرور مرکزی...');
                 await autoSyncService.syncUsersOnly();
                 currentUsers = useStore.getState().users || [];
@@ -210,8 +216,10 @@ const LoginPage = () => {
 
             if (user) {
                 login(user);
-                // بارگذاری تمام فاکتورها، حساب‌ها و اسناد برای دستگاه جدید
-                autoSyncService.loadFromHost().catch(() => {});
+                // بارگذاری تمام فاکتورها، حساب‌ها و اسناد تنها در صورت پیکربندی و اتصال صریح به سرور
+                if (workspaceService.isRemoteCloudConfigured()) {
+                    autoSyncService.loadFromHost().catch(() => {});
+                }
             } else {
                 setError('نام کاربری یا رمز عبور اشتباه است.');
             }
@@ -532,6 +540,53 @@ const MainAppLayout: React.FC = () => {
     );
 };
 
+/**
+ * تابع پاکسازی کش و بازنشانی جامع (Clear Cache and Reset Utility)
+ * پاک کردن کامل localStorage، IndexedDB و sessionStorage جهت تضمین یک شروع کاملاً خام (Clean Slate)
+ */
+export async function clearCacheAndResetApp(): Promise<void> {
+    try {
+        if (typeof window !== 'undefined') {
+            sessionStorage.clear();
+            sessionStorage.setItem('system_reset', 'true');
+            localStorage.clear();
+
+            if (window.indexedDB && window.indexedDB.databases) {
+                try {
+                    const dbs = await window.indexedDB.databases();
+                    for (const db of dbs) {
+                        if (db.name) {
+                            window.indexedDB.deleteDatabase(db.name);
+                        }
+                    }
+                } catch (_) {
+                    window.indexedDB.deleteDatabase('AshkeGhalamDB');
+                    window.indexedDB.deleteDatabase('AshkeGhalamOfflineDB');
+                }
+            } else {
+                window.indexedDB.deleteDatabase('AshkeGhalamDB');
+                window.indexedDB.deleteDatabase('AshkeGhalamOfflineDB');
+            }
+
+            if ('caches' in window) {
+                const cacheNames = await caches.keys();
+                for (const name of cacheNames) {
+                    await caches.delete(name);
+                }
+            }
+
+            window.location.reload();
+        }
+    } catch (err) {
+        console.error('Reset error:', err);
+        window.location.reload();
+    }
+}
+
+if (typeof window !== 'undefined') {
+    (window as any).clearCacheAndResetApp = clearCacheAndResetApp;
+}
+
 const App = () => {
   const currentUser = useStore(state => state.currentUser);
   const logout = useStore(state => state.logout);
@@ -589,18 +644,16 @@ const App = () => {
       };
     }
     
-    // شروع سینک کراس دیوایس
-    if (FEATURES.ENABLE_CROSS_DEVICE_SYNC) {
-      crossDeviceSync.startAutoSync();
+    // شروع سرویس‌های همگام‌سازی ابری تنها در صورتی که اتصال به سرور پیکربندی و تایید شده باشد
+    if (workspaceService.isRemoteCloudConfigured()) {
+      if (FEATURES.ENABLE_CROSS_DEVICE_SYNC) {
+        crossDeviceSync.startAutoSync();
+      }
+      if (FEATURES.ENABLE_AUTO_SYNC) {
+        autoSyncService.start();
+      }
+      realtimeSyncService.start();
     }
-    
-    // شروع Auto-Sync با Host
-    if (FEATURES.ENABLE_AUTO_SYNC) {
-      autoSyncService.start();
-    }
-    
-    // شروع Real-time Sync
-    realtimeSyncService.start();
     
     // شروع پشتیبانگیری خودکار
     if (currentUser && FEATURES.ENABLE_AUTO_BACKUP) {
@@ -615,15 +668,17 @@ const App = () => {
       adminChatNotificationService.startMonitoring(12000);
     }
 
-    // شروع پردازش دوره‌ای صف سینک - هر ۲ دقیقه
+    // شروع پردازش دوره‌ای صف سینک - هر ۲ دقیقه (صرفاً در صورت اتصال به سرور)
     const queueTimer = setInterval(() => {
-      if (navigator.onLine) {
+      if (navigator.onLine && workspaceService.isRemoteCloudConfigured()) {
         syncQueue.processQueue().catch(() => {});
       }
     }, 2 * 60 * 1000); // هر ۲ دقیقه
 
-    // پردازش فوری هنگام اولیه
-    setTimeout(() => syncQueue.processQueue().catch(() => {}), 3000);
+    // پردازش فوری هنگام اولیه در صورت اتصال به سرور
+    if (workspaceService.isRemoteCloudConfigured()) {
+      setTimeout(() => syncQueue.processQueue().catch(() => {}), 3000);
+    }
     
     return () => {
       clearTimeout(initConnection);
@@ -642,14 +697,18 @@ const App = () => {
   }, [currentUser]);
 
   const [showActivationModal, setShowActivationModal] = useState(false);
+  const [showAndroidCommercialModal, setShowAndroidCommercialModal] = useState(false);
   const [showTrialLimitModal, setShowTrialLimitModal] = useState(false);
   const [trialLimitReason, setTrialLimitReason] = useState<'CUSTOMERS_LIMIT' | 'DOCUMENTS_LIMIT' | 'MANUAL'>('MANUAL');
   const [showSetupWizard, setShowSetupWizard] = useState(() => {
     if (typeof window === 'undefined') return false;
     if (!isDesktopApp()) {
       localStorage.setItem('ashk_initial_setup_done', 'true');
-      localStorage.setItem('ashk_license_status', 'ACTIVATED');
-      localStorage.setItem('ashk_mother_server', 'true');
+      // سرور وب/هاست به عنوان سیستم مادر فعال است، اما اندروید در حالت پیش‌فرض با سقف ۵۰ سند شروع می‌شود
+      if (!isAndroidApp()) {
+        localStorage.setItem('ashk_license_status', 'ACTIVATED');
+        localStorage.setItem('ashk_mother_server', 'true');
+      }
       return false;
     }
     return localStorage.getItem('ashk_initial_setup_done') === null;
@@ -682,15 +741,18 @@ const App = () => {
 
   useEffect(() => {
     const handleOpenActivation = () => setShowActivationModal(true);
+    const handleOpenAndroidCommercial = () => setShowAndroidCommercialModal(true);
     const handleOpenTrialLimit = (e: any) => {
       if (e.detail?.reason) setTrialLimitReason(e.detail.reason);
       setShowTrialLimitModal(true);
     };
 
     window.addEventListener('open-activation-dashboard', handleOpenActivation);
+    window.addEventListener('open-android-commercial-hub', handleOpenAndroidCommercial);
     window.addEventListener('open-trial-limit-modal', handleOpenTrialLimit);
     return () => {
       window.removeEventListener('open-activation-dashboard', handleOpenActivation);
+      window.removeEventListener('open-android-commercial-hub', handleOpenAndroidCommercial);
       window.removeEventListener('open-trial-limit-modal', handleOpenTrialLimit);
     };
   }, []);
@@ -724,6 +786,12 @@ const App = () => {
                 <ActivationDashboard 
                   isOpen={showActivationModal} 
                   onClose={() => setShowActivationModal(false)}
+                />
+              )}
+              {showAndroidCommercialModal && (
+                <AndroidCommercialHubModal
+                  isOpen={showAndroidCommercialModal}
+                  onClose={() => setShowAndroidCommercialModal(false)}
                 />
               )}
               <Routes>

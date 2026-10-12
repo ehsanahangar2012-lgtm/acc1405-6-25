@@ -63,10 +63,12 @@ class SimpleSignatureService {
       console.warn('پاسخ اولیه سرور امضا ناموفق بود:', e);
     }
 
-    // ۳. ذخیره در مخزن امن و پایدار ابری (Persistent Cloud Storage) به عنوان کانال تضمین‌شده
+    // ۳. ذخیره در مخزن امن و پایدار ابری (Persistent Cloud Storage) به عنوان کانال تضمین‌شده عمومی
     try {
       await persistentStorage.saveData('sig_' + rawToken, request);
       await persistentStorage.saveData('sig_' + fullToken, request);
+      await persistentStorage.saveData('public_sig_' + rawToken, request);
+      await persistentStorage.saveData('public_sig_' + fullToken, request);
     } catch (e) {
       console.warn('خطا در ذخیره ابری درخواست امضا:', e);
     }
@@ -84,10 +86,13 @@ class SimpleSignatureService {
         request = (await idbService.getByIndex('signature_requests', 'token', rawUuid).catch(() => null)) as SignatureRequest;
       }
       
-      // ۲. در صورتی که رکورد محلی وجود نداشت، تلاش از سرور امضا
+      // ۲. در صورتی که رکورد محلی وجود نداشت، تلاش از سرور امضا با توکن کامل و اولیه
       if (!request || !request.documentPreview) {
         try {
-          const response = await fetch(`${API_CONFIG.SIGNATURE_API}?action=getRequest&token=${encodeURIComponent(token)}`);
+          let response = await fetch(`${API_CONFIG.SIGNATURE_API}?action=getRequest&token=${encodeURIComponent(token)}`);
+          if (!response.ok) {
+            response = await fetch(`${API_CONFIG.SIGNATURE_API}?action=getRequest&token=${encodeURIComponent(rawUuid)}`);
+          }
           if (response.ok) {
             const result = await response.json();
             if (result.success && result.request) {
@@ -99,14 +104,20 @@ class SimpleSignatureService {
         }
       }
 
-      // ۳. بررسی کانال تضمین‌شده ابری persistentStorage در صورت عدم دریافت
+      // ۳. بررسی کانال تضمین‌شده ابری persistentStorage جهت استفاده کاربران غیرلاگین و عمومی
       if (!request || !request.documentPreview) {
         try {
           let cloudReq = await persistentStorage.loadData('sig_' + token);
           if (!cloudReq) {
             cloudReq = await persistentStorage.loadData('sig_' + rawUuid);
           }
-          if (cloudReq && (cloudReq.token === token || cloudReq.token === rawUuid)) {
+          if (!cloudReq) {
+            cloudReq = await persistentStorage.loadData('public_sig_' + token);
+          }
+          if (!cloudReq) {
+            cloudReq = await persistentStorage.loadData('public_sig_' + rawUuid);
+          }
+          if (cloudReq && (cloudReq.documentPreview || cloudReq.token)) {
             request = cloudReq;
           }
         } catch (e) {

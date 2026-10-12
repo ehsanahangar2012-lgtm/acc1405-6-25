@@ -1,8 +1,8 @@
-// Trial & License Status Badge for Top Bar / Header
 import React, { useState, useEffect } from 'react';
 import { Sparkles, ShieldCheck, Users, FileText, Lock } from 'lucide-react';
 import { useStore } from '../store';
 import { licenseQuotaService, MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS } from '../services/licenseQuotaService';
+import { isAndroidApp } from '../utils';
 
 export const TrialStatusBadge: React.FC = () => {
     const customerCount = useStore(state => state.people.length);
@@ -10,6 +10,7 @@ export const TrialStatusBadge: React.FC = () => {
         state.invoices.length + state.vouchers.length + state.transactions.length + state.checks.length
     );
     const [isLicensed, setIsLicensed] = useState(() => licenseQuotaService.isFullyLicensedSync());
+    const isAndroid = isAndroidApp();
 
     useEffect(() => {
         const updateStatus = () => {
@@ -30,16 +31,48 @@ export const TrialStatusBadge: React.FC = () => {
         }));
     };
 
+    if (isAndroid) {
+        if (isLicensed) {
+            return (
+                <button
+                    type="button"
+                    id="license-status-badge-android-active"
+                    onClick={() => window.dispatchEvent(new CustomEvent('open-android-commercial-hub'))}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold shadow-xs cursor-pointer hover:bg-emerald-500/25 transition"
+                    title="نسخه همراه با لایسنس سرور اصلی فعال است (کلیک جهت مشاهده و مدیریت)"
+                >
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>همراه فعال (لایسنس سرور اصلی)</span>
+                </button>
+            );
+        }
+
+        return (
+            <button
+                type="button"
+                id="license-status-badge-android-trial"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-android-commercial-hub'))}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 text-[10px] font-bold shadow-xs cursor-pointer hover:bg-amber-500/25 transition"
+                title="نسخه پیش‌فرض همراه (سقف ۵۰ سند - کلیک جهت فعال‌سازی یا لینک به PWA)"
+            >
+                <Lock className="w-3.5 h-3.5 text-amber-400" />
+                <span>همراه ({documentCount}/۵۰ سند)</span>
+            </button>
+        );
+    }
+
     if (isLicensed) {
         return (
-            <div 
+            <button
+                type="button"
                 id="license-status-badge-active"
-                className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold shadow-xs"
+                onClick={() => window.dispatchEvent(new CustomEvent('open-activation-dashboard'))}
+                className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold shadow-xs cursor-pointer hover:bg-emerald-500/20 transition"
                 title="نرم‌افزار با لایسنس تجاری فعال است"
             >
                 <ShieldCheck className="w-3 h-3" />
                 <span>نسخه تجاری فعال</span>
-            </div>
+            </button>
         );
     }
 

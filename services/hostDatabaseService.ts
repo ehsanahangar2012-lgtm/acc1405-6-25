@@ -2,6 +2,7 @@
 import { API_CONFIG } from '../config';
 import { syncQueue } from './syncQueueService';
 import { persistentStorage } from './persistentStorage';
+import { workspaceService } from './workspaceService';
 
 interface SyncMetadata {
     lastSync: number;
@@ -32,6 +33,9 @@ class HostDatabaseService {
 
     // ذخیره کل جدول به صورت یکپارچه و اتمیک
     async saveTable(table: string, dataArray: any[]): Promise<boolean> {
+        if (!workspaceService.isRemoteCloudConfigured()) {
+            return true;
+        }
         try {
             const ok = await persistentStorage.saveData(table, dataArray);
             if (ok) {
@@ -50,6 +54,9 @@ class HostDatabaseService {
 
     // ذخیره داده با version control به صورت کاملاً ناهمگام و بدون لگ در ویندوز
     async save(table: string, data: any, skipQueue = false) {
+        if (!workspaceService.isRemoteCloudConfigured()) {
+            return { success: true, localOnly: true, version: Date.now() };
+        }
         // ثبت شناسه و تاریخ آخرین تغییر برای سینک اتوماتیک
         const recordToSave = {
             ...data,
@@ -73,6 +80,9 @@ class HostDatabaseService {
 
     // دریافت داده با incremental sync و timeout
     async get(table: string, id?: string) {
+        if (!workspaceService.isRemoteCloudConfigured()) {
+            return null;
+        }
         // ۱. ابتدا از طریق persistentStorage (هاست بدون نیاز به توکن مسدودکننده)
         try {
             const cloudData = await persistentStorage.loadData(table);

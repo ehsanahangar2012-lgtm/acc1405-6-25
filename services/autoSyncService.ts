@@ -64,15 +64,32 @@ class AutoSyncService {
         return this.deviceId;
     }
 
+    /**
+     * آیا برقراری ارتباط و همگام‌سازی با سرور مجاز است؟
+     */
+    public canSyncWithServer(): boolean {
+        if (typeof window === 'undefined') return false;
+        if (!navigator.onLine) return false;
+        if (workspaceService.isStandaloneOffline()) return false;
+        return workspaceService.isRemoteCloudConfigured();
+    }
+
     start() {
         if (this.syncInterval) return;
         if (typeof window === 'undefined') return;
 
+        // اگر سیستم در حالت محلی مستقل و خام است، هیچ سینکی با سرور شروع نمی‌شود
+        if (!this.canSyncWithServer()) {
+            return;
+        }
+
         deletedRecordsRegistry.startAutoSync();
 
         window.addEventListener('online', () => {
-            notificationService.wentOnline();
-            this.scheduleIdleSync();
+            if (this.canSyncWithServer()) {
+                notificationService.wentOnline();
+                this.scheduleIdleSync();
+            }
         });
 
         window.addEventListener('offline', () => {
@@ -81,14 +98,14 @@ class AutoSyncService {
 
         // Pull خودکار هنگام بازگشت کاربر به تب
         document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && navigator.onLine && !this.isSyncing) {
+            if (!document.hidden && this.canSyncWithServer() && !this.isSyncing) {
                 this.scheduleIdleSync(500);
             }
         });
 
         // همگام‌سازی دوره‌ای سبک
         this.syncInterval = setInterval(() => {
-            if (navigator.onLine && !this.isSyncing) {
+            if (this.canSyncWithServer() && !this.isSyncing) {
                 // اگر کاربر کمتر از ۳ ثانیه پیش کلیک یا تایپ کرده، سینک را به تاخیر بینداز
                 if (Date.now() - this.lastUserInteraction < 3000) {
                     return;
@@ -99,13 +116,14 @@ class AutoSyncService {
 
         // بارگذاری اولیه با تاخیر امن
         setTimeout(() => {
-            if (navigator.onLine) {
+            if (this.canSyncWithServer()) {
                 this.scheduleIdleSync(0);
             }
         }, INITIAL_DELAY_MS);
     }
 
     private scheduleIdleSync(delay = 200) {
+        if (!this.canSyncWithServer()) return;
         setTimeout(() => {
             if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
                 (window as any).requestIdleCallback(() => {
@@ -118,7 +136,7 @@ class AutoSyncService {
     }
 
     private async executeFullSyncCycle() {
-        if (this.isSyncing || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+        if (!this.canSyncWithServer() || this.isSyncing) return;
         try {
             await this.loadFromHost();
             await syncQueue.processQueue();
@@ -140,7 +158,7 @@ class AutoSyncService {
      * همگام‌سازی مستقل کاربران از سرور ابری (قبل و بعد از ورود)
      */
     async syncUsersOnly(): Promise<boolean> {
-        if (workspaceService.isStandaloneOffline() || !navigator.onLine) return false;
+        if (!this.canSyncWithServer()) return false;
         try {
             const serverUsers = await persistentStorage.loadData('users');
             if (serverUsers && Array.isArray(serverUsers)) {
@@ -161,7 +179,7 @@ class AutoSyncService {
      * ارسال داده‌های تغییریافته به سرور هاست
      */
     async syncToHost(force = false): Promise<void> {
-        if (workspaceService.isStandaloneOffline()) {
+        if (!this.canSyncWithServer()) {
             this.isSyncing = false;
             return;
         }
@@ -245,7 +263,7 @@ class AutoSyncService {
      * بارگذاری تغییرات از سرور به صورت تجمیعی (Single-Batch UI State Update)
      */
     async loadFromHost(forceReload = false): Promise<boolean> {
-        if (workspaceService.isStandaloneOffline() || (typeof navigator !== 'undefined' && !navigator.onLine)) return false;
+        if (!this.canSyncWithServer()) return false;
 
         try {
             await deletedRecordsRegistry.syncFromServer();

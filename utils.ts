@@ -406,9 +406,29 @@ export const sendInvoicePdf = async (pdfBlob: Blob, invoiceId: string): Promise<
 };
 
 /**
- * Safe fetch JSON helper that avoids Unexpected token '<' errors when server returns HTML/error pages.
+ * بررسی اینکه آیا اتصال به هاست و وب‌سایت در نسخه ویندوز و اندروید مجاز است؟
+ * در حالت تست و لیمیت بدون لایسنس، هیچ ارتباطی با سایت حتی در زمان تست اتصال نباید برقرار شود.
+ */
+export const isHostConnectedOrAllowed = (): boolean => {
+  if (typeof window === 'undefined') return true;
+  const isWebOrPwa = !isDesktopApp() && !isAndroidApp();
+  if (isWebOrPwa) return true;
+  
+  // بررسی لایسنس معتبر در ویندوز و اندروید
+  const status = localStorage.getItem('ashk_license_status');
+  const hasKey = Boolean(localStorage.getItem('ashk_license_key') || localStorage.getItem('ashk_activation_code') || localStorage.getItem('ashk_server_license_data'));
+  return status === 'ACTIVATED' && hasKey;
+};
+
+/**
+ * Safe fetch JSON helper that avoids Unexpected token '<' errors when server returns HTML/error pages,
+ * and enforces zero-connection in unlicensed Windows/Android test/limit mode.
  */
 export const safeFetchJson = async (input: RequestInfo | URL, init?: RequestInit, fallback: any = null): Promise<any> => {
+  if (!isHostConnectedOrAllowed()) {
+    // در حالت آزمایشی یا بدون لایسنس ویندوز/اندروید، هیچ درخواست شبکه و ارتباطی با هاست انجام نمی‌شود.
+    return fallback;
+  }
   try {
     const response = await fetch(input, init);
     const contentType = response.headers.get('content-type') || '';
@@ -513,8 +533,42 @@ export const getAppTitleForPlatform = (platform: AppPlatform = getAppPlatform())
 /**
  * Pack payload into token with base64 url-safe string for 100% offline remote signature link resilience
  */
-export const packPayloadToToken = (uuid: string, payload: any): string => {
+export const packPayloadToToken = (uuid: string, rawPayload: any): string => {
   try {
+    let payload = rawPayload;
+    
+    // فشرده‌سازی اطلاعات پیش‌نمایش جهت حفظ سبکی لینک و جلوگیری از شکستگی در پیامک و پیام‌رسان‌ها
+    if (payload && typeof payload === 'object') {
+      const copy = { ...payload };
+      if (copy.preview) {
+        let pObj = copy.preview;
+        if (typeof pObj === 'string') {
+          try { pObj = JSON.parse(pObj); } catch {}
+        }
+        if (pObj && typeof pObj === 'object') {
+          // حذف رشته‌های سنگین بیس۶۴ مانند تصاویر مهر و لوگو فقط برای توکن URL (دیتا بر روی سرور کامل ذخیره می‌شود)
+          const compactObj = { ...pObj };
+          delete compactObj.logo;
+          delete compactObj.stamp;
+          delete compactObj.signature;
+          if (compactObj.company) {
+            compactObj.company = { ...compactObj.company };
+            delete compactObj.company.logo;
+            delete compactObj.company.stamp;
+            delete compactObj.company.signature;
+          }
+          if (compactObj.companySnapshot) {
+            compactObj.companySnapshot = { ...compactObj.companySnapshot };
+            delete compactObj.companySnapshot.logo;
+            delete compactObj.companySnapshot.stamp;
+            delete compactObj.companySnapshot.signature;
+          }
+          copy.preview = JSON.stringify(compactObj);
+        }
+      }
+      payload = copy;
+    }
+
     const jsonStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
     const base64 = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))));
     const urlSafe = base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');

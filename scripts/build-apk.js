@@ -7,10 +7,26 @@ const rootDir = process.cwd();
 const distDir = path.resolve(rootDir, 'dist');
 const capacitorConfigPath = path.resolve(rootDir, 'capacitor.config.json');
 
+const pkgPath = path.resolve(rootDir, 'package.json');
+const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) : { version: '16.27.0' };
+const APP_VERSION = pkg.version || '16.27.0';
+
 console.log('================================================================');
-console.log('  📱 سامانه بیلد خودکار پکیج APK اندروید اشک قلم (Capacitor)');
+console.log(`  📱 سامانه بیلد خودکار پکیج APK اندروید اشک قلم v${APP_VERSION}`);
 console.log('  🏢 نرم‌افزار حسابداری و اتوماسیون مالی اشک قلم (AshkeGhalam)');
 console.log('================================================================\n');
+
+// ۰. پاکسازی و حذف فایل‌های بیلد قدیمی طبق قوانین پروژه
+console.log('🧹 در حال پاکسازی فایل‌های APK و بیلد‌های قدیمی...');
+try {
+    const rootFiles = fs.readdirSync(rootDir);
+    rootFiles.filter(f => f.startsWith('AshkeGhalam-') && f.endsWith('.apk')).forEach(oldFile => {
+        try {
+            fs.unlinkSync(path.join(rootDir, oldFile));
+            console.log(`🗑️ فایل APK قدیمی حذف شد: ${oldFile}`);
+        } catch {}
+    });
+} catch {}
 
 // ۱. بررسی یا ایجاد پوشه خروجی dist
 if (!fs.existsSync(distDir) || !fs.existsSync(path.join(distDir, 'index.html'))) {

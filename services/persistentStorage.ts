@@ -20,22 +20,26 @@ class PersistentStorage {
     private readonly WRITE_DEBOUNCE_MS = 400; // ۴۰۰ میلی‌ثانیه دی‌بانس برای تجمیع درخواست‌های ذخیره
 
     private async request(action: string, data: any): Promise<StorageResponse> {
-        // اگر حالت آفلاین مستقل فعال باشد، نیازی به ارتباط با هاست نیست
+        // ۱. اگر حالت آفلاین مستقل فعال باشد، نیازی به ارتباط با هاست نیست
         if (workspaceService.isStandaloneOffline()) {
             return { success: false, message: 'حالت آفلاین مستقل فعال است' };
         }
 
-        // در نسخه دسکتاپ ویندوز در حالت کاملاً محلی، نیازی به ارسال درخواست سرور نیست
-        if (isDesktopApp() && !licenseQuotaService.isFullyLicensedSync() && !workspaceService.getConfig().customServerUrl && !localStorage.getItem('ashk_custom_server_url')) {
-            return { success: false, message: 'در نسخه دسکتاپ محلی داده‌ها ایزوله و پرسرعت ذخیره می‌شوند' };
+        // ۲. در حالت نصب خام (اندروید، ویندوز و کلاینت‌ها)، تا زمان ورود اطلاعات سرور و توکن، داده‌ها کاملاً محلی هستند
+        if (!workspaceService.isRemoteCloudConfigured()) {
+            return { success: false, message: 'سامانه در حالت داده محلی مستقل و خام اجرا می‌شود (عدم دسترسی به هاست).' };
         }
 
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
             return { success: false, message: 'دستگاه آفلاین است' };
         }
 
+        const baseUrl = workspaceService.getBaseUrl();
+        if (!baseUrl) {
+            return { success: false, message: 'آدرس سرور هاست پیکربندی نشده است' };
+        }
+
         try {
-            const baseUrl = workspaceService.getBaseUrl();
             const storageEndpoint = `${baseUrl}/storage.php`;
             const workspaceHeaders = workspaceService.getHeaders();
 

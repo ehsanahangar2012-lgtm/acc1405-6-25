@@ -50,6 +50,21 @@ const quickDeployGuide = `
 
 zip.file('QUICK_START_HOST.txt', quickDeployGuide);
 
+const pkgPath = path.resolve('package.json');
+const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) : { version: '16.27.0' };
+const APP_VERSION = pkg.version || '16.27.0';
+
+// پاکسازی بیلدهای قدیمی طبق قوانین پروژه
+console.log('🧹 در حال پاکسازی پکیج‌های فشرده و بیلدهای قدیمی...');
+const rootFiles = fs.readdirSync(path.resolve('.'));
+rootFiles.filter(f => f.endsWith('.zip')).forEach(oldZip => {
+    try {
+        fs.unlinkSync(path.resolve(oldZip));
+        console.log(`  حذف پکیج قدیمی: ${oldZip}`);
+    } catch (_) {}
+});
+
+const targetVersionZipPath = path.resolve(`ashke-ghalam-host-v${APP_VERSION}.zip`);
 const targetZipPath = path.resolve('ashke-ghalam-host-package.zip');
 
 try {
@@ -59,17 +74,20 @@ try {
         compressionOptions: { level: 9 }
     });
 
+    fs.writeFileSync(targetVersionZipPath, content);
     fs.writeFileSync(targetZipPath, content);
     fs.writeFileSync(path.resolve('dist.zip'), content);
 
     if (fs.existsSync(distDir)) {
+        fs.writeFileSync(path.join(distDir, `ashke-ghalam-host-v${APP_VERSION}.zip`), content);
         fs.writeFileSync(path.join(distDir, 'ashke-ghalam-host-package.zip'), content);
         fs.writeFileSync(path.join(distDir, 'dist.zip'), content);
     }
     
     const sizeInMB = (content.length / (1024 * 1024)).toFixed(2);
-    console.log(`\n✅ فایل زیپ با موفقیت در بدنه پروژه ایجاد گردید:`);
-    console.log(`📁 مسیر: ${targetZipPath}`);
+    console.log(`\n✅ فایل‌های پکیج هاست با موفقیت با نام ورژن ایجاد گردیدند:`);
+    console.log(`📁 پکیج نسخه‌دار: ${targetVersionZipPath}`);
+    console.log(`📁 پکیج پیش‌فرض: ${targetZipPath}`);
     console.log(`📁 فایل جایگزین: ${path.resolve('dist.zip')}`);
     console.log(`📊 حجم بسته نهایی: ${sizeInMB} مگابایت`);
     console.log('====================================================\n');

@@ -2,6 +2,7 @@
 import { autoSyncService } from './autoSyncService';
 import { hostDB } from './hostDatabaseService';
 import { deletedRecordsRegistry } from './deletedRecordsRegistry';
+import { workspaceService } from './workspaceService';
 
 interface SyncState {
     lastPull: number;
@@ -27,6 +28,7 @@ class RealtimeSyncService {
     }
 
     start() {
+        if (!workspaceService.isRemoteCloudConfigured()) return;
         // مدیریت مرکزی توسط autoSyncService جهت جلوگیری از رقابت و بارگذاری سنگین
         autoSyncService.start();
     }
@@ -36,7 +38,7 @@ class RealtimeSyncService {
     }
 
     async pushChange(table: string, action: 'insert' | 'update' | 'delete', id: string, data?: any): Promise<void> {
-        if (!navigator.onLine) return;
+        if (!navigator.onLine || !workspaceService.isRemoteCloudConfigured()) return;
         try {
             if (action === 'delete') {
                 deletedRecordsRegistry.registerDeletion(id, table as any);
@@ -51,6 +53,7 @@ class RealtimeSyncService {
     }
 
     async forceSync(): Promise<void> {
+        if (!workspaceService.isRemoteCloudConfigured()) return;
         await autoSyncService.loadFromHost(true);
         await autoSyncService.syncToHost(true);
     }

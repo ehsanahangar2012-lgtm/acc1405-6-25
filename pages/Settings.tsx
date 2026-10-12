@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { CompanyProfile, SystemConfig } from '../types';
-import { generateId, fileToBase64, formatNumber } from '../utils';
+import { generateId, fileToBase64, formatNumber, isDesktopApp, isAndroidApp } from '../utils';
 import { smartStorage } from '../services/smartStorageService';
 import { 
     Settings as SettingsIcon, Building2, Landmark, ShieldCheck, Palette, 
@@ -17,12 +17,14 @@ import BackupManager from '../components/BackupManager';
 import FiscalYear from './FiscalYear';
 import WorkspaceManager from '../components/WorkspaceManager';
 import { CompanyHostSyncService } from '../services/companyHostSyncService';
+import { licenseQuotaService } from '../services/licenseQuotaService';
 
 const Settings = () => {
     const { companies, config, updateConfig, addCompany, updateCompany, setActiveCompany, deleteCompany, isOnline, exportBackup, logout, addNotification } = useStore();
     const [activeSection, setActiveSection] = useState<'general' | 'sync' | 'companies' | 'financial' | 'fiscal' | 'advanced' | 'backup' | 'workspace'>('general');
     const [copiedToken, setCopiedToken] = useState(false);
     const [copiedUrl, setCopiedUrl] = useState(false);
+    const [licenseInputKey, setLicenseInputKey] = useState('');
 
     const getSyncToken = () => {
         let token = localStorage.getItem('ashk_host_sync_token');
@@ -114,6 +116,15 @@ const Settings = () => {
             {/* Main Content Area */}
             <main className="flex-1 min-w-0 bg-white dark:bg-slate-900/50 backdrop-blur-md border border-slate-200 dark:border-white/10 rounded-2xl lg:rounded-[2.5rem] p-4 sm:p-6 lg:p-8 xl:p-10 shadow-lg dark:shadow-2xl flex flex-col">
                 <div className="flex-1 min-w-0">
+                    {!licenseQuotaService.isFullyLicensedSync() && (
+                        <div className="mb-6 p-4 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center gap-3 text-amber-600 dark:text-amber-400">
+                            <AlertTriangle size={24} className="shrink-0" />
+                            <div className="text-xs font-bold leading-relaxed">
+                                <span>توجه: برنامه بدون لایسنس فعال و در حالت محدود (سقف ۵۰ سند و ۳۰ مشتری) کار می‌کند. برای دسترسی نامحدود و همگام‌سازی کامل، لایسنس یا توکن ابری را در بخش پیوند سرور وارد کنید.</span>
+                            </div>
+                        </div>
+                    )}
+
                     {/* --- GENERAL SETTINGS --- */}
                     {activeSection === 'general' && (
                         <div className="space-y-6 sm:space-y-8 animate-fade-in">
@@ -178,8 +189,43 @@ const Settings = () => {
                         <div className="space-y-8 animate-fade-in">
                             <SectionHeader title="مرکز همگام‌سازی و کد پیوند سرور (Sync Token)" subtitle="دریافت کد اتصال اختصاصی جهت همگام‌سازی نسخه ویندوز با دیتابیس وب سرور مادر" />
 
-                            {/* Token Banner */}
-                            <div className="bg-gradient-to-br from-indigo-900/60 via-slate-900 to-purple-950/80 p-6 md:p-8 rounded-[2.5rem] border border-indigo-500/30 shadow-2xl space-y-6">
+                            {((isDesktopApp() || isAndroidApp()) && !licenseQuotaService.isFullyLicensedSync()) ? (
+                                <div className="bg-amber-500/10 border border-amber-500/30 p-6 md:p-8 rounded-[2.5rem] space-y-6 shadow-2xl">
+                                    <div className="flex items-center gap-3 text-amber-500 font-black text-base">
+                                        <ShieldCheck size={26}/>
+                                        <span>حالت آفلاین امن (بدون ارتباط با سایت و اینترنت)</span>
+                                    </div>
+                                    <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                                        برطبق ضوابط امنیتی و اجرایی، نرم‌افزار اندروید و ویندوز هیچ‌گونه ارتباطی با وب‌سایت، هاست یا سرورهای خارجی در حالت آزمایشی ندارد. تمامی داده‌ها صرفاً به صورت محلی ذخیره و پشتیبان‌گیری می‌شوند. جهت نمایش و فعال‌سازی گزینه‌های اتصال به هاست و سینک ابری، لطفاً لایسنس تجاری معتبر خود را وارد نمایید:
+                                    </p>
+                                    <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                                        <input 
+                                            type="text" 
+                                            placeholder="کلید لایسنس تجاری (مثال: AG-LIC-2026-XXXX)" 
+                                            value={licenseInputKey}
+                                            onChange={(e) => setLicenseInputKey(e.target.value)}
+                                            className="flex-1 bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono"
+                                        />
+                                        <button 
+                                            onClick={() => {
+                                                if (!licenseInputKey.trim()) {
+                                                    addNotification('error', 'لطفاً کلید لایسنس را وارد کنید');
+                                                    return;
+                                                }
+                                                licenseQuotaService.activateWithServerLicense({ licenseKey: licenseInputKey.trim(), companyName: 'شرکت تجاری فعال' });
+                                                addNotification('success', 'لایسنس با موفقیت تأیید شد! گزینه‌های اتصال به هاست فعال شدند.');
+                                                setLicenseInputKey('');
+                                            }}
+                                            className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-xl font-black text-xs transition shadow-lg shrink-0"
+                                        >
+                                            تأیید و فعال‌سازی اتصال
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {/* Token Banner */}
+                                    <div className="bg-gradient-to-br from-indigo-900/60 via-slate-900 to-purple-950/80 p-6 md:p-8 rounded-[2.5rem] border border-indigo-500/30 shadow-2xl space-y-6">
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-black uppercase text-teal-400 tracking-wider bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
@@ -278,7 +324,6 @@ const Settings = () => {
                             </div>
                         </div>
                     )}
-
                     {/* --- COMPANIES SETTINGS --- */}
                     {activeSection === 'companies' && (
                         <div className="space-y-8 animate-fade-in">
@@ -404,8 +449,9 @@ const Settings = () => {
                                             <div className="flex items-center gap-3">
                                                 <span className="text-xs text-slate-400">فاصله زمانی (ثانیه)</span>
                                                 <input type="number" min="10" max="300" className="w-20 bg-slate-950 border border-white/5 rounded-lg p-2 text-center text-white text-xs" value={config.autoSaveInterval || 60} onChange={e => updateConfig({autoSaveInterval: Number(e.target.value)})} />
-                                            </div>
-                                        )}
+   
+                                        </div>
+                                         )}
                                     </div>
                                 </SettingCard>
 
@@ -517,11 +563,10 @@ const Settings = () => {
                         </div>
                     )}
                 </div>
-                
                 <footer className="mt-8 pt-4 border-t border-white/5 text-center hidden lg:block">
-                    <p className="text-[10px] text-teal-400 font-black">طراحی و توسعه نرم‌افزار: دپارتمان IT اشک قلم | www.ashkghalam.ir</p>
+                    <p className="text-[10px] text-teal-400 font-black">طراحی و توسعه: دپارتمان IT</p>
                 </footer>
-            </main>
+            </div>
 
             {/* Add Company Modal */}
             {showAddCompany && (

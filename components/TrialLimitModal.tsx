@@ -15,11 +15,23 @@ import {
     Sparkles, 
     Users, 
     FileText,
-    Loader2
+    Loader2,
+    Globe,
+    RefreshCw
 } from 'lucide-react';
 import { hardwareIdService } from '../services/hardwareIdService';
 import { licenseGeneratorService } from '../services/licenseGeneratorService';
-import { licenseQuotaService, MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS, MAX_HEMAYAT_CUSTOMERS, MAX_HEMAYAT_DOCUMENTS } from '../services/licenseQuotaService';
+import { 
+    licenseQuotaService, 
+    MAX_TRIAL_CUSTOMERS, 
+    MAX_TRIAL_DOCUMENTS, 
+    MAX_HEMAYAT_CUSTOMERS, 
+    MAX_HEMAYAT_DOCUMENTS,
+    MAX_ANDROID_DEFAULT_CUSTOMERS,
+    MAX_ANDROID_DEFAULT_DOCUMENTS
+} from '../services/licenseQuotaService';
+import { androidCommercialService } from '../services/androidCommercialService';
+import { isAndroidApp } from '../utils';
 import { useStore } from '../store';
 
 interface TrialLimitModalProps {
@@ -39,13 +51,16 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
     const [licenseKey, setLicenseKey] = useState('');
     const [activationCode, setActivationCode] = useState('');
     const [isActivating, setIsActivating] = useState(false);
+    const [isLinkingPwa, setIsLinkingPwa] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+    const isAndroid = isAndroidApp();
     const customerCount = people.length;
     const documentCount = invoices.length + vouchers.length + transactions.length + checks.length;
     const isHemayat = licenseQuotaService.getCurrentPlan() === 'HEMAYAT';
-    const maxCust = isHemayat ? MAX_HEMAYAT_CUSTOMERS : MAX_TRIAL_CUSTOMERS;
-    const maxDoc = isHemayat ? MAX_HEMAYAT_DOCUMENTS : MAX_TRIAL_DOCUMENTS;
+    
+    const maxCust = isAndroid ? MAX_ANDROID_DEFAULT_CUSTOMERS : (isHemayat ? MAX_HEMAYAT_CUSTOMERS : MAX_TRIAL_CUSTOMERS);
+    const maxDoc = isAndroid ? MAX_ANDROID_DEFAULT_DOCUMENTS : (isHemayat ? MAX_HEMAYAT_DOCUMENTS : MAX_TRIAL_DOCUMENTS);
 
     useEffect(() => {
         hardwareIdService.getHardwareId().then(setHwid);
@@ -56,6 +71,26 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
         navigator.clipboard.writeText(hwid);
         setCopiedHwid(true);
         setTimeout(() => setCopiedHwid(false), 2000);
+    };
+
+    const handleLinkPwaAndActivate = async () => {
+        setIsLinkingPwa(true);
+        setStatusMessage(null);
+        try {
+            const result = await androidCommercialService.linkToPwaAndActivate();
+            if (result.success) {
+                setStatusMessage({ type: 'success', text: result.message });
+                setTimeout(() => {
+                    if (onClose) onClose();
+                }, 1600);
+            } else {
+                setStatusMessage({ type: 'error', text: result.message });
+            }
+        } catch (e: any) {
+            setStatusMessage({ type: 'error', text: 'خطا در برقراری ارتباط با PWA و هاست سرور' });
+        } finally {
+            setIsLinkingPwa(false);
+        }
     };
 
     const handleActivate = async (e: React.FormEvent) => {
@@ -95,12 +130,16 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
                         </div>
                         <div>
                             <h2 className="text-lg font-black text-white flex items-center gap-2">
-                                <span>سقف نسخه پایه مستقل</span>
+                                <span>{isAndroid ? 'سقف نسخه پیش‌فرض همراه' : 'سقف نسخه پایه مستقل'}</span>
                                 <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                                    پایان سهمیه آزمایشی
+                                    {isAndroid ? 'پایان سقف ۵۰ سند' : 'پایان سهمیه آزمایشی'}
                                 </span>
                             </h2>
-                            <p className="text-xs text-slate-400 mt-0.5">جهت ثبت نامحدود مشتریان و اسناد، لایسنس خود را فعال فرمایید</p>
+                            <p className="text-xs text-slate-400 mt-0.5">
+                                {isAndroid 
+                                    ? 'جهت ثبت اسناد بیشتر، با یک کلیک به سیستم PWA لینک کنید یا لایسنس را فعال فرمایید'
+                                    : 'جهت ثبت نامحدود مشتریان و اسناد، لایسنس خود را فعال فرمایید'}
+                            </p>
                         </div>
                     </div>
 
@@ -145,6 +184,42 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
                             </div>
                         </div>
                     </div>
+
+                    {/* PWA Link Banner for Mobile Platform */}
+                    {isAndroid && (
+                        <div className="bg-gradient-to-r from-teal-950/70 via-slate-900 to-slate-900 border border-teal-500/40 p-4 rounded-2xl space-y-3 shadow-lg">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-black text-white flex items-center gap-1.5">
+                                    <Globe className="w-4 h-4 text-teal-400" />
+                                    <span>پیوند مستقیم با سیستم PWA و فعال‌سازی با لایسنس سرور اصلی</span>
+                                </span>
+                                <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2.5 py-0.5 rounded-full font-bold border border-teal-500/30">
+                                    یک‌کلیکه
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                                این اپلیکیشن پلتفرم همراه سامانه PWA است. با کلیک بر روی دکمه زیر، مشخصات لایسنس فعال در سرور اصلی به صورت خودکار دریافت شده و برنامه بدون محدودیت فعال می‌گردد.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={handleLinkPwaAndActivate}
+                                disabled={isLinkingPwa}
+                                className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/30 disabled:opacity-50"
+                            >
+                                {isLinkingPwa ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                        <span>در حال برقراری پیوند با PWA و دریافت مشخصات لایسنس سرور...</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <RefreshCw className="w-4 h-4" />
+                                        <span>🔗 پیوند به سیستم PWA و فعال‌سازی با لایسنس سرور اصلی</span>
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    )}
 
                     {/* Explanatory Banner */}
                     <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl space-y-2">

@@ -29,11 +29,63 @@ export interface UpdateCheckResult {
     isDesktop: boolean;
 }
 
-export const APP_CURRENT_VERSION = '16.24.0';
-export const APP_BUILD_NUMBER = '20260916';
+export const APP_CURRENT_VERSION = '16.29.0';
+export const APP_BUILD_NUMBER = '20261012';
 
 // پایگاه‌داده تاریخچه نسخه‌ها به‌صورت پیش‌فرض برای زمان‌های آفلاین
 const DEFAULT_RELEASES: ReleaseInfo[] = [
+    {
+        version: '16.29.0',
+        date: '۱۴۰۵/۰۷/۲۱',
+        type: 'minor',
+        title: 'بهینه‌سازی ریسپانسیو تنظیمات اندروید، هشدار حالت لایسنس محدود و اصلاح تست اتصال',
+        size: '1.9 MB (وصله آنی دلتا)',
+        downloadUrl: 'https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.29.0.exe',
+        isCurrent: true,
+        changes: [
+            { category: 'بهبود', desc: 'بهینه‌سازی کامل ریسپانسیو و نمایش المان‌ها در بخش تنظیمات نسخه اندروید و موبایل' },
+            { category: 'امنیت', desc: 'نمایش هشدار صریح و واضح وضعیت سقف ۵۰ سند و عدم فعال‌بودن لایسنس در اندروید و ویندوز' },
+            { category: 'بهبود', desc: 'اصلاح تابع تست اتصال به هاست: بررسی سلامت و پینگ سرور بدون فراخوانی و دریافت داده‌های بیزینس' }
+        ]
+    },
+    {
+        version: '16.28.0',
+        date: '۱۴۰۵/۰۷/۲۱',
+        type: 'minor',
+        title: 'شناسه یکتای سخت‌افزاری اندروید (UUID) و ابزار پاکسازی جامع کش و حافظه محلی',
+        size: '1.9 MB',
+        downloadUrl: 'https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.28.0.exe',
+        isCurrent: false,
+        changes: [
+            { category: 'ویژگی جدید', desc: 'تولید شناسه یکتای دستگاه (UUID) در نسخه اندروید هنگام نصب اولیه' }
+        ]
+    },
+    {
+        version: '16.26.0',
+        date: '۱۴۰۵/۰۷/۲۱',
+        type: 'minor',
+        title: 'همگام‌سازی سامانه همراه با اکوسیستم PWA (سقف پیش‌فرض ۵۰ سند و فعال‌سازی با لایسنس سرور اصلی)',
+        size: '1.9 MB',
+        downloadUrl: 'https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.26.0.exe',
+        isCurrent: false,
+        changes: [
+            { category: 'ویژگی جدید', desc: 'تثبیت نسخه همراه به عنوان بخشی از اکوسیستم PWA' }
+        ]
+    },
+    {
+        version: '16.25.0',
+        date: '۱۴۰۵/۰۷/۲۱',
+        type: 'minor',
+        title: 'فعال‌سازی نسخه تجاری همراه اشک قلم (استقلال کامل، ثبت نامحدود و اشتراک‌گذاری بومی)',
+        size: '1.8 MB (وصله آنی دلتا)',
+        downloadUrl: 'https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.25.0.exe',
+        isCurrent: false,
+        changes: [
+            { category: 'ویژگی جدید', desc: 'استقلال کامل پلتفرم اندروید و فعال‌سازی مزیت نسخه تجاری همراه بدون سقف لایسنس و اسناد' },
+            { category: 'ویژگی جدید', desc: 'مرکز مدیریت تجاری همراه با تنظیم نام، شماره و اطلاعات کارت فروشگاه برای درج در اسناد' },
+            { category: 'ویژگی جدید', desc: 'اشتراک‌گذاری مستقیم فاکتور در پیام‌رسان‌های بومی (ایتا، روبیکا، بله) و پیامک بدون نیاز به سرور' }
+        ]
+    },
     {
         version: '16.24.0',
         date: '۱۴۰۵/۰۶/۲۵',
@@ -41,7 +93,7 @@ const DEFAULT_RELEASES: ReleaseInfo[] = [
         title: 'بهینه‌سازی پرفورمنس پایگاه‌داده دسکتاپ ویندوز، پل پیامک اندروید و بروزرسانی خودکار OTA',
         size: '1.6 MB (وصله آنی دلتا)',
         downloadUrl: 'https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.24.0.exe',
-        isCurrent: true,
+        isCurrent: false,
         changes: [
             { category: 'بهبود', desc: 'بهینه‌سازی موتور پایگاه‌داده دسکتاپ ویندوز و رفع کامل کندی در اتصال به وب‌سرور هاست' },
             { category: 'ویژگی جدید', desc: 'پل ارتباطی ارسال مستقیم پیامک از گوشی اندروید به صورت آفلاین و سیم‌کارتی' },
@@ -139,7 +191,7 @@ class OtaUpdateService {
             }
         }
 
-        if (desktopVer && desktopVer !== '16.12.0' && desktopVer !== '16.22.0') {
+        if (desktopVer && desktopVer !== '16.12.0') {
             return desktopVer;
         }
 

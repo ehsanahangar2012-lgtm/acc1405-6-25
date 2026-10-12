@@ -5,7 +5,7 @@
   "author": "Ehsan Ahangar",
   "main": "electron/main.cjs",
   "private": true,
-  "version": "16.24.0",
+  "version": "16.30.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

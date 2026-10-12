@@ -77,14 +77,40 @@ switch ($action) {
         $key = preg_replace('/[^a-zA-Z0-9_-]/', '', $input['key']);
         $file = $DATA_DIR . '/' . $key . '.json';
         file_put_contents($file, $input['value'], LOCK_EX);
+
+        // اگر کلید مربوط به امضا یا اسناد عمومی باشد، در پوشه عمومی اصلی /data/ نیز ذخیره می‌شود
+        if (strpos($key, 'sig_') === 0 || strpos($key, 'share_') === 0 || strpos($key, 'public_') === 0) {
+            $globalDir = __DIR__ . '/data';
+            if (!is_dir($globalDir)) mkdir($globalDir, 0755, true);
+            file_put_contents($globalDir . '/' . $key . '.json', $input['value'], LOCK_EX);
+        }
+
         echo json_encode(['success' => true, 'workspace' => $workspace ?: 'default']);
         break;
 
     case 'load':
         $key = preg_replace('/[^a-zA-Z0-9_-]/', '', $input['key']);
         $file = $DATA_DIR . '/' . $key . '.json';
+        $foundData = null;
+
         if (file_exists($file)) {
-            echo json_encode(['success' => true, 'data' => file_get_contents($file), 'workspace' => $workspace ?: 'default']);
+            $foundData = file_get_contents($file);
+        } elseif (strpos($key, 'sig_') === 0 || strpos($key, 'share_') === 0 || strpos($key, 'public_') === 0) {
+            // ۱. بررسی پوشه عمومی اصلی /data/
+            $globalFile = __DIR__ . '/data/' . $key . '.json';
+            if (file_exists($globalFile)) {
+                $foundData = file_get_contents($globalFile);
+            } else {
+                // ۲. جستجو در تمام پوشه‌های فضاهای کاری /data/tenants/*/
+                $tenantFiles = glob(__DIR__ . '/data/tenants/*/' . $key . '.json');
+                if (!empty($tenantFiles) && file_exists($tenantFiles[0])) {
+                    $foundData = file_get_contents($tenantFiles[0]);
+                }
+            }
+        }
+
+        if ($foundData !== null) {
+            echo json_encode(['success' => true, 'data' => $foundData, 'workspace' => $workspace ?: 'default']);
         } else {
             echo json_encode(['success' => false, 'workspace' => $workspace ?: 'default']);
         }

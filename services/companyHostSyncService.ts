@@ -5,7 +5,7 @@
 
 import { CompanyProfile } from '../types';
 import { API_CONFIG } from '../config';
-import { safeFetchJson } from '../utils';
+import { safeFetchJson, isHostConnectedOrAllowed } from '../utils';
 
 export interface CompanyVaultSyncResult {
     success: boolean;
@@ -22,6 +22,15 @@ export class CompanyHostSyncService {
      * ذخیره‌سازی ابری تمامی شرکت‌های ثبت‌شده به همراه لوگوها، امضاها و مهرها در بخش مجزای هاست
      */
     static async syncCompaniesToHost(companies: CompanyProfile[]): Promise<CompanyVaultSyncResult> {
+        if (!isHostConnectedOrAllowed()) {
+            localStorage.setItem('company_vault_local_backup', JSON.stringify(companies));
+            return {
+                success: true,
+                count: companies.length,
+                timestamp: new Date().toLocaleTimeString('fa-IR'),
+                message: 'در حالت تست و لیمیت (بدون لایسنس تجاری)، هیچ ارتباطی با سایت و هاست برقرار نشد. داده‌ها به صورت کاملاً امن و محلی ذخیره شدند.'
+            };
+        }
         try {
             const data = await safeFetchJson(`${this.baseUrl}/api.php?action=company_vault`, {
                 method: 'POST',
@@ -61,6 +70,13 @@ export class CompanyHostSyncService {
      * دریافت شرکت‌های ذخیره‌شده از بخش مجزای هاست
      */
     static async fetchCompaniesFromHost(): Promise<{ success: boolean; companies: CompanyProfile[] }> {
+        if (!isHostConnectedOrAllowed()) {
+            const local = localStorage.getItem('company_vault_local_backup');
+            return {
+                success: true,
+                companies: local ? JSON.parse(local) : []
+            };
+        }
         try {
             const data = await safeFetchJson(`${this.baseUrl}/api.php?action=company_vault`, {
                 method: 'GET'

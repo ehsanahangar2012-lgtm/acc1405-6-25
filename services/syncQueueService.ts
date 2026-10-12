@@ -14,6 +14,7 @@
  */
 
 import { API_CONFIG } from '../config';
+import { workspaceService } from './workspaceService';
 
 export interface QueueItem {
     id: string;
@@ -121,6 +122,10 @@ class SyncQueueService {
 
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
             return { processed: 0, failed: 0, remaining: this.loadQueue().length };
+        }
+
+        if (!workspaceService.isRemoteCloudConfigured()) {
+            return { processed: 0, failed: 0, remaining: 0 };
         }
 
         this.isProcessing = true;

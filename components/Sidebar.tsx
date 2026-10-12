@@ -7,7 +7,7 @@ import {
   Brain, ShieldCheck, BarChart3, ScrollText, Calendar, RefreshCw, Workflow, 
   FileSpreadsheet, ChevronDown, ChevronLeft, ChevronUp, FileCode2, KeyRound, Cloud,
   MessageSquare, Network, Headphones, Sparkles, Megaphone, DownloadCloud,
-  ChevronsDown, ChevronsUp, FolderOpen, Folder
+  ChevronsDown, ChevronsUp, FolderOpen, Folder, Smartphone
 } from 'lucide-react';
 import { useStore } from '../store';
 import { UserPermissions } from '../types';
@@ -123,6 +123,7 @@ const Sidebar = () => {
         { to: '/sms-center', icon: MessageSquare, label: 'پنل پیامک هوشمند', perm: 'finance' },
         { to: '/multi-user-lan', icon: Network, label: 'شبکه محلی چندکاربره', perm: 'settings' },
         { to: '/client-broadcast', icon: Megaphone, label: isDesktop ? 'اطلاعیه‌ها و تخفیف‌ها' : 'انتشار اطلاعیه به کلاینت‌ها', perm: 'settings' },
+        { to: '/install-android', icon: Smartphone, label: 'مرکز نسخه تجاری همراه (اندروید)', badge: 'نامحدود' },
         { to: '/mobile-catalog', icon: BookOpen, label: 'کاتالوگ ویزیتوری همراه + امضای لمسی', badge: 'ویزیتور' },
         { to: '/catalog', icon: BookOpen, label: 'کاتالوگ و معرفی محصول', badge: 'کاتالوگ' },
         { to: '/support-sla', icon: Headphones, label: 'پشتیبانی و تمدید سالانه', perm: 'settings' },
@@ -324,7 +325,7 @@ const Sidebar = () => {
           title="مدیریت لایسنس و قفل سخت‌افزاری HWID"
           className="text-[9px] bg-teal-500/20 hover:bg-teal-500/40 text-teal-300 px-1.5 py-1 rounded-lg font-bold font-mono transition cursor-pointer shrink-0"
         >
-          v16.24
+          v16.26
         </button>
       </div>
 
