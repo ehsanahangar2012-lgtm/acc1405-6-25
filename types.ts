@@ -163,6 +163,13 @@ export interface SystemConfig {
     // Print Settings
     autoPrint?: boolean;
     paperSize?: string;
+    printerType?: '80MM' | '58MM' | 'A4';
+    autoPrintInvoice?: boolean;
+    
+    // Performance & Speed
+    gpuAcceleration?: boolean;
+    virtualizedList?: boolean;
+    offlineCacheMode?: boolean;
     
     // Integrations
     smsPanelEnabled: boolean;
@@ -173,6 +180,7 @@ export interface Product {
   id: string;
   name: string;
   code: string;
+  serialNumber?: string; // شماره سریال اختصاصی کالا
   buyPrice?: number;
   sellPrice?: number;
   price?: number;
@@ -182,7 +190,10 @@ export interface Product {
   unit: string;
   weight?: number; 
   shelfLocation?: string;
-  category?: string;
+  category?: string; // دسته اصلی
+  subCategory?: string; // زیرمجموعه سطح اول
+  subSubCategory?: string; // زیرمجموعه سطح دوم
+  categoryPath?: string; // مسیر دسته‌بندی مثلا: قطعات / پردازنده / سری اینتل
   description?: string;
   imageUrl?: string;
 }
@@ -206,6 +217,7 @@ export interface Person {
 export interface InvoiceItem {
     productId: string;
     productName: string;
+    serialNumber?: string; // شماره سریال کالا در این ردیف فاکتور
     quantity: number;
     buyPrice: number;
     unitPrice: number;

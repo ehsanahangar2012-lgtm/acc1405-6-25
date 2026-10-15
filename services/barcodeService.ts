@@ -173,3 +173,75 @@ export const scanBarcodeFromSource = async (
   }
   return null;
 };
+
+/**
+ * تولید خودکار شماره سریال کالا (SN-YYYYMMDD-XXXXX) به صورت یکتا و آفلاین
+ */
+export const generateAutoSerialNumber = (prefix = 'SN'): string => {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  const randNum = Math.floor(10000 + Math.random() * 90000);
+  return `${prefix}-${y}${m}${d}-${randNum}`;
+};
+
+/**
+ * شنونده سراسری اسکنر بارکدخوان دستی (USB / بلوتوث / بیسیم)
+ * اسکنرهای دستی به صورت شبیه‌ساز کیبورد کار می‌کنند و با سرعت بالا تایپ کرده و در انتها کلید Enter ارسال می‌نمایند.
+ */
+export const initHardwareBarcodeScanner = (
+  onScan: (scannedCode: string) => void,
+  options?: { minLength?: number; maxIntervalMs?: number }
+): (() => void) => {
+  if (typeof window === 'undefined') return () => {};
+
+  const minLength = options?.minLength || 3;
+  const maxIntervalMs = options?.maxIntervalMs || 65; // فاصله فشرده‌شدن کلیدها در اسکنر کمتر از ۶۵ میلی‌ثانیه است
+
+  let buffer = '';
+  let lastKeyTime = 0;
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    // اگر در فیلد متنی خاصی فوکوس است و کاربر عادی تایپ می‌کند نباید مزاحمت ایجاد کند مگر اینکه با سرعت بالا (اسکنر) وارد شود
+    const target = e.target as HTMLElement;
+    const isRegularInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+
+    const currentTime = Date.now();
+    const interval = currentTime - lastKeyTime;
+    lastKeyTime = currentTime;
+
+    if (e.key === 'Enter') {
+      // اسکن پایان یافت
+      if (buffer.length >= minLength) {
+        const finalCode = toAsciiDigits(buffer).trim();
+        if (finalCode) {
+          // اگر اسکن سریع بوده، از پیش‌فرض جلوگیری کنیم
+          if (isRegularInput && interval < 100) {
+            e.preventDefault();
+          }
+          onScan(finalCode);
+        }
+      }
+      buffer = '';
+      return;
+    }
+
+    // اگر زمان بین دو کلید زیاد بود، بافر ریست می‌شود (تایپ دست انسان)
+    if (interval > maxIntervalMs && buffer.length > 0) {
+      buffer = '';
+    }
+
+    // جمع‌آوری کاراکترهای چاپ‌شدنی
+    if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      buffer += e.key;
+    }
+  };
+
+  window.addEventListener('keydown', handleKeyDown, true);
+
+  return () => {
+    window.removeEventListener('keydown', handleKeyDown, true);
+  };
+};
+

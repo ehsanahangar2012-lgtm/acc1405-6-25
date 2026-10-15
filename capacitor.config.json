@@ -12,7 +12,7 @@
     "allowMixedContent": true,
     "captureInput": true,
     "webContentsDebuggingEnabled": false,
-    "appendUserAgent": "AshkeGhalam-Android-Native/16.19.0",
+    "appendUserAgent": "AshkeGhalam-Android-Native/16.32.0",
     "backgroundColor": "#090d16",
     "flavor": "offlineFirst"
   },

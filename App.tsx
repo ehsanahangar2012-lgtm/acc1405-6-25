@@ -25,6 +25,7 @@ import { realConnectionService } from './services/realConnectionService';
 import { realtimeSyncService } from './services/realtimeSyncService';
 import { syncQueue } from './services/syncQueueService';
 import { tauriExitManager } from './services/tauriExitManager';
+import { androidBackButtonService } from './services/androidBackButtonService';
 import { adminChatNotificationService } from './services/adminChatNotificationService';
 import { AuthService } from './services/authService';
 import { ActivationDashboard } from './components/ActivationDashboard';
@@ -662,6 +663,11 @@ const App = () => {
 
     // راه‌اندازی مدیر خروج دسکتاپ و تاوری
     tauriExitManager.init(() => useStore.getState());
+
+    // راه‌اندازی مدیر دکمه بازگشت فیزیکی اندروید
+    androidBackButtonService.init((msg) => {
+      useStore.getState().addNotification('info', msg);
+    });
 
     // پایش هوشمند پیام‌های چت پشتیبانی و نوتیفیکیشن زنده برای ادمین و سیستم
     if (currentUser) {

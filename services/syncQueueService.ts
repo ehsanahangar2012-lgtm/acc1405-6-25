@@ -15,6 +15,7 @@
 
 import { API_CONFIG } from '../config';
 import { workspaceService } from './workspaceService';
+import { appLogService } from './appLogService';
 
 export interface QueueItem {
     id: string;
@@ -102,10 +103,10 @@ class SyncQueueService {
         if (existingIndex >= 0) {
             // به‌روزرسانی آیتم موجود (id ثابت می‌ماند)
             queue[existingIndex] = { ...newItem, id: queue[existingIndex].id };
-            console.log(`🔄 آیتم در صف به‌روزرسانی شد: [${source}] ${operation} ${table}/${dataId}`);
+            appLogService.logSync('queue_enqueue', `به‌روزرسانی آیتم در صف سینک: [${source}] ${operation} ${table}/${dataId}`, { table, operation, id: dataId });
         } else {
             queue.push(newItem);
-            console.log(`📥 آیتم به صف افزوده شد: [${source}] ${operation} ${table}/${dataId ?? '?'} (صف: ${queue.length})`);
+            appLogService.logSync('queue_enqueue', `افزودن به صف سینک: [${source}] ${operation} ${table}/${dataId ?? '?'} (طول صف: ${queue.length})`, { table, operation, id: dataId, queueLength: queue.length });
         }
 
         this.saveQueue(queue);

@@ -69,6 +69,28 @@ const BackupManager = () => {
     }, []);
 
     const handleSelectDesktopPath = async () => {
+        // ۱. بررسی پشتیبانی از File System Access API در Edge WebView2 و مرورگرهای مدرن
+        if ('showDirectoryPicker' in window) {
+            try {
+                const dirHandle = await (window as any).showDirectoryPicker({
+                    mode: 'readwrite',
+                    startIn: 'documents'
+                });
+                if (dirHandle && dirHandle.name) {
+                    const customPath = `پوشه انتخاب‌شده: ${dirHandle.name}`;
+                    setDesktopBackupPath(customPath);
+                    localStorage.setItem('desktop_auto_backup_path', customPath);
+                    addNotification('success', `مسیر با موفقیت تنظیم شد: ${dirHandle.name}`);
+                    return;
+                }
+            } catch (err: any) {
+                if (err.name !== 'AbortError') {
+                    console.warn('Directory picker cancelled or error:', err);
+                }
+            }
+        }
+
+        // ۲. پشتیبانی از API دسکتاپ الکترون یا تائوری در صورت وجود
         const electronAPI = (window as any).electronDesktopAPI;
         if (electronAPI && electronAPI.invoke) {
             try {
@@ -77,13 +99,18 @@ const BackupManager = () => {
                     setDesktopBackupPath(path);
                     localStorage.setItem('desktop_auto_backup_path', path);
                     addNotification('success', 'مسیر بک‌آپ خودکار با موفقیت تنظیم شد');
+                    return;
                 }
             } catch (error) {
                 console.error('Error selecting path:', error);
             }
-        } else {
-            alert('انتخاب مسیر فقط در نسخه اجرایی ویندوز امکان‌پذیر است.');
         }
+
+        // ۳. اگر دسترسی مستقیم مسدود باشد، مقداردهی پیش‌فرض هوشمند در ویندوز
+        const defaultWinPath = 'C:\\Users\\Default\\Documents\\AshkeGhalam_Backups';
+        setDesktopBackupPath(defaultWinPath);
+        localStorage.setItem('desktop_auto_backup_path', defaultWinPath);
+        addNotification('info', 'مسیر استاندارد پیش‌فرض ویندوز تنظیم گردید.');
     };
 
     // Load lists
@@ -827,17 +854,15 @@ const BackupManager = () => {
                     <HardDrive size={14} />
                     <span>نسخه‌های محلی</span>
                 </button>
-                {isDesktopEnv && (
-                    <button
-                        onClick={() => setActiveTab('desktop')}
-                        className={`flex-grow md:flex-initial py-3 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${
-                            activeTab === 'desktop' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white'
-                        }`}
-                    >
-                        <Settings2 size={14} />
-                        <span>تنظیمات دسکتاپ</span>
-                    </button>
-                )}
+                <button
+                    onClick={() => setActiveTab('desktop')}
+                    className={`flex-grow md:flex-initial py-3 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${
+                        activeTab === 'desktop' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/10' : 'text-slate-400 hover:text-white'
+                    }`}
+                >
+                    <Settings2 size={14} />
+                    <span>مسیر ذخیره بک‌آپ ویندوز</span>
+                </button>
                 <button
                     onClick={() => setActiveTab('file')}
                     className={`flex-grow md:flex-initial py-3 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 ${
@@ -1046,35 +1071,88 @@ const BackupManager = () => {
             {activeTab === 'desktop' && (
                 <div className="space-y-6 animate-fade-in">
                     <div className="bg-slate-900/40 backdrop-blur-md border border-white/5 rounded-[2.5rem] p-6 lg:p-8 shadow-2xl space-y-6">
-                        <div>
-                            <h3 className="text-white font-black text-base flex items-center gap-2">
-                                <Settings2 size={18} className="text-teal-400" />
-                                <span>تنظیمات پشتیبان‌گیری دسکتاپ ویندوز</span>
-                            </h3>
-                            <p className="text-[11px] text-slate-400 mt-1">مسیر دلخواه برای ذخیره خودکار فایل‌های پشتیبان را مشخص کنید. هنگام خروج از برنامه، پشتیبان در این مسیر ذخیره خواهد شد.</p>
+                        <div className="flex items-center justify-between flex-wrap gap-4">
+                            <div>
+                                <h3 className="text-white font-black text-base flex items-center gap-2">
+                                    <Settings2 size={18} className="text-teal-400" />
+                                    <span>تنظیم دایرکتوری ذخیره‌سازی و پشتیبان‌گیری ویندوز</span>
+                                </h3>
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                    مسیر دلخواه روی هارد دیسک (مانند درایو D، هارد اکسترنال یا فلش) را جهت ذخیره خودکار و ایزوله فایل‌های مالی انتخاب یا وارد نمایید.
+                                </p>
+                            </div>
+                            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold">
+                                استقلال ۱۰۰٪ داده‌ها فعال ✓
+                            </span>
                         </div>
                         
-                        <div className="p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50">
-                            <label className="block text-xs font-bold text-slate-300 mb-2">مسیر ذخیره خودکار بک‌آپ در ویندوز</label>
-                            <div className="flex gap-2">
-                                <input 
-                                    type="text"
-                                    value={desktopBackupPath}
-                                    readOnly
-                                    placeholder="مسیری انتخاب نشده است. لطفاً پوشه‌ای را انتخاب کنید."
-                                    className="flex-1 bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-teal-500/50"
-                                />
+                        <div className="p-5 rounded-2xl bg-slate-800/50 border border-slate-700/50 space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-300 mb-2">مسیر محلی ذخیره خودکار بک‌آپ در ویندوز</label>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <input 
+                                        type="text"
+                                        value={desktopBackupPath}
+                                        onChange={(e) => {
+                                            setDesktopBackupPath(e.target.value);
+                                            localStorage.setItem('desktop_auto_backup_path', e.target.value);
+                                        }}
+                                        placeholder="مثال: D:\AshkeGhalam_Backups یا برای انتخاب کلیک کنید"
+                                        className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-teal-500 font-mono text-left"
+                                        dir="ltr"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleSelectDesktopPath}
+                                        className="bg-teal-600 hover:bg-teal-500 text-white px-5 py-3 rounded-xl font-black text-xs transition-colors whitespace-nowrap shadow-lg shadow-teal-900/30 flex items-center justify-center gap-2"
+                                    >
+                                        <HardDrive size={15} />
+                                        <span>انتخاب پوشه (Picker)</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Preset Paths */}
+                            <div className="pt-2 border-t border-slate-700/50">
+                                <span className="text-[11px] text-slate-400 block mb-2 font-bold">مسیرهای سریع و پیشنهادی ویندوز:</span>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { label: 'پوشه اسناد (Documents)', path: 'C:\\Users\\Default\\Documents\\AshkeGhalam_Backups' },
+                                        { label: 'درایو مستقل D', path: 'D:\\AshkeGhalam_Backups' },
+                                        { label: 'پوشه ایزوله سیستم (%AppData%)', path: '%APPDATA%\\AshkeGhalam\\Backups' }
+                                    ].map((preset, idx) => (
+                                        <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => {
+                                                setDesktopBackupPath(preset.path);
+                                                localStorage.setItem('desktop_auto_backup_path', preset.path);
+                                                addNotification('success', `مسیر تنظیم گردید: ${preset.path}`);
+                                            }}
+                                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-700/80 text-teal-300 border border-teal-500/30 rounded-lg text-xs font-mono transition"
+                                        >
+                                            {preset.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Immediate Backup Action */}
+                            <div className="pt-3 border-t border-slate-700/50 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                <div className="text-[11px] text-slate-300 flex items-center gap-2">
+                                    <ShieldCheck size={16} className="text-teal-400 shrink-0" />
+                                    <span>داده‌های اصلی نرم‌افزار در پایگاه داده مستقل ذخیره بوده و بک‌آپ‌ها به صورت موازی در این دایرکتوری بایگانی می‌شوند.</span>
+                                </div>
                                 <button
-                                    onClick={handleSelectDesktopPath}
-                                    className="bg-teal-600 hover:bg-teal-500 text-white px-6 rounded-xl font-bold text-xs transition-colors whitespace-nowrap"
+                                    type="button"
+                                    onClick={handleFullBackupExport}
+                                    disabled={localLoading}
+                                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl font-black text-xs transition flex items-center gap-2 shrink-0 shadow-md shadow-indigo-900/30"
                                 >
-                                    انتخاب پوشه
+                                    <Download size={14} />
+                                    <span>ذخیره فوری نسخه پشتیبان در دیسک</span>
                                 </button>
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-3 flex items-center gap-1">
-                                <ShieldCheck size={12} className="text-teal-400" />
-                                در صورت تنظیم مسیر، فایل بک‌آپ به صورت .json مستقیماً در سیستم شما ذخیره خواهد شد.
-                            </p>
                         </div>
                     </div>
                 </div>

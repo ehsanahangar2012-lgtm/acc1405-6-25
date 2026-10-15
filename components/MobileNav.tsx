@@ -20,10 +20,24 @@ export const MobileNav: React.FC = () => {
             <MobileNavItem to="/inventory" icon={Package} label="انبار" isMax={isMaxTableMode} />
             <MobileNavItem to="/contracts" icon={ScrollText} label="قراردادها" isMax={isMaxTableMode} />
             
+            {/* دکمه راهنمای هوشمند ؟ طبق قانون پروژه */}
+            <button
+                onClick={() => {
+                    window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }));
+                }}
+                className="flex flex-col items-center justify-center gap-0.5 transition-all w-11 h-full text-amber-400 hover:text-amber-300 active:scale-95"
+                title="راهنمای هوشمند این بخش (؟)"
+            >
+                <div className="p-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+                    <span className="text-base font-black leading-none px-0.5">؟</span>
+                </div>
+                <span className="text-[8px] font-bold">راهنما</span>
+            </button>
+
             {/* Quick Drawer Opener for All Modules */}
             <button
                 onClick={() => setOpenDrawer(true)}
-                className="flex flex-col items-center justify-center gap-0.5 transition-all w-12 h-full text-slate-400 hover:text-teal-400 active:scale-95"
+                className="flex flex-col items-center justify-center gap-0.5 transition-all w-11 h-full text-slate-400 hover:text-teal-400 active:scale-95"
                 title="سایر منوها و تنظیمات چیدمان"
             >
                 <div className="p-1.5 rounded-xl bg-white/5 text-slate-300">

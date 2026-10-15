@@ -1,5 +1,6 @@
-// Mobile Optimization Hook
+// Mobile & Android Optimization Hook
 import { useState, useEffect } from 'react';
+import { androidBackButtonService } from './services/androidBackButtonService';
 
 export const useMobile = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -7,6 +8,11 @@ export const useMobile = () => {
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>(
     window.innerHeight > window.innerWidth ? 'portrait' : 'landscape'
   );
+  const [isAndroid, setIsAndroid] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const ua = navigator.userAgent || '';
+    return /Android/i.test(ua) || (window as any).Capacitor?.getPlatform?.() === 'android';
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -20,7 +26,14 @@ export const useMobile = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  return { isMobile, isTablet, isDesktop: !isMobile && !isTablet, orientation };
+  return { isMobile, isTablet, isDesktop: !isMobile && !isTablet, orientation, isAndroid };
+};
+
+export const useAndroidBackButtonHandler = (handler: () => boolean, enabled: boolean = true) => {
+  useEffect(() => {
+    if (!enabled) return;
+    return androidBackButtonService.registerHandler(handler);
+  }, [handler, enabled]);
 };
 
 export const useNetworkStatus = () => {
@@ -51,3 +64,4 @@ export const useNetworkStatus = () => {
 
   return { isOnline, connectionType, isSlow: connectionType === 'slow-2g' || connectionType === '2g' };
 };
+

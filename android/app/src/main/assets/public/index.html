@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' file: https://esm.sh https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' file: https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' file: data: https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' file: data: blob: https:; connect-src 'self' file: https: wss:; worker-src 'self' blob: file:;" />
+    <meta name="theme-color" content="#111827" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="manifest" href="./assets/manifest-BxQLvIDH.json">
+    <title>سامانه ابری حسابداری و مدیریت اشک قلم</title>
+    <meta name="description" content="سامانه یکپارچه حسابداری، انبارداری، نسخه تجاری همراه، پل پیامک اندروید، کاتالوگ ویزیتوری، پیش‌بینی نقدینگی و بک‌آپ ۳ گانه نسخه ۱۶.۲۷.۰" />
+    <meta property="og:title" content="سامانه ابری حسابداری و مدیریت اشک قلم" />
+    <meta property="og:description" content="سامانه یکپارچه حسابداری، انبارداری، نسخه تجاری همراه، پل پیامک اندروید، کاتالوگ ویزیتوری، پیش‌بینی نقدینگی و بک‌آپ ۳ گانه نسخه ۱۶.۲۷.۰" />
+    <style>
+      body {
+        background-color: var(--color-background, #f8fafc);
+        color: var(--color-text, #0f172a);
+        font-family: 'Vazirmatn', Vazir, Tahoma, Arial, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        overflow-x: hidden;
+        min-height: 100vh;
+      }
+      body.dark {
+        background-color: var(--color-background, #111827);
+        color: var(--color-text, #f8fafc);
+      }
+      input, textarea, select {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      @media (max-width: 768px) {
+        * { box-sizing: border-box; }
+        html, body { overflow-x: hidden; width: 100%; }
+        h1 { font-size: 1.5rem !important; }
+        h2 { font-size: 1.25rem !important; }
+        h3 { font-size: 1.1rem !important; }
+        .text-4xl { font-size: 1.75rem !important; }
+        .text-3xl { font-size: 1.5rem !important; }
+        .text-2xl { font-size: 1.25rem !important; }
+        .p-8 { padding: 1rem !important; }
+        .p-12 { padding: 1.25rem !important; }
+        .rounded-[3rem] { border-radius: 1.5rem !important; }
+        .rounded-[2.5rem] { border-radius: 1.25rem !important; }
+        input, textarea, select { font-size: 16px !important; }
+      }
+      ::-webkit-scrollbar { width: 4px; height: 4px; }
+      ::-webkit-scrollbar-track { background: #111827; }
+      ::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+      @media print {
+        @page { size: A4; margin: 0; }
+        .no-print { display: none !important; }
+        body { background: white !important; color: black !important; }
+        #root { background: white !important; }
+        .print-container { position: absolute; top: 0; left: 0; width: 100%; display: block !important; z-index: 9999; }
+      }
+    </style>
+
+  <script type="importmap">
+{
+  "imports": {
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
+    "zustand/": "https://esm.sh/zustand@^5.0.10/",
+    "zustand": "https://esm.sh/zustand@^5.0.10",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.48.1",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
+    "react-dom": "https://esm.sh/react-dom@^19.2.4"
+  }
+}
+</script>
+  <script type="module" crossorigin src="./assets/index-CM_S273b.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-T86_m6mw.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const reg = await navigator.serviceWorker.register('/sw.js');
+          console.log('✅ SW registered');
+          
+          // بررسی آپدیت
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker?.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                if (confirm('نسخه جدید موجود است. بارگذاری مجدد؟')) {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  window.location.reload();
+                }
+              }
+            });
+          });
+        } catch (err) {
+          console.error('❌ SW error:', err);
+        }
+      });
+    }
+  </script>
+</body>
+</html>

@@ -6,9 +6,15 @@ const os = require('os');
 const crypto = require('crypto');
 const url = require('url');
 
-// بهینه‌سازی پرفورمنس و رفع مشکل صفحه سفید/سیاه در ویندوزهای قدیمی
+// بهینه‌سازی حداکثری پرفورمنس، رفع لگ، رندر فوق سریع و شتاب‌دهنده سخت‌افزاری GPU در ویندوز
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
+app.commandLine.appendSwitch('enable-gpu-rasterization');
+app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-fast-unload');
+app.commandLine.appendSwitch('renderer-process-limit', '6');
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096 --expose-gc');
 
 let mainWindow = null;
 let splashWindow = null;

@@ -409,7 +409,7 @@ class AndroidCommercialService {
         const backupPayload = {
             system: 'AshkeGhalam Accounting',
             platform: 'Android Commercial Sovereignty',
-            version: '16.29.0',
+            version: '16.32.0',
             exportedAtJalali: getPersianDate(),
             exportedAtTimestamp: Date.now(),
             data: data
@@ -421,7 +421,7 @@ class AndroidCommercialService {
         const link = document.createElement('a');
         const dateStr = getPersianDate().replace(/[/ :]/g, '-');
         link.href = url;
-        link.download = `AshkeGhalam-Android-Backup-v16.29.0-${dateStr}.json`;
+        link.download = `AshkeGhalam-Android-Backup-v16.32.0-${dateStr}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

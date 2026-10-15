@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useStore } from '../store';
 import { Product, Voucher, Person, PrintTheme, VoucherItem, LogisticsProfile, VoucherTemplate } from '../types';
 import { generateId, toPersianDigits, formatCurrency, generateTrackingCode, getPersianDate, getPersianTime, fileToBase64, getNextCustomerCode, getNextProductCode } from '../utils';
-import { Plus, Package, FileOutput, Printer, X, Trash2, ArrowLeft, History, Eye, Truck, AlignLeft, BookMarked, Camera, CheckCircle2, FileSpreadsheet, PackagePlus, CarFront, UserCheck, Bot, Sparkles, Scale, MapPinned, UserPlus, Info, Link as LinkIcon, Smartphone, Weight, Search, LayoutGrid, List, Layers, ShoppingBag, Image as ImageIcon, Share2, Download, Palette, PenTool, Banknote, QrCode, FileText, Send, AlertTriangle, TrendingUp, TrendingDown, BarChart3, Undo2, Save, Copy } from 'lucide-react';
+import { Plus, Package, FileOutput, Printer, X, Trash2, ArrowLeft, History, Eye, Truck, AlignLeft, BookMarked, Camera, CheckCircle2, FileSpreadsheet, PackagePlus, CarFront, UserCheck, Bot, Sparkles, Scale, MapPinned, UserPlus, Info, Link as LinkIcon, Smartphone, Weight, Search, LayoutGrid, List, Layers, ShoppingBag, Image as ImageIcon, Share2, Download, Palette, PenTool, Banknote, QrCode, FileText, Send, AlertTriangle, TrendingUp, TrendingDown, BarChart3, Undo2, Save, Copy, Barcode, Scan, HelpCircle, Shuffle } from 'lucide-react';
 import { NumberInput, FullScreenSignatureModal, ConfirmModal, JalaliDatePicker, useKeyboardShortcut } from '../components/Shared';
 import { VoucherPrint } from '../components/VoucherPrint';
 import { RequestSignatureButton } from '../components/RequestSignatureButton';
@@ -14,6 +14,7 @@ import html2canvas from 'html2canvas';
 import { simpleSignatureService } from '../services/simpleSignatureService';
 import { MobileVoucherWizard } from '../components/MobileVoucherWizard';
 import { useMobile } from '../useMobile';
+import { generateAutoSerialNumber, initHardwareBarcodeScanner } from '../services/barcodeService';
 
 const Inventory = () => {
   const { products, people, invoices, addProduct, updateProduct, deleteProduct, addPerson, deleteVoucher, vouchers, addVoucher, setVoucherSignature, setVoucherCompanySignature, setVoucherSupervisorSignature, lastVoucherNumber, companies, logisticsProfiles, addLogisticsProfile } = useStore();
@@ -35,6 +36,9 @@ const Inventory = () => {
   const [pastedJson, setPastedJson] = useState('');
   
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [scanTarget, setScanTarget] = useState<'voucher' | 'product_serial' | null>(null);
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
+  const [selectedSubCategoryFilter, setSelectedSubCategoryFilter] = useState<string>('ALL');
   const [showTemplates, setShowTemplates] = useState(false);
   const [showReturnModal, setShowReturnModal] = useState(false);
   const [returnVoucherId, setReturnVoucherId] = useState<string | null>(null);
@@ -156,12 +160,63 @@ const Inventory = () => {
       products.filter(p => p.stock <= (p.minStock || 5)),
   [products]);
 
-  const filteredProducts = useMemo(() => 
-      products.filter(p => 
-          (p.name || '').toLowerCase().includes((searchTerm || '').toLowerCase()) ||
-          (p.code && p.code.toLowerCase().includes((searchTerm || '').toLowerCase()))
-      ),
-  [products, searchTerm]);
+  // استخراج دسته‌های اصلی و زیرمجموعه‌ها
+  const categoriesList = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(p => {
+      if (p.category?.trim()) set.add(p.category.trim());
+    });
+    return Array.from(set);
+  }, [products]);
+
+  const subCategoriesList = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(p => {
+      if (selectedCategoryFilter === 'ALL' || p.category === selectedCategoryFilter) {
+        if (p.subCategory?.trim()) set.add(p.subCategory.trim());
+      }
+    });
+    return Array.from(set);
+  }, [products, selectedCategoryFilter]);
+
+  const filteredProducts = useMemo(() => {
+    const q = (searchTerm || '').trim().toLowerCase();
+    return products.filter(p => {
+      // فیلتر دسته اصلی
+      if (selectedCategoryFilter !== 'ALL' && p.category !== selectedCategoryFilter) {
+        return false;
+      }
+      // فیلتر زیرمجموعه
+      if (selectedSubCategoryFilter !== 'ALL' && p.subCategory !== selectedSubCategoryFilter) {
+        return false;
+      }
+      // فیلتر متنی: نام، کد، شماره سریال و مسیر دسته‌بندی
+      if (!q) return true;
+      const matchName = (p.name || '').toLowerCase().includes(q);
+      const matchCode = (p.code || '').toLowerCase().includes(q);
+      const matchSerial = (p.serialNumber || '').toLowerCase().includes(q);
+      const matchCat = (p.category || '').toLowerCase().includes(q);
+      const matchSub = (p.subCategory || '').toLowerCase().includes(q);
+      const matchPath = (p.categoryPath || '').toLowerCase().includes(q);
+      return matchName || matchCode || matchSerial || matchCat || matchSub || matchPath;
+    });
+  }, [products, searchTerm, selectedCategoryFilter, selectedSubCategoryFilter]);
+
+  // شنونده سراسری اسکنر بارکدخوان دستی
+  useEffect(() => {
+    const unsubscribeScanner = initHardwareBarcodeScanner((scannedCode) => {
+      if (showAddProduct) {
+        // اسکن مستقیم شماره سریال در فرم تعریف کالا
+        setNewProd(prev => ({ ...prev, serialNumber: scannedCode }));
+      } else if (view === 'voucher') {
+        handleBarcodeScanned(scannedCode);
+      } else if (activeSubTab === 'products') {
+        setSearchTerm(scannedCode);
+      }
+    });
+
+    return () => unsubscribeScanner();
+  }, [showAddProduct, view, activeSubTab, products, voucherItems]);
 
   // Handle Export Image
   const handleExportImage = async () => {
@@ -342,7 +397,20 @@ const Inventory = () => {
   };
 
   const handleBarcodeScanned = (code: string) => {
-      const product = products.find(p => p.code === code || p.id === code);
+      const cleanCode = code.trim();
+      if (!cleanCode) return;
+
+      if (scanTarget === 'product_serial') {
+          setNewProd(prev => ({ ...prev, serialNumber: cleanCode }));
+          setShowAddProduct(true);
+          setShowBarcodeScanner(false);
+          setScanTarget(null);
+          alert(`✅ شماره سریال اسکن شد: ${cleanCode}`);
+          return;
+      }
+
+      // جستجو در محصولات با کد، سریال یا شناسه
+      const product = products.find(p => p.code === cleanCode || p.serialNumber === cleanCode || p.id === cleanCode);
       if (product) {
           const existing = voucherItems.find(i => i.productId === product.id);
           if (existing) {
@@ -359,11 +427,23 @@ const Inventory = () => {
                   shelfLocation: product.shelfLocation
               }]);
           }
-          alert(`✅ ${product.name} اضافه شد`);
+          alert(`✅ کالای ${product.name} اضافه شد.`);
       } else {
-          alert('❌ محصول یافت نشد');
+          // اگر پیدا نشد و در حالت انبار است، پیشنهاد تعریف کالا با این سریال
+          if (confirm(`کالایی با بارکد/سریال «${cleanCode}» یافت نشد. آیا مایل به تعریف کالای جدید با این سریال هستید؟`)) {
+              setNewProd({
+                  name: '',
+                  serialNumber: cleanCode,
+                  unit: 'عدد',
+                  stock: 0,
+                  buyPrice: 0,
+                  sellPrice: 0
+              });
+              setShowAddProduct(true);
+          }
       }
       setShowBarcodeScanner(false);
+      setScanTarget(null);
   };
 
   const recallDriver = (profile: LogisticsProfile) => {
@@ -715,42 +795,124 @@ const Inventory = () => {
                         </div>
                       ) : (
                         <div className="p-8 space-y-6">
-                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 px-4">
-                                <div className="flex items-center gap-4 w-full md:w-auto">
-                                    <h2 className="text-white font-black text-xl">کالاهای موجود</h2>
-                                    <div className="relative flex-1 md:flex-none">
-                                        <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                            <div className="flex flex-col gap-4 px-2">
+                                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                    <div className="flex items-center gap-4 w-full md:w-auto">
+                                        <h2 className="text-white font-black text-xl flex items-center gap-2">
+                                            <Package className="text-teal-400" size={22} />
+                                            <span>کالاهای موجود انبار</span>
+                                            <span className="text-xs bg-white/5 text-slate-400 font-mono px-2.5 py-1 rounded-xl">
+                                                {toPersianDigits(filteredProducts.length)} از {toPersianDigits(products.length)}
+                                            </span>
+                                        </h2>
+                                    </div>
+                                    <div className="flex gap-2 w-full md:w-auto">
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setScanTarget('product_serial');
+                                                setShowBarcodeScanner(true);
+                                            }}
+                                            className="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white px-4 py-3 rounded-2xl flex items-center justify-center gap-2 text-xs font-black shadow-lg border border-indigo-500/30 transition-all cursor-pointer"
+                                            title="اسکن بارکد / شماره سریال با دوربین یا اسکنر"
+                                        >
+                                            <Scan size={18} />
+                                            <span className="hidden sm:inline">اسکن بارکدخوان</span>
+                                        </button>
+                                        <button onClick={() => setShowExcelImport('products')} className="flex-1 md:flex-none bg-emerald-600 text-white px-4 py-3 rounded-2xl flex items-center justify-center gap-2 text-xs font-black shadow-lg cursor-pointer"><FileSpreadsheet size={18}/> ورود اکسل</button>
+                                        <button onClick={() => { setNewProd({name: '', unit: 'عدد', weight: 0, shelfLocation: '', serialNumber: '', category: '', subCategory: '', subSubCategory: ''}); setShowAddProduct(true); }} className="flex-1 md:flex-none bg-teal-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 text-xs font-black shadow-lg cursor-pointer"><PackagePlus size={18}/> کالا جدید</button>
+                                    </div>
+                                </div>
+
+                                {/* نوار جستجو و فیلترهای چند سطحی دسته‌بندی */}
+                                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-slate-950/60 p-3.5 rounded-2xl border border-white/5">
+                                    <div className="sm:col-span-5 relative">
+                                        <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                                         <input 
                                             type="text" 
-                                            className="w-full bg-slate-950 border border-white/5 rounded-2xl pr-10 pl-4 py-2 text-white text-sm outline-none focus:border-teal-500" 
-                                            placeholder="جستجو..."
+                                            className="w-full bg-slate-900 border border-white/10 rounded-xl pr-10 pl-4 py-2.5 text-white text-xs font-bold outline-none focus:border-teal-500" 
+                                            placeholder="جستجو بر اساس نام، کد یا شماره سریال..."
                                             value={searchTerm}
                                             onChange={e => setSearchTerm(e.target.value)}
                                         />
                                     </div>
-                                </div>
-                                <div className="flex gap-2 w-full md:w-auto">
-                                    <button onClick={() => setShowExcelImport('products')} className="flex-1 md:flex-none bg-emerald-600 text-white px-4 py-3 rounded-2xl flex items-center justify-center gap-2 text-xs font-black shadow-lg"><FileSpreadsheet size={18}/> ورود اکسل</button>
-                                    <button onClick={() => { setNewProd({name: '', unit: 'عدد', weight: 0, shelfLocation: ''}); setShowAddProduct(true); }} className="flex-1 md:flex-none bg-teal-600 text-white px-6 py-3 rounded-2xl flex items-center justify-center gap-2 text-xs font-black shadow-lg"><PackagePlus size={18}/> کالا جدید</button>
+
+                                    {/* فیلتر دسته اصلی */}
+                                    <div className="sm:col-span-4">
+                                        <select
+                                            value={selectedCategoryFilter}
+                                            onChange={e => {
+                                                setSelectedCategoryFilter(e.target.value);
+                                                setSelectedSubCategoryFilter('ALL');
+                                            }}
+                                            className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-teal-500"
+                                        >
+                                            <option value="ALL">همه دسته‌های اصلی</option>
+                                            {categoriesList.map((cat, i) => (
+                                                <option key={i} value={cat}>{cat}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    {/* فیلتر زیرمجموعه */}
+                                    <div className="sm:col-span-3">
+                                        <select
+                                            value={selectedSubCategoryFilter}
+                                            onChange={e => setSelectedSubCategoryFilter(e.target.value)}
+                                            disabled={selectedCategoryFilter === 'ALL' && subCategoriesList.length === 0}
+                                            className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-white text-xs font-bold outline-none focus:border-teal-500 disabled:opacity-50"
+                                        >
+                                            <option value="ALL">همه زیرمجموعه‌ها</option>
+                                            {subCategoriesList.map((sub, i) => (
+                                                <option key={i} value={sub}>{sub}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {filteredProducts.map(p => (
-                                    <div key={p.id} className="bg-black/20 p-6 rounded-3xl border border-white/5 flex justify-between items-center group hover:border-teal-500/30 transition-all">
-                                        <div className="flex-1">
-                                            <div className="text-white font-black text-lg mb-1 flex items-center gap-2">
-                                                {p.name}
-                                                {p.stock <= (p.minStock || 5) && <AlertTriangle size={16} className="text-rose-400" />}
+                                    <div key={p.id} className="bg-black/20 p-6 rounded-3xl border border-white/5 flex flex-col justify-between group hover:border-teal-500/30 transition-all gap-3">
+                                        <div className="flex justify-between items-start gap-3">
+                                            <div className="flex-1">
+                                                <div className="text-white font-black text-lg mb-1 flex items-center gap-2">
+                                                    {p.name}
+                                                    {p.stock <= (p.minStock || 5) && <AlertTriangle size={16} className="text-rose-400" />}
+                                                </div>
+                                                
+                                                {/* مسیر دسته‌بندی و زیرمجموعه‌ها */}
+                                                {(p.category || p.subCategory) && (
+                                                    <div className="text-[11px] text-teal-300 font-bold flex items-center gap-1.5 mb-2 bg-teal-500/10 px-2 py-0.5 rounded-lg w-fit border border-teal-500/20">
+                                                        <Layers size={13} />
+                                                        <span>{p.categoryPath || `${p.category || 'بدون دسته'}${p.subCategory ? ` / ${p.subCategory}` : ''}${p.subSubCategory ? ` / ${p.subSubCategory}` : ''}`}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* شماره سریال کالا */}
+                                                {p.serialNumber && (
+                                                    <div className="text-xs text-indigo-300 font-mono font-bold flex items-center gap-1.5 mb-2 bg-indigo-500/10 px-2.5 py-1 rounded-lg w-fit border border-indigo-500/20">
+                                                        <Barcode size={14} />
+                                                        <span>سریال: {p.serialNumber}</span>
+                                                    </div>
+                                                )}
+
+                                                <div className="flex gap-4">
+                                                    <span className="text-[10px] text-slate-500 font-black uppercase flex items-center gap-1"><MapPinned size={12}/> {p.shelfLocation || '---'}</span>
+                                                    <span className="text-[10px] text-slate-500 font-black uppercase flex items-center gap-1"><Weight size={12}/> {p.weight} KG</span>
+                                                </div>
                                             </div>
-                                            <div className="flex gap-4">
-                                                <span className="text-[10px] text-slate-500 font-black uppercase flex items-center gap-1"><MapPinned size={12}/> {p.shelfLocation || '---'}</span>
-                                                <span className="text-[10px] text-slate-500 font-black uppercase flex items-center gap-1"><Weight size={12}/> {p.weight} KG</span>
+
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-left">
+                                                    <div className={`text-2xl font-black font-mono ${p.stock > 5 ? 'text-teal-400' : 'text-rose-400'}`}>
+                                                        {toPersianDigits(p.stock)}
+                                                    </div>
+                                                    <div className="text-[9px] text-slate-600 font-black uppercase">{p.unit}</div>
+                                                </div>
+                                                <button onClick={() => { setEditingProduct(p); setNewProd(p); setShowAddProduct(true); }} className="p-2 bg-blue-500/10 text-blue-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 cursor-pointer"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                                                <button onClick={() => setDeleteTarget({type: 'product', id: p.id})} className="p-2 bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all opacity-0 group-hover:opacity-100 cursor-pointer"><Trash2 size={18}/></button>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-left"><div className={`text-2xl font-black font-mono ${p.stock > 5 ? 'text-teal-400' : 'text-rose-400'}`}>{toPersianDigits(p.stock)}</div><div className="text-[9px] text-slate-600 font-black uppercase">{p.unit}</div></div>
-                                            <button onClick={() => { setEditingProduct(p); setNewProd(p); setShowAddProduct(true); }} className="p-2 bg-blue-500/10 text-blue-400 rounded-xl hover:bg-blue-600 hover:text-white transition-all opacity-0 group-hover:opacity-100"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                                            <button onClick={() => setDeleteTarget({type: 'product', id: p.id})} className="p-2 bg-rose-500/10 text-rose-500 rounded-xl hover:bg-rose-600 hover:text-white transition-all opacity-0 group-hover:opacity-100"><Trash2 size={18}/></button>
                                         </div>
                                     </div>
                                 ))}
@@ -1175,35 +1337,294 @@ const Inventory = () => {
 
       {/* MODALS */}
       {showAddProduct && (
-          <div className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center animate-fade-in backdrop-blur-md no-print">
-            <div className="bg-slate-900 border-t md:border border-white/10 w-full max-w-md rounded-t-[3rem] md:rounded-[3rem] p-6 lg:p-8 shadow-2xl animate-slide-up md:animate-pop-up max-h-[90vh] overflow-y-auto">
-              <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-black text-white flex items-center gap-3"><PackagePlus className="text-teal-400" /> {editingProduct ? 'ویرایش کالا' : 'تعریف کالا'}</h3><button onClick={() => { setShowAddProduct(false); setEditingProduct(null); }} className="p-2 text-slate-500 hover:text-white"><X/></button></div>
-              <div className="space-y-4 flex-1">
-                <input placeholder="نام کالا" className="w-full bg-slate-950 p-4 rounded-2xl text-white outline-none border border-white/5 focus:border-teal-500 font-black" value={newProd.name} onChange={e => setNewProd({...newProd, name: e.target.value})} autoFocus />
-                <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1"><label className="text-[10px] text-slate-500 pr-2 font-black uppercase">وزن (KG)</label><input type="number" className="w-full bg-slate-950 p-4 rounded-2xl text-white font-mono shadow-inner border border-white/5" value={newProd.weight} onChange={e => setNewProd({...newProd, weight: Number(e.target.value)})} /></div>
-                    <div className="space-y-1"><label className="text-[10px] text-slate-500 pr-2 font-black uppercase">موقعیت قفسه</label><input placeholder="A-10" className="w-full bg-slate-950 p-4 rounded-2xl text-white font-black shadow-inner border border-white/5" value={newProd.shelfLocation} onChange={e => setNewProd({...newProd, shelfLocation: e.target.value})} /></div>
+          <div className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center animate-fade-in backdrop-blur-md no-print p-4">
+            <div className="bg-slate-900 border-t md:border border-white/10 w-full max-w-xl rounded-t-[2.5rem] md:rounded-[2.5rem] p-6 lg:p-8 shadow-2xl animate-slide-up md:animate-pop-up max-h-[92vh] overflow-y-auto custom-scrollbar" dir="rtl">
+              <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
+                <h3 className="text-xl font-black text-white flex items-center gap-3">
+                  <PackagePlus className="text-teal-400" /> 
+                  <span>{editingProduct ? 'ویرایش مشخصات کالا' : 'تعریف و ثبت کالای جدید'}</span>
+                </h3>
+                <button 
+                  onClick={() => { setShowAddProduct(false); setEditingProduct(null); }} 
+                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/5 cursor-pointer"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* نام کالا و واحد */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2 space-y-1">
+                    <label className="text-[11px] font-bold text-slate-300 block pr-1">نام و عنوان کالا *</label>
+                    <input 
+                      placeholder="نام کالا..." 
+                      className="w-full bg-slate-950 p-3.5 rounded-xl text-white outline-none border border-white/10 focus:border-teal-500 font-bold text-sm" 
+                      value={newProd.name || ''} 
+                      onChange={e => setNewProd({...newProd, name: e.target.value})} 
+                      autoFocus 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-300 block pr-1">واحد سنجش</label>
+                    <select 
+                      value={newProd.unit || 'عدد'}
+                      onChange={e => setNewProd({...newProd, unit: e.target.value})}
+                      className="w-full bg-slate-950 p-3.5 rounded-xl text-white outline-none border border-white/10 focus:border-teal-500 font-bold text-xs"
+                    >
+                      <option value="عدد">عدد</option>
+                      <option value="کیلوگرم">کیلوگرم</option>
+                      <option value="بسته">بسته</option>
+                      <option value="کارتن">کارتن</option>
+                      <option value="متر">متر</option>
+                      <option value="لیتر">لیتر</option>
+                      <option value="دستگاه">دستگاه</option>
+                    </select>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 pr-2 font-black uppercase">عکس کالا (اختیاری)</label>
-                  <input type="file" accept="image/*" capture="environment" onChange={async (e) => {
-                    if(e.target.files?.[0]) {
-                      const file = e.target.files[0];
-                      const reader = new FileReader();
-                      reader.onload = () => setNewProd({...newProd, imageUrl: reader.result as string});
-                      reader.readAsDataURL(file);
-                    }
-                  }} className="w-full bg-slate-950 p-3 rounded-xl text-white text-sm border border-white/5" />
-                  {newProd.imageUrl && (
-                    <div className="relative w-24 h-24 mt-2">
-                      <img src={newProd.imageUrl} className="w-full h-full object-cover rounded-xl border-2 border-teal-500" />
-                      <button onClick={() => setNewProd({...newProd, imageUrl: undefined})} className="absolute -top-2 -right-2 p-1 bg-rose-600 text-white rounded-full"><X size={12}/></button>
+
+                {/* بخش شماره سریال: اتوماتیک، دستی و دریافت از طریق اسکنر دستی */}
+                <div className="bg-slate-950 p-4 rounded-2xl border-2 border-indigo-400/50 space-y-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="text-xs font-black text-indigo-200 flex items-center gap-1.5">
+                      <Barcode size={18} className="text-indigo-400" />
+                      <span>شماره سریال اختصاصی کالا</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const autoSerial = generateAutoSerialNumber('SN');
+                          setNewProd(prev => ({ ...prev, serialNumber: autoSerial }));
+                        }}
+                        className="px-3 py-1.5 bg-indigo-500 hover:bg-indigo-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 border border-indigo-300 transition-all cursor-pointer shadow-md active:scale-95"
+                        title="تولید خودکار شماره سریال یکتا بر اساس فرمول استاندارد"
+                      >
+                        <Shuffle size={14} />
+                        <span>تولید اتوماتیک</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScanTarget('product_serial');
+                          setShowBarcodeScanner(true);
+                        }}
+                        className="px-3 py-1.5 bg-teal-500 hover:bg-teal-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 border border-teal-300 transition-all cursor-pointer shadow-md active:scale-95"
+                        title="اسکن سریال با بارکدخوان یا دوربین"
+                      >
+                        <Scan size={14} />
+                        <span>اسکن با بارکدخوان دستی</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="relative">
+                    <input 
+                      type="text" 
+                      placeholder="سریال دستی یا اسکن از طریق بارکدخوان دستی (تفنگی)..." 
+                      value={newProd.serialNumber || ''} 
+                      onChange={e => setNewProd({ ...newProd, serialNumber: e.target.value })}
+                      className="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3.5 text-white font-mono text-sm tracking-wider font-bold outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30"
+                    />
+                  </div>
+                  <p className="text-xs text-indigo-200 font-bold">
+                    💡 می‌توانید بارکدخوان دستی (تفنگی) را روی این کادر بگیرید تا شماره سریال بلادرنگ وارد و ثبت شود.
+                  </p>
+                </div>
+
+                {/* بخش دسته‌بندی کالا در چندین زیرمجموعه (دسته اصلی، زیرمجموعه ۱، زیرمجموعه ۲) */}
+                <div className="bg-slate-950 p-4 rounded-2xl border-2 border-slate-700 space-y-3">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-teal-300">
+                    <Layers size={18} />
+                    <span>دسته‌بندی چند سطحی کالا (شاخه‌ای)</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* دسته اصلی */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-black text-white block pr-1">دسته اصلی *</label>
+                      <input 
+                        list="main-categories-list"
+                        placeholder="مثال: دیجیتال یا مواد اولیه" 
+                        value={newProd.category || ''} 
+                        onChange={e => {
+                          const cat = e.target.value;
+                          const path = `${cat}${newProd.subCategory ? ` / ${newProd.subCategory}` : ''}${newProd.subSubCategory ? ` / ${newProd.subSubCategory}` : ''}`;
+                          setNewProd({ ...newProd, category: cat, categoryPath: path });
+                        }}
+                        className="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-white text-xs font-black outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
+                      />
+                      <datalist id="main-categories-list">
+                        {categoriesList.map((c, i) => <option key={i} value={c} />)}
+                      </datalist>
+                    </div>
+
+                    {/* زیرمجموعه اول */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-black text-white block pr-1">زیرمجموعه ۱ (فرعی)</label>
+                      <input 
+                        list="sub-categories-list"
+                        placeholder="مثال: لپ‌تاپ یا قطعات" 
+                        value={newProd.subCategory || ''} 
+                        onChange={e => {
+                          const sub = e.target.value;
+                          const path = `${newProd.category || ''}${sub ? ` / ${sub}` : ''}${newProd.subSubCategory ? ` / ${newProd.subSubCategory}` : ''}`;
+                          setNewProd({ ...newProd, subCategory: sub, categoryPath: path });
+                        }}
+                        className="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-white text-xs font-black outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
+                      />
+                      <datalist id="sub-categories-list">
+                        {subCategoriesList.map((s, i) => <option key={i} value={s} />)}
+                      </datalist>
+                    </div>
+
+                    {/* زیرمجموعه دوم (سطح سوم) */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-black text-white block pr-1">زیرمجموعه ۲ (تکمیلی)</label>
+                      <input 
+                        placeholder="مثال: سری گیمینگ یا مدل خاص" 
+                        value={newProd.subSubCategory || ''} 
+                        onChange={e => {
+                          const sub2 = e.target.value;
+                          const path = `${newProd.category || ''}${newProd.subCategory ? ` / ${newProd.subCategory}` : ''}${sub2 ? ` / ${sub2}` : ''}`;
+                          setNewProd({ ...newProd, subSubCategory: sub2, categoryPath: path });
+                        }}
+                        className="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3 text-white text-xs font-black outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30"
+                      />
+                    </div>
+                  </div>
+                  {newProd.categoryPath && (
+                    <div className="text-[11px] font-black text-teal-300 bg-teal-950/60 p-2 rounded-lg border border-teal-500/30">
+                      مسیر دسته‌بندی: {newProd.categoryPath}
                     </div>
                   )}
                 </div>
+
+                {/* قیمت خرید، فروش و موجودی اولیه */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-white block pr-1">قیمت خرید (تومان)</label>
+                    <input 
+                      type="number"
+                      placeholder="0"
+                      className="w-full bg-slate-900 p-3 rounded-xl text-white font-mono text-xs font-bold border-2 border-slate-600 outline-none focus:border-teal-400"
+                      value={newProd.buyPrice || ''}
+                      onChange={e => setNewProd({...newProd, buyPrice: Number(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-white block pr-1">قیمت فروش (تومان)</label>
+                    <input 
+                      type="number"
+                      placeholder="0"
+                      className="w-full bg-slate-900 p-3 rounded-xl text-white font-mono text-xs font-bold border-2 border-slate-600 outline-none focus:border-teal-400"
+                      value={newProd.sellPrice || ''}
+                      onChange={e => setNewProd({...newProd, sellPrice: Number(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-white block pr-1">موجودی اولیه</label>
+                    <input 
+                      type="number"
+                      placeholder="0"
+                      className="w-full bg-slate-900 p-3 rounded-xl text-white font-mono text-xs font-bold border-2 border-slate-600 outline-none focus:border-teal-400"
+                      value={newProd.stock || ''}
+                      onChange={e => setNewProd({...newProd, stock: Number(e.target.value) || 0})}
+                    />
+                  </div>
+                </div>
+
+                {/* وزن و موقعیت قفسه */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-white pr-1 block">وزن (KG)</label>
+                    <input 
+                      type="number" 
+                      className="w-full bg-slate-900 p-3 rounded-xl text-white font-mono text-xs font-bold border-2 border-slate-600 outline-none focus:border-teal-400" 
+                      value={newProd.weight || ''} 
+                      onChange={e => setNewProd({...newProd, weight: Number(e.target.value) || 0})} 
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-white pr-1 block">موقعیت قفسه</label>
+                    <input 
+                      placeholder="A-10" 
+                      className="w-full bg-slate-900 p-3 rounded-xl text-white text-xs font-bold border-2 border-slate-600 outline-none focus:border-teal-400" 
+                      value={newProd.shelfLocation || ''} 
+                      onChange={e => setNewProd({...newProd, shelfLocation: e.target.value})} 
+                    />
+                  </div>
+                </div>
               </div>
-              <button onClick={() => { if(!newProd.name) return; if(editingProduct) { updateProduct(editingProduct.id, newProd); setEditingProduct(null); } else { const id=generateId(); addProduct({id, ...newProd, code: getNextProductCode(products), sellPrice:0, buyPrice:0, stock:0, reservedStock:0} as Product); if(view==='voucher') setVoucherItems([...voucherItems, {productId:id, productName:newProd.name!, quantity:1, unit:'واحد', weight:newProd.weight, shelfLocation:newProd.shelfLocation}]); } setShowAddProduct(false); setNewProd({name: '', unit: 'عدد', weight: 0, shelfLocation: ''}); }} className="w-full bg-teal-600 text-white py-4 rounded-2xl font-black text-lg shadow-xl active:scale-95 transition-all mt-4">{editingProduct ? 'ذخیره تغییرات' : 'ذخیره و ثبت'}</button>
-              <button onClick={() => { setShowAddProduct(false); setEditingProduct(null); setNewProd({name: '', unit: 'عدد', weight: 0, shelfLocation: ''}); }} className="w-full bg-slate-800 text-white py-3 rounded-2xl font-bold mt-2">انصراف</button>
+
+              {/* دکمه‌های تایید و انصراف */}
+              <div className="pt-4 mt-4 border-t-2 border-slate-700 flex gap-3">
+                <button 
+                  type="button"
+                  onClick={() => { 
+                    if (!newProd.name?.trim()) {
+                      alert('نام کالا الزامی است.');
+                      return;
+                    } 
+                    if (editingProduct) { 
+                      updateProduct(editingProduct.id, {
+                        ...newProd,
+                        serialNumber: newProd.serialNumber?.trim() || undefined,
+                        category: newProd.category?.trim() || undefined,
+                        subCategory: newProd.subCategory?.trim() || undefined,
+                        subSubCategory: newProd.subSubCategory?.trim() || undefined,
+                        categoryPath: newProd.categoryPath?.trim() || undefined
+                      }); 
+                      setEditingProduct(null); 
+                    } else { 
+                      const id = generateId(); 
+                      const createdProduct = {
+                        id, 
+                        ...newProd, 
+                        name: newProd.name.trim(),
+                        code: newProd.code || getNextProductCode(products), 
+                        sellPrice: newProd.sellPrice || 0, 
+                        buyPrice: newProd.buyPrice || 0, 
+                        stock: newProd.stock || 0, 
+                        reservedStock: 0,
+                        serialNumber: newProd.serialNumber?.trim() || undefined,
+                        category: newProd.category?.trim() || undefined,
+                        subCategory: newProd.subCategory?.trim() || undefined,
+                        subSubCategory: newProd.subSubCategory?.trim() || undefined,
+                        categoryPath: newProd.categoryPath?.trim() || undefined
+                      } as Product;
+                      addProduct(createdProduct); 
+                      if (view === 'voucher') {
+                        setVoucherItems([...voucherItems, {
+                          productId: id, 
+                          productName: createdProduct.name, 
+                          quantity: 1, 
+                          unit: createdProduct.unit, 
+                          weight: createdProduct.weight, 
+                          shelfLocation: createdProduct.shelfLocation
+                        }]);
+                      } 
+                    } 
+                    setShowAddProduct(false); 
+                    setNewProd({ name: '', unit: 'عدد', weight: 0, shelfLocation: '', serialNumber: '', category: '', subCategory: '', subSubCategory: '' }); 
+                  }} 
+                  className="flex-1 bg-teal-500 hover:bg-teal-400 text-slate-950 py-3.5 rounded-xl font-black text-sm shadow-xl active:scale-95 transition-all cursor-pointer border border-teal-300"
+                >
+                  {editingProduct ? 'ذخیره تغییرات' : 'ذخیره و ثبت کالا'}
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => { 
+                    setShowAddProduct(false); 
+                    setEditingProduct(null); 
+                    setNewProd({ name: '', unit: 'عدد', weight: 0, shelfLocation: '', serialNumber: '', category: '', subCategory: '', subSubCategory: '' }); 
+                  }} 
+                  className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3.5 rounded-xl font-bold text-xs cursor-pointer border border-slate-600"
+                >
+                  انصراف
+                </button>
+              </div>
             </div>
           </div>
       )}

@@ -157,14 +157,26 @@ class PersistentStorage {
             try {
                 const result = await this.request('load', { key });
                 if (result.success && result.data) {
-                    const parsed = JSON.parse(result.data || 'null');
-                    this.memoryCache.set(key, { data: parsed, timestamp: Date.now() });
-                    return parsed;
+                    let parsed = null;
+                    try {
+                        parsed = JSON.parse(result.data);
+                    } catch {
+                        parsed = null;
+                    }
+                    if (parsed !== null) {
+                        this.memoryCache.set(key, { data: parsed, timestamp: Date.now() });
+                        return parsed;
+                    }
                 }
 
                 // اگر هاست پاسخ نداد یا آفلاین بود، از کش محلی استفاده شود
                 const fallback = await idbService.get('backups', `storage_${key}`);
-                const fallbackData = fallback?.data ? JSON.parse(fallback.data) : null;
+                let fallbackData = null;
+                try {
+                    fallbackData = fallback?.data ? JSON.parse(fallback.data) : null;
+                } catch {
+                    fallbackData = null;
+                }
                 if (fallbackData) {
                     this.memoryCache.set(key, { data: fallbackData, timestamp: Date.now() });
                 }

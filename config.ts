@@ -87,4 +87,8 @@ export const ENV_MESSAGES = {
 export const CURRENT_ENV = isProduction ? 'PRODUCTION' : 'LOCAL';
 export const ENV_MESSAGE = isProduction ? ENV_MESSAGES.PRODUCTION : ENV_MESSAGES.LOCAL;
 
+// نگارش رسمی سامانه حسابداری اشک قلم و تاریخ شمسی انتشار
+export const APP_VERSION = '16.52.0';
+export const APP_RELEASE_DATE = '۱۴۰۵/۰۷/۲۴';
+
 export { isLocalhost, HOST_BASE_URL };

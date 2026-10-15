@@ -1,10 +1,78 @@
 {
-  "version": "16.24.0",
-  "buildNumber": 20260916,
-  "releaseDate": "۱۴۰۵/۰۶/۲۵",
+  "version": "16.52.0",
+  "buildNumber": 20261026,
+  "releaseDate": "۱۴۰۵/۰۷/۲۴",
   "minSupportedVersion": "16.0.0",
-  "downloadUrl": "https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.24.0.exe",
+  "downloadUrl": "/downloads/AshkeGhalam-v16.52.0.apk",
   "releases": [
+    {
+      "version": "16.52.0",
+      "date": "۱۴۰۵/۰۷/۲۴",
+      "type": "minor",
+      "title": "پیاده‌سازی زون Drag-and-Drop فایل‌های ZIP، سرویس اعتبارسنجی کلاینت‌ساید ZipValidator و بازطراحی سامانه گام‌به‌گام تولید برنامه‌های مستقل ویندوز و اندروید",
+      "size": "بسته‌های مستقل سبک (EXE و APK)",
+      "downloadUrl": "/downloads/AshkeGhalam-v16.52.0.apk",
+      "windowsInstallerUrl": "/downloads/AshkeGhalam-Setup-v16.52.0.exe",
+      "windowsPortableUrl": "/downloads/AshkeGhalam-Portable-v16.52.0.exe",
+      "hostPackageUrl": "/downloads/ashke-ghalam-host-v16.52.0.zip",
+      "isCurrent": true,
+      "changes": [
+        { "category": "دیباگ و ممیزی", "desc": "پیاده‌سازی زون Drag-and-Drop اختصاصی فایل‌های ZIP در مرکز دیباگ با افکت‌های نوری و رابط تعاملی مدرن" },
+        { "category": "امنیت و اعتبارسنجی", "desc": "سرویس کلاینت‌ساید ZipValidator برای کنترل سلامت هدر جادویی، پیشگیری از Zip Slip/Bomb و تطبیق ساختار سورس‌کدهای حسابداری" },
+        { "category": "بازطراحی مستقل", "desc": "بازنویسی و بازطراحی کامل بخش تولید برنامه‌های مستقل ویندوز و اندروید با فرآیند گام‌به‌گام و راهنماهای هوشمند (؟)" },
+        { "category": "موتور آفلاین", "desc": "تعبیه موتور ممیزی آفلاین استاتیک سورس‌کد مالی بدون وابستگی به اینترنت خارجی در شرایط فیلترینگ" }
+      ]
+    },
+    {
+      "version": "16.51.0",
+      "date": "۱۴۰۵/۰۷/۲۳",
+      "type": "minor",
+      "title": "ارتقای جامع بسته‌های اجرایی یک-کلیک ویندوز و اندروید با کامپایلر درون‌سیستمی و رفع کامل وابستگی به MinGW",
+      "size": "بسته‌های مستقل سبک (EXE و APK)",
+      "downloadUrl": "/downloads/AshkeGhalam-v16.51.0.apk",
+      "windowsInstallerUrl": "/downloads/AshkeGhalam-Setup-v16.51.0.exe",
+      "windowsPortableUrl": "/downloads/AshkeGhalam-Portable-v16.51.0.exe",
+      "hostPackageUrl": "/downloads/ashke-ghalam-host-v16.51.0.zip",
+      "isCurrent": false,
+      "changes": [
+        { "category": "معماری بومی", "desc": "تعبیه کامپایلر خودکار داخلی ویندوز (بدون نیاز به MinGW یا Visual Studio) و اجرای آنی با یک کلیک" },
+        { "category": "اجرای سریع", "desc": "راه‌اندازی فوری سامانه با Run-AshkeGhalam.bat بدون نیاز به بیلد مجدد در صورت وجود فایل‌ها" },
+        { "category": "استقلال داده", "desc": "ایزولاسیون کامل دیتابیس در %APPDATA%\\AshkeGhalam و امکان تنظیم آزادانه مسیر پشتیبان" },
+        { "category": "اندروید", "desc": "تولید پکیج کامل نصبی APK سازگار با گوشی‌ها و پوزهای اندرویدی" }
+      ]
+    },
+    {
+      "version": "16.32.0",
+      "date": "۱۴۰۵/۰۷/۲۲",
+      "type": "minor",
+      "title": "رفع مشکل کنتراست تنظیمات، افزودن فیلد شماره سریال، دسته‌بندی چندسطحی کالاها و ثبت سریع با اسکنر دستی در فاکتور",
+      "size": "1.9 MB (بسته بهینه‌سازی جدید)",
+      "downloadUrl": "https://acc.ashkghalam.ir/downloads/AshkeGhalam-v16.32.0.apk",
+      "isCurrent": false,
+      "changes": [
+        { "category": "بهبود", "desc": "رفع کامل مشکل کنتراست بخش تنظیمات مطابق استانداردهای WCAG AAA و افزودن حالت کنتراست فوق‌العاده" },
+        { "category": "ویژگی جدید", "desc": "افزودن فیلد شماره سریال به تعریف کالا با ۳ حالت: تولید اتوماتیک، ورود دستی و دریافت مستقیم از اسکنر دستی" },
+        { "category": "ویژگی جدید", "desc": "افزودن قابلیت دسته‌بندی کالاها در چندین زیرمجموعه (دسته اصلی، زیرمجموعه ۱ و زیرمجموعه ۲ به همراه مسیر درختی)" },
+        { "category": "ویژگی جدید", "desc": "قابلیت دریافت و ثبت فوری کالا از طریق اسکنر دستی به فاکتور و تعریف سریع در لحظه اسکن برای کالاهای ثبت‌نشده" },
+        { "category": "راهنما", "desc": "تعبیه دکمه راهنمای هوشمند (؟) در نوار اسکنر فاکتور و سربرگ تنظیمات" }
+      ]
+    },
+    {
+      "version": "16.31.0",
+      "date": "۱۴۰۵/۰۷/۲۲",
+      "type": "minor",
+      "title": "بهینه‌سازی جامع پلتفرم اندروید، وب‌ویو آفلاین، کنترل دکمه بازگشت و پاکسازی خودکار بیلدها",
+      "size": "1.8 MB (بسته بهینه‌سازی نیتیو اندروید)",
+      "downloadUrl": "https://acc.ashkghalam.ir/downloads/AshkeGhalam-v16.31.0.apk",
+      "isCurrent": false,
+      "changes": [
+        { "category": "بهبود", "desc": "ارتقا و بهینه‌سازی وب‌ویو Capacitor و حذف کامل تاخیر لمس در گوشی‌های اندرویدی" },
+        { "category": "ویژگی جدید", "desc": "پیاده‌سازی موتور مدیریت دکمه بازگشت فیزیکی اندروید جهت جلوگیری از خروج ناخواسته و بستن منظم مدال‌ها" },
+        { "category": "ویژگی جدید", "desc": "تعبیه دکمه راهنمای هوشمند (؟) در نوار ناوبری همراه و ماژول‌های اختصاصی اندروید" },
+        { "category": "بهبود", "desc": "پاکسازی خودکار و صددرصدی فایل‌های APK و بیلدهای قدیمی قبل از کامپایل و نام‌گذاری با نسخه دقیق" },
+        { "category": "عملکرد", "desc": "پشتیبانی کامل از کارکرد ۱۰۰٪ آفلاین و ذخیره‌سازی محلی متناسب با شرایط اینترنت ایران" }
+      ]
+    },
     {
       "version": "16.24.0",
       "date": "۱۴۰۵/۰۶/۲۵",
@@ -12,7 +80,7 @@
       "title": "بهینه‌سازی پرفورمنس پایگاه‌داده دسکتاپ ویندوز، پل پیامک اندروید و بروزرسانی خودکار OTA",
       "size": "1.6 MB (وصله آنی دلتا)",
       "downloadUrl": "https://acc.ashkghalam.ir/downloads/AshkeGhalam-Setup-16.24.0.exe",
-      "isCurrent": true,
+      "isCurrent": false,
       "changes": [
         { "category": "بهبود", "desc": "بهینه‌سازی موتور پایگاه‌داده دسکتاپ ویندوز و رفع کامل کندی در اتصال به وب‌سرور هاست" },
         { "category": "ویژگی جدید", "desc": "پل ارتباطی ارسال مستقیم پیامک از گوشی اندروید به صورت آفلاین و سیم‌کارتی" },

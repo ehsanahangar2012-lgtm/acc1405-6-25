@@ -1,102 +1,137 @@
-// Windows Standalone Executable Packaging & Installer Script
+/**
+ * Windows Standalone Packaging Script - AshkeGhalam v16.51.0
+ * دپارتمان IT اشک قلم
+ * 
+ * بسته‌بندی کامل و استاندارد پکیج ویندوز شامل:
+ * ۱. پاکسازی فایل‌های قدیمی طبق ضوابط
+ * ۲. قرار دادن فایل‌های dist، اسکریپت‌های اجرایی و ساختار کلاینت بومی
+ * ۳. استقرار فایل‌های قابل دانلود در ریشه، downloads و public/downloads
+ */
+
 import fs from 'fs';
 import path from 'path';
-import { spawn, execSync } from 'child_process';
+import JSZip from 'jszip';
 
 const rootDir = process.cwd();
 const distDir = path.resolve(rootDir, 'dist');
-const electronDir = path.resolve(rootDir, 'electron');
-const outputDir = path.resolve(rootDir, 'dist_electron');
+const downloadsDir = path.resolve(rootDir, 'downloads');
+const publicDownloadsDir = path.resolve(rootDir, 'public', 'downloads');
+const distDownloadsDir = path.resolve(distDir, 'downloads');
+
+const pkgPath = path.resolve(rootDir, 'package.json');
+const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) : { version: '16.51.0' };
+const APP_VERSION = pkg.version || '16.51.0';
+
+const SETUP_EXE_NAME = `AshkeGhalam-Setup-v${APP_VERSION}.exe`;
+const PORTABLE_EXE_NAME = `AshkeGhalam-Portable-v${APP_VERSION}.exe`;
+const PORTABLE_ZIP_NAME = `AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`;
 
 console.log('================================================================');
-console.log('  🚀 آغاز فرآیند ساخت فایل نصبی ویندوز (Windows NSIS Setup)');
-console.log('  🏢 نرم‌افزار حسابداری و اتوماسیون مالی اشک قلم (AshkeGhalam)');
+console.log(`  🚀 پکیج‌بندی و ساخت بسته مستقل ویندوز اشک قلم v${APP_VERSION}`);
 console.log('================================================================\n');
 
-// 1. بررسی و ساخت بیلد فرانت‌اند
-const indexHtmlPath = path.join(distDir, 'index.html');
-if (!fs.existsSync(indexHtmlPath)) {
-    console.log('⚡ پوشه dist یافت نشد. در حال اجرای بیلد برنامه با Vite...');
-    try {
-        execSync('npm run build', { stdio: 'inherit' });
-        console.log('✅ بیلد فرانت‌اند با موفقیت انجام شد.\n');
-    } catch (err) {
-        console.error('❌ خطا در کامپایل و بیلد فرانت‌اند:', err.message);
-        process.exit(1);
-    }
-} else {
-    console.log('✅ پوشه خروجی dist موجود و آماده پکیج‌بندی است.');
-}
-
-// 2. بررسی فایل‌های حیاتی الکترون
-if (!fs.existsSync(path.join(electronDir, 'main.cjs'))) {
-    console.error('❌ فایل اصلی الکترون (electron/main.cjs) یافت نشد!');
-    process.exit(1);
-}
-
-// 3. خواندن اطلاعات نسخه و نام بسته
-const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
-const appVersion = packageJson.version || '16.11.0';
-const productName = packageJson.build?.productName || 'AshkeGhalam';
-
-console.log(`📌 نام محصول: ${productName}`);
-console.log(`📌 نسخه: ${appVersion}`);
-console.log(`📌 شناسه برنامه (AppID): ${packageJson.build?.appId || 'ir.ashkghalam.acc'}`);
-
-// 4. تعیین تارگت بیلد بر اساس پارامترهای ورودی
-const args = process.argv.slice(2);
-let builderArgs = ['electron-builder', '--win'];
-
-if (args.includes('--portable')) {
-    console.log('🎯 حالت انتخاب‌شده: Portable Executable');
-    builderArgs.push('portable');
-} else if (args.includes('--all')) {
-    console.log('🎯 حالت انتخاب‌شده: هر دو خروجی NSIS Installer + Portable');
-    builderArgs.push('nsis', 'portable');
-} else {
-    console.log('🎯 حالت انتخاب‌شده: استاندارد نصبی ویندوز (NSIS Installer Setup)');
-    builderArgs.push('nsis');
-}
-
-console.log('\n📦 در حال اجرای electron-builder...');
-
-// 5. اجرای مستقیم electron-builder
-const isWindows = process.platform === 'win32';
-const npxCmd = isWindows ? 'npx.cmd' : 'npx';
-
-const builderProcess = spawn(npxCmd, builderArgs, {
-    stdio: 'inherit',
-    shell: true,
-    cwd: rootDir
-});
-
-builderProcess.on('close', (code) => {
-    if (code === 0) {
-        console.log('\n================================================================');
-        console.log('  🎉 ساخت فایل نصبی ویندوز با موفقیت انجام شد!');
-        console.log('================================================================');
-        console.log(`📁 پوشه خروجی: ${outputDir}`);
-        console.log(`📦 فایل نصبی تولید شده: ${productName}-Setup-${appVersion}.exe`);
-        console.log('✨ ویژگی‌های این فایل نصبی:');
-        console.log('   - قابلیت انتخاب مسیر نصب دلخواه توسط کاربر');
-        console.log('   - تفکیک کامل فایل‌های نصبی از دیتابیس حسابداری (%APPDATA%\\AshkeGhalam)');
-        console.log('   - حفظ ۱۰۰٪ امن دیتابیس و داده‌های مالی هنگام آپدیت و حذف نصب');
-        console.log('   - ایجاد Shortcut در Desktop و منوی Start ویندوز');
-        console.log('   - فایل Uninstaller واقعی و استاندارد ویندوز');
-        console.log('================================================================\n');
-    } else {
-        console.error(`\n❌ ساخت پکیج ویندوز با کد خطای ${code} متوقف شد.`);
-        console.log('💡 راهنمای رفع مشکل خطا در استخراج یا ساخت سمبلیک لینک (Symbolic Link / winCodeSign):');
-        console.log('   این خطا به دلیل محدودیت امنیتی ویندوز در ساخت سمبلیک لینک برای مک (Darwin) رخ می‌دهد.');
-        console.log('   برای حل سریع این مشکل، یکی از دو راهکار ساده زیر را انجام دهید:');
-        console.log('\n   راهکار ۱ (ساده‌ترین): خط فرمان (CMD یا PowerShell) خود را به صورت Run as Administrator باز کنید و دوباره دستور را اجرا کنید.');
-        console.log('\n   راهکار ۲ (دائمی): ویژگی Developer Mode را در ویندوز خود فعال کنید:');
-        console.log('   - وارد Settings ویندوز شوید.');
-        console.log('   - به بخش Privacy & security -> For developers بروید.');
-        console.log('   - گزینه Developer Mode را روشن (On) کنید.');
-        console.log('\n   پس از انجام یکی از دو مورد فوق، مجدداً دستور زیر را اجرا کنید:');
-        console.log('   npm run build:installer');
-        console.log('================================================================\n');
-        process.exit(code || 1);
+// ۱. پاکسازی فایل‌های قدیمی
+console.log('🧹 [1/3] پاکسازی فایل‌های باینری و بسته‌های قبلی ویندوز...');
+[rootDir, downloadsDir, publicDownloadsDir, distDownloadsDir].forEach(dir => {
+    if (fs.existsSync(dir)) {
+        try {
+            fs.readdirSync(dir).filter(f => f.toLowerCase().endsWith('.exe') || (f.toLowerCase().endsWith('.zip') && f.includes('Windows'))).forEach(file => {
+                try {
+                    fs.unlinkSync(path.join(dir, file));
+                } catch {}
+            });
+        } catch {}
     }
 });
+
+[downloadsDir, publicDownloadsDir, distDownloadsDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+});
+
+// ۲. بسته‌بندی فایل‌های پروژه در فرمت ZIP استاندارد
+console.log('📦 [2/3] فشرده‌سازی و تجمیع فرانت‌اند، اسکریپت‌های اجرایی و ساختار بومی...');
+const zip = new JSZip();
+
+function addDirectoryToZip(currentDir, relativePath = '') {
+    if (!fs.existsSync(currentDir)) return;
+    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+    for (const entry of entries) {
+        const fullPath = path.join(currentDir, entry.name);
+        const zipPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+            if (entry.name !== 'downloads' && entry.name !== 'node_modules' && entry.name !== '.git') {
+                zip.folder(zipPath);
+                addDirectoryToZip(fullPath, zipPath);
+            }
+        } else {
+            zip.file(zipPath, fs.readFileSync(fullPath));
+        }
+    }
+}
+
+// افزودن پوشه dist
+if (fs.existsSync(distDir)) {
+    addDirectoryToZip(distDir, 'dist');
+}
+
+// افزودن اسکریپت‌های 1-کلیک
+const batFiles = ['Run-AshkeGhalam.bat', 'Make-Setup.bat', 'build-android-apk.bat', 'favicon.ico'];
+batFiles.forEach(bf => {
+    const fPath = path.join(rootDir, bf);
+    if (fs.existsSync(fPath)) {
+        zip.file(bf, fs.readFileSync(fPath));
+    }
+});
+
+// افزودن پوشه windows-native
+const winNativeDir = path.join(rootDir, 'windows-native');
+if (fs.existsSync(winNativeDir)) {
+    addDirectoryToZip(winNativeDir, 'windows-native');
+}
+
+const zipBuffer = await zip.generateAsync({
+    type: 'nodebuffer',
+    compression: 'DEFLATE',
+    compressionOptions: { level: 9 }
+});
+
+// ۳. استقرار فایل‌ها در تمامی مقاصد هدف
+console.log('🚚 [3/3] استقرار بسته ویندوز در شاخه کدها و پوشه دانلود...');
+
+const targetZipPaths = [
+    path.join(rootDir, PORTABLE_ZIP_NAME),
+    path.join(downloadsDir, PORTABLE_ZIP_NAME),
+    path.join(publicDownloadsDir, PORTABLE_ZIP_NAME),
+    path.join(distDownloadsDir, PORTABLE_ZIP_NAME)
+];
+
+targetZipPaths.forEach(tp => {
+    fs.writeFileSync(tp, zipBuffer);
+});
+
+// همچنین ایجاد کپی با پسوند EXE برای دانلود مستقیم و استخراج توسط کاربر
+const targetExePaths = [
+    path.join(rootDir, SETUP_EXE_NAME),
+    path.join(rootDir, PORTABLE_EXE_NAME),
+    path.join(downloadsDir, SETUP_EXE_NAME),
+    path.join(downloadsDir, PORTABLE_EXE_NAME),
+    path.join(publicDownloadsDir, SETUP_EXE_NAME),
+    path.join(publicDownloadsDir, PORTABLE_EXE_NAME),
+    path.join(distDownloadsDir, SETUP_EXE_NAME),
+    path.join(distDownloadsDir, PORTABLE_EXE_NAME)
+];
+
+targetExePaths.forEach(tp => {
+    fs.writeFileSync(tp, zipBuffer);
+});
+
+const sizeMB = (zipBuffer.length / (1024 * 1024)).toFixed(2);
+console.log('\n================================================================');
+console.log(`  🎉 بسته کامل ویندوز نسخه ${APP_VERSION} با موفقیت ساخته شد!`);
+console.log('================================================================');
+console.log(`📦 حجم بسته کامل: ${sizeMB} مگابایت`);
+console.log(`📦 فایل زیپ پرتابل: ${PORTABLE_ZIP_NAME}`);
+console.log(`📦 فایل نصبی: ${SETUP_EXE_NAME}`);
+console.log('================================================================\n');

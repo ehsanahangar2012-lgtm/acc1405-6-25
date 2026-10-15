@@ -4,7 +4,7 @@ import {
   HelpCircle, X, Sparkles, BookOpen, Lightbulb, 
   Keyboard, ShieldCheck, CheckCircle2, ChevronLeft, ArrowRight,
   Search, ExternalLink, Calendar, CreditCard, Landmark, DollarSign,
-  TrendingUp, Calculator, Building2, Package, Users, FileText, CheckSquare
+  TrendingUp, Calculator, Building2, Package, Users, FileText, CheckSquare, Smartphone
 } from 'lucide-react';
 import { getPersianDate, toPersianDigits } from '../utils';
 
@@ -292,6 +292,24 @@ export const SECTION_GUIDES: Record<string, SectionGuideContent> = {
       'راهنمای گام‌به‌گام خروجی فایل اجرایی مستقل EXE برای ویندوز',
       'مستندات کامل REST API جهت سینک دوطرفه با پروژه‌های اندرویدی (فاکتورها، حواله‌ها، کالاها)',
       'پاسخ به سوالات پرتکرار و ارتباط مستقیم با پشتیبانی در واتساپ'
+    ]
+  },
+  '/install-android': {
+    path: '/install-android',
+    icon: Smartphone,
+    title: 'مرکز نصب و بهینه‌سازی اندروید اشک قلم',
+    subtitle: 'نصب نسخه بومی نیتیو APK، وب‌اپلیکیشن آفلاین PWA و پل ارتباطی پیامک سیم‌کارتی',
+    description: 'در این بخش می‌توانید پکیج مستقل اندروید (APK)، نسخه PWA مستقل از فیلترینگ، اتصال دیتابیس با هاست و ابزار ارسال پیامک سیم‌کارتی بومی را مدیریت کنید.',
+    keyFeatures: [
+      'عملکرد ۱۰۰٪ مستقل و آفلاین بدون نیاز به اتصال دائم اینترنت در بازار و انبار',
+      'پشتیبانی از اسکریپت بیلد خودکار پکیج بومی Capacitor APK با نام و نسخه تفکیک‌شده',
+      'قابلیت اتصال PWA با ذخیره‌سازی محلی IndexedDB روی گوشی موبایل و تبلت',
+      'پل هوشمند ارسال پیامک مستقیم از سیم‌کارت بدون هزینه پنل پیامکی خارجی',
+      'مدیریت دکمه بازگشت فیزیکی گوشی‌های اندروید جهت پیشگیری از خروج ناخواسته'
+    ],
+    tips: [
+      'در صورت استفاده در ایران و شرایط اختلال اینترنت، برنامه به صورت خودکار داده‌ها را در حافظه محلی گوشی نگهداری کرده و با اتصال به سرور محلی همگام می‌سازد.',
+      'برای خروجی سریع فایل نصبی APK می‌توانید از دستور npm run build:apk استفاده نمایید.'
     ]
   }
 };

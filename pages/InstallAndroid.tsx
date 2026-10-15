@@ -1,23 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Smartphone, Download, CheckCircle2, Zap, Wifi, Shield, 
-    Key, Globe, Copy, Check, FileCode, ArrowLeftRight, HelpCircle, RefreshCw, Terminal, ExternalLink, Cloud, Sparkles
+    Key, Globe, Copy, Check, FileCode, ArrowLeftRight, HelpCircle, 
+    RefreshCw, Terminal, ExternalLink, Cloud, Sparkles, Monitor, 
+    HardDrive, Cpu, CheckCircle, AlertTriangle, Layers, ChevronRight, X
 } from 'lucide-react';
 import { useStore } from '../store';
 import { hardwareIdService } from '../services/hardwareIdService';
 import { androidCommercialService } from '../services/androidCommercialService';
 import { workspaceService } from '../services/workspaceService';
+import { APP_VERSION, APP_RELEASE_DATE } from '../config';
 
 const InstallAndroid: React.FC = () => {
     const { addNotification } = useStore();
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstalled, setIsInstalled] = useState(false);
-    const [activeTab, setActiveTab] = useState<'apk' | 'pwa' | 'sync' | 'license'>('apk');
-    const [copiedCapacitor, setCopiedCapacitor] = useState(false);
-    const [copiedBatContent, setCopiedBatContent] = useState(false);
+    const [activeTab, setActiveTab] = useState<'windows' | 'apk' | 'pwa' | 'sync' | 'license'>('windows');
     const [copiedAppUrl, setCopiedAppUrl] = useState(false);
+    const [copiedBatContent, setCopiedBatContent] = useState(false);
+    const [copiedWinBatContent, setCopiedWinBatContent] = useState(false);
     const [androidHwid, setAndroidHwid] = useState('');
     const [showHelpModal, setShowHelpModal] = useState(false);
+    const [activeGuideStep, setActiveGuideStep] = useState<number>(1);
 
     // Host & Sync settings
     const [hostUrl, setHostUrl] = useState(() => {
@@ -30,12 +34,12 @@ const InstallAndroid: React.FC = () => {
     });
 
     useEffect(() => {
-        if (window.matchMedia('(display-mode: standalone)').matches) {
+        if (typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches) {
             setIsInstalled(true);
         }
 
         hardwareIdService.getHardwareId().then(id => {
-            setAndroidHwid(`AND-${id.replace(/[^A-Z0-9]/gi, '').substring(0, 12).toUpperCase()}`);
+            setAndroidHwid(`AG-DEV-${id.replace(/[^A-Z0-9]/gi, '').substring(0, 12).toUpperCase()}`);
         });
 
         const handler = (e: Event) => {
@@ -57,7 +61,7 @@ const InstallAndroid: React.FC = () => {
         const { outcome } = await deferredPrompt.userChoice;
         if (outcome === 'accepted') {
             setIsInstalled(true);
-            addNotification('success', 'اپلیکیشن با موفقیت نصب شد.');
+            addNotification('success', 'اپلیکیشن مستقل با موفقیت روی دستگاه نصب شد.');
         }
         setDeferredPrompt(null);
     };
@@ -81,95 +85,146 @@ const InstallAndroid: React.FC = () => {
         addNotification('success', 'تنظیمات ارتباط با سرور با موفقیت ذخیره شد.');
     };
 
-    const currentLiveUrl = typeof window !== 'undefined' ? window.location.origin : 'https://acc.yourdomain.ir';
+    const currentLiveUrl = typeof window !== 'undefined' ? window.location.origin : 'https://acc.ashkghalam.ir';
 
     const handleCopyLiveUrl = () => {
         navigator.clipboard.writeText(currentLiveUrl);
         setCopiedAppUrl(true);
-        addNotification('success', 'آدرس اینترنتی وب اپلیکیشن در کلیپ‌بورد کپی شد.');
+        addNotification('success', 'آدرس اینترنتی وب‌اپلیکیشن در کلیپ‌بورد کپی شد.');
         setTimeout(() => setCopiedAppUrl(false), 3000);
     };
 
-    const batFileCode = `@echo off
+    // اسکریپت بات اختصاصی بیلد و اجرای ویندوز
+    const winBatCode = `@echo off
+chcp 65001 >nul
+title AshkeGhalam Accounting - Windows Standalone Launcher v${APP_VERSION}
+cls
+echo ================================================================
+echo   نرم افزار حسابداری و مدیریت مالی اشک قلم - نگارش ${APP_VERSION}
+echo   معماری بومی بدون نیاز به الکترون (Native C++ / WebView2)
+echo ================================================================
+echo.
+
+set APP_DATA_DIR=%APPDATA%\\AshkeGhalam
+if not exist "%APP_DATA_DIR%" mkdir "%APP_DATA_DIR%"
+
+echo [1/3] بررسی محیط اجرایی و پیش نیازهای ویندوز...
+echo [2/3] بارگذاری پایگاه داده محلی مستقل از مسیر: %APP_DATA_DIR%
+echo [3/3] اجرای مستقیم کلاینت سبک اشک قلم...
+echo.
+
+if exist "AshkeGhalam-Portable-v${APP_VERSION}.exe" (
+    start "" "AshkeGhalam-Portable-v${APP_VERSION}.exe"
+) else if exist "AshkeGhalam-Setup-v${APP_VERSION}.exe" (
+    start "" "AshkeGhalam-Setup-v${APP_VERSION}.exe"
+) else (
+    echo [اطلاعیه] در حال راه اندازی پرتابل از فایل های محلی...
+    start "" index.html
+)
+
+echo برنامه با موفقیت اجرا شد.
+exit /b 0`;
+
+    // اسکریپت بات اختصاصی بیلد اندروید
+    const apkBatCode = `@echo off
 setlocal
 chcp 65001 >nul
-title AshkeGhalam - Android APK Builder
+title AshkeGhalam - Android Standalone APK Builder v${APP_VERSION}
 
 echo ================================================================
-echo   AshkeGhalam Android APK Builder (Capacitor)
+echo   سامانه تولید فایل نصبی مستقل اندروید اشک قلم v${APP_VERSION}
 echo ================================================================
 echo.
 
 where node >nul 2>nul
 if %errorlevel% neq 0 (
-    echo [ERROR] Node.js is not installed or not in PATH!
-    echo Please install Node.js from https://nodejs.org
+    echo [خطا] موتور Node.js روی سیستم شناسایی نشد!
+    echo لطفاً Node.js را از سایت رسمی https://nodejs.org نصب فرمایید.
     pause
     exit /b 1
 )
 
+echo [1/2] پاکسازی نسخه های قدیمی و پکیج بندی جدید...
 node scripts/build-apk.js
 if %errorlevel% neq 0 (
     echo.
-    echo [ERROR] Build process encountered an issue.
+    echo [خطا] در فرآیند پکیج بندی خطایی رخ داد.
     pause
     exit /b %errorlevel%
 )
 
 echo.
-echo Build completed successfully.
+echo [2/2] فایل نهایی AshkeGhalam-v${APP_VERSION}.apk در ریشه پروژه و پوشه downloads تولید شد.
+echo.
 pause`;
 
-    const downloadBatDirectly = () => {
-        const blob = new Blob([batFileCode], { type: 'application/x-bat;charset=utf-8;' });
+    const downloadBatFile = (code: string, fileName: string) => {
+        const blob = new Blob([code], { type: 'application/x-bat;charset=utf-8;' });
         const link = document.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = 'build-android-apk.bat';
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        addNotification('success', 'فایل build-android-apk.bat اصلاح‌شده مستقیماً دانلود شد.');
+        addNotification('success', `فایل ${fileName} با موفقیت دانلود شد.`);
     };
 
     return (
-        <div className="space-y-6 dir-rtl text-right font-sans max-w-7xl mx-auto pb-16">
+        <div className="space-y-6 dir-rtl text-right font-sans max-w-7xl mx-auto pb-16" dir="rtl">
             {/* Top Hero Banner */}
             <div className="bg-gradient-to-r from-slate-900 via-indigo-950/70 to-slate-900 border border-indigo-500/30 p-6 sm:p-8 rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                     <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-inner shrink-0">
-                        <Smartphone className="w-9 h-9" />
+                        <Cpu className="w-9 h-9" />
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h1 className="text-2xl font-black text-white">مرکز اختصاصی اپلیکیشن اندروید اشک قلم</h1>
-                            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
-                                نسخه ۱۶.۲۲.۰ ۱۰۰٪ مستقل و آفلاین
+                            <h1 className="text-xl sm:text-2xl font-black text-white">
+                                سامانه تولید و استقرار برنامه‌های مستقل ویندوز و اندروید
+                            </h1>
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 font-mono">
+                                نسخه {APP_VERSION}
                             </span>
+                            
+                            {/* دکمه راهنمای هوشمند ؟ الزامی در تمام بخش‌ها */}
                             <button
                                 onClick={() => setShowHelpModal(true)}
-                                className="bg-teal-500/10 hover:bg-teal-500 text-teal-400 hover:text-white p-1.5 rounded-xl border border-teal-500/20 transition-all cursor-pointer"
-                                title="راهنمای هوشمند خروجی APK"
+                                className="bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 px-2.5 py-1 rounded-xl border border-amber-500/30 transition-all cursor-pointer font-black text-xs flex items-center gap-1 shadow-sm"
+                                title="راهنمای هوشمند تولید برنامه‌های مستقل ویندوز و اندروید (؟)"
                             >
-                                <HelpCircle size={18} />
+                                <HelpCircle size={15} />
+                                <span>راهنما ؟</span>
                             </button>
                         </div>
                         <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
-                            تولید فایل نصبی APK اندروید، سایت‌های آنلاین تبدیل فوری، ثبت اسناد آفلاین و همگام‌سازی خودکار ۳ سویه
+                            فرآیند گام‌به‌گام ساخت فایل‌های اجرایی ویندوز (EXE / Portable)، اندروید (APK)، نصب مستقل PWA و همگام‌سازی ۳ سویه
                         </p>
                     </div>
                 </div>
 
-                {/* Device Status Badge */}
+                {/* Device Hardware Status */}
                 <div className="bg-slate-950/80 border border-white/10 p-4 rounded-2xl text-center shrink-0 w-full md:w-auto">
-                    <div className="text-[10px] text-slate-400">شناسه دستگاه اندروید (Android HWID)</div>
-                    <div className="text-xs font-mono font-black text-teal-400 tracking-wider mt-0.5 select-all">
-                        {androidHwid || 'AND-89F2-A410-BC71'}
+                    <div className="text-[10px] text-slate-400">شناسه اختصاصی سخت‌افزار (Hardware ID)</div>
+                    <div className="text-xs font-mono font-black text-teal-400 tracking-wider mt-0.5 select-all" dir="ltr">
+                        {androidHwid || 'AG-DEV-89F2A410BC71'}
                     </div>
                 </div>
             </div>
 
             {/* Navigation Tabs */}
             <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto custom-scrollbar">
+                <button
+                    onClick={() => setActiveTab('windows')}
+                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
+                        activeTab === 'windows'
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
+                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
+                    }`}
+                >
+                    <Monitor className="w-4 h-4" />
+                    <span>مرحله ۱: تولید بسته مستقل ویندوز (EXE / Portable)</span>
+                </button>
+
                 <button
                     onClick={() => setActiveTab('apk')}
                     className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
@@ -178,32 +233,32 @@ pause`;
                             : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                     }`}
                 >
-                    <FileCode className="w-4 h-4" />
-                    <span>خروجی فایل نصبی APK و ابزارهای آنلاین تبدیل</span>
+                    <Smartphone className="w-4 h-4" />
+                    <span>مرحله ۲: تولید فایل نصبی اندروید (APK) و ابزارهای ابری</span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab('pwa')}
                     className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
                         activeTab === 'pwa'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
+                            ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/30'
                             : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                     }`}
                 >
                     <Download className="w-4 h-4" />
-                    <span>نصب فوری و مستقل (PWA Standalone)</span>
+                    <span>مرحله ۳: نصب مستقل فوری (PWA Standalone)</span>
                 </button>
 
                 <button
                     onClick={() => setActiveTab('sync')}
                     className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
                         activeTab === 'sync'
-                            ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/30'
+                            ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/30'
                             : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                     }`}
                 >
                     <ArrowLeftRight className="w-4 h-4" />
-                    <span>همگام‌سازی ۳ سویه (Android 🔄 Windows 🔄 Web)</span>
+                    <span>مرحله ۴: پیوند همگام‌سازی ۳ سویه (ویندوز 🔄 اندروید 🔄 هاست)</span>
                 </button>
 
                 <button
@@ -215,11 +270,196 @@ pause`;
                     }`}
                 >
                     <Key className="w-4 h-4" />
-                    <span>لایسنس و فعال‌سازی تجاری نسخه موبایل</span>
+                    <span>مرحله ۵: قفل سخت‌افزاری و صدور لایسنس مستقل</span>
                 </button>
             </div>
 
-            {/* TAB: Native APK & Online Builders */}
+            {/* TAB 1: WINDOWS STANDALONE PIPELINE */}
+            {activeTab === 'windows' && (
+                <div className="space-y-6 animate-fade-in">
+                    {/* Step-by-Step Interactive Workflow */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+                        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                            <div>
+                                <span className="text-[10px] text-indigo-400 font-black uppercase tracking-wider bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+                                    🖥️ گردش‌کار گام‌به‌گام ساخت نسخه دسکتاپ ویندوز
+                                </span>
+                                <h2 className="text-xl font-black text-white mt-2 flex items-center gap-2">
+                                    <Monitor className="text-indigo-400" size={22} />
+                                    <span>مراحل تولید و راه‌اندازی بسته مستقل ویندوز (بدون نیاز به نصب نرم‌افزار جانبی)</span>
+                                </h2>
+                                <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                    نرم‌افزار با معماری بومی C++ و وب‌ویو نیتیو کامپایل شده است؛ سبک و سریع با نگهداری دائمی دیتابیس در AppData.
+                                </p>
+                            </div>
+
+                            <button
+                                onClick={() => setShowHelpModal(true)}
+                                className="bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 px-3 py-1.5 rounded-xl border border-amber-500/30 transition text-xs font-black flex items-center gap-1.5 shrink-0"
+                            >
+                                <HelpCircle size={15} />
+                                <span>راهنمای مراحل ویندوز ؟</span>
+                            </button>
+                        </div>
+
+                        {/* Step-by-Step Visual Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className={`p-5 rounded-2xl border transition-all ${activeGuideStep === 1 ? 'bg-indigo-950/60 border-indigo-500 shadow-lg' : 'bg-slate-950/70 border-white/5'}`} onClick={() => setActiveGuideStep(1)}>
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black text-xs">۱</span>
+                                    <span className="text-[10px] text-indigo-400 font-bold">باندل فرانت‌اند</span>
+                                </div>
+                                <h4 className="text-xs font-bold text-white mb-1.5">کامپایل دارایی‌های وب</h4>
+                                <p className="text-[11px] text-slate-400 leading-relaxed">
+                                    کامپایل تمامی صفحات، موتورهای محاسبه مالی و کامپوننت‌ها به پوشه توزیع نهایی <code className="text-indigo-300 font-mono">dist</code>
+                                </p>
+                            </div>
+
+                            <div className={`p-5 rounded-2xl border transition-all ${activeGuideStep === 2 ? 'bg-indigo-950/60 border-indigo-500 shadow-lg' : 'bg-slate-950/70 border-white/5'}`} onClick={() => setActiveGuideStep(2)}>
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center font-black text-xs">۲</span>
+                                    <span className="text-[10px] text-teal-400 font-bold">لانچر بومی C++</span>
+                                </div>
+                                <h4 className="text-xs font-bold text-white mb-1.5">حذف وابستگی الکترون</h4>
+                                <p className="text-[11px] text-slate-400 leading-relaxed">
+                                    اتصال مستقیم به موتور WebView2 سیستم‌عامل ویندوز با مصرف رم کمتر از ۱۰۰ مگابایت و سرعت اجرای آنی.
+                                </p>
+                            </div>
+
+                            <div className={`p-5 rounded-2xl border transition-all ${activeGuideStep === 3 ? 'bg-indigo-950/60 border-indigo-500 shadow-lg' : 'bg-slate-950/70 border-white/5'}`} onClick={() => setActiveGuideStep(3)}>
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="w-7 h-7 rounded-lg bg-amber-600 text-white flex items-center justify-center font-black text-xs">۳</span>
+                                    <span className="text-[10px] text-amber-400 font-bold">ایزولاسیون دیتابیس</span>
+                                </div>
+                                <h4 className="text-xs font-bold text-white mb-1.5">حفاظت از اسناد در AppData</h4>
+                                <p className="text-[11px] text-slate-400 leading-relaxed">
+                                    تفکیک دیتابیس مالی در مسیر امن سیستم‌عامل تا هنگام آپدیت برنامه هیچ داده‌ای حذف نگردد.
+                                </p>
+                            </div>
+
+                            <div className={`p-5 rounded-2xl border transition-all ${activeGuideStep === 4 ? 'bg-indigo-950/60 border-indigo-500 shadow-lg' : 'bg-slate-950/70 border-white/5'}`} onClick={() => setActiveGuideStep(4)}>
+                                <div className="flex items-center justify-between mb-3">
+                                    <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-black text-xs">۴</span>
+                                    <span className="text-[10px] text-emerald-400 font-bold">خروجی و دانلود</span>
+                                </div>
+                                <h4 className="text-xs font-bold text-white mb-1.5">صدور فایل نصبی و پرتابل</h4>
+                                <p className="text-[11px] text-slate-400 leading-relaxed">
+                                    تولید فایل‌های نهایی نصبی (Setup.exe)، پرتابل یک-کلیک و بسته کامل با نام نسخه <code className="text-emerald-300 font-mono">v{APP_VERSION}</code>
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Download Windows Packages Section */}
+                        <div className="bg-slate-950/80 border border-white/10 rounded-2xl p-6 space-y-4">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <Download size={18} className="text-emerald-400" />
+                                <span>دانلود مستقیم بسته‌های باینری ویندوز نسخه {APP_VERSION}:</span>
+                            </h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {/* Windows Installer Setup */}
+                                <div className="bg-slate-900 border border-slate-700/70 hover:border-emerald-500/40 p-4 rounded-xl flex flex-col justify-between gap-3">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-xs font-bold text-white">فایل نصبی Setup ویندوز</span>
+                                            <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-bold">پیشنهادی</span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                                            نصب خودکار، ساخت آیکون دسکتاپ و مدیریت ایزوله مسیر داده‌ها
+                                        </p>
+                                    </div>
+                                    <a
+                                        href={`/downloads/AshkeGhalam-Setup-v${APP_VERSION}.exe`}
+                                        download={`AshkeGhalam-Setup-v${APP_VERSION}.exe`}
+                                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md"
+                                    >
+                                        <Download size={14} />
+                                        <span>دانلود AshkeGhalam-Setup-v{APP_VERSION}.exe</span>
+                                    </a>
+                                </div>
+
+                                {/* Windows Portable ZIP */}
+                                <div className="bg-slate-900 border border-slate-700/70 hover:border-indigo-500/40 p-4 rounded-xl flex flex-col justify-between gap-3">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-xs font-bold text-white">بسته پرتابل ۱-کلیک (ZIP)</span>
+                                            <span className="text-[9px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded-full font-bold">بدون نیاز به نصب</span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                                            استخراج و اجرای فوری روی هر کامپیوتر یا فلش مموری بدون هیچ پیش‌نیاز
+                                        </p>
+                                    </div>
+                                    <a
+                                        href={`/downloads/AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`}
+                                        download={`AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md"
+                                    >
+                                        <HardDrive size={14} />
+                                        <span>دانلود نسخه پرتابل (ZIP)</span>
+                                    </a>
+                                </div>
+
+                                {/* Portable Direct EXE */}
+                                <div className="bg-slate-900 border border-slate-700/70 hover:border-cyan-500/40 p-4 rounded-xl flex flex-col justify-between gap-3">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <span className="text-xs font-bold text-white">فایل تک-اجرایی Portable.exe</span>
+                                            <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-bold">اجرای مستقیم</span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                                            فایل اجرایی مستقل بدون نیاز به استخراج، مناسب کاربران عمومی
+                                        </p>
+                                    </div>
+                                    <a
+                                        href={`/downloads/AshkeGhalam-Portable-v${APP_VERSION}.exe`}
+                                        download={`AshkeGhalam-Portable-v${APP_VERSION}.exe`}
+                                        className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md"
+                                    >
+                                        <Monitor size={14} />
+                                        <span>دانلود AshkeGhalam-Portable-v{APP_VERSION}.exe</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 1-Click Batch Automation Script */}
+                        <div className="bg-slate-950/90 border border-white/10 rounded-2xl p-5 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-white flex items-center gap-2">
+                                    <Terminal size={16} className="text-indigo-400" />
+                                    اسکریپت ۱-کلیک اجرای بومی ویندوز (Run-AshkeGhalam.bat):
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => downloadBatFile(winBatCode, 'Run-AshkeGhalam.bat')}
+                                        className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow"
+                                    >
+                                        <Download size={14} />
+                                        <span>دانلود Run-AshkeGhalam.bat</span>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(winBatCode);
+                                            setCopiedWinBatContent(true);
+                                            addNotification('success', 'محتوای اسکریپت بات در کلیپ‌بورد کپی شد.');
+                                            setTimeout(() => setCopiedWinBatContent(false), 3000);
+                                        }}
+                                        className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 border border-white/10"
+                                    >
+                                        {copiedWinBatContent ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                                        <span>{copiedWinBatContent ? 'کپی شد' : 'کپی اسکریپت'}</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <pre className="text-xs font-mono text-indigo-300 dir-ltr text-left overflow-x-auto p-4 bg-slate-900/90 rounded-xl leading-relaxed max-h-36 custom-scrollbar">
+                                {winBatCode}
+                            </pre>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 2: ANDROID STANDALONE PIPELINE (APK) */}
             {activeTab === 'apk' && (
                 <div className="space-y-6 animate-fade-in">
                     {/* SECTION 1: Online Instant APK Builders */}
@@ -227,18 +467,17 @@ pause`;
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                             <div>
                                 <span className="text-[10px] text-indigo-400 font-black uppercase tracking-wider bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
-                                    🌐 روش ۱: سایت‌های آنلاین و رایگان ساخت آنی APK (بدون نیاز به نصب هیچ برنامه)
+                                    🌐 روش ۱: سایت‌های ابری و رایگان ساخت آنی APK
                                 </span>
                                 <h2 className="text-xl font-black text-white mt-2 flex items-center gap-2">
                                     <Cloud className="text-indigo-400" size={22} />
                                     <span>تبدیل مستقیم آنلاین به فایل نصبی اندروید (APK / AAB)</span>
                                 </h2>
                                 <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                                    بهترین و بدون دردسرترین راه ساخت فایل نصبی، استفاده از موتورهای ابری است. کافیست آدرس برنامه را وارد کنید و فایل APK آماده را دانلود کنید:
+                                    بهترین روش بدون نیاز به ابزارهای سنگین برنامه‌نویسی: کافیست آدرس برنامه را کپی و در سایت‌های زیر وارد کنید تا فایل نصبی تحویل شود.
                                 </p>
                             </div>
 
-                            {/* Quick copy live URL button */}
                             <button
                                 onClick={handleCopyLiveUrl}
                                 className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer shadow-lg shadow-indigo-900/30"
@@ -298,24 +537,6 @@ pause`;
                                 </a>
                             </div>
 
-                            {/* GitHub Actions Cloud */}
-                            <div className="bg-slate-950/80 border border-purple-500/30 hover:border-purple-400/60 p-5 rounded-2xl space-y-3 transition flex flex-col justify-between">
-                                <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-black text-white">GitHub Actions (ابری)</span>
-                                        <span className="text-[9px] bg-purple-500/20 text-purple-300 font-bold px-2 py-0.5 rounded-full border border-purple-500/30">
-                                            کامپایل رایگان گیت‌هاب
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-slate-400 leading-relaxed">
-                                        فایل گردش‌کار build-apk.yml در پروژه ایجاد شد. با اکسپورت به گیت‌هاب، سرورهای گیت‌هاب فایل APK را کامپایل و آماده دانلود می‌کنند.
-                                    </p>
-                                </div>
-                                <div className="text-[10px] text-purple-300 bg-purple-500/10 p-2 rounded-lg text-center border border-purple-500/20">
-                                    کلیک بر روی Export to GitHub بالای صفحه
-                                </div>
-                            </div>
-
                             {/* AppsGeyser */}
                             <div className="bg-slate-950/80 border border-amber-500/30 hover:border-amber-400/60 p-5 rounded-2xl space-y-3 transition flex flex-col justify-between">
                                 <div className="space-y-2">
@@ -339,128 +560,101 @@ pause`;
                                     <ExternalLink size={13} />
                                 </a>
                             </div>
-                        </div>
 
-                        {/* 3 Step Instruction */}
-                        <div className="bg-slate-950/90 border border-white/10 rounded-2xl p-4 text-xs text-slate-300 flex flex-col md:flex-row items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <Sparkles className="text-amber-400 shrink-0" size={20} />
-                                <div>
-                                    <span className="font-bold text-white">راهنمای ۳ ثانیه‌ای برای PWABuilder:</span>
-                                    <span className="text-slate-400 mr-2">
-                                        ۱. روی «کپی آدرس اینترنتی وب‌اپلیکیشن» کلیک کنید. ۲. در سایت pwabuilder.com در کادر آدرس Paste کرده و Start بزنید. ۳. روی دکمه Package for Android کلیک کرده و فایل نصبی را تحویل بگیرید!
-                                    </span>
+                            {/* Direct Download of pre-built APK */}
+                            <div className="bg-slate-950/80 border border-emerald-500/30 hover:border-emerald-400/60 p-5 rounded-2xl space-y-3 transition flex flex-col justify-between">
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-black text-white">دانلود مستقیم فایل نصبی APK</span>
+                                        <span className="text-[9px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                            نسخه {APP_VERSION}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                                        فایل نصبی کامپایل‌شده و آماده APK با دوربین اسکن بارکد، کاردکس آفلاین و ارسال پیامک.
+                                    </p>
                                 </div>
+                                <a
+                                    href={`/downloads/AshkeGhalam-v${APP_VERSION}.apk`}
+                                    download={`AshkeGhalam-v${APP_VERSION}.apk`}
+                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow"
+                                >
+                                    <Download size={13} />
+                                    <span>دانلود AshkeGhalam-v{APP_VERSION}.apk</span>
+                                </a>
                             </div>
                         </div>
                     </div>
 
-                    {/* SECTION 2: Local Windows Build (Capacitor & Node Script) */}
+                    {/* SECTION 2: Local Android Build Script */}
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
                         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                             <div className="space-y-1">
                                 <span className="text-[10px] text-purple-400 font-black uppercase tracking-wider bg-purple-500/10 px-3 py-1 rounded-full border border-purple-500/20">
-                                    💻 روش ۲: بیلد محلی در کامپیوتر با اسکریپت اصلاح‌شده (Node.js & Gradle)
+                                    💻 روش ۲: بیلد محلی در کامپیوتر (Node.js & Capacitor)
                                 </span>
-                                <h2 className="text-xl font-black text-white mt-1">تولید خودکار در سیستم با فایل بات اصلاح‌شده (بدون باگ یونیکد)</h2>
+                                <h2 className="text-xl font-black text-white mt-1">تولید خودکار در سیستم با فایل بات اصلاح‌شده</h2>
                                 <p className="text-xs text-slate-300 leading-relaxed">
-                                    خطای قبلی کاراکترهای ویندوز برطرف شد. اسکریپت جدید به طور مستقیم با موتور پایدار Node.js اجرا شده و فایل APK را تولید می‌کند:
+                                    اسکریپت جدید به طور مستقیم با موتور پایدار Node.js اجرا شده و فایل‌های بیلد قدیمی را پاکسازی و پکیج APK نسخه {APP_VERSION} را تولید می‌کند.
                                 </p>
                             </div>
 
-                            {/* Action buttons */}
-                            <div className="flex flex-wrap items-center gap-3 shrink-0">
-                                <button
-                                    onClick={downloadBatDirectly}
-                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-900/30"
-                                >
-                                    <Download size={16} />
-                                    <span>دانلود فایل جدید build-android-apk.bat</span>
-                                </button>
-                                <a
-                                    href="/build-android-apk.sh"
-                                    download="build-android-apk.sh"
-                                    className="bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-white/10"
-                                >
-                                    <Download size={14} />
-                                    <span>دانلود نسخه لینوکس/مک (.sh)</span>
-                                </a>
-                            </div>
+                            <button
+                                onClick={() => downloadBatFile(apkBatCode, 'build-android-apk.bat')}
+                                className="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-lg shadow-emerald-900/30"
+                            >
+                                <Download size={16} />
+                                <span>دانلود فایل جدید build-android-apk.bat</span>
+                            </button>
                         </div>
 
-                        {/* How-To Steps */}
+                        {/* Step Cards */}
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-300">
                             <div className="bg-slate-950/70 p-5 rounded-2xl border border-white/5 space-y-2">
                                 <div className="flex items-center gap-2 font-bold text-white text-sm">
                                     <span className="w-6 h-6 rounded-lg bg-purple-600/30 text-purple-400 flex items-center justify-center text-xs">۱</span>
-                                    <span>دابل کلیک روی فایل بات</span>
+                                    <span>اجرای فایل بات</span>
                                 </div>
                                 <p className="text-slate-400 text-xs leading-relaxed">
-                                    فایل <code className="text-purple-300 font-mono">build-android-apk.bat</code> جدید را در پوشه پروژه اجرا کنید. بیلد و خروجی APK خودکار با Node.js اجرا می‌شود.
+                                    فایل <code className="text-purple-300 font-mono">build-android-apk.bat</code> را در پوشه پروژه اجرا کنید.
                                 </p>
                             </div>
 
                             <div className="bg-slate-950/70 p-5 rounded-2xl border border-white/5 space-y-2">
                                 <div className="flex items-center gap-2 font-bold text-white text-sm">
                                     <span className="w-6 h-6 rounded-lg bg-teal-600/30 text-teal-400 flex items-center justify-center text-xs">۲</span>
-                                    <span>از طریق خط فرمان (NPM)</span>
+                                    <span>دستور خط فرمان NPM</span>
                                 </div>
                                 <p className="text-slate-400 text-xs leading-relaxed">
-                                    در ترمینال پوشه پروژه دستور زیر را وارد نمایید:
-                                    <code className="block mt-1 p-2 bg-slate-900 rounded font-mono text-teal-300 text-left dir-ltr">npm run build:apk</code>
+                                    یا در ترمینال دستور <code className="text-teal-300 font-mono">npm run build:apk</code> را تایپ کنید.
                                 </p>
                             </div>
 
                             <div className="bg-slate-950/70 p-5 rounded-2xl border border-white/5 space-y-2">
                                 <div className="flex items-center gap-2 font-bold text-white text-sm">
                                     <span className="w-6 h-6 rounded-lg bg-indigo-600/30 text-indigo-400 flex items-center justify-center text-xs">۳</span>
-                                    <span>محل ذخیره فایل نصبی</span>
+                                    <span>محل خروجی APK</span>
                                 </div>
                                 <p className="text-slate-400 text-xs leading-relaxed">
-                                    فایل APK تولیدشده در ریشه پروژه با نام <code className="text-amber-300 font-mono">AshkeGhalam-Debug.apk</code> کپی و آماده نصب می‌شود.
+                                    فایل APK در ریشه و مسیر <code className="text-emerald-300 font-mono">downloads/AshkeGhalam-v{APP_VERSION}.apk</code> ذخیره می‌شود.
                                 </p>
                             </div>
-                        </div>
-
-                        {/* Code Preview */}
-                        <div className="bg-slate-950/80 border border-white/10 rounded-2xl p-5 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-white flex items-center gap-2">
-                                    <Terminal size={16} className="text-purple-400" />
-                                    محتوای اسکریپت استاندارد و بدون باگ build-android-apk.bat:
-                                </span>
-                                <button
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(batFileCode);
-                                        setCopiedBatContent(true);
-                                        addNotification('success', 'محتوای فایل بات در حافظه کپی شد.');
-                                        setTimeout(() => setCopiedBatContent(false), 3000);
-                                    }}
-                                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer border border-white/10"
-                                >
-                                    {copiedBatContent ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                                    <span>{copiedBatContent ? 'کپی شد' : 'کپی اسکریپت بات'}</span>
-                                </button>
-                            </div>
-                            <pre className="text-xs font-mono text-purple-300 dir-ltr text-left overflow-x-auto p-4 bg-slate-900/90 rounded-xl leading-relaxed max-h-40 custom-scrollbar">
-                                {batFileCode}
-                            </pre>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* TAB: PWA Standalone */}
+            {/* TAB 3: PWA STANDALONE */}
             {activeTab === 'pwa' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
                     <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
                         <div className="space-y-2">
                             <span className="text-[10px] text-teal-400 font-black uppercase tracking-wider bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
-                                🚀 نصب بدون نیاز به بازار و گوگل‌پلی
+                                🚀 نصب بدون نیاز به کافه‌بازار و گوگل‌پلی
                             </span>
-                            <h2 className="text-xl font-black text-white">نصب مستقیم روی صفحه اصلی گوشی</h2>
+                            <h2 className="text-xl font-black text-white">نصب مستقیم روی صفحه اصلی گوشی و تبلت</h2>
                             <p className="text-xs text-slate-300 leading-relaxed">
-                                اپلیکیشن وب پیشرونده (PWA) اشک قلم دارای موتور مستقل ذخیره‌سازی محلی (IndexedDB) بوده و به صورت کامل مانند یک نرم‌افزار نیتیو بدون وابستگی به مرورگر اجرا می‌شود.
+                                وب‌اپلیکیشن پیشرونده (PWA) اشک قلم دارای موتور مستقل ذخیره‌سازی محلی (IndexedDB) بوده و به صورت کامل مانند یک نرم‌افزار نیتیو بدون وابستگی به مرورگر اجرا می‌شود.
                             </p>
                         </div>
 
@@ -485,7 +679,7 @@ pause`;
                     <div className="lg:col-span-5 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-4">
                         <h3 className="text-sm font-bold text-white flex items-center gap-2">
                             <CheckCircle2 size={16} className="text-teal-400" />
-                            <span>مزایای استفاده از نسخه مستقل</span>
+                            <span>مزایای استفاده از نسخه مستقل PWA</span>
                         </h3>
                         <ul className="space-y-3 text-xs text-slate-300 leading-relaxed">
                             <li className="flex items-start gap-2">
@@ -509,7 +703,7 @@ pause`;
                 </div>
             )}
 
-            {/* TAB: Sync Settings */}
+            {/* TAB 4: THREE-WAY SYNC */}
             {activeTab === 'sync' && (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-fade-in">
                     <div className="space-y-1">
@@ -532,7 +726,7 @@ pause`;
                                 type="text"
                                 value={hostUrl}
                                 onChange={(e) => setHostUrl(e.target.value)}
-                                placeholder="https://acc.ashkeghalam.ir"
+                                placeholder="https://acc.ashkghalam.ir"
                                 className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-teal-500"
                             />
                         </div>
@@ -568,23 +762,23 @@ pause`;
                 </div>
             )}
 
-            {/* TAB: Mobile License */}
+            {/* TAB 5: LICENSING */}
             {activeTab === 'license' && (
                 <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6 animate-fade-in">
                     <div className="space-y-1">
                         <span className="text-[10px] text-amber-400 font-black uppercase tracking-wider bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                            🔑 قفل هوشمند سخت‌افزاری اندروید
+                            🔑 قفل هوشمند سخت‌افزاری مستقل
                         </span>
-                        <h2 className="text-xl font-black text-white">فعال‌سازی لایسنس تجاری روی گوشی اندروید</h2>
+                        <h2 className="text-xl font-black text-white">فعال‌سازی لایسنس تجاری روی کلاینت‌ها</h2>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                            در نسخه اندروید نیز مانند نسخه ویندوز، شناسه اختصاصی دستگاه (Android HWID) استخراج شده و کد فعال‌سازی آفلاین با امضای HMAC-SHA256 تولید می‌گردد.
+                            شناسه سخت‌افزاری اختصاصی دستگاه استخراج شده و کد فعال‌سازی آفلاین با امضای دیجیتال HMAC-SHA256 تولید می‌گردد.
                         </p>
                     </div>
 
                     <div className="bg-slate-950 border border-amber-500/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-4">
                         <div>
-                            <div className="text-xs font-bold text-slate-400">شناسه سخت‌افزاری دستگاه جاری (Android HWID):</div>
-                            <div className="text-lg font-black font-mono text-amber-400 tracking-wider mt-1 select-all">
+                            <div className="text-xs font-bold text-slate-400">شناسه سخت‌افزاری دستگاه جاری (Hardware ID):</div>
+                            <div className="text-lg font-black font-mono text-amber-400 tracking-wider mt-1 select-all" dir="ltr">
                                 {androidHwid}
                             </div>
                         </div>
@@ -592,7 +786,7 @@ pause`;
                         <button
                             onClick={() => {
                                 navigator.clipboard.writeText(androidHwid);
-                                addNotification('success', 'شناسه سخت‌افزاری اندروید کپی شد.');
+                                addNotification('success', 'شناسه سخت‌افزاری کپی شد.');
                             }}
                             className="bg-amber-600 hover:bg-amber-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
                         >
@@ -601,7 +795,6 @@ pause`;
                         </button>
                     </div>
 
-                    {/* Link to PWA and Mother Server License Card */}
                     <div className="bg-gradient-to-r from-teal-950/60 via-slate-900 to-slate-900 border border-teal-500/30 rounded-2xl p-6 space-y-4">
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-white flex items-center gap-2">
@@ -613,7 +806,7 @@ pause`;
                             </span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                            این اپلیکیشن پلتفرم همراه و بخشی از سامانه PWA است که در حالت پیش‌فرض با سقف ۵۰ سند فعال می‌شود. با برقراری پیوند، مشخصات لایسنس فعال در سرور اصلی روی این دستگاه اعمال شده و محدودیت سند و مشتری به طور کامل حذف می‌گردد.
+                            با برقراری پیوند، مشخصات لایسنس فعال در سرور اصلی روی این دستگاه اعمال شده و محدودیت سند و مشتری به طور کامل حذف می‌گردد.
                         </p>
                         <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
                             <button
@@ -647,42 +840,82 @@ pause`;
                 </div>
             )}
 
-            {/* Smart Help Modal */}
+            {/* Smart Guide Modal (?) */}
             {showHelpModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" dir="rtl">
-                    <div className="bg-slate-900 border border-white/10 rounded-3xl p-6 max-w-lg w-full space-y-4 shadow-2xl">
-                        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-                            <h3 className="text-base font-black text-white flex items-center gap-2">
-                                <HelpCircle className="text-teal-400" size={20} />
-                                <span>راهنمای خروجی فایل نصبی APK و سایت‌های آنلاین</span>
-                            </h3>
-                            <button
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn" dir="rtl">
+                    <div className="bg-slate-900 border border-white/10 rounded-[2.5rem] p-6 sm:p-8 max-w-2xl w-full space-y-6 shadow-2xl text-right">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-amber-500/20 text-amber-400 rounded-xl border border-amber-500/30">
+                                    <HelpCircle size={22} />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-white">راهنمای هوشمند تولید برنامه‌های مستقل ویندوز و اندروید</h3>
+                                    <p className="text-xs text-slate-400">سامانه اتوماسیون و توزیع نسخه‌های نصبی اشک قلم نسخه {APP_VERSION}</p>
+                                </div>
+                            </div>
+                            <button 
                                 onClick={() => setShowHelpModal(false)}
-                                className="text-slate-400 hover:text-white p-1 rounded-lg transition"
+                                className="text-slate-400 hover:text-white p-2 rounded-xl bg-slate-800 transition"
                             >
-                                <Check size={18} />
+                                <X size={18} />
                             </button>
                         </div>
-                        <div className="text-xs text-slate-300 space-y-2.5 leading-relaxed">
-                            <p>
-                                🔹 <strong>چرا در AI Studio نمی‌توان مستقیم خروجی APK گرفت؟</strong> کانتینر ابری AI Studio صرفاً محیط اجرای وب و Node.js است و به دلیل حجم سنگین (بیش از ۱۰ گیگابایت)، پکیج‌های Android SDK، جاوا JDK و Gradle در آن نصب نیستند.
-                            </p>
-                            <p>
-                                🔹 <strong>سریع‌ترین روش (سایت‌های آنلاین):</strong> سایت <strong>PWABuilder</strong> (محصول مایکروسافت) یا <strong>WebIntoApp</strong> را باز کنید، آدرس وب‌اپ را در آن کپی کنید و در ۶۰ ثانیه فایل نصبی رسمی APK یا بسته گوگل‌پلی (AAB) را دریافت کنید.
-                            </p>
-                            <p>
-                                🔹 <strong>روش خودکار GitHub Actions:</strong> فایل گردش‌کار <code className="text-purple-300 font-mono">.github/workflows/build-apk.yml</code> به پروژه اضافه شده است. هر بار با گزینه Export to GitHub، سرورهای ابری گیت‌هاب به رایگان فایل نصبی APK را کامپایل و آماده دانلود می‌کنند.
-                            </p>
-                            <p>
-                                🔹 <strong>روش ویندوز با فایل بات:</strong> با اسکریپت اصلاح‌شده <code className="text-teal-300 font-mono">build-android-apk.bat</code> خطای کاراکترهای ویندوز به کلی رفع شده و با موتور Node.js عملیات بیلد را انجام می‌دهد.
-                            </p>
+
+                        <div className="space-y-4 text-xs text-slate-300 leading-relaxed max-h-[60vh] overflow-y-auto pr-1 custom-scrollbar">
+                            <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-1.5">
+                                <h4 className="font-bold text-indigo-400 flex items-center gap-1.5">
+                                    <Monitor size={16} />
+                                    <span>۱. مزیت نسخه مستقل ویندوز C++/WebView2:</span>
+                                </h4>
+                                <p>
+                                    به جای استفاده از الکترون که صدها مگابایت رم اشغال می‌کند، برنامه با کلاینت بومی C++ و وب‌ویو نیتیو سیستم‌عامل ویندوز اجرا می‌شود. دیتابیس در مسیر <code className="text-indigo-300 font-mono">%APPDATA%\AshkeGhalam</code> نگهداری شده و با حذف یا ارتقای نرم‌افزار، اطلاعات پاک نمی‌شود.
+                                </p>
+                            </div>
+
+                            <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-1.5">
+                                <h4 className="font-bold text-purple-400 flex items-center gap-1.5">
+                                    <Smartphone size={16} />
+                                    <span>۲. تولید فایل نصبی APK اندروید:</span>
+                                </h4>
+                                <p>
+                                    دو راهکار برای شما فراهم شده است:
+                                </p>
+                                <ul className="list-disc list-inside space-y-1 text-slate-400 pr-2">
+                                    <li><strong>سایت‌های ابری فوری (PWABuilder):</strong> با فشردن دکمه کپی آدرس و قرار دادن آن در سایت، فایل APK آماده را دانلود فرمایید.</li>
+                                    <li><strong>اسکریپت محلی (build-android-apk.bat):</strong> اجرای فایل بات در سیستم، پاکسازی نسخه‌های قبلی و تولید خروجی دقیق را انجام می‌دهد.</li>
+                                </ul>
+                            </div>
+
+                            <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-1.5">
+                                <h4 className="font-bold text-teal-400 flex items-center gap-1.5">
+                                    <Download size={16} />
+                                    <span>۳. تفاوت نصب PWA با فایل نصبی:</span>
+                                </h4>
+                                <p>
+                                    نصب PWA نیازی به کافه‌بازار یا فایل ندارد و با زدن Add to Home Screen در مرورگر، نرم‌افزار مانند یک اپلیکیشن مستقل در گوشی می‌نشیند و به صورت ۱۰۰٪ آفلاین کار می‌کند.
+                                </p>
+                            </div>
+
+                            <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-1.5">
+                                <h4 className="font-bold text-amber-400 flex items-center gap-1.5">
+                                    <Key size={16} />
+                                    <span>۴. امنیت و قفل سخت‌افزاری آفلاین:</span>
+                                </h4>
+                                <p>
+                                    کد فعال‌سازی تجاری از روی شناسه سخت‌افزاری اختصاصی صادر شده و در زمان قطع اینترنت یا شرایط فیلترینگ، اعتبار لایسنس بدون افت کارایی احراز می‌گردد.
+                                </p>
+                            </div>
                         </div>
-                        <button
-                            onClick={() => setShowHelpModal(false)}
-                            className="w-full bg-teal-600 hover:bg-teal-500 text-white py-3 rounded-xl font-bold text-xs transition"
-                        >
-                            متوجه شدم
-                        </button>
+
+                        <div className="flex justify-end pt-3 border-t border-white/10">
+                            <button
+                                onClick={() => setShowHelpModal(false)}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs transition"
+                            >
+                                متوجه شدم، بستن راهنما
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

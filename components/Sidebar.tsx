@@ -7,13 +7,15 @@ import {
   Brain, ShieldCheck, BarChart3, ScrollText, Calendar, RefreshCw, Workflow, 
   FileSpreadsheet, ChevronDown, ChevronLeft, ChevronUp, FileCode2, KeyRound, Cloud,
   MessageSquare, Network, Headphones, Sparkles, Megaphone, DownloadCloud,
-  ChevronsDown, ChevronsUp, FolderOpen, Folder, Smartphone
+  ChevronsDown, ChevronsUp, FolderOpen, Folder, Smartphone, FolderArchive
 } from 'lucide-react';
 import { useStore } from '../store';
 import { UserPermissions } from '../types';
 import { isDesktopApp } from '../utils';
 import { AccountingLogo } from './AccountingLogo';
 import { PlatformCopyService } from '../services/platformCopyService';
+import { AppDownloadCenterModal } from './AppDownloadCenterModal';
+import { APP_VERSION } from '../config';
 
 interface SidebarNavItem {
   to: string;
@@ -45,6 +47,7 @@ const Sidebar = () => {
   const navRef = useRef<HTMLElement>(null);
   const [canScrollDown, setCanScrollDown] = useState(false);
   const [canScrollUp, setCanScrollUp] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
 
   const mainItems: SidebarNavItem[] = [
     { to: '/', icon: LayoutDashboard, label: 'پیشخوان', perm: 'dashboard', shortcut: 'Alt+1', keyCombo: ['Alt', '1'] },
@@ -123,7 +126,7 @@ const Sidebar = () => {
         { to: '/sms-center', icon: MessageSquare, label: 'پنل پیامک هوشمند', perm: 'finance' },
         { to: '/multi-user-lan', icon: Network, label: 'شبکه محلی چندکاربره', perm: 'settings' },
         { to: '/client-broadcast', icon: Megaphone, label: isDesktop ? 'اطلاعیه‌ها و تخفیف‌ها' : 'انتشار اطلاعیه به کلاینت‌ها', perm: 'settings' },
-        { to: '/install-android', icon: Smartphone, label: 'مرکز نسخه تجاری همراه (اندروید)', badge: 'نامحدود' },
+        { to: '/install-android', icon: Smartphone, label: 'تولید برنامه مستقل (ویندوز / اندروید)', badge: 'مستقل' },
         { to: '/mobile-catalog', icon: BookOpen, label: 'کاتالوگ ویزیتوری همراه + امضای لمسی', badge: 'ویزیتور' },
         { to: '/catalog', icon: BookOpen, label: 'کاتالوگ و معرفی محصول', badge: 'کاتالوگ' },
         { to: '/support-sla', icon: Headphones, label: 'پشتیبانی و تمدید سالانه', perm: 'settings' },
@@ -325,7 +328,7 @@ const Sidebar = () => {
           title="مدیریت لایسنس و قفل سخت‌افزاری HWID"
           className="text-[9px] bg-teal-500/20 hover:bg-teal-500/40 text-teal-300 px-1.5 py-1 rounded-lg font-bold font-mono transition cursor-pointer shrink-0"
         >
-          v16.26
+          v{APP_VERSION}
         </button>
       </div>
 
@@ -411,6 +414,17 @@ const Sidebar = () => {
             سیستم و تنظیمات
           </div>
           {bottomItems.map(item => renderLink(item))}
+          
+          {/* Download App Package Button */}
+          <button
+            type="button"
+            onClick={() => setIsDownloadModalOpen(true)}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all duration-200 text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-500/30 group mt-2 font-bold text-xs"
+            title="دانلود نسخه‌های مستقل نصبی ویندوز، اندروید و هاست"
+          >
+            <FolderArchive className="w-4 h-4 shrink-0 text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span className="truncate">مرکز دانلود نرم‌افزار (EXE / APK)</span>
+          </button>
         </div>
       </nav>
 
@@ -438,6 +452,8 @@ const Sidebar = () => {
           </button>
         </div>
       </div>
+
+      <AppDownloadCenterModal isOpen={isDownloadModalOpen} onClose={() => setIsDownloadModalOpen(false)} />
     </aside>
   );
 };

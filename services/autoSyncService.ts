@@ -14,6 +14,7 @@ import { notificationService } from './notificationService';
 import { persistentStorage } from './persistentStorage';
 import { deletedRecordsRegistry } from './deletedRecordsRegistry';
 import { workspaceService } from './workspaceService';
+import { appLogService } from './appLogService';
 
 const SYNC_INTERVAL_MS = 60_000;   // هر ۶۰ ثانیه برای جلوگیری از بار پردازشی بیهوده
 const INITIAL_DELAY_MS = 2_000;    // ۲ ثانیه پس از اجرای اولیه
@@ -254,6 +255,11 @@ class AutoSyncService {
             }
 
             this.lastSyncTime = Date.now();
+            appLogService.logSync('push_success', `ارسال موفقیت‌آمیز ${changedTables.length} جدول به هاست ابری`, {
+                tables: changedTables.map(t => t.name)
+            });
+        } catch (err: any) {
+            appLogService.logSync('push_error', `خطا در ارسال تغییرات به سرور: ${err?.message || err}`, { error: err });
         } finally {
             this.isSyncing = false;
         }
@@ -303,10 +309,14 @@ class AutoSyncService {
             if (hasAnyRealUpdate && Object.keys(updatesToApply).length > 0) {
                 useStore.setState(updatesToApply);
                 this.lastSyncTime = Date.now();
+                appLogService.logSync('pull_success', `دریافت و ادغام موفقیت‌آمیز ${Object.keys(updatesToApply).length} جدول از هاست ابری`, {
+                    updatedTables: Object.keys(updatesToApply)
+                });
                 return true;
             }
-        } catch (error) {
+        } catch (error: any) {
             console.warn('loadFromHost status (offline):', error);
+            appLogService.logSync('pull_error', `خطا در دریافت داده‌ها از هاست: ${error?.message || error}`, { error });
         }
         return false;
     }

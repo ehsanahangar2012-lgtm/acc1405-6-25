@@ -32,6 +32,7 @@ import { useStore } from '../store';
 import { androidCommercialService, BusinessProfile } from '../services/androidCommercialService';
 import { licenseQuotaService, MAX_ANDROID_DEFAULT_DOCUMENTS, MAX_ANDROID_DEFAULT_CUSTOMERS } from '../services/licenseQuotaService';
 import { isAndroidApp, toPersianDigits, getPersianDate, formatCurrency } from '../utils';
+import { useAndroidBackButtonHandler } from '../useMobile';
 
 interface AndroidCommercialHubModalProps {
     isOpen?: boolean;
@@ -42,6 +43,14 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
     isOpen = true,
     onClose
 }) => {
+    useAndroidBackButtonHandler(() => {
+        if (isOpen && onClose) {
+            onClose();
+            return true;
+        }
+        return false;
+    }, Boolean(isOpen && onClose));
+
     const { people, invoices, vouchers, transactions, checks } = useStore();
     const [activeTab, setActiveTab] = useState<'status' | 'share' | 'backup' | 'guide'>('status');
     const [businessProfile, setBusinessProfile] = useState<BusinessProfile>(() => androidCommercialService.getBusinessProfile());

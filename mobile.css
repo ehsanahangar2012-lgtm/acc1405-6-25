@@ -408,3 +408,51 @@ select:focus {
     border: 2px solid currentColor !important;
   }
 }
+
+/* ==========================================================
+   Android Native WebView & Touch Optimization (تخصصی اندروید)
+   ========================================================== */
+
+/* حذف کامل تاخیر تاچ و هایلایت خاکستری در وب‌ویوی اندروید */
+html, body {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+/* بهینه‌سازی فیلدهای ورودی عددی و ریالی برای کیبورد بومی اندروید */
+input[inputmode="numeric"],
+input[type="number"],
+input[type="tel"] {
+  direction: ltr !important;
+  text-align: right !important;
+  font-family: inherit;
+}
+
+/* ارگونومی لمسی استاندارد گوگل متریال برای دکمه‌ها در موبایل (حداقل ۴۸ پیکسل) */
+@media (max-width: 768px) {
+  .btn-touch,
+  button:not(.btn-compact):not(.no-min-size) {
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+
+  /* اسکرول افقی نرم کارت‌ها و جداول در نمایشگرهای کوچک اندروید */
+  .table-responsive-touch {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  /* سازگاری با ناچ و نوار ناوبری پایین اندروید */
+  .android-safe-bottom {
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .android-safe-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  }
+}
+

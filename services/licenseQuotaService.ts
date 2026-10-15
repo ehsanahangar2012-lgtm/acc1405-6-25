@@ -204,30 +204,23 @@ class LicenseQuotaService {
             return this.isAndroidActivatedOrLinked();
         }
 
-        // ۱. در حالت سیستم مادر (Mother Server)، سیستم به صورت لایسنس کامل و بدون محدودیت عمل می‌کند
-        if (localStorage.getItem('ashk_mother_server') === 'true') {
+        // ۱. بررسی وضعیت لایسنس فعال روی سیستم (فقط در صورت داشتن وضعیت ACTIVATED و کلید معتبر یا مانیفست تایید شده)
+        const localStatus = localStorage.getItem('ashk_license_status');
+        const hasKey = Boolean(localStorage.getItem('ashk_license_key') || localStorage.getItem('ashk_activation_code') || localStorage.getItem('ashk_server_license_data'));
+        
+        if (localStatus === 'ACTIVATED' && hasKey) {
             return true;
         }
 
-        // ۲. در حالت وب سرور هاست (cPanel / Web Server)، سیستم به عنوان نسخه مادر یا سرور مرکزی بدون محدودیت کار می‌کند
-        const isWeb = typeof window !== 'undefined' && !(window as any).electronDesktopAPI && !(window as any).__TAURI__;
-        if (isWeb) {
-            const status = localStorage.getItem('ashk_license_status');
-            if (status !== 'EXPIRED') {
-                return true;
-            }
-        }
-
-        // ۳. بررسی وضعیت لایسنس فعال روی سیستم
-        const localStatus = localStorage.getItem('ashk_license_status');
-        return localStatus === 'ACTIVATED';
+        // پیش‌فرض: در حالت عادی بدون لایسنس معتبر، محدودیت‌های آزمایشی فعال است
+        return false;
     }
 
     /**
      * دریافت پلن فعال جاری
      */
     getCurrentPlan(): string {
-        if (typeof window === 'undefined') return 'UNLIMITED';
+        if (typeof window === 'undefined') return 'TRIAL';
 
         // پلتفرم اندروید
         if (isAndroidApp()) {
@@ -237,21 +230,13 @@ class LicenseQuotaService {
             return 'ANDROID_TRIAL_50';
         }
 
-        if (localStorage.getItem('ashk_mother_server') === 'true') {
+        if (this.isFullyLicensedSync()) {
+            const plan = localStorage.getItem('ashk_license_plan');
+            if (plan) return plan;
             return 'UNLIMITED';
         }
 
-        const isWeb = typeof window !== 'undefined' && !(window as any).electronDesktopAPI && !(window as any).__TAURI__;
-        if (isWeb) {
-            const status = localStorage.getItem('ashk_license_status');
-            if (status !== 'EXPIRED') {
-                return 'UNLIMITED';
-            }
-        }
-
-        const plan = localStorage.getItem('ashk_license_plan');
-        if (plan) return plan;
-        return this.isFullyLicensedSync() ? 'UNLIMITED' : 'TRIAL';
+        return 'TRIAL';
     }
 
     /**

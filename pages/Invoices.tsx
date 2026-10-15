@@ -4,7 +4,7 @@ import { createPortal } from 'react-dom';
 import { useStore } from '../store';
 import { Person, Product, Invoice, InvoiceItem, InvoiceType, Check, IRANIAN_BANKS, PrintTheme, CompanyBranch } from '../types';
 import { formatCurrency, generateId, toPersianDigits, generateTrackingCode, getPersianDate, getPersianTime, generateLocalQrSvg, getNextCustomerCode, getNextProductCode, copyToClipboard, generatePdfBlob, downloadPdfBlob, sendInvoicePdf } from '../utils';
-import { Plus, Trash2, Printer, X, Save, CreditCard, UserPlus, PackagePlus, ShoppingBag, PlusCircle, Edit, ArrowLeft, Eye, Wallet, Landmark, CheckCircle2, ShieldCheck, Workflow, BookmarkPlus, Calculator, Banknote, BookMarked, Info, Barcode as BarcodeIcon, QrCode, ScrollText, Share2, UserCheck, Smartphone, Truck, PenTool, TextQuote, Link as LinkIcon, Calendar, Send, FileText, Download, Camera, MessageSquare, HelpCircle, Building2, Store, ShieldAlert, ArrowUpDown, Shuffle, RotateCcw, Sparkles, Copy, ExternalLink, ArrowDown, ArrowUp } from 'lucide-react';
+import { Plus, Trash2, Printer, X, Save, CreditCard, UserPlus, PackagePlus, ShoppingBag, PlusCircle, Edit, ArrowLeft, Eye, Wallet, Landmark, CheckCircle2, ShieldCheck, Workflow, BookmarkPlus, Calculator, Banknote, BookMarked, Info, Barcode as BarcodeIcon, QrCode, ScrollText, Share2, UserCheck, Smartphone, Truck, PenTool, TextQuote, Link as LinkIcon, Calendar, Send, FileText, Download, Camera, MessageSquare, HelpCircle, Building2, Store, ShieldAlert, ArrowUpDown, Shuffle, RotateCcw, Sparkles, Copy, ExternalLink, ArrowDown, ArrowUp, Scan, Barcode, Layers } from 'lucide-react';
 import { NumberInput, JalaliDatePicker, FullScreenSignatureModal, ConfirmModal, useKeyboardShortcut } from '../components/Shared';
 import { InvoicePrint, PROFORMA_STANDARD_NOTE } from '../components/InvoicePrint';
 import { RequestSignatureButton } from '../components/RequestSignatureButton';
@@ -15,6 +15,8 @@ import { triggerDeviceSms, SmsGatewayService } from '../services/smsGatewayServi
 import { licenseQuotaService } from '../services/licenseQuotaService';
 import { PcPosPaymentModal } from '../components/PcPosPaymentModal';
 import { InvoiceReceiptModal } from '../components/InvoiceReceiptModal';
+import { BarcodeScanner } from '../components/BarcodeScanner';
+import { initHardwareBarcodeScanner, generateAutoSerialNumber } from '../services/barcodeService';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 
@@ -43,7 +45,7 @@ export const getInvoiceTypeDefaults = (targetType: InvoiceType, allInvoices: Inv
 };
 
 const Invoices = () => {
-  const { invoices, products, people, checks, addInvoice, updateInvoice, deleteInvoice, addPerson, addProduct, setInvoiceSignature, companies, defaultInvoiceFooter, savedDescriptions, addSavedDescription, removeSavedDescription, addCheck, addBranch } = useStore();
+  const { invoices, products, people, checks, addInvoice, updateInvoice, deleteInvoice, addPerson, addProduct, setInvoiceSignature, companies, defaultInvoiceFooter, savedDescriptions, addSavedDescription, removeSavedDescription, addCheck, addBranch, addNotification } = useStore();
   
   const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
   const activeCompany = useMemo(() => companies.find(c => c.isActive) || companies[0], [companies]);
@@ -123,11 +125,80 @@ const Invoices = () => {
   const [sortBy, setSortBy] = useState<'date' | 'number' | 'finalTotal' | 'personName' | 'dueDate'>('date');
   const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc');
 
+  // متغیرهای اسکنر دستی و تعریف سریع کالا از طریق اسکنر
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
+  const [showQuickScanAddModal, setShowQuickScanAddModal] = useState(false);
+  const [manualBarcodeInput, setManualBarcodeInput] = useState('');
+  const [scannedPendingCode, setScannedPendingCode] = useState('');
+
   // مودال ارسال مستقیم پیامک اندروید / درگاه پیامک
   const [smsModalInvoice, setSmsModalInvoice] = useState<Invoice | null>(null);
   const [smsTargetPhone, setSmsTargetPhone] = useState<string>('');
   const [smsPreviewText, setSmsPreviewText] = useState<string>('');
   const [smsSignUrl, setSmsSignUrl] = useState<string>('');
+
+  const handleProcessScannedCodeForInvoice = (rawCode: string) => {
+    const code = rawCode.trim();
+    if (!code) return;
+
+    // جستجو بر اساس کد، شماره سریال یا شناسه کالا
+    const foundProduct = products.find(p => p.code === code || p.serialNumber === code || p.id === code);
+    if (foundProduct) {
+      setItems(prevItems => {
+        const existingIdx = prevItems.findIndex(item => item.productId === foundProduct.id);
+        if (existingIdx !== -1) {
+          const next = [...prevItems];
+          const updatedQty = next[existingIdx].quantity + 1;
+          next[existingIdx] = {
+            ...next[existingIdx],
+            quantity: updatedQty,
+            total: updatedQty * next[existingIdx].unitPrice
+          };
+          return next;
+        } else {
+          const unitPrice = type === InvoiceType.SALE ? (foundProduct.sellPrice || 0) : (foundProduct.buyPrice || 0);
+          const newItem: InvoiceItem = {
+            productId: foundProduct.id,
+            productName: foundProduct.name,
+            serialNumber: foundProduct.serialNumber,
+            quantity: 1,
+            buyPrice: foundProduct.buyPrice || 0,
+            unitPrice,
+            total: unitPrice,
+            profit: type === InvoiceType.SALE ? (unitPrice - (foundProduct.buyPrice || 0)) : 0,
+            description: ''
+          };
+          return [newItem, ...prevItems];
+        }
+      });
+      addNotification('success', `کالای «${foundProduct.name}» با اسکنر به فاکتور افزوده شد.`);
+    } else {
+      // کالا در انبار یافت نشد: باز کردن پنجره تعریف سریع کالا از اسکنر دستی
+      setScannedPendingCode(code);
+      setNewProd({
+        name: '',
+        code: getNextProductCode(products),
+        serialNumber: code,
+        sellPrice: 0,
+        buyPrice: 0,
+        unit: 'عدد',
+        category: '',
+        subCategory: ''
+      });
+      setShowQuickScanAddModal(true);
+      addNotification('info', `بارکد/سریال «${code}» شناسایی شد. لطفاً نام و مشخصات کالا را وارد فرمایید.`);
+    }
+  };
+
+  // شنود سراسری اسکنر دستی سخت‌افزاری (تفنگی / بارکدخوان USB و بی‌سیم)
+  useEffect(() => {
+    const unsubscribe = initHardwareBarcodeScanner((scannedCode) => {
+      if (view === 'create' || view === 'edit') {
+        handleProcessScannedCodeForInvoice(scannedCode);
+      }
+    });
+    return () => unsubscribe();
+  }, [view, products, type]);
 
   const handleConvertToSale = (inv: Invoice) => {
     if (confirm(`آیا مایلید پیش‌فاکتور شماره ${(inv.prefix || '') + toPersianDigits(inv.number)} به فاکتور فروش قطعی تبدیل شود؟\n\nبا تایید شما، سند مالی و حسابداری این فاکتور رسماً در دفاتر و مانده حساب مشتری ثبت خواهد شد.`)) {
@@ -499,9 +570,35 @@ const Invoices = () => {
     setShowPersonModal(true);
   };
 
+  const categoriesList = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(p => {
+      if (p.category?.trim()) set.add(p.category.trim());
+    });
+    return Array.from(set);
+  }, [products]);
+
+  const subCategoriesList = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach(p => {
+      if (p.subCategory?.trim()) set.add(p.subCategory.trim());
+    });
+    return Array.from(set);
+  }, [products]);
+
   const handleOpenProductModal = () => {
     const code = getNextProductCode(products);
-    setNewProd({ name: '', sellPrice: 0, buyPrice: 0, unit: 'عدد', code });
+    setNewProd({ 
+      name: '', 
+      sellPrice: 0, 
+      buyPrice: 0, 
+      unit: 'عدد', 
+      code,
+      serialNumber: '',
+      category: '',
+      subCategory: '',
+      subSubCategory: ''
+    });
     setShowProductModal(true);
   };
 
@@ -528,21 +625,33 @@ const Invoices = () => {
       if (!newProd.name?.trim()) return alert('نام کالا الزامی است.');
       const id = generateId();
       const code = newProd.code || getNextProductCode(products);
-      const p = { 
+      const cat = newProd.category?.trim();
+      const sub = newProd.subCategory?.trim();
+      const sub2 = newProd.subSubCategory?.trim();
+      const catPath = `${cat || ''}${sub ? ` / ${sub}` : ''}${sub2 ? ` / ${sub2}` : ''}`.trim() || undefined;
+
+      const p: Product = { 
           id, 
           ...newProd, 
           name: newProd.name.trim(),
           code, 
           stock: 0, 
           reservedStock: 0,
+          unit: newProd.unit || 'عدد',
+          serialNumber: newProd.serialNumber?.trim() || undefined,
+          category: cat || undefined,
+          subCategory: sub || undefined,
+          subSubCategory: sub2 || undefined,
+          categoryPath: catPath,
           buyPrice: newProd.buyPrice || 0,
           sellPrice: newProd.sellPrice || 0
-      } as Product;
+      };
       addProduct(p);
       const unitPrice = type === InvoiceType.SALE ? (p.sellPrice || 0) : (p.buyPrice || 0);
       setItems([{ 
           productId: id, 
           productName: p.name, 
+          serialNumber: p.serialNumber,
           quantity: 1, 
           buyPrice: p.buyPrice || 0, 
           unitPrice, 
@@ -551,6 +660,10 @@ const Invoices = () => {
           description: '' 
       }, ...items]);
       setShowProductModal(false);
+      setShowQuickScanAddModal(false);
+      setScannedPendingCode('');
+      setNewProd({ name: '', sellPrice: 0, buyPrice: 0, unit: 'عدد', serialNumber: '', category: '', subCategory: '', subSubCategory: '' });
+      addNotification('success', `کالای «${p.name}» با موفقیت تعریف شد و به فاکتور افزوده گردید.`);
   };
 
   const handleSaveDescription = () => {
@@ -1449,12 +1562,73 @@ ${url}
                   ردیف‌های جدید در بالای جدول افزوده می‌شوند
                 </span>
               </div>
+              {/* نوار اسکنر دستی بارکدخوان و شماره سریال با کنتراست بالا و راهنمای هوشمند */}
+              <div className="bg-slate-950 p-4 rounded-2xl border-2 border-indigo-400/50 mb-4 shadow-xl">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-2.5">
+                  <div className="flex items-center gap-2 text-indigo-300 text-xs font-black">
+                    <Barcode size={20} className="text-indigo-400" />
+                    <span>ورودی اسکنر دستی بارکدخوان و شماره سریال:</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }))}
+                      className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 rounded-xl border border-amber-400/40 text-xs font-black flex items-center gap-1 transition-all cursor-pointer shadow-sm active:scale-95"
+                      title="راهنمای هوشمند اسکنر دستی (؟)"
+                    >
+                      <HelpCircle size={14} />
+                      <span>راهنما (؟)</span>
+                    </button>
+                    <span className="text-[11px] text-indigo-200 font-bold bg-indigo-950/80 px-2 py-0.5 rounded-lg border border-indigo-500/30">
+                      پشتیبانی خودکار از کیبورد اسکنر و Enter
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="بارکد یا شماره سریال را با اسکنر تفنگی اسکن کنید (یا تایپ و Enter)..."
+                    value={manualBarcodeInput}
+                    onChange={e => setManualBarcodeInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (manualBarcodeInput.trim()) {
+                          handleProcessScannedCodeForInvoice(manualBarcodeInput.trim());
+                          setManualBarcodeInput('');
+                        }
+                      }
+                    }}
+                    className="flex-1 bg-slate-900 border-2 border-slate-600 rounded-xl px-3.5 py-3 text-white font-mono text-sm font-bold outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30 tracking-wider placeholder:text-slate-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (manualBarcodeInput.trim()) {
+                        handleProcessScannedCodeForInvoice(manualBarcodeInput.trim());
+                        setManualBarcodeInput('');
+                      } else {
+                        setShowBarcodeScanner(true);
+                      }
+                    }}
+                    className="bg-indigo-500 hover:bg-indigo-400 text-slate-950 px-4 py-3 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-lg active:scale-95 transition-all cursor-pointer whitespace-nowrap border border-indigo-300"
+                    title="ثبت بارکد اسکن شده یا باز کردن اسکنر تصویری"
+                  >
+                    <Scan size={16} />
+                    <span>{manualBarcodeInput.trim() ? 'ثبت کالا در فاکتور' : 'اسکن با دوربین'}</span>
+                  </button>
+                </div>
+              </div>
+
               <div className="flex gap-2 mb-4">
-                <select className="product-select flex-1 min-w-0 bg-slate-950 border border-white/10 rounded-xl p-3.5 text-white text-sm font-bold outline-none focus:border-teal-500" onChange={(e) => {
+                <select className="product-select flex-1 min-w-0 bg-slate-950 border-2 border-slate-600 rounded-xl p-3.5 text-white text-sm font-bold outline-none focus:border-teal-400" onChange={(e) => {
                       const product = products.find(p => p.id === e.target.value);
                       if (product) {
                           const newItem: InvoiceItem = {
-                              productId: product.id, productName: product.name, quantity: 1,
+                              productId: product.id, productName: product.name, 
+                              serialNumber: product.serialNumber,
+                              quantity: 1,
                               buyPrice: product.buyPrice || 0, unitPrice: type === InvoiceType.SALE ? (product.sellPrice || 0) : (product.buyPrice || 0),
                               total: type === InvoiceType.SALE ? (product.sellPrice || 0) : (product.buyPrice || 0),
                               profit: type === InvoiceType.SALE ? ((product.sellPrice || 0) - (product.buyPrice || 0)) : 0,
@@ -1468,7 +1642,11 @@ ${url}
                       e.target.value = "";
                   }}>
                   <option value="">+ انتخاب کالا برای افزودن به بالای لیست...</option>
-                  {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  {products.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} {p.serialNumber ? `(سریال: ${p.serialNumber})` : ''} {p.category ? `[${p.category}]` : ''}
+                    </option>
+                  ))}
               </select>
               <button 
                 type="button"
@@ -1488,32 +1666,38 @@ ${url}
                     (document.querySelector('.name-input-0') as HTMLInputElement)?.focus();
                   }, 50);
                 }}
-                className="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-white/10 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs font-bold transition-all"
+                className="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-100 border-2 border-slate-600 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer"
                 title="افزودن ردیف آزاد / دستی به بالای لیست"
               >
                 <PlusCircle size={16} />
                 <span className="hidden sm:inline">ردیف آزاد</span>
               </button>
-              <button onClick={handleOpenProductModal} className="shrink-0 bg-teal-600 hover:bg-teal-500 active:scale-95 text-white w-12 h-12 rounded-xl flex items-center justify-center transition-all" title="تعریف سریع کالای جدید">
+              <button onClick={handleOpenProductModal} className="shrink-0 bg-teal-500 hover:bg-teal-400 active:scale-95 text-slate-950 w-12 h-12 rounded-xl flex items-center justify-center transition-all cursor-pointer font-black border border-teal-300 shadow-md" title="تعریف سریع کالای جدید">
                 <PackagePlus size={22} />
               </button>
               </div>
               <div className="space-y-3">
                 {items.length === 0 ? (
-                  <div className="text-center py-8 border border-dashed border-white/10 rounded-2xl text-slate-500 text-sm">
-                    هیچ کالایی به فاکتور افزوده نشده است. از کادر بالا کالا را انتخاب کنید تا به بالای فاکتور اضافه شود.
+                  <div className="text-center py-8 border-2 border-dashed border-slate-700 rounded-2xl text-slate-300 font-bold text-sm bg-slate-950/40">
+                    هیچ کالایی به فاکتور افزوده نشده است. از اسکنر دستی یا کادر انتخاب کالا استفاده نمایید.
                   </div>
                 ) : (
                   items.map((item, idx) => (
-                    <div key={idx} className="bg-slate-950/80 p-3.5 rounded-xl border border-white/5 space-y-2">
-                      <div className="flex justify-between items-center">
+                    <div key={idx} className="bg-slate-950 p-4 rounded-xl border-2 border-slate-700 space-y-2.5 shadow-md">
+                      <div className="flex justify-between items-center flex-wrap gap-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="shrink-0 bg-teal-500/10 text-teal-400 border border-teal-500/20 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
+                          <span className="shrink-0 bg-teal-500/20 text-teal-300 border border-teal-400/40 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
                             ردیف {toPersianDigits(idx + 1)}
                           </span>
+                          {item.serialNumber && (
+                            <span className="shrink-0 bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1" title="شماره سریال اختصاصی کالا">
+                              <Barcode size={12} className="text-indigo-400" />
+                              <span>{item.serialNumber}</span>
+                            </span>
+                          )}
                           {item.productId.startsWith('manual-') ? (
                             <input
-                              className={`name-input-${idx} flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1 text-sm text-white font-bold outline-none focus:border-teal-500`}
+                              className={`name-input-${idx} flex-1 bg-slate-900 border-2 border-slate-600 rounded-lg px-2.5 py-1 text-sm text-white font-bold outline-none focus:border-teal-400`}
                               placeholder="نام کالا یا خدمات دستی..."
                               value={item.productName}
                               onChange={e => {
@@ -1523,14 +1707,14 @@ ${url}
                               }}
                             />
                           ) : (
-                            <span className="text-white font-bold text-sm truncate">{item.productName}</span>
+                            <span className="text-white font-black text-sm truncate">{item.productName}</span>
                           )}
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-teal-400 font-mono font-bold text-xs bg-slate-900 px-2 py-1 rounded-lg border border-white/5">
+                          <span className="text-teal-300 font-mono font-black text-xs bg-slate-900 px-3 py-1.5 rounded-lg border-2 border-slate-700">
                             {formatCurrency(item.total)}
                           </span>
-                          <button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="text-rose-500 p-1 hover:bg-rose-500/10 rounded-lg" title="حذف ردیف"><Trash2 size={16}/></button>
+                          <button onClick={() => setItems(items.filter((_, i) => i !== idx))} className="text-rose-400 p-1.5 hover:bg-rose-500/20 rounded-lg transition-all cursor-pointer" title="حذف ردیف"><Trash2 size={16}/></button>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-2">
@@ -1829,50 +2013,243 @@ ${url}
           document.body
       )}
 
-      {showProductModal && createPortal(
-          <div className="fixed inset-0 z-9999 bg-black/80 backdrop-blur-md flex items-end md:items-center justify-center animate-fade-in no-print" style={{ direction: 'rtl' }}>
-            <div className="bg-slate-900 border-t md:border border-white/10 w-full max-w-md rounded-t-[2.5rem] md:rounded-[3rem] p-8 shadow-2xl animate-slide-up md:animate-pop-up max-h-[90vh] overflow-y-auto">
-              <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 md:hidden"></div>
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-black text-white flex items-center gap-3"><PackagePlus className="text-teal-400" size={24}/> تعریف سریع کالا</h3>
-                <button onClick={() => setShowProductModal(false)} className="text-slate-500 hover:text-white hidden md:block"><X size={20}/></button>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 pr-2 font-black">شماره کالا (خودکار)</label>
-                  <input 
-                    className="w-full bg-slate-950/50 p-4 rounded-2xl border border-white/5 text-slate-400 font-mono outline-none cursor-not-allowed" 
-                    value={newProd.code || ''} 
-                    disabled 
-                    readOnly
-                  />
+      {/* مودال تعریف سریع کالا (با دکمه + یا از طریق اسکنر دستی) با کنتراست بالا */}
+      {(showProductModal || showQuickScanAddModal) && createPortal(
+          <div className="fixed inset-0 z-9999 bg-black/90 backdrop-blur-md flex items-end md:items-center justify-center animate-fade-in no-print p-4" style={{ direction: 'rtl' }}>
+            <div className="bg-slate-950 border-2 border-slate-700 w-full max-w-xl rounded-t-[2.5rem] md:rounded-[3rem] p-6 md:p-8 shadow-2xl animate-slide-up md:animate-pop-up max-h-[92vh] overflow-y-auto custom-scrollbar">
+              <div className="w-12 h-1.5 bg-slate-600 rounded-full mx-auto mb-4 md:hidden"></div>
+              
+              <div className="flex justify-between items-center mb-5 border-b-2 border-slate-700 pb-4">
+                <div>
+                  <h3 className="text-xl font-black text-white flex items-center gap-2.5">
+                    <PackagePlus className="text-teal-400" size={24}/>
+                    <span>{showQuickScanAddModal ? 'تعریف و ثبت سریع کالا از طریق اسکنر دستی' : 'تعریف سریع کالای جدید در فاکتور'}</span>
+                  </h3>
+                  {scannedPendingCode && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs bg-amber-500/20 text-amber-300 font-mono font-bold px-3 py-1 rounded-lg border border-amber-400/40 flex items-center gap-1.5">
+                        <Barcode size={14} />
+                        کد اسکن شده: {scannedPendingCode}
+                      </span>
+                      <span className="text-[11px] text-slate-300 font-bold">
+                        (این کالا در سیستم یافت نشد؛ با تکمیل فرم فوراً به فاکتور افزوده می‌شود)
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] text-slate-500 pr-2 font-black">نام کالا / خدمات</label>
-                  <input 
-                      className="w-full bg-slate-950 p-4 rounded-2xl border border-white/5 text-white font-black outline-none focus:border-teal-500 transition-all" 
-                      placeholder="نام کالا / خدمات" 
-                      value={newProd.name} 
+                <button 
+                  onClick={() => { setShowProductModal(false); setShowQuickScanAddModal(false); }} 
+                  className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-slate-800 transition-all cursor-pointer"
+                >
+                  <X size={22}/>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* کد کالا، نام و واحد */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-white block pr-1">کد کالا</label>
+                    <input 
+                      className="w-full bg-slate-900 p-3 rounded-xl border-2 border-slate-700 text-slate-300 font-mono font-bold text-xs outline-none" 
+                      value={newProd.code || ''} 
+                      disabled 
+                      readOnly
+                    />
+                  </div>
+                  <div className="sm:col-span-2 space-y-1">
+                    <label className="text-xs font-black text-white block pr-1">نام کالا یا خدمات *</label>
+                    <input 
+                      className="w-full bg-slate-900 p-3 rounded-xl border-2 border-slate-600 text-white font-black text-sm outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30" 
+                      placeholder="عنوان دقیق کالا..." 
+                      value={newProd.name || ''} 
                       onChange={e => setNewProd({...newProd, name: e.target.value})} 
                       autoFocus
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-white block pr-1">واحد سنجش</label>
+                    <select 
+                      value={newProd.unit || 'عدد'}
+                      onChange={e => setNewProd({...newProd, unit: e.target.value})}
+                      className="w-full bg-slate-900 p-3 rounded-xl border-2 border-slate-600 text-white text-xs font-bold outline-none focus:border-teal-400"
+                    >
+                      <option value="عدد">عدد</option>
+                      <option value="کیلوگرم">کیلوگرم</option>
+                      <option value="بسته">بسته</option>
+                      <option value="کارتن">کارتن</option>
+                      <option value="متر">متر</option>
+                      <option value="دستگاه">دستگاه</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* بخش شماره سریال: اتوماتیک، دستی و دریافت از طریق اسکنر دستی */}
+                <div className="bg-slate-900 p-4 rounded-2xl border-2 border-indigo-400/50 space-y-2.5">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <label className="text-xs font-black text-indigo-300 flex items-center gap-1.5">
+                      <Barcode size={18} className="text-indigo-400" />
+                      <span>شماره سریال اختصاصی کالا</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const autoSerial = generateAutoSerialNumber('SN');
+                          setNewProd(prev => ({ ...prev, serialNumber: autoSerial }));
+                        }}
+                        className="px-2.5 py-1 bg-indigo-500 hover:bg-indigo-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 border border-indigo-300 transition-all cursor-pointer shadow-sm active:scale-95"
+                        title="تولید خودکار شماره سریال یکتا بر اساس فرمول استاندارد"
+                      >
+                        <Shuffle size={13} />
+                        <span>تولید اتوماتیک</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowBarcodeScanner(true)}
+                        className="px-2.5 py-1 bg-teal-500 hover:bg-teal-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1 border border-teal-300 transition-all cursor-pointer shadow-sm active:scale-95"
+                        title="اسکن سریال با اسکنر تفنگی یا دوربین"
+                      >
+                        <Scan size={13} />
+                        <span>اسکن با بارکدخوان</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <input 
+                    type="text" 
+                    placeholder="شماره سریال دستی، اسکن بارکدخوان تفنگی یا دوربین..." 
+                    value={newProd.serialNumber || ''} 
+                    onChange={e => setNewProd({ ...newProd, serialNumber: e.target.value })}
+                    className="w-full bg-slate-950 border-2 border-slate-600 rounded-xl p-3 text-white font-mono text-sm tracking-wider font-bold outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30"
                   />
+                  <p className="text-xs text-indigo-200 font-bold">
+                    💡 می‌توانید بارکدخوان دستی را مستقیماً شلیک کنید تا شماره سریال کالا تکمیل شود.
+                  </p>
                 </div>
+
+                {/* بخش دسته‌بندی کالا در چندین زیرمجموعه (دسته اصلی، زیرمجموعه ۱، زیرمجموعه ۲) */}
+                <div className="bg-slate-900 p-4 rounded-2xl border-2 border-slate-700 space-y-3">
+                  <div className="flex items-center gap-1.5 text-xs font-black text-teal-300">
+                    <Layers size={18} />
+                    <span>دسته‌بندی چند سطحی کالا</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* دسته اصلی */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-black text-white block pr-1">دسته اصلی</label>
+                      <input 
+                        list="invoice-main-categories"
+                        placeholder="مثال: دیجیتال" 
+                        value={newProd.category || ''} 
+                        onChange={e => {
+                          const cat = e.target.value;
+                          const path = `${cat}${newProd.subCategory ? ` / ${newProd.subCategory}` : ''}${newProd.subSubCategory ? ` / ${newProd.subSubCategory}` : ''}`;
+                          setNewProd({ ...newProd, category: cat, categoryPath: path });
+                        }}
+                        className="w-full bg-slate-950 border-2 border-slate-600 rounded-xl p-2.5 text-white text-xs font-bold outline-none focus:border-teal-400"
+                      />
+                      <datalist id="invoice-main-categories">
+                        {categoriesList.map((c, i) => <option key={i} value={c} />)}
+                      </datalist>
+                    </div>
+
+                    {/* زیرمجموعه اول */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-black text-white block pr-1">زیرمجموعه ۱</label>
+                      <input 
+                        list="invoice-sub-categories"
+                        placeholder="مثال: لوازم جانبی" 
+                        value={newProd.subCategory || ''} 
+                        onChange={e => {
+                          const sub = e.target.value;
+                          const path = `${newProd.category || ''}${sub ? ` / ${sub}` : ''}${newProd.subSubCategory ? ` / ${newProd.subSubCategory}` : ''}`;
+                          setNewProd({ ...newProd, subCategory: sub, categoryPath: path });
+                        }}
+                        className="w-full bg-slate-950 border-2 border-slate-600 rounded-xl p-2.5 text-white text-xs font-bold outline-none focus:border-teal-400"
+                      />
+                      <datalist id="invoice-sub-categories">
+                        {subCategoriesList.map((s, i) => <option key={i} value={s} />)}
+                      </datalist>
+                    </div>
+
+                    {/* زیرمجموعه دوم */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-black text-white block pr-1">زیرمجموعه ۲</label>
+                      <input 
+                        placeholder="مثال: کابل و مبدل" 
+                        value={newProd.subSubCategory || ''} 
+                        onChange={e => {
+                          const sub2 = e.target.value;
+                          const path = `${newProd.category || ''}${newProd.subCategory ? ` / ${newProd.subCategory}` : ''}${sub2 ? ` / ${sub2}` : ''}`;
+                          setNewProd({ ...newProd, subSubCategory: sub2, categoryPath: path });
+                        }}
+                        className="w-full bg-slate-950 border-2 border-slate-600 rounded-xl p-2.5 text-white text-xs font-bold outline-none focus:border-teal-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* قیمت خرید و فروش */}
                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                        <label className="text-[9px] text-slate-500 font-bold pr-2">قیمت خرید (ریال)</label>
-                        <input type="number" className="w-full bg-slate-950 p-4 rounded-2xl border border-white/5 text-white font-mono outline-none focus:border-teal-500" value={newProd.buyPrice || ''} onChange={e => setNewProd({...newProd, buyPrice: Number(e.target.value)})} placeholder="اختیاری" />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-[9px] text-slate-500 font-bold pr-2">قیمت فروش (ریال)</label>
-                        <input type="number" className="w-full bg-slate-950 p-4 rounded-2xl border border-white/5 text-white font-mono outline-none focus:border-teal-500" value={newProd.sellPrice || ''} onChange={e => setNewProd({...newProd, sellPrice: Number(e.target.value)})} placeholder="اختیاری" />
-                    </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-white block pr-1">قیمت خرید (تومان)</label>
+                    <input 
+                      type="number" 
+                      className="w-full bg-slate-900 p-3.5 rounded-xl border-2 border-slate-600 text-white font-mono font-bold text-xs outline-none focus:border-teal-400" 
+                      value={newProd.buyPrice || ''} 
+                      onChange={e => setNewProd({...newProd, buyPrice: Number(e.target.value)})} 
+                      placeholder="0" 
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-black text-white block pr-1">قیمت فروش (تومان)</label>
+                    <input 
+                      type="number" 
+                      className="w-full bg-slate-900 p-3.5 rounded-xl border-2 border-slate-600 text-white font-mono font-bold text-xs outline-none focus:border-teal-400" 
+                      value={newProd.sellPrice || ''} 
+                      onChange={e => setNewProd({...newProd, sellPrice: Number(e.target.value)})} 
+                      placeholder="0" 
+                    />
+                  </div>
                 </div>
-                <button onClick={handleQuickAddProduct} className="w-full bg-teal-600 hover:bg-teal-500 text-white py-4 rounded-2xl font-black shadow-xl mt-2 active:scale-95 transition-all">ذخیره و افزودن به فاکتور</button>
-                <button onClick={() => setShowProductModal(false)} className="w-full bg-slate-800 text-white py-4 rounded-2xl font-bold mt-2 md:hidden">انصراف</button>
+
+                <div className="pt-2 flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={handleQuickAddProduct} 
+                    className="flex-1 bg-teal-500 hover:bg-teal-400 text-slate-950 py-4 rounded-2xl font-black text-sm shadow-xl active:scale-95 transition-all cursor-pointer border border-teal-300"
+                  >
+                    ذخیره و ثبت کالا در فاکتور
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => { setShowProductModal(false); setShowQuickScanAddModal(false); }} 
+                    className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-4 rounded-2xl font-bold text-xs cursor-pointer border border-slate-600"
+                  >
+                    انصراف
+                  </button>
+                </div>
               </div>
             </div>
           </div>,
           document.body
+      )}
+
+      {/* اسکنر بارکد و شماره سریال با دوربین */}
+      {showBarcodeScanner && (
+        <BarcodeScanner 
+          onScan={(code) => {
+            setShowBarcodeScanner(false);
+            if (showProductModal || showQuickScanAddModal) {
+              setNewProd(prev => ({ ...prev, serialNumber: code }));
+            } else {
+              handleProcessScannedCodeForInvoice(code);
+            }
+          }} 
+          onClose={() => setShowBarcodeScanner(false)} 
+        />
       )}
 
       {showCheckModal && createPortal(
