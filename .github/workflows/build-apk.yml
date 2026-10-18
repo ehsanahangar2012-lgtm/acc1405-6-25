@@ -7,7 +7,7 @@ concurrency:
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, fix/core-data-integrity ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
@@ -37,6 +37,10 @@ jobs:
 
       - name: Build local-only browser preview
         run: bun run build:browser-preview
+
+      - name: Mark preview build version
+        shell: bash
+        run: printf '{"sha":"%s"}\n' "$GITHUB_SHA" > dist/version.json
 
       - name: Smoke-test local preview server and safety headers
         shell: bash
@@ -71,6 +75,32 @@ jobs:
           path: browser-preview-package/
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload isolated online preview
+        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/core-data-integrity'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy-browser-preview:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/core-data-integrity'
+    needs: build-browser-preview
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy isolated browser preview
+        id: deployment
+        uses: actions/deploy-pages@v4
+
   build-apk:
     runs-on: ubuntu-latest
 

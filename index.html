@@ -83,7 +83,8 @@
   <body>
     <div id="browser-preview-notice" hidden role="status">پیش‌نمایش مرورگری · اتصال به سرور اصلی غیرفعال است · داده‌ها فقط محلی‌اند</div>
     <script>
-      if (window.location.hostname === '127.0.0.1' && window.location.port === '4173') {
+      if ((window.location.hostname === '127.0.0.1' && window.location.port === '4173') ||
+          window.location.hostname.endsWith('.github.io')) {
         document.getElementById('browser-preview-notice')?.removeAttribute('hidden');
       }
     </script>
@@ -100,7 +101,23 @@
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
   <script>
-    if (!(window.location.hostname === '127.0.0.1' && window.location.port === '4173') && 'serviceWorker' in navigator) {
+    const isBrowserPreviewHost =
+      (window.location.hostname === '127.0.0.1' && window.location.port === '4173') ||
+      window.location.hostname.endsWith('.github.io');
+    const isNativeAndroid = /AshkeGhalam-Android-Native/i.test(navigator.userAgent);
+
+    // Capacitor ships a self-contained asset bundle. Unregister a previously enabled PWA
+    // worker there so cached web assets cannot shadow the APK's current JS/CSS files.
+    if ((isBrowserPreviewHost || isNativeAndroid) && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations()
+        .then(registrations => Promise.all(registrations.map(registration => registration.unregister())))
+        .catch(() => {});
+      if (isNativeAndroid && 'caches' in window) {
+        caches.keys()
+          .then(keys => Promise.all(keys.filter(key => /^(static|dynamic|images|api)-v/i.test(key)).map(key => caches.delete(key))))
+          .catch(() => {});
+      }
+    } else if ('serviceWorker' in navigator) {
       window.addEventListener('load', async () => {
         try {
           const reg = await navigator.serviceWorker.register('/sw.js');

@@ -456,3 +456,59 @@ input[type="tel"] {
   }
 }
 
+
+
+/* Cross-section scroll reliability: normal document scroll plus touch-enabled nested panels. */
+html {
+  min-height: 100%;
+  height: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior-y: auto !important;
+}
+
+body {
+  min-height: 100vh !important;
+  height: auto !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+  overscroll-behavior-y: auto !important;
+}
+
+#root {
+  min-height: 100vh;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+#root > div.min-h-screen {
+  min-height: 100vh !important;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+main {
+  min-width: 0;
+  height: auto !important;
+  overflow: visible !important;
+}
+
+[class~="overflow-y-auto"],
+[class~="overflow-y-scroll"],
+[class~="overflow-auto"],
+.custom-scrollbar,
+.sidebar-scrollbar,
+.modal-container,
+.bottom-sheet {
+  min-height: 0;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain;
+  touch-action: auto !important;
+}
+
+@supports (height: 100dvh) {
+  #root,
+  #root > div.min-h-screen {
+    min-height: 100dvh !important;
+  }
+}

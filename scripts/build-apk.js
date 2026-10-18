@@ -36,6 +36,34 @@ if (!fs.existsSync(androidDir) || !fs.existsSync(gradleWrapper)) {
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 run(npx, ['cap', 'sync', 'android']);
 
+// Fail early if the Android bundle regresses to Tailwind v4 syntax that older WebViews ignore.
+const androidPublicDir = path.join(androidDir, 'app', 'src', 'main', 'assets', 'public');
+const bundledHtmlPath = path.join(androidPublicDir, 'index.html');
+if (!fs.existsSync(bundledHtmlPath)) {
+  throw new Error('Capacitor sync did not create android/app/src/main/assets/public/index.html.');
+}
+const bundledHtml = fs.readFileSync(bundledHtmlPath, 'utf8');
+const cssRefs = [...bundledHtml.matchAll(/href=["']([^"']+\\.css)(?:\\?[^"']*)?["']/g)].map(match => match[1]);
+if (cssRefs.length === 0) {
+  throw new Error('No compiled CSS stylesheet was linked from the Android WebView entry point.');
+}
+for (const cssRef of cssRefs) {
+  const relativeCssPath = decodeURIComponent(cssRef).replace(/^\\.\\//, '').replace(/^\\//, '');
+  const cssPath = path.resolve(androidPublicDir, relativeCssPath);
+  if (!cssPath.startsWith(path.resolve(androidPublicDir) + path.sep) || !fs.existsSync(cssPath)) {
+    throw new Error(`Android stylesheet is missing: ${cssRef}`);
+  }
+  const cssText = fs.readFileSync(cssPath, 'utf8');
+  const unsupported = [
+    /@layer\\s/i.test(cssText) && '@layer',
+    /oklch\\s*\\(/i.test(cssText) && 'oklch()',
+    /color-mix\\s*\\(/i.test(cssText) && 'color-mix()'
+  ].filter(Boolean);
+  if (unsupported.length > 0) {
+    throw new Error(`Android CSS compatibility pass did not finish; unsupported syntax remains: ${unsupported.join(', ')}`);
+  }
+}
+
 if (process.platform !== 'win32') {
   fs.chmodSync(gradleWrapper, 0o755);
 }
