@@ -635,25 +635,32 @@ export const useStore = create<AppState>()(
           const inv = s.invoices.find(v => v.id === id);
           if (!inv) return {};
 
-          deletedRecordsRegistry.registerDeletion(id, 'invoice');
+          // ابطال حسابداری باید موفق باشد؛ در غیر این صورت فاکتور را حذف نکن.
+          try {
+              AccountingEngine.postStornoReversal(id, 'INVOICE');
+          } catch (err) {
+              console.error('AccountingEngine error in deleteInvoice:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return {
+                  notifications: [...s.notifications, {
+                      id: generateId(),
+                      type: 'error',
+                      message: `ابطال فاکتور انجام نشد؛ فاکتور حفظ شد: ${reason}`
+                  }]
+              };
+          }
 
+          deletedRecordsRegistry.registerDeletion(id, 'invoice');
           if (s.currentUser) {
               auditTrail.log(s.currentUser.id, s.currentUser.fullName, 'DELETE', 'invoice', id, inv, undefined, 'HIGH').catch(() => {});
           }
-
           hostDB.deleteFromHost('invoices', id).catch(() => {});
-          persistentStorage.saveData('invoices', s.invoices.filter(v => v.id !== id)).catch(() => {});
-
-          try {
-              AccountingEngine.postStornoReversal(id, 'INVOICE');
-              if (inv.personId) {
-                  PersonLedgerService.removeByReference(inv.personId, id);
-              }
-          } catch (err) {
-              console.error('AccountingEngine error in deleteInvoice:', err);
-          }
-
           const nextInvoices = s.invoices.filter(v => v.id !== id);
+          persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
+
+          if (inv.personId) {
+              PersonLedgerService.removeByReference(inv.personId, id);
+          }
           const relatedTrans = s.transactions.filter(t => t.referenceId === id || t.relatedInvoiceId === id);
           // سند اصلی فاکتور پس از حذف، دیگر از آرایه فاکتورها محاسبه نمی‌شود؛
           // پس برگشت جداگانه‌ی تراکنش نوع فاکتور، مانده را دوباره معکوس می‌کند.
