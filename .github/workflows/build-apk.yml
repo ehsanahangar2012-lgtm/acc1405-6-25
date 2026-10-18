@@ -62,3 +62,34 @@ jobs:
           name: AshkeGhalam-Android-APK
           path: downloads/AshkeGhalam-v*.apk
           if-no-files-found: error
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check project
+        run: bun run lint
+
+      - name: Build real Windows EXE files
+        run: bun run build:windows
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Windows-EXE
+          path: dist_electron/*.exe
+          if-no-files-found: error
+
