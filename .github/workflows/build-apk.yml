@@ -33,7 +33,15 @@ jobs:
           : "${ANDROID_HOME:?ANDROID_HOME is not set on the GitHub runner}"
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -n 1)"
           test -x "$SDKMANAGER"
+          # sdkmanager may exit cleanly before 'yes' finishes; avoid treating yes's
+          # expected broken pipe as a license-acceptance failure.
+          set +o pipefail
           yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null
+          SDKMANAGER_LICENSE_STATUS="${PIPESTATUS[1]}"
+          set -o pipefail
+          if [ "$SDKMANAGER_LICENSE_STATUS" -ne 0 ]; then
+            exit "$SDKMANAGER_LICENSE_STATUS"
+          fi
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Install NPM Dependencies
