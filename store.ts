@@ -533,13 +533,23 @@ export const useStore = create<AppState>()(
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.' }] };
           }
           const updated = [...s.invoices, i];
-          hostDB.save('invoices', i).catch(() => {});
-          
+
+          // فاکتور تنها پس از ثبت موفق سند حسابداری پذیرفته و ذخیره می‌شود.
           try {
               AccountingEngine.postInvoice(i);
           } catch (err) {
               console.error('AccountingEngine error in addInvoice:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return {
+                  notifications: [...s.notifications, {
+                      id: generateId(),
+                      type: 'error',
+                      message: `ثبت فاکتور انجام نشد: ${reason}`
+                  }]
+              };
           }
+
+          hostDB.save('invoices', i).catch(() => {});
           
           let newTransactions = [...s.transactions];
           const personIndex = s.people.findIndex(p => p.id === i.personId);
@@ -645,7 +655,11 @@ export const useStore = create<AppState>()(
 
           const nextInvoices = s.invoices.filter(v => v.id !== id);
           const relatedTrans = s.transactions.filter(t => t.referenceId === id || t.relatedInvoiceId === id);
-          const reversalTransactions = relatedTrans.map(t => ({
+          // سند اصلی فاکتور پس از حذف، دیگر از آرایه فاکتورها محاسبه نمی‌شود؛
+          // پس برگشت جداگانه‌ی تراکنش نوع فاکتور، مانده را دوباره معکوس می‌کند.
+          const reversalTransactions = relatedTrans
+              .filter(t => t.type !== 'INVOICE_SALE' && t.type !== 'INVOICE_PURCHASE' && t.type !== 'REVERSAL')
+              .map(t => ({
               id: generateId(),
               date: getPersianDate(),
               type: 'REVERSAL',
@@ -702,11 +716,19 @@ export const useStore = create<AppState>()(
               PersonLedgerService.removeByReference(pid, id);
           });
 
-          // ثبت در موتور حسابداری (سند قبلی حذف و سند جدید کامپیوتر می‌شود)
+          // ویرایش فقط پس از ثبت موفق سند حسابداری ادامه پیدا می‌کند.
           try {
               AccountingEngine.postInvoice(finalUpdated);
           } catch (err) {
               console.error('AccountingEngine error in updateInvoice:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return {
+                  notifications: [...s.notifications, {
+                      id: generateId(),
+                      type: 'error',
+                      message: `ویرایش فاکتور انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}`
+                  }]
+              };
           }
 
           // بازتولید تراکنش‌های مرتبط با فاکتور
