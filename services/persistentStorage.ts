@@ -15,7 +15,7 @@ class PersistentStorage {
     // حافظه کش در RAM برای دسترسی فوری بدون معطلی و بدون لگ در ویندوز
     private memoryCache: Map<string, { data: any; timestamp: number }> = new Map();
     private inFlightLoads: Map<string, Promise<any>> = new Map();
-    private pendingSaves: Map<string, { value: any; timer: any }> = new Map();
+    private pendingSaves: Map<string, { value: any; timer: any; resolvers: Array<(success: boolean) => void> }> = new Map();
     private readonly CACHE_TTL_MS = 6000; // ۶ ثانیه اعتبار کش در حافظه رم
     private readonly WRITE_DEBOUNCE_MS = 400; // ۴۰۰ میلی‌ثانیه دی‌بانس برای تجمیع درخواست‌های ذخیره
 
@@ -39,17 +39,16 @@ class PersistentStorage {
             return { success: false, message: 'آدرس سرور هاست پیکربندی نشده است' };
         }
 
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
         try {
             const storageEndpoint = `${baseUrl}/storage.php`;
             const workspaceHeaders = workspaceService.getHeaders();
 
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 8000);
-
             const response = await fetch(storageEndpoint, {
                 method: 'POST',
                 cache: 'no-store',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Cache-Control': 'no-cache, no-store, must-revalidate',
                     'Pragma': 'no-cache',
@@ -63,16 +62,28 @@ class PersistentStorage {
                 }),
                 signal: controller.signal
             });
-            clearTimeout(timeout);
-            
+
+            if (!response.ok) {
+                return { success: false, message: `پاسخ ناموفق سرور (${response.status})` };
+            }
+
             const contentType = response.headers.get('content-type');
             if (!contentType?.includes('application/json')) {
                 return { success: false, message: 'سرور پاسخ نامعتبر ارسال کرد' };
             }
-            
-            return await response.json();
+
+            const result = await response.json() as StorageResponse;
+            if (!result || result.success !== true) {
+                return {
+                    success: false,
+                    message: result?.message || 'ذخیره‌سازی روی سرور تأیید نشد'
+                };
+            }
+            return result;
         } catch (error) {
             return { success: false, message: error instanceof Error ? error.message : 'خطا در ارتباط با سرور' };
+        } finally {
+            clearTimeout(timeout);
         }
     }
 
@@ -83,42 +94,70 @@ class PersistentStorage {
      * ۳. ارسال دی‌بانس شده به سرور در پس‌زمینه بدون مسدودسازی نخ اصلی رابط کاربری
      */
     async saveData(key: string, value: any): Promise<boolean> {
-        // ۱. به‌روزرسانی فوری کش حافظه RAM برای خواندن‌های بلادرنگ بعدی
+        // به‌روزرسانی فوری کش محلی؛ این به‌تنهایی به‌معنای تأیید ذخیره ابری نیست.
         this.memoryCache.set(key, { data: value, timestamp: Date.now() });
 
-        // ۲. ذخیره پشتیبان ناهمگام در IndexedDB محلی
+        // ذخیره پشتیبان محلی به‌صورت ناهمگام
         if (typeof window !== 'undefined') {
             try {
-                idbService.save('backups', { id: `storage_${key}`, data: JSON.stringify(value), updatedAt: Date.now() }).catch(() => {});
+                idbService.save('backups', {
+                    id: `storage_${key}`,
+                    data: JSON.stringify(value),
+                    updatedAt: Date.now()
+                }).catch(() => {});
             } catch {}
         }
 
+        // در حالت آفلاین مستقل، ذخیره محلی کافی است.
         if (workspaceService.isStandaloneOffline()) {
             return true;
         }
 
-        // ۳. دی‌بانس کردن ارسال به سرور جهت جلوگیری از قفل شدن نخ اصلی در ویندوز
+        // همه فراخوانی‌های یک کلید، نتیجه همان آخرین مقدارِ ارسال‌شده را دریافت می‌کنند.
+        // موفقیت فقط پس از پاسخ موفق سرور اعلام می‌شود؛ نه بلافاصله پس از صف‌بندی.
         return new Promise<boolean>((resolve) => {
             const existing = this.pendingSaves.get(key);
-            if (existing && existing.timer) {
+            if (existing) {
                 clearTimeout(existing.timer);
+                existing.value = value;
+                existing.resolvers.push(resolve);
+                existing.timer = setTimeout(() => {
+                    void this.flushPendingSave(key, existing);
+                }, this.WRITE_DEBOUNCE_MS);
+                return;
             }
 
-            const timer = setTimeout(async () => {
-                this.pendingSaves.delete(key);
-                try {
-                    const result = await this.request('save', { key, value: JSON.stringify(value) });
-                    resolve(result.success);
-                } catch {
-                    resolve(false);
-                }
+            const pending = {
+                value,
+                timer: undefined as any,
+                resolvers: [resolve]
+            };
+            pending.timer = setTimeout(() => {
+                void this.flushPendingSave(key, pending);
             }, this.WRITE_DEBOUNCE_MS);
-
-            this.pendingSaves.set(key, { value, timer });
-            
-            // بلافاصله تایید محلی برگردان تا UI گیر نکند
-            setTimeout(() => resolve(true), 0);
+            this.pendingSaves.set(key, pending);
         });
+    }
+
+    private async flushPendingSave(
+        key: string,
+        pending: { value: any; timer: any; resolvers: Array<(success: boolean) => void> }
+    ): Promise<void> {
+        if (this.pendingSaves.get(key) !== pending) return;
+        this.pendingSaves.delete(key);
+
+        let success = false;
+        try {
+            const result = await this.request('save', {
+                key,
+                value: JSON.stringify(pending.value)
+            });
+            success = result.success === true;
+        } catch {
+            success = false;
+        } finally {
+            pending.resolvers.forEach(resolve => resolve(success));
+        }
     }
 
     /**
