@@ -1,5 +1,10 @@
 name: Build Android APK
 
+# Avoid dozens of stale builds when a PR receives multiple small fixes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [ main, master ]
