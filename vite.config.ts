@@ -93,7 +93,7 @@ function replaceCssFunctionCalls(value: string, functionName: string, replacer: 
       const char = value[end];
       if (quote) {
         if (escaped) escaped = false;
-        else if (char === '\\\\') escaped = true;
+        else if (char === '\\') escaped = true;
         else if (char === quote) quote = '';
         continue;
       }
