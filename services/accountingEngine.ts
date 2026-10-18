@@ -5,6 +5,23 @@ import { Invoice, InvoiceType, Check, CheckTransfer, Transaction } from '../type
 import { AccountingEntry } from '../types-financial';
 import { generateId, getPersianDate } from '../utils';
 
+// Normalize both Jalali/ISO-style YYYY/MM/DD dates to a comparable key.
+function dateComparisonKey(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const ascii = value.trim()
+    .replace(/[۰-۹]/g, digit => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(digit)))
+    .replace(/[٠-٩]/g, digit => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit)));
+  const datePart = ascii.split(/[T ]/, 1)[0];
+  const parts = datePart.split(/[/-]/);
+  if (parts.length !== 3 || parts.some(part => !/^\d+$/.test(part))) return null;
+  const [year, month, day] = parts;
+  if (year.length > 4 || month.length > 2 || day.length > 2) return null;
+  const m = Number(month);
+  const d = Number(day);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return `${year.padStart(4, '0')}${month.padStart(2, '0')}${day.padStart(2, '0')}`;
+}
+
 export class AccountingEngine {
   /**
    * Validate double-entry transaction parameters before appending to the ledger.
@@ -37,8 +54,17 @@ export class AccountingEngine {
 
     // 3. Prevent posting into closed/locked periods or outside configured periods.
     const date = entry.date;
+    const dateKey = dateComparisonKey(date);
+    if (!dateKey) {
+      throw new Error(`قالب تاریخ سند معتبر نیست: ${date}. قالب مورد انتظار سال/ماه/روز است.`);
+    }
+
     const periods = finStore.fiscalPeriods || [];
-    const matchedPeriod = periods.find(p => p.startDate <= date && date <= p.endDate);
+    const matchedPeriod = periods.find(p => {
+      const startKey = dateComparisonKey(p.startDate);
+      const endKey = dateComparisonKey(p.endDate);
+      return Boolean(startKey && endKey && startKey <= dateKey && dateKey <= endKey);
+    });
 
     if (periods.length > 0 && !matchedPeriod) {
       throw new Error(`برای تاریخ ${date} دوره مالی تعریف‌شده‌ای وجود ندارد.`);
@@ -48,8 +74,15 @@ export class AccountingEngine {
     }
 
     const globalConfig = useStore.getState().config;
-    if (globalConfig.fiscalStartDate && globalConfig.fiscalEndDate &&
-        (date < globalConfig.fiscalStartDate || date > globalConfig.fiscalEndDate)) {
+    const fiscalStartKey = globalConfig.fiscalStartDate ? dateComparisonKey(globalConfig.fiscalStartDate) : null;
+    const fiscalEndKey = globalConfig.fiscalEndDate ? dateComparisonKey(globalConfig.fiscalEndDate) : null;
+    if (globalConfig.fiscalStartDate && !fiscalStartKey) {
+      throw new Error('تاریخ شروع سال مالی در تنظیمات نامعتبر است.');
+    }
+    if (globalConfig.fiscalEndDate && !fiscalEndKey) {
+      throw new Error('تاریخ پایان سال مالی در تنظیمات نامعتبر است.');
+    }
+    if (fiscalStartKey && fiscalEndKey && (dateKey < fiscalStartKey || dateKey > fiscalEndKey)) {
       throw new Error(`تاریخ ${date} خارج از بازه سال مالی پیکربندی‌شده است.`);
     }
 
@@ -177,6 +210,25 @@ export class AccountingEngine {
     }
 
     try {
+    // Reject malformed invoice totals before removing any previously posted journal.
+    if (invoice.type === InvoiceType.SALE || invoice.type === InvoiceType.PURCHASE) {
+      const subtotal = Number(invoice.subTotal);
+      const discount = Number(invoice.discount || 0);
+      const tax = Number(invoice.tax || 0);
+      const cashAmount = Number(invoice.cashAmount || 0);
+      const checkAmount = Number(invoice.checkAmount || 0);
+      const finalTotal = Number(invoice.finalTotal);
+      const netAmount = subtotal - discount;
+
+      if (!Number.isFinite(netAmount) || netAmount <= 0 ||
+          !Number.isFinite(tax) || tax < 0 ||
+          !Number.isFinite(cashAmount) || cashAmount < 0 ||
+          !Number.isFinite(checkAmount) || checkAmount < 0 ||
+          !Number.isFinite(finalTotal) || finalTotal <= 0) {
+        throw new Error('مبالغ فاکتور نامعتبر است؛ مبلغ خالص، مالیات، پرداخت و جمع نهایی را بررسی کنید.');
+      }
+    }
+
     // در سند اصلاحی، سند قبل حذف و سند جدید به طور کامل جایگزین می‌شود
     useFinancialStore.setState(s => ({
       accountingEntries: s.accountingEntries.filter(e => e.referenceId !== invoice.id)
