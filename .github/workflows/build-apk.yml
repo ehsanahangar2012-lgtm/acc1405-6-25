@@ -3,6 +3,8 @@ name: Build Android APK
 on:
   push:
     branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
   workflow_dispatch:
 
 jobs:
@@ -17,7 +19,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -29,27 +30,17 @@ jobs:
         uses: android-actions/setup-android@v3
 
       - name: Install NPM Dependencies
-        run: npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps
 
-      - name: Build Web Project
-        run: npm run build
+      - name: Type-check project
+        run: npm run lint
 
-      - name: Add and Sync Android Platform with Capacitor
-        run: |
-          npx cap add android || true
-          npx cap sync android
-
-      - name: Make gradlew executable
-        run: chmod +x android/gradlew
-
-      - name: Build Android Debug APK
-        run: |
-          cd android
-          ./gradlew assembleDebug --no-daemon
+      - name: Build real Android APK
+        run: npm run build:apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: AshkeGhalam-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: downloads/AshkeGhalam-v*.apk
           if-no-files-found: error
