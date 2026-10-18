@@ -69,6 +69,57 @@ function parseLegacyColor(expression: string, vars: Map<string, string>): number
   return [0, 0, 0, 1];
 }
 
+function replaceCssFunctionCalls(value: string, functionName: string, replacer: (call: string) => string): string {
+  const marker = `${functionName.toLowerCase()}(`;
+  const lower = value.toLowerCase();
+  let output = '';
+  let cursor = 0;
+
+  while (cursor < value.length) {
+    const start = lower.indexOf(marker, cursor);
+    if (start < 0) {
+      output += value.slice(cursor);
+      break;
+    }
+
+    output += value.slice(cursor, start);
+    const openIndex = start + marker.length - 1;
+    let depth = 0;
+    let quote = '';
+    let escaped = false;
+    let end = openIndex;
+
+    for (; end < value.length; end++) {
+      const char = value[end];
+      if (quote) {
+        if (escaped) escaped = false;
+        else if (char === '\\\\') escaped = true;
+        else if (char === quote) quote = '';
+        continue;
+      }
+      if (char === '"' || char === "'") {
+        quote = char;
+        continue;
+      }
+      if (char === '(') depth++;
+      else if (char === ')') {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+
+    if (end >= value.length || depth !== 0) {
+      output += value.slice(start);
+      break;
+    }
+
+    output += replacer(value.slice(start, end + 1));
+    cursor = end + 1;
+  }
+
+  return output;
+}
+
 function androidLegacyCssPlugin(): any {
   return {
     postcssPlugin: 'ashk-android-legacy-css',
@@ -118,6 +169,23 @@ function androidLegacyCssPlugin(): any {
         }
       };
       flattenLayers(root);
+
+      // Safety net: no color-mix() should survive in the packaged APK. The first pass
+      // preserves common Tailwind transparency values; this fallback covers other
+      // color-mix variants and CSS feature-detection expressions unsupported by old WebViews.
+      root.walkDecls((decl: any) => {
+        decl.value = replaceCssFunctionCalls(decl.value, 'color-mix', () => 'rgba(0, 0, 0, 0.5)');
+      });
+      root.walkAtRules((rule: any) => {
+        if (rule.params?.toLowerCase().includes('color-mix(')) {
+          rule.params = replaceCssFunctionCalls(rule.params, 'color-mix', () => 'rgb(0, 0, 0)');
+        }
+      });
+      root.walkRules((rule: any) => {
+        if (rule.selector?.toLowerCase().includes('color-mix(')) {
+          rule.selector = replaceCssFunctionCalls(rule.selector, 'color-mix', () => 'rgba(0, 0, 0, 0.5)');
+        }
+      });
     }
   };
 }
