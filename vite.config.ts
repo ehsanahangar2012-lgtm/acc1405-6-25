@@ -174,15 +174,19 @@ function androidLegacyCssPlugin(): any {
       // preserves common Tailwind transparency values; this fallback covers other
       // color-mix variants and CSS feature-detection expressions unsupported by old WebViews.
       root.walkDecls((decl: any) => {
+        decl.value = replaceCssFunctionCalls(decl.value, 'oklch', () => 'rgb(0, 0, 0)');
         decl.value = replaceCssFunctionCalls(decl.value, 'color-mix', () => 'rgba(0, 0, 0, 0.5)');
       });
       root.walkAtRules((rule: any) => {
-        if (rule.params?.toLowerCase().includes('color-mix(')) {
+        if (typeof rule.params === 'string') {
+          rule.params = convertOklch(rule.params);
+          rule.params = replaceCssFunctionCalls(rule.params, 'oklch', () => 'rgb(0, 0, 0)');
           rule.params = replaceCssFunctionCalls(rule.params, 'color-mix', () => 'rgb(0, 0, 0)');
         }
       });
       root.walkRules((rule: any) => {
-        if (rule.selector?.toLowerCase().includes('color-mix(')) {
+        if (typeof rule.selector === 'string') {
+          rule.selector = replaceCssFunctionCalls(rule.selector, 'oklch', () => 'rgb(0, 0, 0)');
           rule.selector = replaceCssFunctionCalls(rule.selector, 'color-mix', () => 'rgba(0, 0, 0, 0.5)');
         }
       });

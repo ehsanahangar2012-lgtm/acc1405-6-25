@@ -106,17 +106,30 @@
       window.location.hostname.endsWith('.github.io');
     const isNativeAndroid = /AshkeGhalam-Android-Native/i.test(navigator.userAgent);
 
-    // Capacitor ships a self-contained asset bundle. Unregister a previously enabled PWA
-    // worker there so cached web assets cannot shadow the APK's current JS/CSS files.
-    if ((isBrowserPreviewHost || isNativeAndroid) && 'serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations()
-        .then(registrations => Promise.all(registrations.map(registration => registration.unregister())))
-        .catch(() => {});
-      if (isNativeAndroid && 'caches' in window) {
-        caches.keys()
-          .then(keys => Promise.all(keys.filter(key => /^(static|dynamic|images|api)-v/i.test(key)).map(key => caches.delete(key))))
-          .catch(() => {});
+    // Keep local / hosted preview and Capacitor builds isolated from stale PWA caches.
+    if (isBrowserPreviewHost || isNativeAndroid) {
+      const cleanupTasks = [];
+      if ('serviceWorker' in navigator) {
+        cleanupTasks.push(navigator.serviceWorker.getRegistrations().then(registrations => {
+          if (registrations.length) {
+            return Promise.all(registrations.map(registration => registration.unregister())).then(() => true);
+          }
+          return false;
+        }));
       }
+      if ('caches' in window) {
+        cleanupTasks.push(caches.keys().then(keys => {
+          const staleKeys = keys.filter(key => /^(static|dynamic|images|api)-v/i.test(key));
+          return Promise.all(staleKeys.map(key => caches.delete(key))).then(() => staleKeys.length > 0);
+        }));
+      }
+      Promise.all(cleanupTasks).then(results => {
+        const cleanupKey = 'ashk-preview-cache-reset-v1';
+        if (results.some(Boolean) && sessionStorage.getItem(cleanupKey) !== '1') {
+          sessionStorage.setItem(cleanupKey, '1');
+          window.location.reload();
+        }
+      }).catch(() => {});
     } else if ('serviceWorker' in navigator) {
       window.addEventListener('load', async () => {
         try {
