@@ -77,13 +77,13 @@ jobs:
           retention-days: 14
 
       - name: Upload isolated online preview
-        if: github.event_name == 'push' && github.ref == 'refs/heads/fix/core-data-integrity'
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/fix/core-data-integrity'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy-browser-preview:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/fix/core-data-integrity'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/fix/core-data-integrity'
     needs: build-browser-preview
     runs-on: ubuntu-latest
     permissions:
