@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
 
+const appPackage = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
+const APP_VERSION = String(appPackage.version || '0.0.0');
+
 console.log('========================================');
 console.log('آماده‌سازی خودکار پکیج توزیع (dist) اشک قلم');
 console.log('========================================\n');
@@ -123,7 +126,7 @@ fs.writeFileSync('dist/daily-backups/.htaccess', backupHtaccess, 'utf8');
 fs.writeFileSync('dist/db/.htaccess', backupHtaccess, 'utf8');
 
 // ۱۱. ایجاد راهنمای جامع استقرار در dist/README.txt
-const readme = `# سامانه یکپارچه ابری و آفلاین اشک قلم - نسخه ۱۵.۸.۰
+const readme = `# سامانه یکپارچه ابری و آفلاین اشک قلم - نسخه ${APP_VERSION}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 این بسته توزیع (dist) شامل تمامی کدهای کامپایل شده فرانت‌اند، موتورهای آفلاین، APIهای PHP،
