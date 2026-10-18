@@ -29,8 +29,8 @@ const copyDir = (src, dest) => {
     }
 };
 
-if (fs.existsSync('dist-build')) {
-    console.log('کپی فایل‌های کامپایل شده فرانت‌اند از dist-build...');
+if (!fs.existsSync(path.join('dist', 'index.html')) && fs.existsSync('dist-build')) {
+    console.log('کپی فایل‌های کامپایل شده فرانت‌اند از dist-build (مسیر سازگاری نسخه‌های قدیمی)...');
     copyDir('dist-build', 'dist');
 }
 
