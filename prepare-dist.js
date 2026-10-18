@@ -5,15 +5,13 @@ console.log('========================================');
 console.log('آماده‌سازی خودکار پکیج توزیع (dist) اشک قلم');
 console.log('========================================\n');
 
-// ۱. حذف پوشه dist قبلی
+// ۱. حفظ خروجی Vite در dist؛ حذف آن باعث از دست رفتن index.html و شکست بسته‌بندی می‌شد.
 if (fs.existsSync('dist')) {
-    console.log('حذف پوشه dist قبلی...');
-    fs.rmSync('dist', { recursive: true, force: true });
+    console.log('حفظ خروجی موجود Vite در پوشه dist...');
+} else {
+    console.log('ایجاد پوشه اصلی dist...');
+    fs.mkdirSync('dist', { recursive: true });
 }
-
-// ۲. ایجاد پوشه dist
-console.log('ایجاد پوشه اصلی dist...');
-fs.mkdirSync('dist', { recursive: true });
 
 // ۳. کپی فایل‌های build شده از dist-build
 const copyDir = (src, dest) => {
@@ -34,6 +32,10 @@ const copyDir = (src, dest) => {
 if (fs.existsSync('dist-build')) {
     console.log('کپی فایل‌های کامپایل شده فرانت‌اند از dist-build...');
     copyDir('dist-build', 'dist');
+}
+
+if (!fs.existsSync(path.join('dist', 'index.html'))) {
+    throw new Error('dist/index.html یافت نشد؛ ابتدا npm run build:web را اجرا کنید.');
 }
 
 // ۴. کپی فایل‌های PHP از host-backend و روت
