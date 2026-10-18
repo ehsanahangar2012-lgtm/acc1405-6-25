@@ -12,6 +12,7 @@ import { hostDB } from './services/hostDatabaseService';
 import { auditTrail } from './services/auditTrailService';
 import { rbacService, PREDEFINED_ROLES } from './services/rbacService';
 import { AccountingEngine } from './services/accountingEngine';
+import { useFinancialStore } from './store-financial';
 import PersonLedgerService from './services/personLedgerService';
 import { dataBridge } from './services/dataBridge';
 import { idbService } from './services/indexedDBService';
@@ -1683,6 +1684,25 @@ export const useStore = create<AppState>()(
       }),
       setOnlineStatus: (isOnline) => set({ isOnline }),
       hydrateStore: (data) => {
+          const restoreFinancialData = (source: any) => {
+              const incoming = source?.financialData;
+              if (!incoming || typeof incoming !== 'object') return;
+              const keys = [
+                  'accountingEntries', 'chartOfAccounts', 'taxConfigs', 'taxReports',
+                  'cashFlowEntries', 'projects', 'projectTransactions', 'fixedAssets',
+                  'budgets', 'budgetLines', 'loans', 'loanInstallments', 'bankAccounts',
+                  'bankTransactions', 'currencies', 'auditLogs', 'fiscalPeriods',
+                  'aiInsights', 'ocrDocuments'
+              ];
+              const patch: Record<string, any[]> = {};
+              keys.forEach(key => {
+                  if (Array.isArray(incoming[key])) patch[key] = incoming[key];
+              });
+              if (Object.keys(patch).length > 0) {
+                  useFinancialStore.setState(patch as any);
+              }
+          };
+
           try {
               if (data && typeof data === 'object') {
                   const hasBackupTables = 
@@ -1745,6 +1765,7 @@ export const useStore = create<AppState>()(
                           data: JSON.stringify(migrated)
                       }).catch(() => {});
 
+                      restoreFinancialData(data);
                       set(s => ({ ...s, ...migrated }));
                       return;
                   }
@@ -1752,7 +1773,10 @@ export const useStore = create<AppState>()(
           } catch (e) {
               console.error('Error in hydrateStore migration:', e);
           }
-          set(s => ({ ...s, ...data }));
+          restoreFinancialData(data);
+          const operationalData: any = { ...(data as any) };
+          delete operationalData.financialData;
+          set(s => ({ ...s, ...operationalData }));
       },
       exportBackup: () => {
           const state = get();
@@ -1776,6 +1800,8 @@ export const useStore = create<AppState>()(
               roles: state.roles,
               importConfigs: state.importConfigs,
               importBatches: state.importBatches,
+              // Accounting has its own Zustand store; include it or a backup cannot restore the financial ledger.
+              financialData: useFinancialStore.getState(),
               signature: ''
           };
           backupData.signature = securityService.signBackup(backupData);
