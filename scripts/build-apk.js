@@ -1,161 +1,65 @@
 /**
- * Android Native APK Build & Packaging Script - AshkeGhalam v16.54.0
- * دپارتمان IT اشک قلم
- * 
- * ساخت و پکیج‌بندی مستقیم اپلیکیشن اندروید اشک قلم:
- * ۱. پاکسازی صددرصدی فایل‌های APK و بیلد‌های قدیمی
- * ۲. بررسی صحت دارایی‌ها و وجود index.html در پوشه assets اندروید
- * ۳. ایجاد پکیج استاندارد APK همراه با هدر معتبر DEX، مانیفست و امضای دیجیتال (بدون خطای تجزیه)
- * ۴. استقرار در شاخه کدها، پوشه دانلود و پوشه توزیع عمومی
+ * Builds a real Android APK through Capacitor + the Gradle Android project.
+ * No APK, DEX file, or signature is fabricated by this script.
  */
-
-import fs from 'fs';
-import path from 'path';
-import JSZip from 'jszip';
-import { execSync } from 'child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const rootDir = process.cwd();
-const distDir = path.resolve(rootDir, 'dist');
-const androidDir = path.resolve(rootDir, 'android');
-const androidAssetsPublicDir = path.resolve(androidDir, 'app', 'src', 'main', 'assets', 'public');
-const downloadsDir = path.resolve(rootDir, 'downloads');
-const publicDownloadsDir = path.resolve(rootDir, 'public', 'downloads');
-const distDownloadsDir = path.resolve(distDir, 'downloads');
+const androidDir = path.join(rootDir, 'android');
+const gradleWrapper = path.join(androidDir, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
+const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
+const appVersion = packageJson.version || '0.0.0';
+const apkName = `AshkeGhalam-v${appVersion}.apk`;
+const apkSource = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 
-const pkgPath = path.resolve(rootDir, 'package.json');
-const pkg = fs.existsSync(pkgPath) ? JSON.parse(fs.readFileSync(pkgPath, 'utf-8')) : { version: '16.54.0' };
-const APP_VERSION = pkg.version || '16.54.0';
-const APK_OUTPUT_NAME = `AshkeGhalam-v${APP_VERSION}.apk`;
-
-console.log('================================================================');
-console.log(`  📱 سامانه ساخت و پکیج‌بندی فایل APK اندروید اشک قلم v${APP_VERSION}`);
-console.log('  🏢 نرم‌افزار حسابداری و اتوماسیون مالی اشک قلم (AshkeGhalam)');
-console.log('================================================================\n');
-
-// ۰. پاکسازی و حذف قطعی فایل‌های APK و بیلد‌های قدیمی
-console.log('🧹 [1/4] در حال پاکسازی فایل‌های APK قدیمی از تمامی مسیرها...');
-const cleanDirectories = [rootDir, downloadsDir, publicDownloadsDir, distDownloadsDir];
-
-cleanDirectories.forEach(dir => {
-    if (fs.existsSync(dir)) {
-        try {
-            const files = fs.readdirSync(dir);
-            files.filter(f => f.toLowerCase().endsWith('.apk')).forEach(file => {
-                try {
-                    fs.unlinkSync(path.join(dir, file));
-                    console.log(`   🗑️ فایل APK قدیمی حذف شد: ${file}`);
-                } catch (e) {
-                    console.warn(`   خطای جزئی در حذف: ${e.message}`);
-                }
-            });
-        } catch (_) {}
-    }
-});
-
-// ساخت پوشه‌های دانلود در صورت عدم وجود
-[downloadsDir, publicDownloadsDir, distDownloadsDir].forEach(dir => {
-    if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-    }
-});
-
-// ۱.۵. اجرای اسکریپت عیب‌یابی و بررسی دارایی‌های اندروید (جلوگیری از خطای Missing index.html)
-console.log('\n[2/4] اجرای عیب‌یابی و صحت‌سنجی دارایی‌های وب و اندروید...');
-try {
-    execSync('node scripts/diagnose-android-assets.js', { stdio: 'inherit' });
-} catch (e) {
-    console.warn('   ⚠️ هشدار در عیب‌یابی خودکار:', e.message);
+function run(command, args, cwd = rootDir) {
+  const result = spawnSync(command, args, {
+    cwd,
+    stdio: 'inherit',
+    shell: process.platform === 'win32'
+  });
+  if (result.error) throw result.error;
+  if (result.status !== 0) {
+    throw new Error(`Command failed: ${command} ${args.join(' ')} (exit ${result.status ?? 'unknown'})`);
+  }
 }
 
-// ۲. ساخت پکیج APK با ساختار استاندارد اندروید
-console.log('\n[3/4] در حال بسته‌بندی فایل‌های ساختار استاندارد APK و مانیفست...');
-const zip = new JSZip();
-
-// افزودن AndroidManifest.xml
-const manifestSrc = path.join(androidDir, 'app', 'src', 'main', 'AndroidManifest.xml');
-let manifestContent = '<?xml version="1.0" encoding="utf-8"?>\n<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="ir.ashkghalam.acc" android:versionCode="16540" android:versionName="' + APP_VERSION + '">\n    <uses-sdk android:minSdkVersion="24" android:targetSdkVersion="34" />\n    <application android:label="AshkeGhalam" android:icon="@mipmap/ic_launcher" android:usesCleartextTraffic="true">\n        <activity android:name=".MainActivity" android:exported="true">\n            <intent-filter>\n                <action android:name="android.intent.action.MAIN" />\n                <category android:name="android.intent.category.LAUNCHER" />\n            </intent-filter>\n        </activity>\n    </application>\n</manifest>';
-
-if (fs.existsSync(manifestSrc)) {
-    try {
-        manifestContent = fs.readFileSync(manifestSrc, 'utf-8');
-    } catch {}
+if (!fs.existsSync(path.join(rootDir, 'dist', 'index.html'))) {
+  throw new Error('dist/index.html not found. Run the web build first (npm run build:web).');
 }
-zip.file('AndroidManifest.xml', manifestContent);
-
-// افزودن هدر معتبر Dalvik Executable (classes.dex) جهت رفع قطعی خطای تجزیه در اندروید
-const dexHeader = Buffer.from('dex\n035\0' + '\x70'.repeat(1024) + 'AshkeGhalam Dalvik Executable Runtime v' + APP_VERSION + '\x00'.repeat(2048));
-zip.file('classes.dex', dexHeader);
-
-// افزودن دارایی‌های وب و آفلاین به assets/public/ از androidAssetsPublicDir یا distDir
-function addDirRecursive(currentDir, zipBasePath) {
-    if (!fs.existsSync(currentDir)) return;
-    const entries = fs.readdirSync(currentDir, { withFileTypes: true });
-    for (const entry of entries) {
-        const fullPath = path.join(currentDir, entry.name);
-        const zipPath = `${zipBasePath}/${entry.name}`;
-        if (entry.isDirectory()) {
-            if (entry.name !== 'downloads' && entry.name !== 'node_modules') {
-                zip.folder(zipPath);
-                addDirRecursive(fullPath, zipPath);
-            }
-        } else {
-            zip.file(zipPath, fs.readFileSync(fullPath));
-        }
-    }
+if (!fs.existsSync(androidDir) || !fs.existsSync(gradleWrapper)) {
+  throw new Error('The Android Gradle project or Gradle wrapper is missing.');
 }
 
-if (fs.existsSync(androidAssetsPublicDir)) {
-    addDirRecursive(androidAssetsPublicDir, 'assets/public');
-} else if (fs.existsSync(distDir)) {
-    addDirRecursive(distDir, 'assets/public');
-} else {
-    zip.file('assets/public/index.html', '<html dir="rtl"><head><meta charset="utf-8"><title>AshkeGhalam Android</title></head><body><h1>اشک قلم - نسخه همراه</h1></body></html>');
+const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+run(npx, ['cap', 'sync', 'android']);
+
+if (process.platform !== 'win32') {
+  fs.chmodSync(gradleWrapper, 0o755);
+}
+run(gradleWrapper, ['assembleDebug', '--no-daemon'], androidDir);
+
+if (!fs.existsSync(apkSource)) {
+  throw new Error(`Gradle reported success but the APK was not found: ${apkSource}`);
+}
+const apkBuffer = fs.readFileSync(apkSource);
+if (apkBuffer.length < 100_000 || apkBuffer.subarray(0, 2).toString() !== 'PK') {
+  throw new Error('The Android build output does not look like a valid APK archive.');
 }
 
-// افزودن منابع گرافیکی و آیکون‌ها
-const resSrc = path.join(androidDir, 'app', 'src', 'main', 'res');
-if (fs.existsSync(resSrc)) {
-    addDirRecursive(resSrc, 'res');
-}
-
-// افزودن امضا و اطلاعات مانیفست استاندارد META-INF جهت اجازه نصب روی اندروید بدون خطای امنیتی
-const manifestMeta = `Manifest-Version: 1.0\nCreated-By: AshkeGhalam Native Android Builder v${APP_VERSION}\nBuilt-By: Ehsan Ahangar\nApplication-ID: ir.ashkghalam.acc\n`;
-zip.file('META-INF/MANIFEST.MF', manifestMeta);
-zip.file('META-INF/CERT.SF', `Signature-Version: 1.0\nCreated-By: 1.0 (AshkeGhalam)\nSHA1-Digest-Manifest: offline-verified-secure\n`);
-zip.file('META-INF/CERT.RSA', Buffer.from('ASHKEGHALAM-SECURE-SIGNATURE-BLOCK-' + APP_VERSION + '\x00'.repeat(512)));
-
-// ساخت بایت‌های نهایی APK با حجم استاندارد
-const apkContent = await zip.generateAsync({
-    type: 'nodebuffer',
-    compression: 'DEFLATE',
-    compressionOptions: { level: 9 }
-});
-
-// ۳. استقرار فایل APK با نام ورژن در تمامی مقاصد هدف
-console.log('\n[4/4] در حال استقرار فایل نصبی APK در شاخه کدها و پوشه دانلود...');
-
-const targetApkPaths = [
-    path.join(rootDir, APK_OUTPUT_NAME),
-    path.join(downloadsDir, APK_OUTPUT_NAME),
-    path.join(publicDownloadsDir, APK_OUTPUT_NAME),
-    path.join(distDownloadsDir, APK_OUTPUT_NAME),
-    path.join(distDir, APK_OUTPUT_NAME)
+const destinations = [
+  rootDir,
+  path.join(rootDir, 'downloads'),
+  path.join(rootDir, 'public', 'downloads'),
+  path.join(rootDir, 'dist', 'downloads'),
+  path.join(rootDir, 'dist')
 ];
+for (const directory of destinations) {
+  fs.mkdirSync(directory, { recursive: true });
+  fs.copyFileSync(apkSource, path.join(directory, apkName));
+}
 
-targetApkPaths.forEach(targetPath => {
-    try {
-        fs.writeFileSync(targetPath, apkContent);
-    } catch (e) {
-        console.warn(`خطا در نوشتن به ${targetPath}:`, e.message);
-    }
-});
-
-const sizeInMB = (apkContent.length / (1024 * 1024)).toFixed(2);
-console.log('\n================================================================');
-console.log('  🎉 فایل نصبی APK با موفقیت تولید و مستقر گردید!');
-console.log('================================================================');
-console.log(`📦 نام فایل:           ${APK_OUTPUT_NAME}`);
-console.log(`📊 حجم پکیج نصبی:      ${sizeInMB} مگابایت (استاندارد و کامل)`);
-console.log(`📁 مسیر ریشه کدها:      ${rootDir}/${APK_OUTPUT_NAME}`);
-console.log(`📁 مسیر پوشه دانلود:   ${downloadsDir}/${APK_OUTPUT_NAME}`);
-console.log('================================================================\n');
+console.log(`Built real debug APK: ${apkName} (${(apkBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+console.log('Note: this is a debug-signed build for installation/testing; configure a private release keystore for production distribution.');
