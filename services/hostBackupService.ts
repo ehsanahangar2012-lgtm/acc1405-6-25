@@ -10,7 +10,7 @@
  * 6. بکاپ لوکال در IndexedDB به‌عنوان fallback
  */
 
-import { API_CONFIG } from '../config';
+import { API_CONFIG, IS_BROWSER_PREVIEW } from '../config';
 import { idbService } from './indexedDBService';
 import { useFinancialStore } from '../store-financial';
 
@@ -101,6 +101,7 @@ class HostBackupService {
      */
     start(getState: () => any): void {
         this.stop();
+        if (IS_BROWSER_PREVIEW) return;
 
         // بررسی آیا امروز بکاپ گرفته شده
         const lastBackup = Number(localStorage.getItem(LAST_BACKUP_KEY) || '0');
@@ -139,6 +140,7 @@ class HostBackupService {
      * ثبت درخواست بک‌آپ خودکار با دی‌بانس هوشمند برای هربار ثبت فاکتور، سند، چک و...
      */
     triggerAutoBackup(state: any, reason: string = 'ثبت اطلاعات'): void {
+        if (IS_BROWSER_PREVIEW) return;
         if (this.autoBackupDebounceTimer) {
             clearTimeout(this.autoBackupDebounceTimer);
         }
@@ -187,6 +189,16 @@ class HostBackupService {
                            (assets.signatures && assets.signatures.length > 0),
             };
 
+            // In browser preview, store only to this browser's IndexedDB; never contact the host.
+            if (IS_BROWSER_PREVIEW) {
+                await this.saveLocally(payload);
+                return {
+                    success: true,
+                    backupId,
+                    message: 'نسخه آزمایشی: پشتیبان فقط به‌صورت محلی ذخیره شد.'
+                };
+            }
+
             // ۴. ارسال به هاست
             let hostResult: BackupResult;
             if (navigator.onLine) {
@@ -220,7 +232,7 @@ class HostBackupService {
      * دریافت لیست بکاپ‌های هاست
      */
     async listHostBackups(): Promise<HostBackupEntry[]> {
-        if (!navigator.onLine) return [];
+        if (IS_BROWSER_PREVIEW || !navigator.onLine) return [];
         try {
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), 8000);
@@ -255,6 +267,9 @@ class HostBackupService {
      * بازیابی بکاپ از هاست
      */
     async restoreFromHost(backupId: string): Promise<RestoreResult> {
+        if (IS_BROWSER_PREVIEW) {
+            return { success: false, error: 'بازیابی از هاست در محیط آزمایشی غیرفعال است.' };
+        }
         try {
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -288,6 +303,7 @@ class HostBackupService {
     // ─── حذف ───────────────────────────────────────────────────────────────
 
     async deleteHostBackup(backupId: string): Promise<boolean> {
+        if (IS_BROWSER_PREVIEW) return false;
         try {
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), 8000);

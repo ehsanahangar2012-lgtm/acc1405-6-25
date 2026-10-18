@@ -81,10 +81,26 @@
 </script>
 </head>
   <body>
+    <div id="browser-preview-notice" hidden role="status">پیش‌نمایش مرورگری · اتصال به سرور اصلی غیرفعال است · داده‌ها فقط محلی‌اند</div>
+    <script>
+      if (window.location.hostname === '127.0.0.1' && window.location.port === '4173') {
+        document.getElementById('browser-preview-notice')?.removeAttribute('hidden');
+      }
+    </script>
+    <style>
+      #browser-preview-notice[hidden] { display: none; }
+      #browser-preview-notice {
+        position: fixed; top: 8px; right: 8px; z-index: 2147483647;
+        max-width: calc(100% - 16px); padding: 6px 10px; border-radius: 8px;
+        background: rgba(124, 45, 18, .96); color: #fff;
+        font: 12px/1.5 Tahoma, Arial, sans-serif; box-shadow: 0 2px 10px #0003;
+        pointer-events: none;
+      }
+    </style>
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
   <script>
-    if ('serviceWorker' in navigator) {
+    if (!(window.location.hostname === '127.0.0.1' && window.location.port === '4173') && 'serviceWorker' in navigator) {
       window.addEventListener('load', async () => {
         try {
           const reg = await navigator.serviceWorker.register('/sw.js');

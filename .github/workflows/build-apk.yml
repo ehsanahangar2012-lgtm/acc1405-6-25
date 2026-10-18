@@ -13,6 +13,64 @@ on:
   workflow_dispatch:
 
 jobs:
+
+  build-browser-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check project
+        run: bun run lint
+
+      - name: Build local-only browser preview
+        run: bun run build:browser-preview
+
+      - name: Smoke-test local preview server and safety headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/serve-browser-preview.mjs > /tmp/ashke-browser-preview.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4173/ -o /tmp/browser-preview-index.html; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q 'id="root"' /tmp/browser-preview-index.html
+          curl --silent --show-error --fail --head http://127.0.0.1:4173/ | grep -qi "content-security-policy:.*connect-src 'self'"
+          curl --silent --show-error --fail http://127.0.0.1:4173/invoices -o /tmp/browser-preview-route.html
+          grep -q 'id="root"' /tmp/browser-preview-route.html
+
+      - name: Package browser preview
+        run: |
+          mkdir -p browser-preview-package
+          cp -R dist browser-preview-package/dist
+          cp scripts/serve-browser-preview.mjs browser-preview-package/serve-browser-preview.mjs
+          cp Preview-Browser.bat browser-preview-package/Preview-Browser.bat
+          cp README-BROWSER-PREVIEW.md browser-preview-package/README-BROWSER-PREVIEW.md
+
+      - name: Upload browser preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Browser-Preview
+          path: browser-preview-package/
+          if-no-files-found: error
+          retention-days: 14
   build-apk:
     runs-on: ubuntu-latest
 

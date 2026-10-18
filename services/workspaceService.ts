@@ -1,6 +1,6 @@
 // Workspace & Multi-Tenant Management Service
 // مدیریت فضاهای کاری مجزا، استقلال نسخه دسکتاپ و پیکربندی بدون تداخل با سایر مشتریان
-import { HOST_BASE_URL } from '../config';
+import { HOST_BASE_URL, IS_BROWSER_PREVIEW } from '../config';
 import { isAndroidApp, isDesktopApp } from '../utils';
 
 export interface WorkspaceConfig {
@@ -98,7 +98,7 @@ class WorkspaceService {
     }
 
     public isStandaloneOffline(): boolean {
-        return Boolean(this.config.standaloneOfflineMode);
+        return IS_BROWSER_PREVIEW || Boolean(this.config.standaloneOfflineMode);
     }
 
     /**
@@ -109,7 +109,7 @@ class WorkspaceService {
      * ۲. توکن ابری (workspaceToken یا ashk_cloud_token یا ashk_host_sync_token) یا لایسنس فعال سرور وارد شده باشد.
      */
     public isRemoteCloudConfigured(): boolean {
-        if (typeof window === 'undefined') return false;
+        if (IS_BROWSER_PREVIEW || typeof window === 'undefined') return false;
         if (this.isStandaloneOffline()) return false;
 
         const customUrl = (
@@ -141,6 +141,7 @@ class WorkspaceService {
     }
 
     public getBaseUrl(): string {
+        if (IS_BROWSER_PREVIEW) return '';
         const custom = (
             this.config.customServerUrl || 
             (typeof window !== 'undefined' ? localStorage.getItem('ashk_custom_server_url') || localStorage.getItem('ashk_host_url') : '') || 
@@ -199,6 +200,12 @@ class WorkspaceService {
 
     // تست اتصال به هاست (فقط بررسی سلامت و پینگ بدون فراخوانی و دریافت داده‌های بیزینس)
     public async testConnection(): Promise<{ success: boolean; message: string; details?: any }> {
+        if (IS_BROWSER_PREVIEW) {
+            return {
+                success: true,
+                message: 'پیش‌نمایش مرورگری فعال است؛ داده‌ها فقط محلی هستند و اتصال به هاست غیرفعال است.'
+            };
+        }
         if (this.isStandaloneOffline()) {
             return {
                 success: true,

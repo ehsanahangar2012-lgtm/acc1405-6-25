@@ -24,6 +24,7 @@
     "cleanup:builds": "node scripts/cleanup-builds.js",
     "preview": "vite preview",
     "build:web": "vite build",
+    "build:browser-preview": "vite build --mode browser-preview",
     "build:windows": "npm run build:web && node prepare-dist.js && node scripts/build-windows.js all"
   },
   "dependencies": {

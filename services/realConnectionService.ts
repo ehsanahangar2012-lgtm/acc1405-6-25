@@ -1,5 +1,5 @@
 // سرویس تشخیص اتصال واقعی به هاست
-import { API_CONFIG } from '../config';
+import { API_CONFIG, IS_BROWSER_PREVIEW } from '../config';
 
 class RealConnectionService {
   private isHostOnline = false;
@@ -38,7 +38,7 @@ class RealConnectionService {
 
   // چک اتصال واقعی به هاست
   private async checkHostConnection(): Promise<boolean> {
-    if (typeof window === 'undefined') return false;
+    if (IS_BROWSER_PREVIEW || typeof window === 'undefined') return false;
     
     try {
       const controller = new AbortController();
@@ -62,6 +62,11 @@ class RealConnectionService {
 
   // چک همزمان اتصال
   private async checkConnections() {
+    if (IS_BROWSER_PREVIEW) {
+      this.isHostOnline = false;
+      this.updateStatus(false);
+      return;
+    }
     if (typeof navigator === 'undefined') return;
     
     if (!navigator.onLine) {
@@ -88,6 +93,7 @@ class RealConnectionService {
 
   // وضعیت فعلی
   isOnline(): boolean {
+    if (IS_BROWSER_PREVIEW) return false;
     if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
     return this.isHostOnline || navigator.onLine;
   }
