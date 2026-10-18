@@ -458,38 +458,45 @@ input[type="tel"] {
 
 
 
-/* Cross-section scroll reliability: normal document scroll plus touch-enabled nested panels. */
+/* Native document scroll and touch scrolling across every application section. */
 html {
-  min-height: 100%;
   height: auto !important;
+  min-height: 100%;
+  width: 100%;
   overflow-x: hidden !important;
   overflow-y: auto !important;
+  position: static !important;
   overscroll-behavior-y: auto !important;
 }
 
 body {
-  min-height: 100vh !important;
   height: auto !important;
+  min-height: 100vh !important;
+  width: 100%;
   overflow-x: hidden !important;
-  overflow-y: visible !important;
+  overflow-y: auto !important;
+  position: static !important;
   overscroll-behavior-y: auto !important;
+  touch-action: pan-y pinch-zoom !important;
 }
 
 #root {
-  min-height: 100vh;
   height: auto !important;
+  min-height: 100vh;
+  width: 100%;
   overflow: visible !important;
 }
 
 #root > div.min-h-screen {
-  min-height: 100vh !important;
   height: auto !important;
-  overflow: visible !important;
+  min-height: 100vh !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
 }
 
-main {
-  min-width: 0;
+#root main {
   height: auto !important;
+  min-height: 0;
   overflow: visible !important;
 }
 
@@ -499,11 +506,12 @@ main {
 .custom-scrollbar,
 .sidebar-scrollbar,
 .modal-container,
-.bottom-sheet {
+.bottom-sheet,
+.table-responsive-touch {
   min-height: 0;
   -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: contain;
-  touch-action: auto !important;
+  touch-action: pan-y !important;
 }
 
 @supports (height: 100dvh) {
