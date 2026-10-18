@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // تنظیمات
-$BACKUP_ROOT = __DIR__ . '/backups';
+$BACKUP_ROOT = __DIR__ . '/backup';
 $DAILY_BACKUP_ROOT = __DIR__ . '/daily-backups';
 $IMAGES_ROOT = __DIR__ . '/uploads';
 
@@ -26,8 +26,21 @@ function createBackupStructure($root) {
     }
 }
 
-function saveCompressedData($data, $filename) {
-    return file_put_contents($filename, gzcompress(json_encode($data, JSON_UNESCAPED_UNICODE), 9));
+function saveCompressedData($data, $filename, $targetDir = null, $maxFiles = 10) {
+    $saved = file_put_contents($filename, gzcompress(json_encode($data, JSON_UNESCAPED_UNICODE), 9));
+    if ($saved !== false && $targetDir && is_dir($targetDir)) {
+        $files = glob($targetDir . '/*.gz');
+        if (count($files) > $maxFiles) {
+            usort($files, function($a, $b) {
+                return filemtime($b) - filemtime($a);
+            });
+            $toRemove = array_slice($files, $maxFiles);
+            foreach ($toRemove as $rem) {
+                @unlink($rem);
+            }
+        }
+    }
+    return $saved;
 }
 
 function loadCompressedData($filename) {
@@ -46,13 +59,15 @@ switch ($action) {
         $type = $data['type'] ?? 'general';
         $timestamp = date('Y-m-d_H-i-s');
         
-        // بک‌آپ فوری
-        $filename = $BACKUP_ROOT . '/' . $type . '/' . $timestamp . '.gz';
-        saveCompressedData($data['payload'], $filename);
+        // بک‌آپ فوری (حداکثر 10 فایل)
+        $targetFolder = $BACKUP_ROOT . '/' . $type;
+        $filename = $targetFolder . '/' . $timestamp . '.gz';
+        saveCompressedData($data['payload'], $filename, $targetFolder, 10);
         
-        // بک‌آپ روزانه
-        $daily_filename = $DAILY_BACKUP_ROOT . '/' . $type . '/' . date('Y-m-d') . '.gz';
-        saveCompressedData($data['payload'], $daily_filename);
+        // بک‌آپ روزانه (حداکثر 10 فایل)
+        $dailyFolder = $DAILY_BACKUP_ROOT . '/' . $type;
+        $daily_filename = $dailyFolder . '/' . date('Y-m-d') . '.gz';
+        saveCompressedData($data['payload'], $daily_filename, $dailyFolder, 10);
         
         echo json_encode(['success' => true, 'file' => basename($filename)]);
         break;

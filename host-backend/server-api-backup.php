@@ -58,14 +58,21 @@ if (empty($expectedToken) || $providedToken !== $expectedToken) {
     exit();
 }
 
-$backupDir = __DIR__ . '/backups';
+$backupDir = __DIR__ . '/backup';
 if (!is_dir($backupDir)) {
     mkdir($backupDir, 0755, true);
 }
+// If old 'backups' folder exists, copy any files if needed
+$legacyDir = __DIR__ . '/backups';
+if (is_dir($legacyDir) && !file_exists($backupDir . '/backups_index.json') && file_exists($legacyDir . '/backups_index.json')) {
+    @copy($legacyDir . '/backups_index.json', $backupDir . '/backups_index.json');
+}
+
 $indexPath = $backupDir . '/backups_index.json';
+$MAX_BACKUP_FILES = 10;
 
 // Helper function to rebuild index dynamically if it is missing
-function rebuildIndex($backupDir, $indexPath) {
+function rebuildIndex($backupDir, $indexPath, $maxFiles = 10) {
     $files = glob($backupDir . '/backup_*.json');
     $entries = [];
     foreach ($files as $file) {
@@ -79,7 +86,7 @@ function rebuildIndex($backupDir, $indexPath) {
                 'timestamp' => $data['timestamp'] ?? (filemtime($file) * 1000),
                 'label' => $data['label'] ?? 'Manual Backup',
                 'size' => filesize($file),
-                'type' => $data['type'] ?? 'manual',
+                'type' => $data['type'] ?? 'auto',
                 'checksum' => $data['checksum'] ?? '',
                 'version' => $data['version'] ?? '2.0.0',
                 'hasAssets' => $data['hasAssets'] ?? false
@@ -89,6 +96,19 @@ function rebuildIndex($backupDir, $indexPath) {
     usort($entries, function($a, $b) {
         return $b['timestamp'] - $a['timestamp'];
     });
+
+    // Enforce 10 files limit
+    if (count($entries) > $maxFiles) {
+        $toRemove = array_slice($entries, $maxFiles);
+        $entries = array_slice($entries, 0, $maxFiles);
+        foreach ($toRemove as $rem) {
+            $remFile = "$backupDir/backup_{$rem['id']}.json";
+            if (file_exists($remFile)) {
+                @unlink($remFile);
+            }
+        }
+    }
+
     file_put_contents($indexPath, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     return $entries;
 }
@@ -125,7 +145,7 @@ switch ($action) {
             'timestamp' => $input['timestamp'] ?? (time() * 1000),
             'label' => $input['label'] ?? 'Manual Backup',
             'size' => strlen($jsonData),
-            'type' => $input['type'] ?? 'manual',
+            'type' => $input['type'] ?? 'auto',
             'checksum' => $input['checksum'] ?? '',
             'version' => $input['version'] ?? '2.0.0',
             'hasAssets' => $input['hasAssets'] ?? false
@@ -148,20 +168,32 @@ switch ($action) {
             return $b['timestamp'] - $a['timestamp'];
         });
         
-        // Keep at most 7 backups
-        if (count($entries) > 7) {
-            $toRemove = array_slice($entries, 7);
-            $entries = array_slice($entries, 0, 7);
+        // Keep at most 10 backups
+        if (count($entries) > $MAX_BACKUP_FILES) {
+            $toRemove = array_slice($entries, $MAX_BACKUP_FILES);
+            $entries = array_slice($entries, 0, $MAX_BACKUP_FILES);
             foreach ($toRemove as $rem) {
                 $remFile = "$backupDir/backup_{$rem['id']}.json";
                 if (file_exists($remFile)) {
-                    unlink($remFile);
+                    @unlink($remFile);
+                }
+            }
+        }
+        
+        // Also cleanup any orphan backup files exceeding 10 files
+        $existingFiles = glob($backupDir . '/backup_*.json');
+        if (count($existingFiles) > $MAX_BACKUP_FILES) {
+            $indexedIds = array_column($entries, 'id');
+            foreach ($existingFiles as $ef) {
+                $fileId = str_replace(['backup_', '.json'], '', basename($ef));
+                if (!in_array($fileId, $indexedIds)) {
+                    @unlink($ef);
                 }
             }
         }
         
         file_put_contents($indexPath, json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-        echo json_encode(['success' => true, 'id' => $id]);
+        echo json_encode(['success' => true, 'id' => $id, 'retained' => count($entries)]);
         break;
         
     case 'list':

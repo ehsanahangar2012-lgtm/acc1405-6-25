@@ -224,6 +224,7 @@ export interface InvoiceItem {
     total: number;
     profit: number;
     description?: string;
+    entryOrder?: number; // ترتیب ثبت کالا از ۱ تا N برای پیش‌نمایش و چاپ فاکتور
 }
 
 export interface WorkflowSignatures {

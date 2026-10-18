@@ -157,6 +157,7 @@ const Invoices = () => {
           return next;
         } else {
           const unitPrice = type === InvoiceType.SALE ? (foundProduct.sellPrice || 0) : (foundProduct.buyPrice || 0);
+          const nextOrder = prevItems.reduce((max, it) => Math.max(max, it.entryOrder || 0), 0) + 1;
           const newItem: InvoiceItem = {
             productId: foundProduct.id,
             productName: foundProduct.name,
@@ -166,7 +167,8 @@ const Invoices = () => {
             unitPrice,
             total: unitPrice,
             profit: type === InvoiceType.SALE ? (unitPrice - (foundProduct.buyPrice || 0)) : 0,
-            description: ''
+            description: '',
+            entryOrder: nextOrder
           };
           return [newItem, ...prevItems];
         }
@@ -304,7 +306,10 @@ const Invoices = () => {
     setInvoicePrefix(inv.prefix || '');
     setSelectedCompanyId(inv.companyId || activeCompany?.id || 'default');
     setSelectedBranchId(inv.branchId || '');
-    setItems(inv.items); setType(inv.type); setDescription(inv.description || '');
+    // در زمان ویرایش: آخرین قلم‌های ورودی در بالای جدول برای عدم اسکرول قرار می‌گیرند
+    const indexedItems = (inv.items || []).map((it, idx) => ({ ...it, entryOrder: it.entryOrder || (idx + 1) }));
+    setItems([...indexedItems].reverse());
+    setType(inv.type); setDescription(inv.description || '');
     setDiscount(inv.discount); setTax(inv.tax); setCashAmount(inv.cashAmount);
     setCheckPayment(inv.checks || []); 
     setDriverName(inv.driverName || ''); setDriverPhone(inv.driverPhone || ''); setVehiclePlate(inv.vehiclePlate || '');
@@ -316,14 +321,15 @@ const Invoices = () => {
   const handlePreview = (inv: Invoice) => { 
     setSelectedInvoiceId(inv.id); 
     setShowPreviousBalance(inv.showPreviousBalance !== undefined ? inv.showPreviousBalance : true);
-    // ذخیره پیشنمایش فاکتور برای استفاده در امضا
+    // ذخیره پیشنمایش فاکتور برای استفاده در امضا - مرتب‌سازی اقلام به ترتیب ثبت از بالا به پایین
+    const sortedInvItems = [...(inv.items || [])].sort((a, b) => (a.entryOrder || 0) - (b.entryOrder || 0));
     const documentPreview = JSON.stringify({
       type: 'invoice',
       number: inv.number,
       prefix: inv.prefix,
       date: inv.date,
       customer: inv.personName,
-      items: inv.items.map(i => ({ name: i.productName, quantity: i.quantity, price: i.unitPrice })),
+      items: sortedInvItems.map(i => ({ name: i.productName, quantity: i.quantity, price: i.unitPrice })),
       total: inv.finalTotal
     });
     sessionStorage.setItem(`invoice_preview_${inv.id}`, documentPreview);
@@ -521,7 +527,7 @@ const Invoices = () => {
       number: finalInvoiceNumber,
       prefix: invoicePrefix.trim() || undefined,
       trackingCode: '', date: invoiceDate, dueDate: dueDate, personId: selectedPerson, personName: person?.name || 'ناشناس',
-      type, items, subTotal, totalProfit: 0, tax, discount, finalTotal: payable, cashAmount, checkAmount: checkTotal,
+      type, items: [...items].sort((a, b) => (a.entryOrder || 0) - (b.entryOrder || 0)), subTotal, totalProfit: 0, tax, discount, finalTotal: payable, cashAmount, checkAmount: checkTotal,
       driverName, driverPhone, vehiclePlate,
       checks: processedChecks, 
       description,
@@ -648,6 +654,7 @@ const Invoices = () => {
       };
       addProduct(p);
       const unitPrice = type === InvoiceType.SALE ? (p.sellPrice || 0) : (p.buyPrice || 0);
+      const nextOrder = items.reduce((max, it) => Math.max(max, it.entryOrder || 0), 0) + 1;
       setItems([{ 
           productId: id, 
           productName: p.name, 
@@ -657,7 +664,8 @@ const Invoices = () => {
           unitPrice, 
           total: unitPrice, 
           profit: type === InvoiceType.SALE ? (unitPrice - (p.buyPrice || 0)) : 0, 
-          description: '' 
+          description: '',
+          entryOrder: nextOrder
       }, ...items]);
       setShowProductModal(false);
       setShowQuickScanAddModal(false);
@@ -667,9 +675,20 @@ const Invoices = () => {
   };
 
   const handleSaveDescription = () => {
-      if (description && !savedDescriptions.includes(description)) {
-          addSavedDescription(description);
-          alert('متن به لیست توضیحات آماده اضافه شد.');
+      if (description) {
+          const lines = description.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+          let addedCount = 0;
+          lines.forEach(line => {
+              if (line && !savedDescriptions.includes(line)) {
+                  addSavedDescription(line);
+                  addedCount++;
+              }
+          });
+          if (addedCount > 0) {
+              addNotification('success', `${toPersianDigits(addedCount)} سطر پانویس به لیست پانویس‌های آماده افزوده شد.`);
+          } else {
+              addNotification('info', 'این پانویس(ها) قبلاً در لیست پانویس‌های آماده ذخیره شده‌اند.');
+          }
       }
   };
 
@@ -1625,6 +1644,7 @@ ${url}
                 <select className="product-select flex-1 min-w-0 bg-slate-950 border-2 border-slate-600 rounded-xl p-3.5 text-white text-sm font-bold outline-none focus:border-teal-400" onChange={(e) => {
                       const product = products.find(p => p.id === e.target.value);
                       if (product) {
+                          const nextOrder = items.reduce((max, it) => Math.max(max, it.entryOrder || 0), 0) + 1;
                           const newItem: InvoiceItem = {
                               productId: product.id, productName: product.name, 
                               serialNumber: product.serialNumber,
@@ -1632,7 +1652,8 @@ ${url}
                               buyPrice: product.buyPrice || 0, unitPrice: type === InvoiceType.SALE ? (product.sellPrice || 0) : (product.buyPrice || 0),
                               total: type === InvoiceType.SALE ? (product.sellPrice || 0) : (product.buyPrice || 0),
                               profit: type === InvoiceType.SALE ? ((product.sellPrice || 0) - (product.buyPrice || 0)) : 0,
-                              description: ''
+                              description: '',
+                              entryOrder: nextOrder
                           };
                           setItems([newItem, ...items]);
                           setTimeout(() => {
@@ -1641,7 +1662,7 @@ ${url}
                       }
                       e.target.value = "";
                   }}>
-                  <option value="">+ انتخاب کالا برای افزودن به بالای لیست...</option>
+                  <option value="">+ انتخاب کالا برای افزودن به بالاترین سطر (دسترسی سریع بدون اسکرول)...</option>
                   {products.map(p => (
                     <option key={p.id} value={p.id}>
                       {p.name} {p.serialNumber ? `(سریال: ${p.serialNumber})` : ''} {p.category ? `[${p.category}]` : ''}
@@ -1651,6 +1672,7 @@ ${url}
               <button 
                 type="button"
                 onClick={() => {
+                  const nextOrder = items.reduce((max, it) => Math.max(max, it.entryOrder || 0), 0) + 1;
                   const newItem: InvoiceItem = {
                     productId: 'manual-' + generateId(),
                     productName: '',
@@ -1659,7 +1681,8 @@ ${url}
                     unitPrice: 0,
                     total: 0,
                     profit: 0,
-                    description: ''
+                    description: '',
+                    entryOrder: nextOrder
                   };
                   setItems([newItem, ...items]);
                   setTimeout(() => {
@@ -1667,10 +1690,10 @@ ${url}
                   }, 50);
                 }}
                 className="shrink-0 bg-slate-800 hover:bg-slate-700 text-slate-100 border-2 border-slate-600 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs font-black transition-all cursor-pointer"
-                title="افزودن ردیف آزاد / دستی به بالای لیست"
+                title="افزودن ردیف آزاد / دستی به بالاترین سطر"
               >
                 <PlusCircle size={16} />
-                <span className="hidden sm:inline">ردیف آزاد</span>
+                <span className="hidden sm:inline">ردیف آزاد در بالا</span>
               </button>
               <button onClick={handleOpenProductModal} className="shrink-0 bg-teal-500 hover:bg-teal-400 active:scale-95 text-slate-950 w-12 h-12 rounded-xl flex items-center justify-center transition-all cursor-pointer font-black border border-teal-300 shadow-md" title="تعریف سریع کالای جدید">
                 <PackagePlus size={22} />
@@ -1686,8 +1709,8 @@ ${url}
                     <div key={idx} className="bg-slate-950 p-4 rounded-xl border-2 border-slate-700 space-y-2.5 shadow-md">
                       <div className="flex justify-between items-center flex-wrap gap-2">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="shrink-0 bg-teal-500/20 text-teal-300 border border-teal-400/40 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md">
-                            ردیف {toPersianDigits(idx + 1)}
+                          <span className="shrink-0 bg-teal-500/20 text-teal-300 border border-teal-400/40 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md" title="ترتیب ثبت در فاکتور نهایی">
+                            ردیف {toPersianDigits(item.entryOrder || (items.length - idx))}
                           </span>
                           {item.serialNumber && (
                             <span className="shrink-0 bg-indigo-500/20 text-indigo-300 border border-indigo-400/40 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1" title="شماره سریال اختصاصی کالا">
@@ -1823,49 +1846,69 @@ ${url}
                                 {savedDescriptions.length === 0 ? (
                                     <div className="text-[10px] text-slate-500 p-1 text-center">پانویس آماده‌ای ثبت نشده است</div>
                                 ) : (
-                                    savedDescriptions.map((desc, i) => (
-                                        <div key={i} className="flex items-center justify-between gap-1.5 p-1 hover:bg-white/5 rounded text-[10px] text-white">
-                                            <label className="flex items-center gap-1.5 cursor-pointer flex-1 min-w-0">
-                                                <input 
-                                                    type="checkbox" 
-                                                    className="w-3.5 h-3.5 accent-teal-500 shrink-0"
-                                                    onChange={(e) => {
-                                                        if(e.target.checked) {
-                                                            setDescription(prev => prev ? prev + '\n' + desc : desc);
-                                                        } else {
-                                                            setDescription(prev => prev.replace(desc, '').replace(/\n\n/g, '\n').trim());
+                                    savedDescriptions.map((desc, i) => {
+                                        const cleanDesc = desc.trim();
+                                        const currentLines = description.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                                        const isChecked = currentLines.includes(cleanDesc);
+
+                                        return (
+                                            <div key={i} className="flex items-center justify-between gap-1.5 p-1 hover:bg-white/5 rounded text-[10px] text-white">
+                                                <label className="flex items-center gap-1.5 cursor-pointer flex-1 min-w-0">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        className="w-3.5 h-3.5 accent-teal-500 shrink-0"
+                                                        checked={isChecked}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setDescription(prev => {
+                                                                    const lines = prev ? prev.split(/\r?\n/).map(l => l.trim()).filter(Boolean) : [];
+                                                                    if (!lines.includes(cleanDesc)) {
+                                                                        lines.push(cleanDesc);
+                                                                    }
+                                                                    return lines.join('\n');
+                                                                });
+                                                            } else {
+                                                                setDescription(prev => {
+                                                                    const lines = prev.split(/\r?\n/).map(l => l.trim()).filter(l => l !== cleanDesc && Boolean(l));
+                                                                    return lines.join('\n');
+                                                                });
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="truncate flex-1" title={cleanDesc}>{cleanDesc}</span>
+                                                </label>
+                                                <button 
+                                                    type="button" 
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        e.preventDefault();
+                                                        if (confirm(`آیا از حذف این پانویس از لیست اطمینان دارید؟\n«${cleanDesc.slice(0, 30)}...»`)) {
+                                                            removeSavedDescription(i);
                                                         }
                                                     }}
-                                                />
-                                                <span className="truncate flex-1" title={desc}>{desc}</span>
-                                            </label>
-                                            <button 
-                                                type="button" 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    e.preventDefault();
-                                                    if (confirm(`آیا از حذف این پانویس از لیست اطمینان دارید؟\n«${desc.slice(0, 30)}...»`)) {
-                                                        removeSavedDescription(i);
-                                                    }
-                                                }}
-                                                className="text-slate-500 hover:text-rose-400 p-1 hover:bg-rose-500/10 rounded transition-all shrink-0" 
-                                                title="حذف این پانویس"
-                                            >
-                                                <Trash2 size={13} />
-                                            </button>
-                                        </div>
-                                    ))
+                                                    className="text-slate-500 hover:text-rose-400 p-1 hover:bg-rose-500/10 rounded transition-all shrink-0" 
+                                                    title="حذف این پانویس"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </button>
+                                            </div>
+                                        );
+                                    })
                                 )}
                             </div>
                             <button onClick={handleSaveDescription} className="p-2.5 bg-white/5 rounded-xl hover:bg-teal-600 hover:text-white transition-all text-slate-400 shrink-0" title="ذخیره متن فعلی به عنوان پانویس آماده"><BookmarkPlus size={16}/></button>
                         </div>
                     </div>
                     <textarea 
-                        className="w-full bg-slate-950 border border-white/5 rounded-2xl p-4 text-white text-xs leading-6 outline-none focus:border-teal-500 h-24 resize-none shadow-inner" 
-                        placeholder="توضیحات، شرایط گارانتی، شماره حساب و..." 
+                        className="w-full bg-slate-950 border border-white/5 rounded-2xl p-4 text-white text-xs leading-6 outline-none focus:border-teal-500 h-28 resize-none shadow-inner" 
+                        placeholder="توضیحات و پانویس فاکتور (هر شرط یا پانویس در یک سطر جداگانه)..." 
                         value={description}
                         onChange={e => setDescription(e.target.value)}
                     />
+                    <div className="text-[10px] text-slate-400 flex items-center justify-between px-1">
+                        <span>ℹ️ هر پانویس در یک خط مجزا قرار می‌گیرد و در برگه چاپی نیز خط‌به‌خط نمایش داده می‌شود.</span>
+                        <span className="font-mono text-teal-400 font-bold">{toPersianDigits(description.split(/\r?\n/).filter(Boolean).length)} خط پانویس</span>
+                    </div>
                 </div>
             </div>
           </div>

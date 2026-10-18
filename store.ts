@@ -4,6 +4,7 @@ import { Person, Product, Invoice, Check, Voucher, CompanyProfile, SystemConfig,
 import { generateId, getPersianDate, generateTrackingCode, toPersianDigits, downloadJSON } from './utils';
 import { ImportBatch, ImportMappingConfig } from './types-import';
 import { backupService } from './services/backupService';
+import { autoBackupService } from './services/autoBackupService';
 import { backupMigrationService } from './services/backupMigrationService';
 import { securityService } from './services/securityService';
 import { realConnectionService } from './services/realConnectionService';
@@ -157,6 +158,17 @@ export const useStore = create<AppState>()(
       if (typeof window !== 'undefined') {
         (window as any).__ZUSTAND_STORE__ = { getState: get, setState: set };
       }
+
+      // ارسال درخواست فول بک‌آپ خودکار به هاست در شاخه backup با سقف ۱۰ فایل
+      const triggerAutoBackup = (reason: string) => {
+        setTimeout(() => {
+          try {
+            autoBackupService.triggerFullAutoBackup(get(), reason);
+          } catch (e) {
+            console.warn('Auto backup trigger error:', e);
+          }
+        }, 300);
+      };
       
       return {
       currentUser: null,
@@ -376,6 +388,7 @@ export const useStore = create<AppState>()(
           const stamped = { ...c, updatedAt: new Date().toISOString() };
           dataBridge.save('companies', stamped);
           persistentStorage.saveData('companies', [...s.companies, stamped]).catch(() => {});
+          triggerAutoBackup(`ثبت شرکت ${c.name}`);
           return { companies: [...s.companies, stamped] };
       }),
       updateCompany: (id, up) => set(s => {
@@ -385,17 +398,20 @@ export const useStore = create<AppState>()(
               hostDB.save('companies', company).catch(() => {});
               persistentStorage.saveData('companies', updated).catch(() => {});
           }
+          triggerAutoBackup(`ویرایش مشخصات شرکت ${company?.name || ''}`);
           return { companies: updated };
       }),
       setActiveCompany: (id) => set(s => {
           const updated = s.companies.map(c => ({...c, isActive: c.id === id}));
           backupService.backupData('companies', updated).catch(() => {});
           persistentStorage.saveData('companies', updated).catch(() => {});
+          triggerAutoBackup('تغییر شعبه فعال شرکت');
           return { companies: updated };
       }),
       deleteCompany: (id) => set(s => {
           deletedRecordsRegistry.registerDeletion(id, 'company');
           const filtered = s.companies.filter(c => c.id !== id);
+          triggerAutoBackup('حذف شرکت');
           
           // اگر شعبه فعال حذف شد، اولین شعبه باقیمانده را فعال کن
           const wasActive = s.companies.find(c => c.id === id)?.isActive;
@@ -593,6 +609,7 @@ export const useStore = create<AppState>()(
               });
           }
 
+          triggerAutoBackup(`ثبت فاکتور ${i.number}`);
           return { 
               invoices: updated, 
               people: updatedPeople,
@@ -647,6 +664,7 @@ export const useStore = create<AppState>()(
           reversalTransactions.forEach(t => t.balanceAfter = exactBalance);
           const updatedPeople = s.people.map(p => p.id === inv.personId ? { ...p, balance: exactBalance } : p);
 
+          triggerAutoBackup(`ابطال فاکتور ${inv.number}`);
           return { 
               invoices: nextInvoices, 
               transactions: nextTransactions,
@@ -769,6 +787,7 @@ export const useStore = create<AppState>()(
           persistentStorage.saveData('people', updatedPeople).catch(() => {});
           persistentStorage.saveData('transactions', nextTransactions).catch(() => {});
 
+          triggerAutoBackup(`ویرایش فاکتور ${finalUpdated.number}`);
           return { 
               invoices: nextInvoices, 
               transactions: nextTransactions,
@@ -817,6 +836,7 @@ export const useStore = create<AppState>()(
           const exactBalance = targetPersonId ? PersonLedgerService.getBalance(targetPersonId) : 0;
           const updatedPeople = s.people.map(p => p.id === targetPersonId ? { ...p, balance: exactBalance } : p);
 
+          triggerAutoBackup(`ثبت چک ${c.checkNumber || c.sayadId || ''}`);
           return { 
               checks: [...s.checks, {...c, personId: targetPersonId}],
               people: updatedPeople,
@@ -845,6 +865,7 @@ export const useStore = create<AppState>()(
           hostDB.save('checks', updatedCheck).catch(() => {});
           persistentStorage.saveData('checks', s.checks.map(c => c.id === id ? updatedCheck : c)).catch(() => {});
 
+          triggerAutoBackup(`تغییر وضعیت چک ${check.checkNumber || ''}`);
           return { 
               checks: s.checks.map(c => c.id === id ? { ...c, status } : c),
               people: updatedPeople,
@@ -859,6 +880,7 @@ export const useStore = create<AppState>()(
               hostDB.save('checks', changed).catch(() => {});
               persistentStorage.saveData('checks', updatedChecks).catch(() => {});
           }
+          triggerAutoBackup(`تصویر چک ${id}`);
           return { checks: updatedChecks, notifications: [...s.notifications, { id: generateId(), type: 'success', message: 'تصویر چک بروزرسانی شد.' }] };
       }),
       updateCheckMetadata: (id, meta) => set(s => {
@@ -868,7 +890,8 @@ export const useStore = create<AppState>()(
               hostDB.save('checks', changed).catch(() => {});
               persistentStorage.saveData('checks', updatedChecks).catch(() => {});
           }
-          return { checks: updatedChecks };
+          triggerAutoBackup(`مشخصات چک ${id}`);
+          return { checks: updatedChecks, notifications: [...s.notifications, { id: generateId(), type: 'success', message: 'اطلاعات چک بروزرسانی شد.' }] };
       }),
 
       addCheckTransfer: (t) => set(s => {
@@ -1024,6 +1047,7 @@ export const useStore = create<AppState>()(
               }
           });
 
+          triggerAutoBackup(`ثبت حواله انبار ${v.number}`);
           return { 
               vouchers: [...s.vouchers, v], 
               products: updatedProducts,
@@ -1072,6 +1096,7 @@ export const useStore = create<AppState>()(
           });
           hostDB.save('vouchers', updated).catch(() => {});
 
+          triggerAutoBackup(`ویرایش حواله انبار ${updated.number}`);
           return { 
               products: updatedProducts,
               vouchers: s.vouchers.map(v => v.id === id ? updated : v),
@@ -1104,6 +1129,7 @@ export const useStore = create<AppState>()(
           });
           persistentStorage.saveData('products', updatedProducts).catch(() => {});
 
+          triggerAutoBackup(`حذف حواله انبار`);
           return { 
               vouchers: s.vouchers.filter(x => x.id !== id), 
               products: updatedProducts,
@@ -1403,6 +1429,7 @@ export const useStore = create<AppState>()(
               people: updatedPeople, 
               notifications: [...s.notifications, { id: generateId(), type: 'success', message: type === 'INCOME' ? 'دریافتی از مشتری ثبت و در کاردکس طرف‌حساب و محاسبات اعمال شد.' : 'پرداختی مالی ثبت و در کاردکس شخص اعمال شد.' }] 
           }));
+          triggerAutoBackup(type === 'INCOME' ? 'دریافتی مالی' : 'پرداختی مالی');
           return newTrans;
       },
 
@@ -1534,6 +1561,7 @@ export const useStore = create<AppState>()(
               ]
           }));
 
+          triggerAutoBackup(`پرداخت فاکتور ${invoice.number}`);
           return newTrans;
       },
       deleteTransaction: (id) => set(s => {

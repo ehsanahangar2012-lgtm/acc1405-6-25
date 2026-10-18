@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Megaphone, X, ExternalLink, Sparkles, DownloadCloud, Settings2, Check, RefreshCw } from 'lucide-react';
+import { Megaphone, X, ExternalLink, Sparkles, DownloadCloud, Settings2, Check } from 'lucide-react';
 import { getPersianDate, toPersianDigits } from '../utils';
 import { useStore } from '../store';
 import { persistentStorage } from '../services/persistentStorage';
@@ -14,6 +14,19 @@ export interface Announcement {
   linkText?: string;
 }
 
+// تابع ساخت شناسه یکتا و پایدار (deterministic) بدون تولید رندوم تا پیام‌های دیده شده دوباره نمایش داده نشوند
+const generateStableId = (item: any, fallbackPrefix: string, index: number): string => {
+  if (item.id && typeof item.id === 'string' && !item.id.includes('Math.random') && !item.id.startsWith('ann-0.')) {
+    return item.id;
+  }
+  const rawKey = `${(item.title || '').trim()}::${(item.content || item.message || '').trim().slice(0, 40)}`;
+  let hash = 0;
+  for (let i = 0; i < rawKey.length; i++) {
+    hash = Math.imul(31, hash) + rawKey.charCodeAt(i) | 0;
+  }
+  return `${fallbackPrefix}-${index}-${(hash >>> 0).toString(16)}`;
+};
+
 // تابع دریافت اطلاعیه‌ها و پیشنهادات از سرور مرکزی، فایل کانفیگ یا حافظه اشتراکی سرور
 const fetchAnnouncements = async (): Promise<Announcement[]> => {
   const currentDate = getPersianDate();
@@ -24,8 +37,8 @@ const fetchAnnouncements = async (): Promise<Announcement[]> => {
     if (Array.isArray(remoteData) && remoteData.length > 0) {
       const activeBroadcasts = remoteData
         .filter((b: any) => b.active !== false)
-        .map((b: any) => ({
-          id: b.id || 'ann-' + Math.random(),
+        .map((b: any, idx: number) => ({
+          id: generateStableId(b, 'remote-ann', idx),
           title: b.title || 'اطلاعیه سامانه',
           content: b.message || b.content || '',
           type: (b.type === 'DISCOUNT' ? 'promo' : b.type === 'UPDATE' ? 'update' : 'info') as 'promo' | 'update' | 'info',
@@ -47,8 +60,8 @@ const fetchAnnouncements = async (): Promise<Announcement[]> => {
       if (Array.isArray(parsed) && parsed.length > 0) {
         const activeBroadcasts = parsed
           .filter(b => b.active !== false)
-          .map(b => ({
-            id: b.id || 'ann-' + Math.random(),
+          .map((b, idx) => ({
+            id: generateStableId(b, 'local-bc', idx),
             title: b.title || 'اطلاعیه سامانه',
             content: b.message || b.content || '',
             type: (b.type === 'DISCOUNT' ? 'promo' : b.type === 'UPDATE' ? 'update' : 'info') as 'promo' | 'update' | 'info',
@@ -63,14 +76,14 @@ const fetchAnnouncements = async (): Promise<Announcement[]> => {
     }
   } catch {}
 
-  // ۲. بررسی فراخوانی API مرکزی (در صورت فعال بودن وب‌سرور یا cPanel)
+  // ۳. بررسی فراخوانی API مرکزی (در صورت فعال بودن وب‌سرور یا cPanel)
   try {
     const res = await fetch('/api/broadcasts.php', { method: 'GET', cache: 'no-cache' }).catch(() => null);
     if (res && res.ok) {
       const data = await res.json();
       if (Array.isArray(data) && data.length > 0) {
-        return data.map((item: any) => ({
-          id: item.id || 'ann-' + Math.random(),
+        return data.map((item: any, idx: number) => ({
+          id: generateStableId(item, 'api-ann', idx),
           title: item.title || 'اطلاعیه سامانه',
           content: item.content || item.message || '',
           type: (item.type === 'promo' || item.type === 'update' ? item.type : 'info') as 'promo' | 'update' | 'info',
@@ -82,19 +95,19 @@ const fetchAnnouncements = async (): Promise<Announcement[]> => {
     }
   } catch {}
 
-  // ۳. اطلاعیه‌های پیش‌فرض پویا با تاریخ جاری شمسی (بدون هیچ تاریخ ثابت یا قدیمی)
+  // ۴. اطلاعیه‌های پیش‌فرض اولیه سامانه با شناسه‌های ثابت و مشخص
   return [
     {
-      id: 'app-update-latest',
+      id: 'app-update-latest-v16',
       title: 'ارتقای پایگاه داده و سرعت سامانه (نسخه ۱۶.۱۲.۰)',
-      content: 'موتور پایگاه داده ایزوله ویندوز فعال گردید. تمامی اطلاعات هم‌اکنون به صورت فایل دیتابیس مستقل روی هارد دیسک و خروجی رابطه ای SQL ذخیره می‌شوند.',
+      content: 'موتور پایگاه داده ایزوله ویندوز فعال گردید. تمامی اطلاعات هم‌اکنون به صورت فایل دیتابیس مستقل روی هارد دیسک و خروجی رابطه‌ای SQL ذخیره می‌شوند.',
       type: 'update',
       date: currentDate,
       link: '#update-engine',
       linkText: 'بررسی وضعیت دیتابیس'
     },
     {
-      id: 'festival-promo-current',
+      id: 'festival-promo-current-v16',
       title: 'جشنواره تخفیف ویژه نرم‌افزار جامع اشک قلم',
       content: 'با ارتقا یا تمدید سالانه لایسنس کسب‌وکار و فعال‌سازی سرویس مؤدیان، از ۴۰٪ تخفیف انحصاری بهره‌مند شوید.',
       type: 'promo',
@@ -112,9 +125,9 @@ export const SplashAnnouncement: React.FC = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
 
-  // وضعیت ویرایش محتوا برای مدیر و هنگام نصب
+  // وضعیت ویرایش محتوا برای مدیر
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -123,20 +136,41 @@ export const SplashAnnouncement: React.FC = () => {
   const [editLink, setEditLink] = useState('');
   const [editLinkText, setEditLinkText] = useState('');
 
+  // ذخیره شناسه‌های پیام‌های نمایش داده شده در حافظه تا در دفعات بعدی باز نشوند
+  const markIdsAsSeen = (ids: string[]) => {
+    if (!ids || ids.length === 0) return;
+    try {
+      const stored = localStorage.getItem('seen_announcements');
+      const seenIds: string[] = stored ? JSON.parse(stored) : [];
+      const updated = Array.from(new Set([...seenIds, ...ids]));
+      localStorage.setItem('seen_announcements', JSON.stringify(updated));
+    } catch (e) {
+      console.warn('Error saving seen_announcements:', e);
+    }
+  };
+
   const loadAnnouncements = async () => {
     try {
       const data = await fetchAnnouncements();
-      const seenIds = JSON.parse(localStorage.getItem('seen_announcements') || '[]');
-      
-      // نمایش مواردی که کاربر هنوز ندیده است (یا همه در حالت تنظیم مجدد)
-      const newAnnouncements = data.filter(a => !seenIds.includes(a.id));
-      
-      if (newAnnouncements.length > 0) {
-        setAnnouncements(newAnnouncements);
+      let seenIds: string[] = [];
+      try {
+        const stored = localStorage.getItem('seen_announcements');
+        seenIds = stored ? JSON.parse(stored) : [];
+        if (!Array.isArray(seenIds)) seenIds = [];
+      } catch {
+        seenIds = [];
+      }
+
+      // فقط مواردی که کاربر هرگز ندیده است انتخاب می‌شوند
+      const unreadAnnouncements = data.filter(a => a.id && !seenIds.includes(a.id));
+
+      if (unreadAnnouncements.length > 0) {
+        setAnnouncements(unreadAnnouncements);
         setIsOpen(true);
-      } else if (data.length > 0 && localStorage.getItem('ashk_always_show_announcement') === 'true') {
-        setAnnouncements(data);
-        setIsOpen(true);
+        // به محض نمایش به کاربر، شناسه‌ها ثبت می‌شوند تا در راه‌اندازی‌های بعدی دوباره نمایش داده نشوند
+        markIdsAsSeen(unreadAnnouncements.map(a => a.id));
+      } else {
+        setIsOpen(false);
       }
     } catch (error) {
       console.error('Failed to fetch announcements:', error);
@@ -146,35 +180,44 @@ export const SplashAnnouncement: React.FC = () => {
   };
 
   useEffect(() => {
-    // بررسی پس از تاخیر کوتاه تا لود اولیه انجام شود
+    // بررسی پس از تاخیر کوتاه برای روان بودن بارگذاری برنامه
     const timer = setTimeout(loadAnnouncements, 800);
     return () => clearTimeout(timer);
   }, []);
 
-  const handleClose = () => {
+  // بستن کل پنجره و جلوگیری قطعی از نمایش مجدد همه پیام‌های حاضر
+  const handleCloseAll = () => {
+    markIdsAsSeen(announcements.map(a => a.id));
+    setIsOpen(false);
+    setIsEditing(false);
+  };
+
+  const handleNextOrClose = () => {
     if (announcements[currentIndex]) {
-      const seenIds = JSON.parse(localStorage.getItem('seen_announcements') || '[]');
-      localStorage.setItem('seen_announcements', JSON.stringify([...seenIds, announcements[currentIndex].id]));
+      markIdsAsSeen([announcements[currentIndex].id]);
     }
 
     if (currentIndex < announcements.length - 1) {
       setCurrentIndex(prev => prev + 1);
     } else {
-      setIsOpen(false);
-      setIsEditing(false);
+      handleCloseAll();
     }
   };
 
   const handleAction = () => {
     const current = announcements[currentIndex];
+    if (current) {
+      markIdsAsSeen([current.id]);
+    }
     if (current?.link === '#update-engine') {
       window.location.hash = '/settings';
-      setIsOpen(false);
+      handleCloseAll();
     } else if (current?.link === '#contact-sales') {
       window.dispatchEvent(new CustomEvent('open-trial-limit-modal', { detail: { reason: 'PROMO' } }));
-      setIsOpen(false);
+      handleCloseAll();
     } else if (current?.link) {
       window.open(current.link, '_blank');
+      handleCloseAll();
     }
   };
 
@@ -199,7 +242,7 @@ export const SplashAnnouncement: React.FC = () => {
   const handleSaveEdit = () => {
     if (!editTitle.trim() || !editContent.trim()) return;
 
-    const currentId = announcements[currentIndex]?.id || 'ann-' + Date.now();
+    const currentId = announcements[currentIndex]?.id || ('ann-edit-' + Date.now());
     const updatedAnnouncement: Announcement = {
       id: currentId,
       title: editTitle.trim(),
@@ -238,8 +281,6 @@ export const SplashAnnouncement: React.FC = () => {
         broadcastsList.unshift(broadcastItem);
       }
       localStorage.setItem('ashk_server_broadcasts', JSON.stringify(broadcastsList));
-      // پاک کردن سابقه بازدید تا همه کلاینت‌ها اعلان ویرایش شده را ببینند
-      localStorage.removeItem('seen_announcements');
     } catch {}
 
     setIsEditing(false);
@@ -274,7 +315,7 @@ export const SplashAnnouncement: React.FC = () => {
             <button 
               type="button"
               onClick={() => isEditing ? setIsEditing(false) : handleStartEdit()}
-              className="w-9 h-9 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-500 hover:bg-teal-50 hover:text-teal-600 transition"
+              className="w-9 h-9 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-500 hover:bg-teal-50 hover:text-teal-600 transition cursor-pointer"
               title="ویرایش متن و تاریخ این پیشنهاد"
             >
               <Settings2 size={18} />
@@ -282,16 +323,16 @@ export const SplashAnnouncement: React.FC = () => {
           )}
           <button 
             type="button"
-            onClick={handleClose}
-            className="w-9 h-9 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-500 hover:bg-rose-100 hover:text-rose-600 transition"
-            title="بستن"
+            onClick={handleCloseAll}
+            className="w-9 h-9 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-500 hover:bg-rose-100 hover:text-rose-600 transition cursor-pointer"
+            title="بستن و عدم نمایش مجدد"
           >
             <X size={18} />
           </button>
         </div>
 
         {isEditing ? (
-          /* فرم ویرایش آنلاین محتوا برای مدیر یا هنگام نصب */
+          /* فرم ویرایش آنلاین محتوا برای مدیر */
           <div className="flex flex-col gap-3 py-2">
             <div className="flex items-center gap-2 mb-1">
               <Settings2 className="w-5 h-5 text-teal-500" />
@@ -304,50 +345,75 @@ export const SplashAnnouncement: React.FC = () => {
                 type="text" 
                 value={editTitle} 
                 onChange={e => setEditTitle(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold"
+                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold outline-none focus:border-teal-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">متن توضیحات:</label>
+              <textarea 
+                rows={4}
+                value={editContent} 
+                onChange={e => setEditContent(e.target.value)}
+                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 leading-relaxed font-medium outline-none focus:border-teal-500 resize-none"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">تاریخ نمایش (شمسی):</label>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">تاریخ نمایش:</label>
                 <input 
                   type="text" 
                   value={editDate} 
                   onChange={e => setEditDate(e.target.value)}
-                  placeholder={getPersianDate()}
-                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono"
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-center outline-none focus:border-teal-500"
+                  placeholder="1403/01/01"
                 />
               </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">نوع اطلاعیه:</label>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">نوع پیام:</label>
                 <select 
                   value={editType} 
                   onChange={e => setEditType(e.target.value as any)}
-                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-bold"
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-teal-500"
                 >
-                  <option value="promo">جشنواره و پیشنهاد ویژه</option>
-                  <option value="update">بروزرسانی نرم‌افزار</option>
+                  <option value="promo">جشنواره و تخفیف</option>
+                  <option value="update">بروزرسانی سامانه</option>
                   <option value="info">اطلاعیه عمومی</option>
                 </select>
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">متن پیام یا توضیحات تخفیف:</label>
-              <textarea 
-                rows={3}
-                value={editContent} 
-                onChange={e => setEditContent(e.target.value)}
-                className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800"
-              />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">لینک یا دستور:</label>
+                <input 
+                  type="text" 
+                  value={editLink} 
+                  onChange={e => setEditLink(e.target.value)}
+                  placeholder="#update-engine یا آدرس سایت"
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 dir-ltr outline-none focus:border-teal-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">متن روی دکمه:</label>
+                <input 
+                  type="text" 
+                  value={editLinkText} 
+                  onChange={e => setEditLinkText(e.target.value)}
+                  placeholder="مشاهده جزئیات"
+                  className="w-full text-xs p-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:border-teal-500"
+                />
+              </div>
             </div>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2 mt-2">
               <button 
                 type="button"
                 onClick={handleSaveEdit}
-                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl py-2.5 font-bold text-xs flex items-center justify-center gap-1.5 transition shadow"
+                className="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl py-2.5 font-bold text-xs flex items-center justify-center gap-1.5 transition shadow cursor-pointer"
               >
                 <Check size={16} />
                 <span>ذخیره و انتشار در سامانه</span>
@@ -355,7 +421,7 @@ export const SplashAnnouncement: React.FC = () => {
               <button 
                 type="button"
                 onClick={() => setIsEditing(false)}
-                className="px-4 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl py-2.5 font-bold text-xs"
+                className="px-4 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl py-2.5 font-bold text-xs cursor-pointer"
               >
                 انصراف
               </button>
@@ -382,22 +448,46 @@ export const SplashAnnouncement: React.FC = () => {
               {current.content}
             </p>
 
+            {/* نشانگر ذخیره دائمی وضعیت بازدید */}
+            <div className="mb-4 p-2 bg-slate-100 dark:bg-slate-800/60 rounded-xl flex items-center gap-2 text-[11px] text-slate-600 dark:text-slate-400 select-none">
+              <span className="text-emerald-500 font-bold">✓</span>
+              <span>این پیام در شروع‌های بعدی برنامه دیگر نمایش داده نخواهد شد.</span>
+            </div>
+
             <div className="mt-auto flex flex-col sm:flex-row gap-2.5">
               {current.link && (
                 <button 
                   onClick={handleAction}
-                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl py-3 font-black text-xs flex items-center justify-center gap-1.5 transition shadow"
+                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white rounded-xl py-3 font-black text-xs flex items-center justify-center gap-1.5 transition shadow cursor-pointer"
                 >
                   {current.linkText || 'مشاهده جزئیات'}
                   <ExternalLink size={14} />
                 </button>
               )}
-              <button 
-                onClick={handleClose}
-                className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-white rounded-xl py-3 font-black text-xs transition"
-              >
-                {announcements.length > 1 && currentIndex < announcements.length - 1 ? 'بعدی' : 'متوجه شدم'}
-              </button>
+              {announcements.length > 1 && currentIndex < announcements.length - 1 ? (
+                <>
+                  <button 
+                    onClick={handleNextOrClose}
+                    className="flex-1 bg-teal-500 hover:bg-teal-400 text-slate-950 font-black rounded-xl py-3 text-xs transition cursor-pointer shadow"
+                  >
+                    پیام بعدی ({toPersianDigits(currentIndex + 2)} از {toPersianDigits(announcements.length)})
+                  </button>
+                  <button 
+                    onClick={handleCloseAll}
+                    className="px-4 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-white rounded-xl py-3 font-black text-xs transition cursor-pointer"
+                    title="بستن تمام پیام‌ها"
+                  >
+                    بستن همه
+                  </button>
+                </>
+              ) : (
+                <button 
+                  onClick={handleCloseAll}
+                  className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-white rounded-xl py-3 font-black text-xs transition cursor-pointer"
+                >
+                  متوجه شدم و بستن
+                </button>
+              )}
             </div>
 
             {announcements.length > 1 && (

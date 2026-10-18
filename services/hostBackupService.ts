@@ -34,6 +34,18 @@ export interface BackupAssets {
         stamp?: string;      // base64 data URL
         signature?: string;  // base64 data URL
     }>;
+    checkImages?: Array<{
+        id: string;
+        checkNumber?: string;
+        sayadId?: string;
+        imageUrl?: string;
+        holderName?: string;
+    }>;
+    signatures?: Array<{
+        id: string;
+        type: string;
+        signature: string;
+    }>;
 }
 
 export interface BackupResult {
@@ -54,7 +66,7 @@ export interface RestoreResult {
 const LOCAL_BACKUP_STORE  = 'local_backups';
 const LAST_BACKUP_KEY     = 'host_last_backup_time';
 const BACKUP_INTERVAL_MS  = 24 * 60 * 60 * 1000; // ۲۴ ساعت
-const MAX_HOST_BACKUPS    = 7;
+const MAX_HOST_BACKUPS    = 10; // نگهداری حداکثر ۱۰ فایل در هاست
 const FETCH_TIMEOUT_MS    = 30_000; // ۳۰ ثانیه - بکاپ داده بزرگ است
 const APP_VERSION         = '15.4.0';
 
@@ -63,7 +75,8 @@ const BACKUP_TABLES = [
     'users', 'companies', 'products', 'people',
     'invoices', 'vouchers', 'checks', 'transactions',
     'checkTransfers', 'contracts', 'salaries', 'config',
-    'roles', 'importConfigs',
+    'roles', 'importConfigs', 'logisticsProfiles',
+    'defaultInvoiceFooter', 'savedDescriptions'
 ] as const;
 
 // ─── سرویس ───────────────────────────────────────────────────────────────────
@@ -119,24 +132,40 @@ class HostBackupService {
         }
     }
 
+    private autoBackupDebounceTimer: any = null;
+
+    /**
+     * ثبت درخواست بک‌آپ خودکار با دی‌بانس هوشمند برای هربار ثبت فاکتور، سند، چک و...
+     */
+    triggerAutoBackup(state: any, reason: string = 'ثبت اطلاعات'): void {
+        if (this.autoBackupDebounceTimer) {
+            clearTimeout(this.autoBackupDebounceTimer);
+        }
+        this.autoBackupDebounceTimer = setTimeout(() => {
+            this.createBackup(state, 'auto', reason).catch(err => {
+                console.warn('Auto backup notification error:', err);
+            });
+        }, 1200);
+    }
+
     // ─── ایجاد بکاپ ──────────────────────────────────────────────────────────
 
     /**
-     * ایجاد بکاپ کامل (داده + فایل‌های باینری)
+     * ایجاد بکاپ کامل (داده + فایل‌های باینری و تصاویر چک‌ها و امضاها)
      */
-    async createBackup(state: any, type: 'auto' | 'manual' = 'manual'): Promise<BackupResult> {
+    async createBackup(state: any, type: 'auto' | 'manual' = 'manual', reason?: string): Promise<BackupResult> {
         if (this.isRunning) {
             return { success: false, error: 'بکاپ دیگری در حال اجراست' };
         }
         this.isRunning = true;
 
         try {
-            console.log(`📦 شروع بکاپ ${type}...`);
+            console.log(`📦 شروع بکاپ فول ${type} (${reason || 'سیستم'})...`);
 
             // ۱. استخراج داده‌های اصلی
             const backupData = this.extractBackupData(state);
 
-            // ۲. استخراج فایل‌های باینری شرکت (لوگو، امضا، مهر)
+            // ۲. استخراج فایل‌های باینری شرکت (لوگو، امضا، مهر)، تصاویر چک‌ها و امضاها
             const assets = this.extractCompanyAssets(state);
 
             // ۳. ساخت پکیج بکاپ کامل
@@ -146,13 +175,15 @@ class HostBackupService {
             const payload = {
                 id: backupId,
                 timestamp: Date.now(),
-                label: this.generateLabel(type, now),
+                label: this.generateLabel(type, now, reason),
                 type,
                 version: APP_VERSION,
                 data: backupData,
                 assets,
                 checksum: this.checksum(backupData),
-                hasAssets: assets.companies.some(c => c.logo || c.stamp || c.signature),
+                hasAssets: (assets.companies && assets.companies.some(c => c.logo || c.stamp || c.signature)) || 
+                           (assets.checkImages && assets.checkImages.length > 0) || 
+                           (assets.signatures && assets.signatures.length > 0),
             };
 
             // ۴. ارسال به هاست
@@ -293,11 +324,52 @@ class HostBackupService {
     }
 
     /**
-     * استخراج فایل‌های باینری شرکت (لوگو، امضا، مهر)
-     * این فیلدها معمولاً به‌صورت data URL (base64) ذخیره می‌شوند
+     * استخراج فایل‌های باینری شرکت (لوگو، امضا، مهر)، تصاویر چک‌ها و تمامی امضاها
+     * این فیلدها شامل base64 تصاویر چک‌ها، امضاهای فاکتورها، اسناد و رسیدها می‌باشند
      */
     private extractCompanyAssets(state: any): BackupAssets {
         const companies = Array.isArray(state.companies) ? state.companies : [];
+        const checks = Array.isArray(state.checks) ? state.checks : [];
+        const invoices = Array.isArray(state.invoices) ? state.invoices : [];
+        const vouchers = Array.isArray(state.vouchers) ? state.vouchers : [];
+        const transactions = Array.isArray(state.transactions) ? state.transactions : [];
+
+        // استخراج تصاویر چک‌ها
+        const checkImages = checks
+            .filter((c: any) => Boolean(c.imageUrl))
+            .map((c: any) => ({
+                id: c.id,
+                checkNumber: c.checkNumber || '',
+                sayadId: c.sayadId || '',
+                imageUrl: c.imageUrl,
+                holderName: c.holderName || ''
+            }));
+
+        // استخراج امضاهای ثبت شده
+        const signatures: Array<{ id: string; type: string; signature: string }> = [];
+        
+        invoices.forEach((inv: any) => {
+            if (inv.signature) {
+                signatures.push({ id: inv.id, type: 'invoice_main', signature: inv.signature });
+            }
+            if (inv.workflowSignatures) {
+                Object.entries(inv.workflowSignatures).forEach(([role, sig]) => {
+                    if (sig) signatures.push({ id: `${inv.id}_${role}`, type: `invoice_${role}`, signature: sig as string });
+                });
+            }
+        });
+
+        vouchers.forEach((v: any) => {
+            if (v.signature) signatures.push({ id: `${v.id}_main`, type: 'voucher_main', signature: v.signature });
+            if (v.companySignature) signatures.push({ id: `${v.id}_company`, type: 'voucher_company', signature: v.companySignature });
+            if (v.supervisorSignature) signatures.push({ id: `${v.id}_supervisor`, type: 'voucher_supervisor', signature: v.supervisorSignature });
+        });
+
+        transactions.forEach((t: any) => {
+            if (t.signature) signatures.push({ id: `${t.id}_sig`, type: 'transaction_sig', signature: t.signature });
+            if (t.receiptImage) signatures.push({ id: `${t.id}_receipt`, type: 'transaction_receipt', signature: t.receiptImage });
+        });
+
         return {
             companies: companies.map((c: any) => ({
                 id: c.id,
@@ -306,6 +378,8 @@ class HostBackupService {
                 ...(c.stamp     ? { stamp: c.stamp }         : {}),
                 ...(c.signature ? { signature: c.signature } : {}),
             })),
+            checkImages,
+            signatures
         };
     }
 
@@ -357,7 +431,7 @@ class HostBackupService {
             const entries: HostBackupEntry[] = Array.isArray(existing?.entries) ? existing.entries : [];
             entries.push(indexEntry);
 
-            // نگهداری آخرین MAX_HOST_BACKUPS بکاپ
+            // نگهداری آخرین MAX_HOST_BACKUPS بکاپ (۱۰ فایل)
             entries.sort((a, b) => b.timestamp - a.timestamp);
             if (entries.length > MAX_HOST_BACKUPS) {
                 const toRemove = entries.splice(MAX_HOST_BACKUPS);
@@ -372,12 +446,13 @@ class HostBackupService {
         }
     }
 
-    private generateLabel(type: 'auto' | 'manual', date: Date): string {
+    private generateLabel(type: 'auto' | 'manual', date: Date, reason?: string): string {
         const jalali = new Intl.DateTimeFormat('fa-IR', {
             year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit'
+            hour: '2-digit', minute: '2-digit', second: '2-digit'
         }).format(date);
-        return `${type === 'auto' ? '🔄 خودکار' : '✋ دستی'} - ${jalali}`;
+        const reasonTag = reason ? ` (${reason})` : '';
+        return `${type === 'auto' ? '🔄 خودکار' : '✋ دستی'}${reasonTag} - ${jalali}`;
     }
 
     private checksum(data: any): string {

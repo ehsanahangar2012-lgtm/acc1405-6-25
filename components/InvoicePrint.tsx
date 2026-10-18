@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Invoice, PrintTheme, Person, InvoiceType } from '../types';
 import { toPersianDigits, formatCurrency, formatAmountOnly, getCurrencyLabel, getQrCodeUrl, generateBarcodeSvg, generateLocalQrSvg } from '../utils';
 import { useStore } from '../store';
@@ -39,17 +39,56 @@ export const InvoicePaymentQrBox: React.FC<{ invoice: Invoice; company?: any; co
     );
 };
 
-export const ProformaNoticeBox: React.FC<{ description?: string; compact?: boolean }> = ({ description, compact = false }) => (
-    <div className={`bg-amber-50/90 border-2 border-amber-300 rounded-xl ${compact ? 'p-2 my-1' : 'p-3 my-2'} text-right`} dir="rtl">
-        <div className="flex items-center gap-1.5 text-amber-900 font-black text-[11px] mb-0.5">
-            <ShieldAlert size={14} className="text-amber-700 shrink-0" />
-            <span>پانویس و شرایط حقوقی پیش‌فاکتور:</span>
+export const RenderFootnoteLines: React.FC<{ 
+    description?: string; 
+    label?: string; 
+    className?: string; 
+    bullet?: boolean;
+}> = ({ 
+    description, 
+    label = 'توضیحات و شرایط:', 
+    className = '', 
+    bullet = true
+}) => {
+    if (!description || !description.trim()) return null;
+    const lines = description.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) return null;
+
+    return (
+        <div className={`text-right space-y-1.5 ${className}`} dir="rtl">
+            {label && <span className="font-bold text-slate-800 text-[10px] block mb-1">{label}</span>}
+            <div className="space-y-1">
+                {lines.map((line, idx) => (
+                    <div key={idx} className="flex items-start gap-1.5 leading-4 text-[9.5px] text-slate-700">
+                        {bullet && <span className="text-slate-400 font-bold select-none text-[10px] shrink-0 leading-4">•</span>}
+                        <span className="flex-1 break-words font-medium">{line}</span>
+                    </div>
+                ))}
+            </div>
         </div>
-        <p className={`${compact ? 'text-[8.5px] leading-tight' : 'text-[9.5px] leading-relaxed'} text-amber-950 font-bold whitespace-pre-line`}>
-            {description || PROFORMA_STANDARD_NOTE}
-        </p>
-    </div>
-);
+    );
+};
+
+export const ProformaNoticeBox: React.FC<{ description?: string; compact?: boolean }> = ({ description, compact = false }) => {
+    const text = description || PROFORMA_STANDARD_NOTE;
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    return (
+        <div className={`bg-amber-50/90 border-2 border-amber-300 rounded-xl ${compact ? 'p-2 my-1' : 'p-3 my-2'} text-right`} dir="rtl">
+            <div className="flex items-center gap-1.5 text-amber-900 font-black text-[11px] mb-1">
+                <ShieldAlert size={14} className="text-amber-700 shrink-0" />
+                <span>پانویس و شرایط حقوقی پیش‌فاکتور:</span>
+            </div>
+            <div className={`${compact ? 'text-[8.5px] leading-tight space-y-0.5' : 'text-[9.5px] leading-relaxed space-y-1'} text-amber-950 font-bold`}>
+                {lines.map((line, idx) => (
+                    <div key={idx} className="flex items-start gap-1">
+                        <span className="text-amber-700 select-none">•</span>
+                        <span>{line}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
 
 interface Props { 
     data: Invoice; 
@@ -133,8 +172,19 @@ export const InvoicePrint: React.FC<Props> = ({ data, person, theme, showPreviou
     const prevBalance = currentBalance - (thisInvoiceDebt - thisInvoicePaid);
     const effectiveShowPrevBalance = showPreviousBalance !== undefined ? showPreviousBalance : (data.showPreviousBalance !== undefined ? data.showPreviousBalance : true);
 
+    // مرتب‌سازی اقلام به ترتیب ثبت زمانی از ردیف ۱ تا آخر برای پیش‌نمایش و چاپ فاکتور
+    const sortedItems = useMemo(() => {
+        if (!data.items || !Array.isArray(data.items)) return [];
+        return [...data.items].sort((a, b) => (a.entryOrder || 0) - (b.entryOrder || 0));
+    }, [data.items]);
+
+    const formattedData = useMemo(() => ({
+        ...data,
+        items: sortedItems
+    }), [data, sortedItems]);
+
     const commonProps = { 
-        data, 
+        data: formattedData, 
         docCompany, 
         qrCode, 
         barcodeUrl, 
@@ -283,11 +333,11 @@ const ModernCorporateTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCo
                     {data.type === InvoiceType.PROFORMA ? (
                         <ProformaNoticeBox description={data.description} />
                     ) : (
-                        data.description && (
-                            <div className="bg-white p-2 rounded-xl border border-slate-200 text-[9.5px] text-slate-600 leading-4 font-normal text-right" style={{ letterSpacing: 'normal' }}>
-                                <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>{data.description}
-                            </div>
-                        )
+                        <RenderFootnoteLines 
+                            description={data.description} 
+                            label="توضیحات و شرایط فاکتور:" 
+                            className="bg-white p-2.5 rounded-xl border border-slate-200"
+                        />
                     )}
                 </div>
                 <div className="col-span-5 bg-blue-50/80 border border-blue-200 rounded-2xl p-4 text-xs space-y-2 text-right" dir="rtl">
@@ -450,12 +500,11 @@ const CreativeBrightTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCod
                     {data.type === InvoiceType.PROFORMA ? (
                         <ProformaNoticeBox description={data.description} />
                     ) : (
-                        data.description && (
-                            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 text-[9.5px] text-slate-600 font-normal leading-4 text-right" style={{ letterSpacing: 'normal' }}>
-                                <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>
-                                {data.description}
-                            </div>
-                        )
+                        <RenderFootnoteLines 
+                            description={data.description} 
+                            label="توضیحات و شرایط فاکتور:" 
+                            className="bg-slate-50 border border-slate-200 rounded-2xl p-3"
+                        />
                     )}
                 </div>
 
@@ -589,11 +638,11 @@ const OfficialCleanTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCode
                         {data.type === InvoiceType.PROFORMA ? (
                             <ProformaNoticeBox description={data.description} compact={true} />
                         ) : (
-                            data.description && (
-                                <div className="pt-2 border-t border-slate-200 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
-                                    <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>{data.description}
-                                </div>
-                            )
+                            <RenderFootnoteLines 
+                                description={data.description} 
+                                label="توضیحات و شرایط فاکتور:" 
+                                className="pt-2 border-t border-slate-200"
+                            />
                         )}
                     </div>
                     <div className="space-y-1.5">
@@ -701,11 +750,11 @@ const IndustrialCrispTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCo
                     {data.type === InvoiceType.PROFORMA ? (
                         <ProformaNoticeBox description={data.description} compact={true} />
                     ) : (
-                        data.description && (
-                            <div className="pt-2 border-t border-slate-200 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
-                                <span className="font-bold text-slate-800 text-[10px]">توضیحات و مشخصات فنی: </span>{data.description}
-                            </div>
-                        )
+                        <RenderFootnoteLines 
+                            description={data.description} 
+                            label="توضیحات و مشخصات فنی:" 
+                            className="pt-2 border-t border-slate-200"
+                        />
                     )}
                 </div>
                 <div className="border-4 border-slate-950 p-3 space-y-1.5 bg-slate-50">
@@ -813,11 +862,11 @@ const MinimalLightTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCode,
                 {data.type === InvoiceType.PROFORMA ? (
                     <ProformaNoticeBox description={data.description} compact={true} />
                 ) : (
-                    data.description && (
-                        <div className="pt-2 mt-2 border-t border-slate-300 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
-                            <b>توضیحات و پانویس: </b>{data.description}
-                        </div>
-                    )
+                    <RenderFootnoteLines 
+                        description={data.description} 
+                        label="توضیحات و پانویس:" 
+                        className="pt-2 mt-2 border-t border-slate-300"
+                    />
                 )}
             </div>
 
@@ -916,11 +965,11 @@ const ExecutiveIvoryTheme = ({ data, docCompany, qrCode, barcodeUrl, trackingCod
                     {data.type === InvoiceType.PROFORMA ? (
                         <ProformaNoticeBox description={data.description} />
                     ) : (
-                        data.description && (
-                            <div className="mt-3 pt-2 border-t border-slate-200 text-[9.5px] text-slate-600 font-normal leading-4 text-right">
-                                <span className="font-bold text-slate-800 text-[10px]">توضیحات و شرایط: </span>{data.description}
-                            </div>
-                        )
+                        <RenderFootnoteLines 
+                            description={data.description} 
+                            label="توضیحات و شرایط:" 
+                            className="mt-3 pt-2 border-t border-slate-200"
+                        />
                     )}
                 </div>
                 <div className="col-span-5 bg-white border-2 border-[#d4af37] rounded-2xl p-4 text-xs space-y-1.5 text-right" dir="rtl">
@@ -1217,11 +1266,13 @@ const PersianHeritageTheme = ({
                                     <ProformaNoticeBox description={data.description} compact={true} />
                                 </div>
                             ) : (
-                                data.description && (
-                                    <div className="mt-auto pt-2 text-[9.5px] text-slate-600 font-normal leading-4 bg-white/90 p-2 rounded-lg border border-[#e2d7be]">
-                                        <strong className="text-[#0f172a] text-[10px]">یادداشت و شرایط فاکتور: </strong>{data.description}
-                                    </div>
-                                )
+                                <div className="mt-auto pt-2">
+                                    <RenderFootnoteLines 
+                                        description={data.description} 
+                                        label="یادداشت و شرایط فاکتور:" 
+                                        className="bg-white/90 p-2.5 rounded-lg border border-[#e2d7be]"
+                                    />
+                                </div>
                             )}
                         </PersianCard>
                     </div>
@@ -1467,11 +1518,11 @@ export const Thermal80mmTheme = ({
                     ⚠️ {data.description || PROFORMA_STANDARD_NOTE}
                 </div>
             ) : (
-                data.description && (
-                    <div className="text-[9px] text-slate-800 pb-2 mb-2 border-b border-dotted border-black leading-relaxed whitespace-pre-line">
-                        {data.description}
-                    </div>
-                )
+                <RenderFootnoteLines 
+                    description={data.description} 
+                    label="پانویس و شرایط فاکتور:" 
+                    className="text-[9px] text-slate-800 pb-2 mb-2 border-b border-dotted border-black leading-relaxed"
+                />
             )}
 
             {/* بارکد و کیوآر پرداخت و اصالت */}

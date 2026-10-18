@@ -11,7 +11,7 @@ import { hostBackupService, BackupResult, HostBackupEntry } from './hostBackupSe
 import { idbService } from './indexedDBService';
 
 const LOCAL_IDB_KEY = 'auto_backups';
-const MAX_LOCAL_BACKUPS = 7;
+const MAX_LOCAL_BACKUPS = 10;
 
 interface LocalBackup {
     id: string;
@@ -47,6 +47,17 @@ class AutoBackupService {
             this.intervalId = null;
         }
         hostBackupService.stop();
+    }
+
+    /**
+     * اجرای خودکار فول بک‌آپ پس از ثبت هر فاکتور، سند، دریافت و پرداخت، چک و...
+     */
+    triggerFullAutoBackup(state: any, reason: string = 'ثبت اطلاعات مالی'): void {
+        try {
+            hostBackupService.triggerAutoBackup(state, reason);
+        } catch (e) {
+            console.warn('triggerFullAutoBackup error:', e);
+        }
     }
 
     /**

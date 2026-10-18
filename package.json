@@ -5,7 +5,7 @@
   "author": "Ehsan Ahangar",
   "main": "electron/main.cjs",
   "private": true,
-  "version": "16.52.0",
+  "version": "16.54.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -20,6 +20,8 @@
     "build:apk": "node scripts/build-apk.js",
     "apk": "node scripts/build-apk.js",
     "prepare-dist": "node prepare-dist.js",
+    "diagnose:android": "node scripts/diagnose-android-assets.js",
+    "cleanup:builds": "node scripts/cleanup-builds.js",
     "preview": "vite preview"
   },
   "dependencies": {
