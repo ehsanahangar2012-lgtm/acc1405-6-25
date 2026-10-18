@@ -9,6 +9,7 @@
 
 import { hostBackupService, BackupResult, HostBackupEntry } from './hostBackupService';
 import { idbService } from './indexedDBService';
+import { useFinancialStore } from '../store-financial';
 
 const LOCAL_IDB_KEY = 'auto_backups';
 const MAX_LOCAL_BACKUPS = 10;
@@ -76,7 +77,7 @@ class AutoBackupService {
     async createLocalBackup(state: any): Promise<void> {
         try {
             const id = Date.now().toString();
-            const data = JSON.stringify(state);
+            const data = JSON.stringify({ ...state, financialData: useFinancialStore.getState() });
             const backup: LocalBackup = {
                 id,
                 timestamp: Date.now(),
