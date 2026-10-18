@@ -55,9 +55,9 @@ for (const cssRef of cssRefs) {
   }
   const cssText = fs.readFileSync(cssPath, 'utf8');
   const unsupported = [
-    /@layer\\s/i.test(cssText) && '@layer',
-    /oklch\\s*\\(/i.test(cssText) && 'oklch()',
-    /color-mix\\s*\\(/i.test(cssText) && 'color-mix()'
+    /@layer\s/i.test(cssText) && '@layer',
+    /oklch\s*\(/i.test(cssText) && 'oklch()',
+    /color-mix\s*\(/i.test(cssText) && 'color-mix()',
   ].filter(Boolean);
   if (unsupported.length > 0) {
     throw new Error(`Android CSS compatibility pass did not finish; unsupported syntax remains: ${unsupported.join(', ')}`);
