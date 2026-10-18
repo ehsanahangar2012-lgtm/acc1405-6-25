@@ -43,12 +43,12 @@ if (!fs.existsSync(bundledHtmlPath)) {
   throw new Error('Capacitor sync did not create android/app/src/main/assets/public/index.html.');
 }
 const bundledHtml = fs.readFileSync(bundledHtmlPath, 'utf8');
-const cssRefs = [...bundledHtml.matchAll(/href=["']([^"']+\\.css)(?:\\?[^"']*)?["']/g)].map(match => match[1]);
+const cssRefs = [...bundledHtml.matchAll(/href="([^"]+\.css)"/g)].map(match => match[1]);
 if (cssRefs.length === 0) {
   throw new Error('No compiled CSS stylesheet was linked from the Android WebView entry point.');
 }
 for (const cssRef of cssRefs) {
-  const relativeCssPath = decodeURIComponent(cssRef).replace(/^\\.\\//, '').replace(/^\\//, '');
+  const relativeCssPath = decodeURIComponent(cssRef).replace(/^\.\//, '').replace(/^\//, '');
   const cssPath = path.resolve(androidPublicDir, relativeCssPath);
   if (!cssPath.startsWith(path.resolve(androidPublicDir) + path.sep) || !fs.existsSync(cssPath)) {
     throw new Error(`Android stylesheet is missing: ${cssRef}`);
