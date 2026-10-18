@@ -15,10 +15,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -44,14 +42,14 @@ jobs:
           fi
           "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
 
-      - name: Install NPM Dependencies
-        run: npm install --legacy-peer-deps
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
 
       - name: Type-check project
-        run: npm run lint
+        run: bun run lint
 
       - name: Build real Android APK
-        run: npm run build:apk
+        run: bun run build:apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
