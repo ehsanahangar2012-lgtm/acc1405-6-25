@@ -24,28 +24,33 @@ export class AccountingEngine {
       throw new Error(`حساب بستانکار نامعتبر است: شناسه یافت نشد (${entry.creditAccountId})`);
     }
 
-    // 2. Validate non-zero positive amounts
-    if (!entry.amount || entry.amount <= 0) {
-      throw new Error(`مبلغ سند حسابداری باید بزرگتر از صفر باشد: (${entry.amount})`);
+    // 2. Validate a real positive amount and a meaningful posting date.
+    if (typeof entry.amount !== 'number' || !Number.isFinite(entry.amount) || entry.amount <= 0) {
+      throw new Error(`مبلغ سند حسابداری باید عددی محدود و بزرگتر از صفر باشد: (${entry.amount})`);
+    }
+    if (typeof entry.date !== 'string' || !entry.date.trim()) {
+      throw new Error('تاریخ سند حسابداری الزامی است.');
+    }
+    if (entry.debitAccountId === entry.creditAccountId) {
+      throw new Error('حساب بدهکار و بستانکار نمی‌توانند یکسان باشند.');
     }
 
-    // 3. Validate fiscal period rules
+    // 3. Prevent posting into closed/locked periods or outside configured periods.
     const date = entry.date;
     const periods = finStore.fiscalPeriods || [];
-    
-    // Find matching fiscal period
     const matchedPeriod = periods.find(p => p.startDate <= date && date <= p.endDate);
+
+    if (periods.length > 0 && !matchedPeriod) {
+      throw new Error(`برای تاریخ ${date} دوره مالی تعریف‌شده‌ای وجود ندارد.`);
+    }
     if (matchedPeriod && (matchedPeriod.status === 'CLOSED' || matchedPeriod.status === 'LOCKED')) {
       throw new Error(`خطای انطباق: دوره مالی مربوط به تاریخ ${date} بسته یا قفل شده است.`);
     }
 
-    // Check against global fiscal config if store periods are empty
     const globalConfig = useStore.getState().config;
-    if (globalConfig.fiscalStartDate && globalConfig.fiscalEndDate) {
-      if (date < globalConfig.fiscalStartDate || date > globalConfig.fiscalEndDate) {
-        // Warning or error for out of boundary posting
-        console.warn(`پست خارج از بازه سال مالی پیکربندی شده: ${date}`);
-      }
+    if (globalConfig.fiscalStartDate && globalConfig.fiscalEndDate &&
+        (date < globalConfig.fiscalStartDate || date > globalConfig.fiscalEndDate)) {
+      throw new Error(`تاریخ ${date} خارج از بازه سال مالی پیکربندی‌شده است.`);
     }
 
     return true;
@@ -140,6 +145,15 @@ export class AccountingEngine {
    * Post dynamic double-entry transactions for Invoices.
    */
   static postInvoice(invoice: Invoice) {
+    // Keep a rollback point: a failure must not erase the previous posting or leave half a document.
+    const previousEntries = [...(useFinancialStore.getState().accountingEntries || [])];
+    const personId = invoice.personId;
+    let previousLedgerCache: string | null = null;
+    if (personId && typeof window !== 'undefined') {
+      try { previousLedgerCache = localStorage.getItem(`ledger-${personId}`); } catch {}
+    }
+
+    try {
     // در سند اصلاحی، سند قبل حذف و سند جدید به طور کامل جایگزین می‌شود
     useFinancialStore.setState(s => ({
       accountingEntries: s.accountingEntries.filter(e => e.referenceId !== invoice.id)
@@ -311,6 +325,16 @@ export class AccountingEngine {
 
     // Refresh sub-ledger balance in store
     this.refreshPersonBalance(invoice.personId);
+    } catch (error) {
+      useFinancialStore.setState({ accountingEntries: previousEntries });
+      if (personId && typeof window !== 'undefined') {
+        try {
+          if (previousLedgerCache === null) localStorage.removeItem(`ledger-${personId}`);
+          else localStorage.setItem(`ledger-${personId}`, previousLedgerCache);
+        } catch {}
+      }
+      throw error;
+    }
   }
 
   /**
