@@ -16,6 +16,7 @@ class PersistentStorage {
     private memoryCache: Map<string, { data: any; timestamp: number }> = new Map();
     private inFlightLoads: Map<string, Promise<any>> = new Map();
     private pendingSaves: Map<string, { value: any; timer: any; resolvers: Array<(success: boolean) => void> }> = new Map();
+    private inFlightSaves: Set<string> = new Set();
     private readonly CACHE_TTL_MS = 6000; // ۶ ثانیه اعتبار کش در حافظه رم
     private readonly WRITE_DEBOUNCE_MS = 400; // ۴۰۰ میلی‌ثانیه دی‌بانس برای تجمیع درخواست‌های ذخیره
 
@@ -144,7 +145,11 @@ class PersistentStorage {
         pending: { value: any; timer: any; resolvers: Array<(success: boolean) => void> }
     ): Promise<void> {
         if (this.pendingSaves.get(key) !== pending) return;
+        // Serialize writes for each key so a slower old request cannot overwrite a newer value.
+        if (this.inFlightSaves.has(key)) return;
+
         this.pendingSaves.delete(key);
+        this.inFlightSaves.add(key);
 
         let success = false;
         try {
@@ -156,7 +161,16 @@ class PersistentStorage {
         } catch {
             success = false;
         } finally {
+            this.inFlightSaves.delete(key);
             pending.resolvers.forEach(resolve => resolve(success));
+
+            // If another value arrived while the previous request was in flight,
+            // send that newest value next, after the earlier request has completed.
+            const nextPending = this.pendingSaves.get(key);
+            if (nextPending) {
+                clearTimeout(nextPending.timer);
+                void this.flushPendingSave(key, nextPending);
+            }
         }
     }
 
