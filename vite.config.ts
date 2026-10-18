@@ -9,9 +9,9 @@ const __dirname = dirname(__filename);
 
 const BROWSER_PREVIEW_CSP = "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'";
 
-function convertOklch(value) {
+function convertOklch(value: string): string {
   return value.replace(/oklch\(\s*([+-]?(?:\d+\.?\d*|\.\d+)%?)\s+([+-]?(?:\d+\.?\d*|\.\d+))\s+([+-]?(?:\d+\.?\d*|\.\d+))(?:\s*\/\s*([+-]?(?:\d+\.?\d*|\.\d+)%?))?\s*\)/gi,
-    (_match, lightnessRaw, chromaRaw, hueRaw, alphaRaw) => {
+    (_match: string, lightnessRaw: string, chromaRaw: string, hueRaw: string, alphaRaw?: string) => {
       const L = String(lightnessRaw).endsWith('%') ? parseFloat(lightnessRaw) / 100 : parseFloat(lightnessRaw);
       const C = parseFloat(chromaRaw);
       const h = parseFloat(hueRaw) * Math.PI / 180;
@@ -41,7 +41,7 @@ function convertOklch(value) {
     });
 }
 
-function parseLegacyColor(expression, vars) {
+function parseLegacyColor(expression: string, vars: Map<string, string>): number[] {
   let value = String(expression).trim().toLowerCase();
   const variable = value.match(/^var\((--[\w-]+)/);
   if (variable) value = String(vars.get(variable[1]) || '').trim().toLowerCase();
@@ -69,49 +69,49 @@ function parseLegacyColor(expression, vars) {
   return [0, 0, 0, 1];
 }
 
-function androidLegacyCssPlugin() {
+function androidLegacyCssPlugin(): any {
   return {
     postcssPlugin: 'ashk-android-legacy-css',
-    OnceExit(root) {
+    OnceExit(root: any) {
       // Tailwind v4 emits newer color functions and CSS cascade layers.
       // Convert colors and flatten layer wrappers for older Android System WebView builds.
-      root.walkDecls((decl) => {
+      root.walkDecls((decl: any) => {
         decl.value = convertOklch(decl.value);
         decl.value = decl.value
           .replace(/linear-gradient\(\s*in\s+(?:oklab|lab|srgb|hsl|hwb)\s*,/gi, 'linear-gradient(')
-          .replace(/linear-gradient\(\s*([^,()]+?)\s+in\s+(?:oklab|lab|srgb|hsl|hwb)\s*,/gi, (_m, direction) => `linear-gradient(${direction.trim()},`);
+          .replace(/linear-gradient\(\s*([^,()]+?)\s+in\s+(?:oklab|lab|srgb|hsl|hwb)\s*,/gi, (_m: string, direction: string) => `linear-gradient(${direction.trim()},`);
       });
 
       const colorVars = new Map();
-      root.walkDecls((decl) => {
+      root.walkDecls((decl: any) => {
         if (decl.prop.startsWith('--color-')) colorVars.set(decl.prop, decl.value.trim());
       });
 
       const mixPattern = /color-mix\(\s*in\s+(?:oklab|srgb|lab|lch|hsl|hwb)\s*,\s*(var\(--color-[\w-]+\)|currentcolor|#[\da-f]{3,8}|rgba?\([^)]*\)|white|black)\s+(\d+(?:\.\d+)?)%\s*,\s*transparent\s*\)/gi;
-      root.walkDecls((decl) => {
-        decl.value = decl.value.replace(mixPattern, (_m, expression, opacityRaw) => {
+      root.walkDecls((decl: any) => {
+        decl.value = decl.value.replace(mixPattern, (_m: string, expression: string, opacityRaw: string) => {
           const [r, g, blue, originalAlpha] = parseLegacyColor(expression, colorVars);
           const alpha = Math.max(0, Math.min(1, Number(opacityRaw) / 100 * originalAlpha));
           return `rgba(${Math.round(r)}, ${Math.round(g)}, ${Math.round(blue)}, ${alpha.toFixed(3)})`;
         });
       });
 
-      root.walkAtRules('supports', (rule) => {
+      root.walkAtRules('supports', (rule: any) => {
         rule.params = rule.params
           .replace(/\(color:\s*color-mix\(in\s+lab,\s*red,\s*red\)\)/gi, '(color: rgb(0, 0, 0))')
           .replace(/background-image:\s*linear-gradient\(in\s+(?:lab|oklab|srgb),\s*red,\s*red\)/gi, 'background-image: linear-gradient(red, red)');
       });
 
-      const flattenLayers = (container) => {
+      const flattenLayers = (container: any) => {
         for (const node of [...(container.nodes || [])]) {
           if (node.type === 'atrule' && node.name === 'layer') {
             if (!node.nodes || node.nodes.length === 0) {
               node.remove();
               continue;
             }
-            const children = node.nodes.map((child) => child.clone());
+            const children = node.nodes.map((child: any) => child.clone());
             node.replaceWith(...children);
-            children.forEach((child) => flattenLayers(child));
+            children.forEach((child: any) => flattenLayers(child));
           } else if (node.nodes) {
             flattenLayers(node);
           }
@@ -122,12 +122,12 @@ function androidLegacyCssPlugin() {
   };
 }
 
-function browserPreviewIsolationPlugin() {
+function browserPreviewIsolationPlugin(): any {
   return {
     name: 'ashk-browser-preview-isolation',
     transformIndexHtml: {
       order: 'post',
-      handler(html) {
+      handler(html: string): string {
         const buildId = String(process.env.GITHUB_SHA || 'local').replace(/[^a-zA-Z0-9._-]/g, '');
         let output = html.replace(
           /<meta http-equiv="Content-Security-Policy" content="[^"]*"\s*\/>/i,
