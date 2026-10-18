@@ -12,6 +12,7 @@
 
 import { API_CONFIG } from '../config';
 import { idbService } from './indexedDBService';
+import { useFinancialStore } from '../store-financial';
 
 // ─── انواع ───────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ const LAST_BACKUP_KEY     = 'host_last_backup_time';
 const BACKUP_INTERVAL_MS  = 24 * 60 * 60 * 1000; // ۲۴ ساعت
 const MAX_HOST_BACKUPS    = 10; // نگهداری حداکثر ۱۰ فایل در هاست
 const FETCH_TIMEOUT_MS    = 30_000; // ۳۰ ثانیه - بکاپ داده بزرگ است
-const APP_VERSION         = '15.4.0';
+const APP_VERSION         = '16.54.0';
 
 // جداول اصلی که باید بکاپ شوند
 const BACKUP_TABLES = [
@@ -320,6 +321,9 @@ class HostBackupService {
             const val = state[table];
             if (val !== undefined) data[table] = val;
         }
+
+        // دفتر مالی در یک Zustand store جداگانه نگهداری می‌شود؛ بک‌آپ ابری هم باید آن را داشته باشد.
+        data.financialData = useFinancialStore.getState();
         return data;
     }
 
