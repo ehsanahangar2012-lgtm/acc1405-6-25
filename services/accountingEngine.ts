@@ -103,12 +103,35 @@ export class AccountingEngine {
     const finStore = useFinancialStore.getState();
     const entries = finStore.accountingEntries || [];
 
-    // Find all matching entries that have not already been reversed
-    const matches = entries.filter(e => 
-      e.referenceId === referenceId && 
-      e.referenceType === referenceType &&
-      !e.description.startsWith('[اصلاحی - برگشتی]')
-    );
+    // Select source entries that have not already received a storno entry.
+    // The source-id marker makes repeated status changes idempotent.
+    const matches = entries.filter(e => {
+      if (e.referenceId !== referenceId ||
+          e.referenceType !== referenceType ||
+          e.description.startsWith('[اصلاحی - برگشتی]')) {
+        return false;
+      }
+
+      const marker = `[REVERSAL_OF:${e.id}]`;
+      const hasMarkedReversal = entries.some(reversal =>
+        reversal.referenceId === referenceId &&
+        reversal.referenceType === referenceType &&
+        reversal.description.includes(marker)
+      );
+      if (hasMarkedReversal) return false;
+
+      // Recognize legacy reversals created before source IDs were recorded.
+      const legacyDescription = `[اصلاحی - برگشتی] بابت ${e.description}`;
+      const hasLegacyReversal = entries.some(reversal =>
+        reversal.referenceId === referenceId &&
+        reversal.referenceType === referenceType &&
+        reversal.description === legacyDescription &&
+        reversal.debitAccountId === e.creditAccountId &&
+        reversal.creditAccountId === e.debitAccountId &&
+        reversal.amount === e.amount
+      );
+      return !hasLegacyReversal;
+    });
 
     if (matches.length === 0) return;
 
@@ -120,7 +143,7 @@ export class AccountingEngine {
       const stornoEntry: AccountingEntry = {
         id: stornoId,
         date: currentLocalDate,
-        description: `[اصلاحی - برگشتی] بابت ${match.description}`,
+        description: `[اصلاحی - برگشتی] بابت ${match.description} [REVERSAL_OF:${match.id}]`,
         debitAccountId: match.creditAccountId, // Swap accounts
         creditAccountId: match.debitAccountId,
         amount: match.amount,
