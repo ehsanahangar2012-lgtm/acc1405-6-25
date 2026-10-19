@@ -83,7 +83,7 @@ $Cert.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::
 - `ANDROID_SIGNER_SHA256` — fingerprint گواهی Android، ۶۴ رقم هگزادسیمال و بدون `:`
 - `WINDOWS_SIGNING_PUBLISHER` — نام نمایشی دقیق گواهی Windows
 
-این مقادیر را در **Repository secrets**، فایل‌های پروژه یا کد قرار ندهید؛ workflow برای ساخت تجاری فقط آن‌ها را از محیط `commercial-signing` می‌خواند.
+این مقادیر را در **Repository secrets**، فایل‌های پروژه یا کد قرار ندهید؛ workflow برای ساخت تجاری باید آن‌ها را از محیط `commercial-signing` بخواند. اگر هرکدام از این شش Secret قبلاً در سطح مخزن تعریف شده‌اند، پس از ثبت و آزمایش نسخهٔ محیطی، نمونه‌های سطح مخزن را حذف کنید؛ Secret سطح مخزن می‌تواند در buildهای عادی هم در دسترس باشد و محدودیت محیط به‌تنهایی آن را خنثی نمی‌کند.
 
 ### `commercial-release`
 این محیط را فقط برای تگ‌های `v*` محدود کنید و در صورت امکان یک یا چند **Required reviewer** تعیین کنید. هیچ کلید خصوصی‌ای لازم نیست در این محیط ذخیره شود؛ فقط مرحلهٔ انتشار Draft Release را محافظت می‌کند.
