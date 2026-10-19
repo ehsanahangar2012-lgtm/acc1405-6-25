@@ -46,7 +46,9 @@ if (!fs.existsSync(path.join(rootDir, 'dist', 'index.html'))) {
 
 fs.mkdirSync(outputDir, { recursive: true });
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-run(npx, ['electron-builder', '--win', ...targets]);
+// Disable electron-builder's implicit CI publishing. This workflow only builds artifacts;
+// publishing GitHub releases is a separate, explicit operation requiring a release token.
+run(npx, ['electron-builder', '--win', ...targets, '--publish', 'never']);
 
 const executables = fs.readdirSync(outputDir)
   .filter(name => name.toLowerCase().endsWith('.exe'))
