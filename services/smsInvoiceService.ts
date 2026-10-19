@@ -2,6 +2,7 @@ import { Invoice, Person, CompanyProfile, InvoiceType } from '../types';
 import { formatCurrency, toPersianDigits, getPersianDate, isAndroidApp } from '../utils';
 import { simpleSignatureService } from './simpleSignatureService';
 import { SmsGatewayService, triggerDeviceSms } from './smsGatewayService';
+import { workspaceService } from './workspaceService';
 
 export interface SmsInvoiceSendResult {
     success: boolean;
@@ -167,13 +168,15 @@ export class SmsInvoiceService {
                 signUrl
             };
 
-            const response = await fetch('/api.php', {
+            const secureHeaders = await workspaceService.getSecureHeaders();
+            const response = await fetch('/host-backend/api.php', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                headers: { 'Content-Type': 'application/json', ...secureHeaders },
+                body: JSON.stringify({ ...payload, workspace_id: workspaceService.getWorkspaceId() })
             });
+            const result = await response.json().catch(() => null);
 
-            if (response.ok) {
+            if (response.ok && result?.success === true) {
                 return {
                     success: true,
                     message: `پیامک فاکتور با موفقیت از طریق پنل پیامک به شماره ${toPersianDigits(phone)} ارسال شد.`,
