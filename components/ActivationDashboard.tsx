@@ -156,7 +156,7 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                     throw new Error('امضای دیجیتال پاسخ لایسنس معتبر نیست؛ کلاینت فعال نشد.');
                 }
                 const receiptPayload = verifiedReceipt.payload;
-                const resolvedCompany = data.title || companyName || 'مشتری مجاز هاست';
+                const resolvedCompany = receiptPayload.company_name || data.title || companyName || 'مشتری مجاز هاست';
                 const resolvedExpireDate = receiptPayload.expire_date;
                 const resolvedUnlimited = receiptPayload.is_unlimited === true;
                 const resolvedFeatures = receiptPayload.features.filter((feature: unknown) => typeof feature === 'string') as string[];
