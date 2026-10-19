@@ -652,6 +652,33 @@ export class AccountingEngine {
   }
 
   /**
+   * Reverse a check-transfer document and its affected check-status postings atomically.
+   */
+  static reverseCheckTransfer(transfer: CheckTransfer) {
+    return this.withPostingRollback([transfer.personId], () => {
+      this.postStornoReversal(transfer.id, 'CHECK_TRANSFER');
+      transfer.checkIds.forEach(checkId => {
+        this.postStornoReversal(checkId, 'CHECK_STATUS');
+      });
+      if (transfer.personId) {
+        PersonLedgerService.removeByReference(transfer.personId, transfer.id);
+      }
+    });
+  }
+
+  /**
+   * Reverse a financial transaction before its source record is deleted.
+   */
+  static reverseGeneralTransaction(trans: Transaction) {
+    return this.withPostingRollback([trans.personId], () => {
+      this.postStornoReversal(trans.id, 'TRANSACTION');
+      if (trans.personId) {
+        PersonLedgerService.removeByReference(trans.personId, trans.id);
+      }
+    });
+  }
+
+  /**
    * Post General Income/Expense Transactions.
    */
   static postGeneralTransaction(trans: Transaction) {
