@@ -186,8 +186,8 @@ const LicenseManager: React.FC = () => {
             const newLicenseKey = licenseGeneratorService.generateLicenseKey();
             const workspaceId = `ws_${newLicenseKey.replace(/[^A-Z0-9]/gi, '').toLowerCase()}`;
             const planConfig = PLAN_CONFIGS[selectedPlan];
-            const effectiveExpireDate = planConfig.isUnlimited ? '9999-12-31' : expireDate;
-            if (!planConfig.isUnlimited) {
+            const effectiveExpireDate = selectedPlan === 'GOLD' ? '9999-12-31' : expireDate;
+            if (selectedPlan !== 'GOLD') {
                 const parsedExpiry = new Date(`${effectiveExpireDate}T00:00:00Z`);
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveExpireDate) || Number.isNaN(parsedExpiry.getTime()) || parsedExpiry.toISOString().slice(0, 10) !== effectiveExpireDate) {
                     throw new Error('تاریخ انقضا باید یک تاریخ معتبر میلادی با فرمت YYYY-MM-DD باشد.');
