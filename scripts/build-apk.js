@@ -11,8 +11,19 @@ const androidDir = path.join(rootDir, 'android');
 const gradleWrapper = path.join(androidDir, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
 const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 const appVersion = packageJson.version || '0.0.0';
-const apkName = `AshkeGhalam-v${appVersion}.apk`;
-const apkSource = path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
+const releaseSigningReady = [
+  process.env.ANDROID_KEYSTORE_PATH,
+  process.env.ANDROID_KEYSTORE_PASSWORD,
+  process.env.ANDROID_KEY_ALIAS,
+  process.env.ANDROID_KEY_PASSWORD
+].every(value => typeof value === 'string' && value.trim().length > 0);
+const isReleaseBuild = releaseSigningReady;
+const apkName = isReleaseBuild
+  ? `AshkeGhalam-v${appVersion}.apk`
+  : `AshkeGhalam-v${appVersion}-debug.apk`;
+const apkSource = isReleaseBuild
+  ? path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk')
+  : path.join(androidDir, 'app', 'build', 'outputs', 'apk', 'debug', 'app-debug.apk');
 
 function run(command, args, cwd = rootDir) {
   const result = spawnSync(command, args, {
@@ -32,6 +43,9 @@ if (!fs.existsSync(path.join(rootDir, 'dist', 'index.html'))) {
 if (!fs.existsSync(androidDir) || !fs.existsSync(gradleWrapper)) {
   throw new Error('The Android Gradle project or Gradle wrapper is missing.');
 }
+
+// Obfuscate the packaged JavaScript; never include source maps in native releases.
+run(process.execPath, ['scripts/obfuscate-release.js']);
 
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 run(npx, ['cap', 'sync', 'android']);
@@ -67,7 +81,8 @@ for (const cssRef of cssRefs) {
 if (process.platform !== 'win32') {
   fs.chmodSync(gradleWrapper, 0o755);
 }
-run(gradleWrapper, ['assembleDebug', '--no-daemon'], androidDir);
+const gradleTask = isReleaseBuild ? 'assembleRelease' : 'assembleDebug';
+run(gradleWrapper, [gradleTask, '--no-daemon'], androidDir);
 
 if (!fs.existsSync(apkSource)) {
   throw new Error(`Gradle reported success but the APK was not found: ${apkSource}`);
@@ -78,16 +93,16 @@ if (apkBuffer.length < 100_000 || apkBuffer.subarray(0, 2).toString() !== 'PK') 
 }
 
 const destinations = [
-  rootDir,
   path.join(rootDir, 'downloads'),
   path.join(rootDir, 'public', 'downloads'),
-  path.join(rootDir, 'dist', 'downloads'),
-  path.join(rootDir, 'dist')
+  path.join(rootDir, 'dist', 'downloads')
 ];
 for (const directory of destinations) {
   fs.mkdirSync(directory, { recursive: true });
   fs.copyFileSync(apkSource, path.join(directory, apkName));
 }
 
-console.log(`Built real debug APK: ${apkName} (${(apkBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
-console.log('Note: this is a debug-signed build for installation/testing; configure a private release keystore for production distribution.');
+console.log(`Built real ${isReleaseBuild ? 'signed release' : 'debug/test'} APK: ${apkName} (${(apkBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+if (!isReleaseBuild) {
+  console.log('Production signing is not configured. Set ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD to produce the hardened, signed release APK.');
+}
