@@ -202,3 +202,35 @@ body.light :is([class~="bg-teal-500"], [class~="bg-teal-600"], [class~="bg-emera
 body.light :is([class~="bg-teal-500"], [class~="bg-teal-600"], [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-green-500"], [class~="bg-green-600"], [class~="bg-blue-500"], [class~="bg-sky-500"], [class~="bg-cyan-600"]) * {
   color: #102a2b !important;
 }
+
+/* Dark neutral gradients and black/gray utility surfaces also need light-theme counterparts. */
+body.light :is([class~="bg-black"], [class*="bg-gray-900"], [class*="bg-gray-800"], [class*="bg-zinc-900"], [class*="bg-zinc-800"], [class*="bg-neutral-900"], [class*="bg-neutral-800"]):not(button):not(a):not(.fixed) {
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+}
+body.light [class*="bg-gradient"]:is([class*="from-slate-"], [class*="via-slate-"], [class*="to-slate-"], [class*="from-gray-"], [class*="via-gray-"], [class*="to-gray-"], [class*="from-zinc-"], [class*="from-neutral-"], [class*="from-black"]) {
+  background-image: linear-gradient(135deg, #ffffff 0%, #f8fafc 58%, #edf2f7 100%) !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+}
+body.light [class*="bg-gradient"][class*="from-teal-600"],
+body.light [class*="bg-gradient"][class*="from-emerald-600"] {
+  color: #102a2b !important;
+}
+body.light [class*="bg-gradient"][class*="from-teal-600"] *,
+body.light [class*="bg-gradient"][class*="from-emerald-600"] * {
+  color: #102a2b !important;
+}
+body.light [class*="bg-gradient"]:is([class*="from-blue-600"], [class*="from-indigo-600"], [class*="from-violet-600"], [class*="from-purple-600"], [class*="from-rose-600"], [class*="from-red-600"]) {
+  color: #ffffff !important;
+}
+body.light [class*="bg-gradient"]:is([class*="from-blue-600"], [class*="from-indigo-600"], [class*="from-violet-600"], [class*="from-purple-600"], [class*="from-rose-600"], [class*="from-red-600"]) * {
+  color: #ffffff !important;
+}
+body.light .invoice-paper,
+body.light .sheet-a4-white,
+body.light .print-content {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
