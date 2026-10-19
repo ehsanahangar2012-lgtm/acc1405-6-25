@@ -191,6 +191,9 @@ jobs:
       - name: Build real Android APK
         run: bun run build:apk
 
+      - name: Verify Android package excludes server and admin tooling
+        run: node scripts/sanitize-client-build.js android/app/src/main/assets/public --verify-only
+
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -239,6 +242,9 @@ jobs:
 
       - name: Build real Windows EXE files
         run: bun run build:windows
+
+      - name: Verify Windows renderer excludes server and admin tooling
+        run: node scripts/sanitize-client-build.js dist --verify-only
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
