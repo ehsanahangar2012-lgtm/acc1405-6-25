@@ -56,7 +56,7 @@ if (!$signingReady && function_exists('openssl_pkey_new') && function_exists('op
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $action = $input['action'] ?? $_GET['action'] ?? 'list';
-$adminSecret = (string)($_SERVER['HTTP_X_ADMIN_SECRET'] ?? $input['admin_secret'] ?? '');
+$adminSecret = (string)($_SERVER['HTTP_X_ADMIN_SECRET'] ?? '');
 
 // اگر اکشن عمومی برای بررسی وضعیت باشد
 if ($action === 'verify_license') {
@@ -171,7 +171,7 @@ if ($action === 'public_key') {
 // Every registry mutation/list operation requires the server-only admin secret.
 // DISABLED / empty keys fail closed; the secret is accepted only in a POST body or header.
 $configuredAdminSecret = (string)($config['admin_secret_key'] ?? '');
-if ($configuredAdminSecret === '' || $configuredAdminSecret === 'DISABLED' || $adminSecret === '' || !hash_equals($configuredAdminSecret, $adminSecret)) {
+if (strlen($configuredAdminSecret) < 32 || $configuredAdminSecret === 'DISABLED' || $adminSecret === '' || !hash_equals($configuredAdminSecret, $adminSecret)) {
     http_response_code(401);
     echo json_encode([
         'success' => false,
@@ -191,12 +191,20 @@ if (in_array($action, ['add', 'save_workspace', 'update'], true) && !$signingRea
 
 switch ($action) {
     case 'list':
-        // دریافت لیست کلیه کاربران و فضاهای کاری تعریف شده در سرور
+        $workspaces = array_values($config['workspaces'] ?? []);
+        $licenses = [];
+        foreach ($workspaces as $entry) {
+            if (!empty($entry['license_key'])) $licenses[] = $entry;
+            unset($entry['token'], $entry['token_hash']);
+        }
+        foreach ($workspaces as &$entry) { unset($entry['token'], $entry['token_hash']); }
+        unset($entry);
         echo json_encode([
             'success' => true,
-            'workspaces' => array_values($config['workspaces'] ?? []),
-            'auto_register' => (!empty($config['auto_register_new_tenants']) && getenv('ASHK_ALLOW_AUTO_REGISTER_TENANTS') === '1'),
-            'server_time' => date('Y-m-d H:i:s')
+            'licenses' => $licenses,
+            'workspaces' => $workspaces,
+            'auto_register' => false,
+            'server_time' => date('c')
         ], JSON_UNESCAPED_UNICODE);
         break;
 
@@ -231,6 +239,14 @@ switch ($action) {
             'notes' => trim($input['notes'] ?? ($existing['notes'] ?? ''))
         ];
 
+        // For a commercial key issued by the mother-web portal, store only its SHA-256 verifier.
+        $commercialKey = trim((string)($input['license_key'] ?? ''));
+        $issuedToken = (string)($config['workspaces'][$wsId]['token'] ?? '');
+        if ($action === 'add' && $commercialKey !== '' && $issuedToken !== '' && hash_equals($commercialKey, $issuedToken)) {
+            $config['workspaces'][$wsId]['license_key'] = $commercialKey;
+            $config['workspaces'][$wsId]['token_hash'] = hash('sha256', $issuedToken);
+            unset($config['workspaces'][$wsId]['token']);
+        }
         file_put_contents($authFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
 
         echo json_encode([
@@ -247,7 +263,7 @@ switch ($action) {
             echo json_encode(['success' => false, 'message' => 'لایسنس/فضای کاری یافت نشد.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
-        $config['workspaces'][$wsId]['status'] = 'SUSPENDED';
+        $config['workspaces'][$wsId]['status'] = 'REVOKED';
         $config['workspaces'][$wsId]['revoked_at'] = date('Y-m-d H:i:s');
         file_put_contents($authFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
         echo json_encode(['success' => true, 'message' => 'لایسنس در سرور ابطال شد.'], JSON_UNESCAPED_UNICODE);
@@ -267,6 +283,11 @@ switch ($action) {
     case 'toggle_status':
         $wsId = trim($input['workspace_id'] ?? '');
         if (isset($config['workspaces'][$wsId])) {
+            if (($config['workspaces'][$wsId]['status'] ?? '') === 'REVOKED') {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'message' => 'لایسنس باطل‌شده قابل فعال‌سازی مجدد نیست.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             $curr = $config['workspaces'][$wsId]['status'] ?? 'ACTIVE';
             $config['workspaces'][$wsId]['status'] = ($curr === 'ACTIVE') ? 'SUSPENDED' : 'ACTIVE';
             file_put_contents($authFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
