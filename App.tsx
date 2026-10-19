@@ -389,6 +389,16 @@ const useSmartRoutePreloader = () => {
     useEffect(() => {
         const path = location.pathname;
 
+        // On phones and native Android WebView, background-prefetching several large
+        // accounting modules competes with first paint and makes startup feel slow.
+        // Let mobile load only the route the user actually opened.
+        if (
+            typeof window !== 'undefined' &&
+            (isAndroidApp() || window.matchMedia('(max-width: 768px)').matches)
+        ) {
+            return;
+        }
+
         switch (path) {
             case '/':
             case '':
