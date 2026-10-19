@@ -28,6 +28,7 @@ import { encryptedStorageService, AppManifest } from '../services/encryptedStora
 import { idbService } from '../services/indexedDBService';
 import { workspaceService } from '../services/workspaceService';
 import { verifyServerLicenseReceipt } from '../services/serverLicenseReceiptService';
+import { HOST_BASE_URL } from '../config';
 
 interface ActivationDashboardProps {
     isOpen?: boolean;
@@ -45,7 +46,7 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
     const [licenseKey, setLicenseKey] = useState('');
         const [companyName, setCompanyName] = useState('');
     const [workspaceId, setWorkspaceId] = useState('default');
-    const [serverUrl, setServerUrl] = useState('');
+    const [serverUrl, setServerUrl] = useState(() => workspaceService.getConfig().customServerUrl || HOST_BASE_URL);
     const [isLoading, setIsLoading] = useState(false);
     const [copiedHwid, setCopiedHwid] = useState(false);
     const [copiedSig, setCopiedSig] = useState(false);
@@ -98,7 +99,8 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
             const hwid = deviceInfo?.hwid || await hardwareIdService.getHardwareId();
             const cleanWorkspaceId = workspaceId.trim();
             const cleanLicenseKey = licenseKey.trim();
-            const resolvedServerUrl = (serverUrl.trim() || window.location.origin).replace(/\/+$/, '');
+            const resolvedServerUrl = (serverUrl.trim() || HOST_BASE_URL).replace(/\/+$/, '');
+            const activationServerUrl = HOST_BASE_URL.replace(/\/+$/, '');
 
             if (!cleanWorkspaceId || ['default', 'main'].includes(cleanWorkspaceId) || !cleanLicenseKey) {
                 setMessage({ type: 'error', text: 'برای فعال‌سازی آنلاین، شناسه فضای کاری اختصاصی ثبت‌شده و کلید لایسنس لازم است؛ default/main برای پرتال مادر رزرو شده‌اند.' });
@@ -112,9 +114,10 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                 token: cleanLicenseKey,
                 hwid
             });
+            // Commercial license authority is fixed by app configuration; the user-entered host is for data sync only.
             const apiCandidates = [
-                `${resolvedServerUrl}/tenant-manager.php`,
-                `${resolvedServerUrl}/host-backend/tenant-manager.php`
+                `${activationServerUrl}/tenant-manager.php`,
+                `${activationServerUrl}/host-backend/tenant-manager.php`
             ];
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -143,7 +146,7 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
 
             if (response?.ok && data?.allowed === true && data?.status === 'ACTIVE') {
                 const verifiedReceipt = await verifyServerLicenseReceipt({
-                    hostUrl: resolvedServerUrl,
+                    hostUrl: activationServerUrl,
                     licenseKey: cleanLicenseKey,
                     workspaceId: cleanWorkspaceId,
                     hwid,
@@ -189,6 +192,7 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                     expireDate: resolvedExpireDate,
                     isUnlimited: resolvedUnlimited,
                     hostUrl: resolvedServerUrl,
+                    licenseAuthorityUrl: activationServerUrl,
                     syncToken: cleanLicenseKey,
                     workspaceToken: cleanLicenseKey,
                     maxCustomers: receiptPayload.max_customers,
