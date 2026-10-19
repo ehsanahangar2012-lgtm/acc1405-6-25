@@ -535,8 +535,7 @@ try {
 
         case 'backup': {
             $result = createBackup();
-            if (empty($result['success'])) http_response_code(500);
-            hostStorageRespond(200, $result);
+            hostStorageRespond(!empty($result['success']) ? 200 : 500, $result);
             break;
         }
 
