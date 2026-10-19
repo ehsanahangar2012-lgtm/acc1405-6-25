@@ -45,7 +45,7 @@ export const getInvoiceTypeDefaults = (targetType: InvoiceType, allInvoices: Inv
 };
 
 const Invoices = () => {
-  const { invoices, products, people, checks, addInvoice, updateInvoice, deleteInvoice, addPerson, addProduct, setInvoiceSignature, companies, defaultInvoiceFooter, savedDescriptions, addSavedDescription, removeSavedDescription, addCheck, addBranch, addNotification } = useStore();
+  const { invoices, products, people, checks, addInvoice, updateInvoice, deleteInvoice, addPerson, addProduct, setInvoiceSignature, companies, defaultInvoiceFooter, savedDescriptions, addSavedDescription, removeSavedDescription, addBranch, addNotification } = useStore();
   
   const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
   const activeCompany = useMemo(() => companies.find(c => c.isActive) || companies[0], [companies]);
