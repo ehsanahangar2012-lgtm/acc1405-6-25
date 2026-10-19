@@ -226,8 +226,9 @@ function createWindow() {
             contextIsolation: true,
             preload: getPreloadPath(),
             sandbox: false,
-            webSecurity: false,
-            allowRunningInsecureContent: true,
+            devTools: !app.isPackaged,
+            webSecurity: true,
+            allowRunningInsecureContent: false,
             partition: 'persist:ashke-ghalam-isolated-secure'
         },
         backgroundColor: '#111827',
