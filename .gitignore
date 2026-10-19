@@ -41,3 +41,15 @@ backups/
 # Temporary files
 *.tmp
 *.temp
+
+# Native release outputs and private signing material
+*.exe
+*.apk
+*.pfx
+*.p12
+*.keystore
+*.jks
+/dist_electron/
+/downloads/
+/public/downloads/
+/android/app/ashk-release.jks
