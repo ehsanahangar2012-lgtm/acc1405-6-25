@@ -7,7 +7,7 @@ concurrency:
 
 on:
   push:
-    branches: [ main, master, fix/core-data-integrity ]
+    branches: [ main, master ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
