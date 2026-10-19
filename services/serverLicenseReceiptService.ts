@@ -94,10 +94,14 @@ export async function verifyServerLicenseReceipt(args: {
     if (!Number.isFinite(payload.expires_at) || payload.expires_at <= now) return null;
     if (typeof payload.plan !== 'string' || !Array.isArray(payload.features)) return null;
     if (!Number.isFinite(payload.max_customers) || !Number.isFinite(payload.max_documents)) return null;
-    if (!payload.is_unlimited) {
+    if (payload.expire_date !== '9999-12-31') {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.expire_date || '')) return null;
       const expires = new Date(payload.expire_date + 'T23:59:59Z');
-      if (Number.isNaN(expires.getTime()) || expires.getTime() < Date.now()) return null;
+      if (
+        Number.isNaN(expires.getTime()) ||
+        expires.toISOString().slice(0, 10) !== payload.expire_date ||
+        expires.getTime() < Date.now()
+      ) return null;
     }
     return { payload, receipt };
   } catch {
