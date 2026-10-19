@@ -2,7 +2,7 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, X-Workspace-ID, X-Workspace-Token, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, X-Workspace-ID, X-Workspace-Token, X-Device-HWID, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
@@ -12,11 +12,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $headers = function_exists('getallheaders') ? getallheaders() : [];
 $workspaceHeader = '';
 $tokenHeader = '';
+$hwidHeader = '';
 foreach ($headers as $k => $v) {
     if (strcasecmp($k, 'X-Workspace-ID') === 0) {
         $workspaceHeader = $v;
     } elseif (strcasecmp($k, 'X-Workspace-Token') === 0) {
         $tokenHeader = $v;
+    } elseif (strcasecmp($k, 'X-Device-HWID') === 0) {
+        $hwidHeader = $v;
     }
 }
 
@@ -25,6 +28,7 @@ $workspace = trim($workspaceHeader ?: ($input['workspace_id'] ?? $_GET['workspac
 $workspace = preg_replace('/[^a-zA-Z0-9_-]/', '', $workspace);
 // Do not accept workspace tokens in query strings: URLs can be captured in access logs and referrers.
 $token = trim($tokenHeader ?: ($input['workspace_token'] ?? ''));
+$hwid = trim($hwidHeader ?: ($input['hwid'] ?? ''));
 
 // بررسی لایسنس و توکن در صورت وجود فایل license_validator.php
 if (!is_file(__DIR__ . '/license_validator.php')) {
@@ -37,7 +41,7 @@ if (!is_file(__DIR__ . '/license_validator.php')) {
     exit;
 }
 require_once __DIR__ . '/license_validator.php';
-$access = LicenseValidator::validateAccess($workspace, $token);
+$access = LicenseValidator::validateAccess($workspace, $token, $hwid);
 if (!$access['allowed']) {
     http_response_code(403);
     echo json_encode([
