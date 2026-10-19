@@ -1,7 +1,17 @@
+import { registerPlugin } from '@capacitor/core';
 import { isAndroidApp, getPersianDate, toPersianDigits, formatCurrency } from '../utils';
+import { APP_VERSION } from '../config';
+import { backupEncryptionService } from './backupEncryptionService';
 import { licenseQuotaService } from './licenseQuotaService';
 import { workspaceService } from './workspaceService';
 import { securityService } from './securityService';
+
+interface NativeBackupPlugin {
+    saveBackup(options: { fileName: string; content: string; mimeType?: string }): Promise<{
+        success?: boolean; cancelled?: boolean; uri?: string; bytesWritten?: number;
+    }>;
+}
+const nativeBackupPlugin = registerPlugin<NativeBackupPlugin>('NativeBackup');
 
 export interface BusinessProfile {
     companyName: string;
@@ -437,28 +447,40 @@ class AndroidCommercialService {
     /**
      * استخراج فایل بکاپ مستقل و آفلاین دیتابیس در گوشی
      */
-    createOfflineBackupFile(data: any): void {
-        if (typeof window === 'undefined') return;
+    /**
+     * Export a passphrase-encrypted portable backup through Android's system folder picker.
+     */
+    async createOfflineBackupFile(data: any, passphrase: string): Promise<{ success: boolean; cancelled?: boolean; location?: string; fileName?: string }> {
+        if (typeof window === 'undefined') throw new Error('محیط ذخیره‌سازی در دسترس نیست.');
         const backupPayload = {
             system: 'AshkeGhalam Accounting',
-            platform: 'Android Commercial Sovereignty',
-            version: '16.32.0',
+            platform: 'Portable Offline Backup',
+            version: APP_VERSION,
             exportedAtJalali: getPersianDate(),
             exportedAtTimestamp: Date.now(),
-            data: data
+            data
         };
+        const encryptedJson = backupEncryptionService.encryptJson(backupPayload, passphrase);
+        const dateStr = getPersianDate().replace(/[/ :]/g, '-');
+        const fileName = `AshkeGhalam-Android-Backup-v${APP_VERSION}-${dateStr}.agbak`;
 
-        const jsonStr = JSON.stringify(backupPayload, null, 2);
-        const blob = new Blob([jsonStr], { type: 'application/json;charset=utf-8' });
+        if (isAndroidApp()) {
+            const result = await nativeBackupPlugin.saveBackup({ fileName, content: encryptedJson, mimeType: 'application/json' });
+            if (result?.cancelled) return { success: false, cancelled: true, fileName };
+            if (!result?.success) throw new Error('ذخیره فایل پشتیبان در مسیر انتخاب‌شده تأیید نشد.');
+            return { success: true, location: result.uri, fileName };
+        }
+
+        const blob = new Blob([encryptedJson], { type: 'application/json;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        const dateStr = getPersianDate().replace(/[/ :]/g, '-');
         link.href = url;
-        link.download = `AshkeGhalam-Android-Backup-v16.32.0-${dateStr}.json`;
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+        return { success: true, fileName };
     }
 
     /**
