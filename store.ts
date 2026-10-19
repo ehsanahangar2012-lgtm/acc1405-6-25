@@ -2085,7 +2085,7 @@ export const useStore = create<AppState>()(
               return;
           }
           const encryptedText = backupEncryptionService.encryptJson(backupData, passphrase);
-          downloadJSON(JSON.parse(encryptedText), `AshkeGhalam-Backup-Encrypted-${getPersianDate().replace(/\\//g, '-')}`);
+          downloadJSON(JSON.parse(encryptedText), `AshkeGhalam-Backup-Encrypted-${getPersianDate().replaceAll("/", "-")}`);
           // No plaintext full-export copy is uploaded by this action.
       }
     };
