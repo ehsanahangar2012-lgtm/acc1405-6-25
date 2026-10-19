@@ -142,10 +142,20 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
           <div className="bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-4 flex items-start gap-3">
             <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
             <div className="text-xs text-emerald-200/90 leading-relaxed">
-              <strong className="text-emerald-300 block mb-1">نسخه‌های اجرایی منتشرشده:</strong>
-              فایل‌های این بخش از GitHub Releases دریافت می‌شوند. نبود اتصال اینترنت برای ثبت حسابداری محلی پشتیبانی می‌شود، اما همگام‌سازی با سرور به پیکربندی و مجوز معتبر نیاز دارد.
+              <strong className="text-emerald-300 block mb-1">وضعیت فعلی بسته‌های اجرایی:</strong>
+              پیوندهای دانلود رسمی پس از انتشار نسخه امضاشده فعال می‌شوند. ساخت فعلی ویندوز بدون گواهی ناشر و APK با امضای debug/test تولید شده است؛ این بسته‌ها فقط برای آزمون داخلی هستند، نه توزیع تجاری. خروجی آزمایشی را از Actions دریافت کنید.
             </div>
           </div>
+
+            <a
+              href="https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/actions/workflows/build-apk.yml"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 hover:text-emerald-200 underline underline-offset-4"
+            >
+              مشاهده اجراهای ساخت و بخش Artifacts در GitHub Actions
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
 
           {/* Download Packages Cards */}
           <div className="space-y-3.5">
@@ -229,7 +239,7 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
               <span>موتور اجرای فعلی دسکتاپ: Electron</span>
             </div>
             <p>
-              فایل‌ها پس از ساخت و انتشار نسخه با برچسب نسخه (v{APP_VERSION}) در GitHub Releases قرار می‌گیرند؛ خروجی‌های آزمایشی از بخش Actions قابل دریافت‌اند.
+              برای انتشار عمومی، نسخه باید با برچسب v{APP_VERSION} منتشر و بسته‌های ویندوز و اندروید با گواهی/کلید ناشر امضا شوند. خروجی‌های unsigned یا debug فقط برای آزمون داخلی‌اند.
             </p>
           </div>
 
