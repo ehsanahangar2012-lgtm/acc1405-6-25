@@ -10,6 +10,8 @@ import { useStore } from '../store';
 import { downloadJSON, getPersianDate, toPersianDigits, fetchWithTimeout } from '../utils';
 import { hostBackupService, HostBackupEntry } from '../services/hostBackupService';
 import { securityService } from '../services/securityService';
+import { backupEncryptionService } from '../services/backupEncryptionService';
+import CryptoJS from 'crypto-js';
 import { autoBackupService } from '../services/autoBackupService';
 import { backupMigrationService } from '../services/backupMigrationService';
 import { smartStorage } from '../services/smartStorageService';
@@ -32,6 +34,8 @@ const BackupManager = () => {
     const [tripleLoading, setTripleLoading] = useState(false);
     const [tripleReport, setTripleReport] = useState<TripleBackupReport | null>(null);
     const [localLoading, setLocalLoading] = useState(false);
+    const [backupExportPassword, setBackupExportPassword] = useState('');
+    const [backupImportPassword, setBackupImportPassword] = useState('');
     const [cloudLoading, setCloudLoading] = useState(false);
     const [hostBackups, setHostBackups] = useState<HostBackupEntry[]>([]);
     const [localSnapshots, setLocalSnapshots] = useState<any[]>([]);
@@ -471,62 +475,50 @@ const BackupManager = () => {
     const handleFullBackupExport = async () => {
         setLocalLoading(true);
         try {
+            if (backupExportPassword.trim().length < 12) {
+                throw new Error('برای خروجی قابل‌حمل، یک رمز حداقل ۱۲ نویسه‌ای وارد کنید.');
+            }
             const allBranches = (companies || []).flatMap(c => (c.branches || []).map(b => ({ ...b, companyId: c.id })));
             const currentRoles = useStore.getState().roles || [];
             const backupData: any = {
                 timestamp: new Date().toISOString(),
                 version: APP_VERSION,
                 backupFormatVersion: 2,
-                companies,
-                branches: allBranches,
-                products,
-                people,
-                invoices,
-                vouchers,
-                checks,
-                transactions,
-                checkTransfers,
-                salaries,
-                contracts,
-                config,
-                users,
-                roles: currentRoles,
-                importConfigs,
-                financialData: useFinancialStore.getState(),
-                signature: ''
+                companies, branches: allBranches, products, people, invoices, vouchers, checks,
+                transactions, checkTransfers, salaries, contracts, config, users, roles: currentRoles,
+                importConfigs, financialData: useFinancialStore.getState(), signature: ''
             };
 
+            // The legacy digest detects accidental corruption only; portability and tamper
+            // detection for this file come from the password-derived encryption envelope.
             backupData.signature = securityService.signBackup(backupData);
-            const dateStr = getPersianDate().replace(/\//g, '-');
+            const encryptedText = backupEncryptionService.encryptJson(backupData, backupExportPassword);
+            const dateStr = getPersianDate().replaceAll('/', '-');
             const desktopAPI = (window as any).electronDesktopAPI;
             let savedNativePath = '';
 
             if (desktopAPI && typeof desktopAPI.writeLocalBackup === 'function') {
                 const fileName = 'AshkeGhalam-ManualBackup-' + Date.now() + '.json';
-                const result = await desktopAPI.writeLocalBackup(fileName, JSON.stringify(backupData, null, 2));
-                if (result?.success && typeof result.filePath === 'string') {
-                    savedNativePath = result.filePath;
-                } else if (result?.error && result.error !== 'BACKUP_DIRECTORY_NOT_SELECTED') {
+                const result = await desktopAPI.writeLocalBackup(fileName, encryptedText);
+                if (result?.success && typeof result.filePath === 'string') savedNativePath = result.filePath;
+                else if (result?.error && result.error !== 'BACKUP_DIRECTORY_NOT_SELECTED') {
                     throw new Error('ذخیره فایل پشتیبان روی دیسک ناموفق بود: ' + result.error);
                 }
             }
 
-            backupService.backupData('full-export', backupData).catch(() => {});
+            // Exporting a file must not silently send a plaintext copy to the cloud.
             if (savedNativePath) {
-                if (addNotification) addNotification('success', 'فایل پشتیبان مستقل روی دیسک ذخیره شد: ' + savedNativePath);
-                else alert('فایل پشتیبان مستقل روی دیسک ذخیره شد.');
+                if (addNotification) addNotification('success', 'فایل پشتیبان رمزگذاری‌شده روی دیسک ذخیره شد: ' + savedNativePath);
+                else alert('فایل پشتیبان رمزگذاری‌شده روی دیسک ذخیره شد.');
             } else {
-                downloadJSON(backupData, 'AshkeGhalam-Backup-Signed-' + dateStr);
-                if (addNotification) {
-                    addNotification('info', 'فایل پشتیبان دانلود شد. برای ذخیره خودکار در پوشه مستقل ویندوز، ابتدا پوشه را انتخاب کنید.');
-                } else {
-                    alert('فایل پشتیبان دانلود شد؛ ذخیره خودکار در پوشه مستقل نیازمند انتخاب پوشه است.');
-                }
+                downloadJSON(JSON.parse(encryptedText), 'AshkeGhalam-Backup-Encrypted-' + dateStr);
+                if (addNotification) addNotification('success', 'فایل پشتیبان رمزگذاری‌شده دانلود شد. رمز را جدا از فایل نگه دارید.');
+                else alert('فایل پشتیبان رمزگذاری‌شده دانلود شد؛ رمز را جداگانه نگه دارید.');
             }
         } catch (error: any) {
             console.error(error);
             if (addNotification) addNotification('error', 'صدور فایل پشتیبان ناموفق بود: ' + (error?.message || 'خطای نامشخص'));
-            else alert('خطا در صدور فایل پشتیبان');
+            else alert('خطا در صدور فایل پشتیبان: ' + (error?.message || 'خطای نامشخص'));
         } finally {
             setLocalLoading(false);
         }
@@ -535,24 +527,58 @@ const BackupManager = () => {
     // 2. Import JSON file & verify signature & migrate
     const handleRestoreFile = async (file: File) => {
         try {
-            const text = await file.text();
-            const rawData = JSON.parse(text);
+            const fileText = await file.text();
+            let rawData: any;
+            try { rawData = JSON.parse(fileText); }
+            catch { throw new Error('فایل پشتیبان قابل خواندن نیست.'); }
 
-            // Structure check
+            // Portable backup files require the same passphrase. Device-local backups
+            // use the OS-protected Electron safeStorage envelope and cannot be moved to
+            // another Windows profile/device.
+            if (backupEncryptionService.isEncryptedEnvelope(rawData)) {
+                if (backupImportPassword.trim().length < 12) throw new Error('رمز فایل پشتیبان را در کادر بازیابی وارد کنید.');
+                rawData = backupEncryptionService.decryptJson(fileText, backupImportPassword);
+            } else if (rawData?.format === 'ASHKEGHALAM_DESKTOP_BACKUP_V1') {
+                const desktopAPI = (window as any).electronDesktopAPI;
+                if (!desktopAPI || typeof desktopAPI.invoke !== 'function') {
+                    throw new Error('این بکاپ با حفاظت سیستم‌عامل ویندوز ذخیره شده و فقط در همان پروفایل ویندوز قابل بازگشایی است.');
+                }
+                const decrypted = await desktopAPI.invoke('decrypt-local-backup', fileText);
+                if (!decrypted?.success || typeof decrypted.data !== 'string') {
+                    throw new Error(decrypted?.error || 'بازگشایی امن فایل دستگاهی ناموفق بود.');
+                }
+                rawData = JSON.parse(decrypted.data);
+            }
+
+            // Automatic local copies include a checksum across accounting data/assets.
+            if (rawData?.checksumAlgorithm === 'sha256' && rawData?.data && typeof rawData.data === 'object') {
+                const actualChecksum = CryptoJS.SHA256(JSON.stringify({ data: rawData.data, assets: rawData.assets ?? {} })).toString();
+                if (typeof rawData.checksum !== 'string' || actualChecksum !== rawData.checksum.toLowerCase()) {
+                    throw new Error('کنترل صحت بکاپ محلی ناموفق است؛ بازیابی متوقف شد.');
+                }
+                const restored = { ...rawData.data };
+                const assets = rawData.assets || {};
+                if (Array.isArray(assets.companies) && Array.isArray(restored.companies)) {
+                    restored.companies = restored.companies.map((company: any) => {
+                        const asset = assets.companies.find((entry: any) => entry.id === company.id);
+                        return asset ? { ...company, logo: asset.logo ?? company.logo, stamp: asset.stamp ?? company.stamp, signature: asset.signature ?? company.signature } : company;
+                    });
+                }
+                if (Array.isArray(assets.checkImages)) restored.checkImages = assets.checkImages;
+                if (Array.isArray(assets.signatures)) restored.signatures = assets.signatures;
+                rawData = restored;
+            }
+
             const hasBackupTables = !!(
-                rawData.companies || rawData.products || rawData.people || 
-                rawData.invoices || rawData.vouchers || rawData.checks || 
-                rawData.transactions || rawData.salaries || rawData.contracts ||
-                rawData.state
+                rawData.companies || rawData.products || rawData.people || rawData.invoices ||
+                rawData.vouchers || rawData.checks || rawData.transactions || rawData.salaries ||
+                rawData.contracts || rawData.state
             );
-
             if (!hasBackupTables) {
-                alert('خطا: فایل انتخاب شده ساختار معتبری از سیستم پشتیبانی ما نیست.');
+                alert('خطا: فایل انتخاب‌شده ساختار معتبری از اطلاعات حسابداری ندارد.');
                 return;
             }
 
-            // Version 2 backups must pass integrity verification. Legacy formats are
-            // imported only through a separate, explicit compatibility confirmation.
             const formatVersion = Number(rawData.backupFormatVersion || 0);
             const isValid = securityService.verifyBackup(rawData);
             if (formatVersion >= 2 && !isValid) {
@@ -560,21 +586,18 @@ const BackupManager = () => {
                 return;
             }
             if (formatVersion < 2 && !isValid) {
-                const proceed = confirm('این فایل پشتیبان قدیمی است و کنترل یکپارچگی نسخه جدید را ندارد. فقط در صورتی ادامه دهید که منبع فایل را می‌شناسید. آیا می‌خواهید مسیر مهاجرت فایل قدیمی را ادامه دهید؟');
+                const proceed = confirm('این فایل پشتیبان قدیمی است یا امضای نسخه جدید را ندارد. فقط در صورتی ادامه دهید که منبع فایل را می‌شناسید. آیا می‌خواهید مسیر مهاجرت فایل قدیمی را ادامه دهید؟');
                 if (!proceed) return;
             }
 
-            if (!confirm('⚠️ تایید نهایی بازیابی:\nتمام داده‌های فعلی شما جایگزین اطلاعات این فایل خواهند شد و برنامه مجددا بارگذاری می‌شود. آیا مطمئن هستید؟')) {
-                return;
-            }
+            if (!confirm('تأیید نهایی بازیابی: اطلاعات فعلی جایگزین فایل انتخابی خواهد شد. مطمئن شوید نسخه‌ای از داده‌های فعلی دارید. ادامه می‌دهید؟')) return;
 
-            // Run migration
             const migrated = backupMigrationService.migrateBackupData(rawData);
-
-            // Hydrate state
             hydrateStore(migrated);
-            
-            alert('✅ بازیابی و مهاجرت داده‌ها با موفقیت انجام شد. برنامه مجدداً بارگذاری می‌شود...');
+            if (rawData.financialData && typeof rawData.financialData === 'object') {
+                useFinancialStore.setState(rawData.financialData);
+            }
+            alert('بازیابی و مهاجرت داده‌ها انجام شد. بخش‌های مالی و اسناد را بررسی کنید.');
             window.location.reload();
         } catch (error: any) {
             alert(`خطا در پردازش فایل پشتیبان: ${error?.message || error}`);
@@ -1368,8 +1391,7 @@ const BackupManager = () => {
                                     <span>خروجی و دانلود فایل پشتیبان (امضا شده)</span>
                                 </h4>
                                 <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                                    یک فایل با فرمت JSON دانلود خواهید کرد که شامل کلیه پایگاه‌داده‌ها، حساب‌ها، شعب، کالاها، عکس لوگوها، امضاها، مهرها و غیره است.
-                                    این فایل حاوی امضای یکتای امنیتی سیستم بوده و اصالت آن هنگام بازیابی بررسی خواهد شد.
+                                    یک فایل JSON رمزگذاری‌شده شامل اطلاعات حسابداری، کاربران، شعب، کالاها، فاکتورها، تصاویر/امضاها و دفتر مالی ذخیره یا دانلود می‌شود. این خروجی قابل‌حمل است و با همان رمز در دستگاه دیگر باز می‌شود.
                                 </p>
                             </div>
 
@@ -1379,11 +1401,17 @@ const BackupManager = () => {
                                     <span className="text-indigo-400 font-mono font-bold">{formatSize(JSON.stringify(useStore.getState()).length)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
-                                    <span className="text-slate-500">حفاظت رمزنگاری:</span>
+                                    <span className="text-slate-500">حفاظت فایل:</span>
                                     <span className="text-emerald-400 font-black flex items-center gap-1">
-                                        <ShieldCheck size={14} /> امضا شده فعال
+                                        <ShieldCheck size={14} /> رمزگذاری با رمز انتخابی
                                     </span>
                                 </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label htmlFor="backup-export-password" className="block text-sm font-bold text-slate-200">رمزگذاری فایل پشتیبان (حداقل ۱۲ نویسه)</label>
+                                <input id="backup-export-password" type="password" autoComplete="new-password" minLength={12} value={backupExportPassword} onChange={e => setBackupExportPassword(e.target.value)} placeholder="رمز قوی و قابل نگهداری انتخاب کنید" className="w-full min-h-12 rounded-xl bg-slate-950 border border-white/20 px-3 py-3 text-base text-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
+                                <p className="text-sm text-slate-300 leading-6">رمز را جدا از فایل نگه دارید؛ فراموشی آن به معنی ناتوانی در بازیابی است.</p>
                             </div>
 
                             <button
@@ -1409,6 +1437,12 @@ const BackupManager = () => {
                             </div>
 
                             <div 
+                            <div className="space-y-1.5 mb-4">
+                                <label htmlFor="backup-import-password" className="block text-sm font-bold text-slate-200">رمز بازیابی فایل رمزگذاری‌شده</label>
+                                <input id="backup-import-password" type="password" autoComplete="current-password" value={backupImportPassword} onChange={e => setBackupImportPassword(e.target.value)} placeholder="رمز هنگام ایجاد فایل" className="w-full min-h-12 rounded-xl bg-slate-950 border border-white/20 px-3 py-3 text-base text-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
+                                <p className="text-sm text-slate-300 leading-6">اگر فایل قدیمی و بدون رمز است، برنامه پیش از بازیابی هشدار می‌دهد.</p>
+                            </div>
+
                                 className={`h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
                                     dragOver ? 'border-teal-500 bg-teal-500/10 text-teal-400' : 'border-white/10 hover:border-teal-500 text-slate-400 hover:text-white'
                                 }`}
@@ -1424,7 +1458,7 @@ const BackupManager = () => {
                                 <input 
                                     id="restore_file_input" 
                                     type="file" 
-                                    accept=".json" 
+                                    accept=".json,.agbak" 
                                     onChange={handleFileChange} 
                                     className="hidden" 
                                 />
