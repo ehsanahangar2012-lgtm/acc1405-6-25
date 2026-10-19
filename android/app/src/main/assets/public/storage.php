@@ -114,7 +114,7 @@ function storageSaveValue(string $dataDir, string $key, string $value, array $ac
         return ['success' => false, 'error' => 'QUOTA_DATA_INVALID'];
     }
 
-    $unlimited = !empty($access['is_unlimited']);
+    $unlimited = !empty($access['is_unlimited']) || (($access['role'] ?? '') === 'SUPER_ADMIN');
     $limit = $category === 'customers'
         ? (int)($access['max_customers'] ?? 30)
         : (int)($access['max_documents'] ?? 100);
@@ -221,6 +221,7 @@ switch ($action) {
             storageRespond(413, ['success' => false, 'error' => 'INVALID_OR_OVERSIZED_VALUE']);
         }
         $result = storageSaveValue($DATA_DIR, $key, $value, $access);
+        if (!empty($result['success'])) $result['workspace'] = $workspace;
         if (empty($result['success'])) {
             $status = in_array($result['error'] ?? '', ['CUSTOMER_QUOTA_EXCEEDED', 'DOCUMENT_QUOTA_EXCEEDED'], true) ? 409 :
                 (($result['error'] ?? '') === 'QUOTA_LOCK_UNAVAILABLE' ? 503 : 400);
