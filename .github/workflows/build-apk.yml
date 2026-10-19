@@ -36,6 +36,20 @@ jobs:
       - name: Type-check project
         run: bun run lint
 
+      - name: Validate PHP server endpoints syntax
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: openssl
+        env:
+          fail-fast: true
+        run: |
+          set -euo pipefail
+          php -l host-backend/license_validator.php
+          php -l host-backend/tenant-manager.php
+          php -l android/app/src/main/assets/public/license_validator.php
+          php -l android/app/src/main/assets/public/tenant-manager.php
+
       - name: Build local-only browser preview
         run: bun run build:browser-preview
 
