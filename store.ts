@@ -1742,10 +1742,32 @@ export const useStore = create<AppState>()(
           }
           const trans = s.transactions.find(t => t.id === id);
           if (!trans) return {};
-          
-          // Reverse journal entries successfully before removing the source transaction.
+
+          const linkedInvoice = trans.relatedInvoiceId
+              ? s.invoices.find(invoice => invoice.id === trans.relatedInvoiceId)
+              : undefined;
+          const paymentRecord = linkedInvoice?.payments?.find(payment => payment.id === trans.id);
+          const checkIdFromMetadata = (trans.metadata as any)?.checkId;
+          const linkedCheck = s.checks.find(check =>
+              check.id === trans.id ||
+              (checkIdFromMetadata && check.id === checkIdFromMetadata) ||
+              (trans.relatedInvoiceId &&
+                  (trans.metadata as any)?.paymentMethod === 'CHECK' &&
+                  check.relatedInvoiceId === trans.relatedInvoiceId &&
+                  check.amount === trans.amount &&
+                  check.checkNumber === trans.trackingCode)
+          ) || linkedInvoice?.checks?.find(check =>
+              check.id === trans.id ||
+              (checkIdFromMetadata && check.id === checkIdFromMetadata) ||
+              (trans.relatedInvoiceId &&
+                  (trans.metadata as any)?.paymentMethod === 'CHECK' &&
+                  check.amount === trans.amount &&
+                  check.checkNumber === trans.trackingCode)
+          );
+
+          // Reverse journals before deleting either the transaction or its linked check.
           try {
-              AccountingEngine.reverseGeneralTransaction(trans);
+              AccountingEngine.reverseTransactionAndCheck(trans, linkedCheck);
           } catch (err) {
               console.error('AccountingEngine error in deleteTransaction:', err);
               const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
@@ -1754,17 +1776,54 @@ export const useStore = create<AppState>()(
 
           deletedRecordsRegistry.registerDeletion(id, 'transaction');
           hostDB.deleteFromHost('transactions', id).catch(() => {});
-          
           const filteredTransactions = s.transactions.filter(t => t.id !== id);
+
+          let nextChecks = s.checks;
+          if (linkedCheck) {
+              deletedRecordsRegistry.registerDeletion(linkedCheck.id, 'check');
+              hostDB.deleteFromHost('checks', linkedCheck.id).catch(() => {});
+              nextChecks = s.checks.filter(check => check.id !== linkedCheck.id);
+          }
+
+          let nextInvoices = s.invoices;
+          if (linkedInvoice && paymentRecord) {
+              const isCheckPayment = paymentRecord.method === 'CHECK';
+              const updatedInvoice = {
+                  ...linkedInvoice,
+                  cashAmount: isCheckPayment
+                      ? (linkedInvoice.cashAmount || 0)
+                      : Math.max(0, (linkedInvoice.cashAmount || 0) - paymentRecord.amount),
+                  checkAmount: isCheckPayment
+                      ? Math.max(0, (linkedInvoice.checkAmount || 0) - paymentRecord.amount)
+                      : (linkedInvoice.checkAmount || 0),
+                  payments: (linkedInvoice.payments || []).filter(payment => payment.id !== trans.id),
+                  checks: (linkedInvoice.checks || []).filter(check =>
+                      check.id !== trans.id &&
+                      check.id !== checkIdFromMetadata &&
+                      (!linkedCheck || check.id !== linkedCheck.id)
+                  )
+              };
+              nextInvoices = s.invoices.map(invoice => invoice.id === linkedInvoice.id ? updatedInvoice : invoice);
+              hostDB.save('invoices', updatedInvoice).catch(() => {});
+              persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
+          }
+
           persistentStorage.saveData('transactions', filteredTransactions).catch(() => {});
+          persistentStorage.saveData('checks', nextChecks).catch(() => {});
 
-          const exactBalance = trans.personId ? PersonLedgerService.getBalance(trans.personId, s.invoices, filteredTransactions, s.checks) : 0;
-          const updatedPeople = s.people.map(p => p.id === trans.personId ? { ...p, balance: exactBalance } : p);
+          const personId = trans.personId || linkedCheck?.personId;
+          const exactBalance = personId
+              ? PersonLedgerService.getBalance(personId, nextInvoices, filteredTransactions, nextChecks)
+              : 0;
+          const updatedPeople = s.people.map(p => p.id === personId ? { ...p, balance: exactBalance } : p);
+          if (personId) persistentStorage.saveData('people', updatedPeople).catch(() => {});
 
-          return { 
-              transactions: filteredTransactions, 
-              people: updatedPeople, 
-              notifications: [...s.notifications, { id: generateId(), type: 'info', message: 'تراکنش حذف و مانده کاردکس شخص اصلاح شد.' }] 
+          return {
+              invoices: nextInvoices,
+              transactions: filteredTransactions,
+              checks: nextChecks,
+              people: updatedPeople,
+              notifications: [...s.notifications, { id: generateId(), type: 'info', message: 'تراکنش حذف شد؛ اسناد حسابداری معکوس و ماندهٔ فاکتور/چک باز‌محاسبه شد.' }]
           };
       }),
       
