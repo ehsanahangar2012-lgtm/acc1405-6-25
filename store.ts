@@ -30,6 +30,58 @@ const fullPermissions = (): UserPermissions => ({
     settings: emptyPerm(true), users: emptyPerm(true)
 });
 
+// Single source of truth for stock movement semantics, including both return directions.
+function voucherStockDelta(voucher: Voucher, quantity: number): number {
+  if (voucher.type === 'IN') return quantity;
+  if (voucher.type === 'OUT') return -quantity;
+  return voucher.movementType === 'RETURN_RECEIPT' ? quantity : -quantity;
+}
+
+function validateVoucherInventoryChange(
+  products: Product[],
+  operations: Array<{ voucher: Voucher; multiplier?: 1 | -1 }>,
+  validateAfterEachOperation = true
+): string | null {
+  const projectedStock = new Map<string, number>();
+  for (const product of products) {
+    const stock = Number(product.stock ?? 0);
+    if (!Number.isFinite(stock)) {
+      return `موجودی ثبت‌شدهٔ کالای «${product.name}» نامعتبر است؛ ابتدا موجودی کالا را اصلاح کنید.`;
+    }
+    projectedStock.set(product.id, stock);
+  }
+
+  for (const operation of operations) {
+    const { voucher, multiplier = 1 } = operation;
+    for (const item of voucher.items || []) {
+      const quantity = Number(item.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        return `تعداد کالای «${item.productName || 'نامشخص'}» در حواله باید عددی معتبر و بزرگ‌تر از صفر باشد.`;
+      }
+
+      const product = products.find(p => p.id === item.productId || p.name === item.productName);
+      if (!product) continue; // Non-catalog items do not have a stock counter here.
+
+      const current = projectedStock.get(product.id) ?? 0;
+      const next = current + (voucherStockDelta(voucher, quantity) * multiplier);
+      projectedStock.set(product.id, next);
+      if (validateAfterEachOperation && next < 0) {
+        return `موجودی کالای «${product.name}» کافی نیست. موجودی پس از این حواله به ${next} می‌رسد.`;
+      }
+    }
+  }
+
+  if (!validateAfterEachOperation) {
+    for (const product of products) {
+      const next = projectedStock.get(product.id) ?? 0;
+      if (next < 0) {
+        return `این تغییر موجودی کالای «${product.name}» را منفی می‌کند (${next}). ابتدا گردش‌های مرتبط را اصلاح کنید.`;
+      }
+    }
+  }
+  return null;
+}
+
 const DEFAULT_ROLES: Role[] = [
     { id: 'admin', name: 'مدیر سیستم', description: 'دسترسی کامل به تمام بخش‌ها', permissions: fullPermissions() }
 ];
@@ -1034,6 +1086,11 @@ export const useStore = create<AppState>()(
           if (!quotaCheck.allowed) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.' }] };
           }
+          const stockError = validateVoucherInventoryChange(s.products, [{ voucher: v }]);
+          if (stockError) {
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `حواله ثبت نشد: ${stockError}` }] };
+          }
+
           hostDB.save('vouchers', v).catch(() => {});
           let updatedPeople = [...s.people];
           let newTransactions = [...s.transactions];
@@ -1064,7 +1121,7 @@ export const useStore = create<AppState>()(
           v.items.forEach(item => {
               const pIndex = updatedProducts.findIndex(p => p.id === item.productId || p.name === item.productName);
               if (pIndex !== -1) {
-                  const change = v.type === 'IN' ? item.quantity : v.type === 'OUT' ? -item.quantity : 0;
+                  const change = voucherStockDelta(v, item.quantity);
                   updatedProducts[pIndex] = {
                       ...updatedProducts[pIndex],
                       stock: (updatedProducts[pIndex].stock || 0) + change
@@ -1091,12 +1148,20 @@ export const useStore = create<AppState>()(
           const oldVoucher = s.vouchers.find(v => v.id === id);
           if (!oldVoucher) return {};
 
+          const stockError = validateVoucherInventoryChange(s.products, [
+              { voucher: oldVoucher, multiplier: -1 },
+              { voucher: { ...updated, id }, multiplier: 1 }
+          ], false);
+          if (stockError) {
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `ویرایش حواله انجام نشد: ${stockError}` }] };
+          }
+
           let updatedProducts = [...s.products];
           // خنثی کردن تغییرات قدیم
           oldVoucher.items.forEach(item => {
               const pIndex = updatedProducts.findIndex(p => p.id === item.productId || p.name === item.productName);
               if (pIndex !== -1) {
-                  const change = oldVoucher.type === 'IN' ? -item.quantity : oldVoucher.type === 'OUT' ? item.quantity : 0;
+                  const change = -voucherStockDelta(oldVoucher, item.quantity);
                   updatedProducts[pIndex] = {
                       ...updatedProducts[pIndex],
                       stock: (updatedProducts[pIndex].stock || 0) + change
@@ -1108,7 +1173,7 @@ export const useStore = create<AppState>()(
           updated.items.forEach(item => {
               const pIndex = updatedProducts.findIndex(p => p.id === item.productId || p.name === item.productName);
               if (pIndex !== -1) {
-                  const change = updated.type === 'IN' ? item.quantity : updated.type === 'OUT' ? -item.quantity : 0;
+                  const change = voucherStockDelta({ ...updated, id }, item.quantity);
                   updatedProducts[pIndex] = {
                       ...updatedProducts[pIndex],
                       stock: (updatedProducts[pIndex].stock || 0) + change
@@ -1137,6 +1202,13 @@ export const useStore = create<AppState>()(
           const voucher = s.vouchers.find(x => x.id === id);
           if (!voucher) return {};
 
+          const stockError = validateVoucherInventoryChange(s.products, [
+              { voucher, multiplier: -1 }
+          ], false);
+          if (stockError) {
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `حذف حواله انجام نشد: ${stockError}` }] };
+          }
+
           deletedRecordsRegistry.registerDeletion(id, 'voucher');
           hostDB.deleteFromHost('vouchers', id).catch(() => {});
           persistentStorage.saveData('vouchers', s.vouchers.filter(x => x.id !== id)).catch(() => {});
@@ -1145,7 +1217,7 @@ export const useStore = create<AppState>()(
           voucher.items.forEach(item => {
               const pIndex = updatedProducts.findIndex(p => p.id === item.productId || p.name === item.productName);
               if (pIndex !== -1) {
-                  const change = voucher.type === 'IN' ? -item.quantity : voucher.type === 'OUT' ? item.quantity : 0;
+                  const change = -voucherStockDelta(voucher, item.quantity);
                   updatedProducts[pIndex] = {
                       ...updatedProducts[pIndex],
                       stock: (updatedProducts[pIndex].stock || 0) + change
@@ -1203,6 +1275,14 @@ export const useStore = create<AppState>()(
           const batch = s.importBatches.find(b => b.id === batchId);
           if (!batch || batch.status !== 'PENDING_VAL') return {};
 
+          const stockError = validateVoucherInventoryChange(
+              s.products,
+              batch.vouchers.map(voucher => ({ voucher }))
+          );
+          if (stockError) {
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `ثبت نهایی واردات لغو شد: ${stockError}` }] };
+          }
+
           const updatedBatches = s.importBatches.map(b => 
               b.id === batchId ? { ...b, status: 'COMMITTED' as const } : b
           );
@@ -1243,19 +1323,11 @@ export const useStore = create<AppState>()(
                   const pIndex = updatedProducts.findIndex(p => p.name === item.productName || p.id === item.productId);
                   if (pIndex !== -1) {
                       const qty = item.quantity;
-                      let stockChange = 0;
-                      if (v.type === 'IN') {
-                          stockChange = qty;
-                      } else if (v.type === 'OUT') {
-                          stockChange = -qty;
-                      } else if (v.type === 'RETURN') {
-                          // Return receipt increases stock, Return issue decreases it
-                          stockChange = v.movementType === 'RETURN_RECEIPT' ? qty : -qty;
-                      }
+                      const stockChange = voucherStockDelta(v, qty);
                       
                       updatedProducts[pIndex] = {
                           ...updatedProducts[pIndex],
-                          stock: Math.max(0, updatedProducts[pIndex].stock + stockChange)
+                          stock: Number(updatedProducts[pIndex].stock ?? 0) + stockChange
                       };
                       
                       // Save product update to Host DB (simulated)
