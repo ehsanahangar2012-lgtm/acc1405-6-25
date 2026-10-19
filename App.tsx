@@ -629,6 +629,16 @@ const MainAppLayout: React.FC = () => {
         else navigate('/');
     };
 
+    useEffect(() => {
+        const handleNativeBack = () => {
+            const historyIndex = Number((window.history.state as { idx?: number } | null)?.idx ?? 0);
+            if (historyIndex > 0) navigate(-1);
+            else navigate('/');
+        };
+        window.addEventListener('ashk-app-back', handleNativeBack);
+        return () => window.removeEventListener('ashk-app-back', handleNativeBack);
+    }, [navigate, location.key]);
+
     // اجرای پیش‌بارگذاری هوشمند وابسته به مسیر فعلی
     useSmartRoutePreloader();
 

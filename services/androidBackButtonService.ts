@@ -56,10 +56,11 @@ class AndroidBackButtonService {
             return;
         }
 
-        // ۲. اگر داخل تاریخچه ناوبری صفحه داخلی است، یک گام به عقب برود
+        // ۲. روی صفحه داخلی از React Router بخواه تا به عقب برگردد؛
+        // این کار حتی وقتی WebView تاریخچه مرورگر ندارد به صفحه سفید ختم نمی‌شود.
         const currentHash = window.location.hash;
         if (currentHash && currentHash !== '#/' && currentHash !== '#') {
-            window.history.back();
+            window.dispatchEvent(new CustomEvent('ashk-app-back'));
             return;
         }
 
