@@ -688,9 +688,11 @@ export const useStore = create<AppState>()(
           const inv = s.invoices.find(v => v.id === id);
           if (!inv) return {};
 
-          // ابطال حسابداری باید موفق باشد؛ در غیر این صورت فاکتور را حذف نکن.
+          const relatedTrans = s.transactions.filter(t => t.referenceId === id || t.relatedInvoiceId === id);
+
+          // Reverse invoice-day entries and every linked payment journal atomically.
           try {
-              AccountingEngine.postStornoReversal(id, 'INVOICE');
+              AccountingEngine.reverseInvoiceAndPayments(inv, relatedTrans);
           } catch (err) {
               console.error('AccountingEngine error in deleteInvoice:', err);
               const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
@@ -714,7 +716,6 @@ export const useStore = create<AppState>()(
           if (inv.personId) {
               PersonLedgerService.removeByReference(inv.personId, id);
           }
-          const relatedTrans = s.transactions.filter(t => t.referenceId === id || t.relatedInvoiceId === id);
           // سند اصلی فاکتور پس از حذف، دیگر از آرایه فاکتورها محاسبه نمی‌شود؛
           // پس برگشت جداگانه‌ی تراکنش نوع فاکتور، مانده را دوباره معکوس می‌کند.
           const reversalTransactions = relatedTrans
@@ -753,7 +754,20 @@ export const useStore = create<AppState>()(
           }
           
           const oldInvoice = s.invoices.find(v => v.id === id);
-          const finalUpdated = { ...updated, id };
+          if (!oldInvoice) return {};
+          // The editor may omit payment history and other metadata; merge with the stored record.
+          const finalUpdated = { ...oldInvoice, ...updated, id };
+          const separatelyPostedPaymentIds = new Set(
+              (finalUpdated.payments || []).filter(payment => payment.accountingPosted === true).map(payment => payment.id)
+          );
+          const separatelyPostedCash = (finalUpdated.payments || [])
+              .filter(payment => payment.accountingPosted === true && payment.method !== 'CHECK')
+              .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+          const separatelyPostedChecks = (finalUpdated.payments || [])
+              .filter(payment => payment.accountingPosted === true && payment.method === 'CHECK')
+              .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+          const embeddedCashAmount = Math.max(0, Number(finalUpdated.cashAmount || 0) - separatelyPostedCash);
+          const embeddedCheckAmount = Math.max(0, Number(finalUpdated.checkAmount || 0) - separatelyPostedChecks);
           const nextInvoices = s.invoices.map(v => v.id === id ? finalUpdated : v);
 
           // Cache cleanup is intentionally deferred until accounting succeeds.
@@ -785,8 +799,11 @@ export const useStore = create<AppState>()(
               } catch {}
           }
 
-          // بازتولید تراکنش‌های مرتبط با فاکتور
-          const filteredTransactions = s.transactions.filter(t => t.referenceId !== id && t.relatedInvoiceId !== id);
+          // Rebuild invoice-day summary rows, but keep actual dated payment transactions.
+          const filteredTransactions = s.transactions.filter(t => {
+              if (t.referenceId !== id && t.relatedInvoiceId !== id) return true;
+              return separatelyPostedPaymentIds.has(t.id);
+          });
           const newTransList: Transaction[] = [];
 
           if (finalUpdated.personId && finalUpdated.type !== InvoiceType.PROFORMA) {
@@ -804,12 +821,12 @@ export const useStore = create<AppState>()(
                   trackingCode: finalUpdated.trackingCode
               });
 
-              if (finalUpdated.cashAmount > 0) {
+              if (embeddedCashAmount > 0) {
                   newTransList.push({
                       id: generateId(),
                       date: finalUpdated.date,
                       type: 'CASH_PAYMENT',
-                      amount: finalUpdated.cashAmount,
+                      amount: embeddedCashAmount,
                       personId: finalUpdated.personId,
                       personName: finalUpdated.personName,
                       description: `دریافت نقدی بابت فاکتور ${finalUpdated.number}`,
@@ -821,13 +838,13 @@ export const useStore = create<AppState>()(
                   });
               }
 
-              if (finalUpdated.checkAmount > 0 && finalUpdated.checks && finalUpdated.checks.length > 0) {
-                  const checkNumbers = finalUpdated.checks.map(c => c.checkNumber || c.sayadId || 'چک').join('، ');
+              if (embeddedCheckAmount > 0) {
+                  const checkNumbers = finalUpdated.checks?.map(c => c.checkNumber || c.sayadId || 'چک').join('، ') || 'چک';
                   newTransList.push({
                       id: generateId(),
                       date: finalUpdated.date,
                       type: 'CHECK_INFO',
-                      amount: finalUpdated.checkAmount,
+                      amount: embeddedCheckAmount,
                       personId: finalUpdated.personId,
                       personName: finalUpdated.personName,
                       description: `چک ${checkNumbers} - محاسبه شده در فاکتور ${finalUpdated.number}`,
