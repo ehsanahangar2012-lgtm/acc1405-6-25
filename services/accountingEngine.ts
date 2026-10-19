@@ -229,10 +229,10 @@ export class AccountingEngine {
       }
     }
 
-    // در سند اصلاحی، سند قبل حذف و سند جدید به طور کامل جایگزین می‌شود
-    useFinancialStore.setState(s => ({
-      accountingEntries: s.accountingEntries.filter(e => e.referenceId !== invoice.id)
-    }));
+    // Keep the accounting audit trail: reverse any currently active postings first,
+    // then append the replacement invoice entries. The catch below restores the snapshot
+    // if any part of the correction fails.
+    this.postStornoReversal(invoice.id, 'INVOICE');
     
     if (invoice.personId) {
       PersonLedgerService.removeByReference(invoice.personId, invoice.id);
