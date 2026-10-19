@@ -17,7 +17,8 @@ if (!openssl_pkey_export($privateKey, $privatePem)) { fwrite(STDERR, "Unable to 
 $details = openssl_pkey_get_details($privateKey);
 $base = ['title'=>'CI Test Customer','created_at'=>date('Y-m-d H:i:s'),'expire_date'=>date('Y-m-d',strtotime('+7 days')),'status'=>'ACTIVE','max_users'=>5,'is_unlimited'=>false,'plan'=>'BRONZE','max_customers'=>50,'max_documents'=>500,'features'=>['BASIC_MODULES'],'hwid'=>'','workspace_id'=>'ws_test','token'=>'ASHK-CI-TEST-0001'];
 $expired = $base; $expired['workspace_id']='ws_expired'; $expired['token']='ASHK-CI-EXPIRED-0001'; $expired['expire_date']=date('Y-m-d',strtotime('-2 days'));
-$registry=['auto_register_new_tenants'=>false,'admin_secret_key'=>'ci-test-admin-secret','license_signing_private_key'=>$privatePem,'license_signing_public_key'=>$details['key'],'workspaces'=>['ws_test'=>$base,'ws_expired'=>$expired]];
+$quota = $base; $quota['workspace_id']='ws_quota'; $quota['token']='ASHK-CI-QUOTA-0001'; $quota['hwid']='HWID-Q'; $quota['max_customers']=2; $quota['max_documents']=3;
+$registry=['auto_register_new_tenants'=>false,'admin_secret_key'=>'ci-test-admin-secret','license_signing_private_key'=>$privatePem,'license_signing_public_key'=>$details['key'],'workspaces'=>['ws_test'=>$base,'ws_expired'=>$expired,'ws_quota'=>$quota]];
 $json=json_encode($registry,JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCAPED_SLASHES);
 if($json===false||file_put_contents(getenv('TEST_REGISTRY_PATH'),$json)===false){fwrite(STDERR,"Unable to write test registry\n");exit(1);}
 chmod(getenv('TEST_REGISTRY_PATH'),0600);
@@ -315,6 +316,40 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-valid.json
   -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A"}' "$BASE_URL/storage.php")"
 [[ "$code" == "200" ]]
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||($r["workspace"]??"")!=="ws_test"){fwrite(STDERR,"Device-bound storage access failed\\n");exit(1);}' "$TEST_DIR/storage-valid.json"
+
+# Legacy signature/share keys must never read from or write to another tenant's namespace.
+mkdir -p "$TEST_DIR/data/tenants/ws_other"
+php -r '$record=["secret"=>"other-tenant-only"];file_put_contents($argv[1],json_encode($record));' "$TEST_DIR/data/tenants/ws_other/share_probe.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-cross-tenant.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' -d '{"action":"load","key":"share_probe"}' "$BASE_URL/storage.php")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["success"]??true)!==false||isset($j["data"])){fwrite(STDERR,"Generic storage leaked another workspace share");exit(1);}' "$TEST_DIR/storage-cross-tenant.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-invalid-key.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' -d '{"action":"load","key":"../../etc/passwd"}' "$BASE_URL/storage.php")"
+[[ "$code" == "400" ]]
+
+# Server, not the UI/localStorage, enforces max_customers and max_documents.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-quota-people-ok.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_quota' -H 'X-Workspace-Token: ASHK-CI-QUOTA-0001' -H 'X-Device-HWID: HWID-Q' \
+  -H 'Content-Type: application/json' -d '{"action":"save","key":"people","value":"[{\"id\":\"p1\"},{\"id\":\"p2\"}]"}' "$BASE_URL/storage.php")"
+[[ "$code" == "200" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-quota-people-denied.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_quota' -H 'X-Workspace-Token: ASHK-CI-QUOTA-0001' -H 'X-Device-HWID: HWID-Q' \
+  -H 'Content-Type: application/json' -d '{"action":"save","key":"people","value":"[{\"id\":\"p1\"},{\"id\":\"p2\"},{\"id\":\"p3\"}]"}' "$BASE_URL/storage.php")"
+[[ "$code" == "409" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="CUSTOMER_QUOTA_EXCEEDED"||($j["max"]??null)!==2){fwrite(STDERR,"Server-side customer quota was not enforced");exit(1);}' "$TEST_DIR/storage-quota-people-denied.json"
+
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-quota-invoices-ok.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_quota' -H 'X-Workspace-Token: ASHK-CI-QUOTA-0001' -H 'X-Device-HWID: HWID-Q' \
+  -H 'Content-Type: application/json' -d '{"action":"save","key":"invoices","value":"[{\"id\":\"i1\"},{\"id\":\"i2\"},{\"id\":\"i3\"}]"}' "$BASE_URL/storage.php")"
+[[ "$code" == "200" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-quota-invoices-denied.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_quota' -H 'X-Workspace-Token: ASHK-CI-QUOTA-0001' -H 'X-Device-HWID: HWID-Q' \
+  -H 'Content-Type: application/json' -d '{"action":"save","key":"invoices","value":"[{\"id\":\"i1\"},{\"id\":\"i2\"},{\"id\":\"i3\"},{\"id\":\"i4\"}]"}' "$BASE_URL/storage.php")"
+[[ "$code" == "409" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="DOCUMENT_QUOTA_EXCEEDED"||($j["max"]??null)!==3){fwrite(STDERR,"Server-side document quota was not enforced");exit(1);}' "$TEST_DIR/storage-quota-invoices-denied.json"
 
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-valid.json" -w '%{http_code}' \
   -H 'Content-Type: application/json' -d '{"action":"stats","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A"}' "$BASE_URL/host-storage-api.php")"
