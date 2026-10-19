@@ -450,11 +450,11 @@ php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!==
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-system-no-auth.json" -w '%{http_code}' \
   -H 'X-Workspace-ID: ws_test' -H 'Content-Type: application/json' -d '{"action":"backup_data","type":"ci_test","payload":{"probe":"should-deny"}}' "$BASE_URL/backup-system.php")"
 [[ "$code" == "403" ]]
-code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-system-valid.json" -w '%{http_code}' \
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-system-retired.json" -w '%{http_code}' \
   -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
   -H 'Content-Type: application/json' -d '{"action":"backup_data","type":"ci_test","payload":{"probe":"ok"}}' "$BASE_URL/backup-system.php")"
-[[ "$code" == "200" ]]
-php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||empty($r["file"])){fwrite(STDERR,"Device-bound backup write failed\\n");exit(1);}' "$TEST_DIR/backup-system-valid.json"
+[[ "$code" == "410" ]]
+php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["error"]??"")!=="ENCRYPTED_BACKUP_API_REQUIRED"){fwrite(STDERR,"Legacy plaintext backup endpoint was not retired\\n");exit(1);}' "$TEST_DIR/backup-system-retired.json"
 
 code="$(post_json '{"action":"verify_license","workspace_id":"ws_test","token":"ASHK-CI-TEST-0001","hwid":"HWID-B"}' "$TEST_DIR/mismatch.json")"
 [[ "$code" == "403" ]]; assert_status "$TEST_DIR/mismatch.json" "HWID_MISMATCH"
