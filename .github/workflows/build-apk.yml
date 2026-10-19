@@ -51,6 +51,10 @@ jobs:
           php -l android/app/src/main/assets/public/license_validator.php
           php -l android/app/src/main/assets/public/tenant-manager.php
 
+      - name: Test server license registration and lifecycle
+        shell: bash
+        run: bash scripts/test-license-server.sh
+
       - name: Build local-only browser preview
         run: bun run build:browser-preview
 
