@@ -25,7 +25,8 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
     'sql-db-export',
     'sql-db-info',
     'open-database-folder',
-    'save-backup-file'
+    'get-local-backup-directory',
+    'write-local-backup'
 ]);
 const ALLOWED_SEND_CHANNELS = new Set(['backup-completed-exit']);
 const ALLOWED_RECEIVE_CHANNELS = new Set(['trigger-backup-and-exit']);
@@ -59,6 +60,8 @@ contextBridge.exposeInMainWorld('electronDesktopAPI', {
     loadSqlDatabase: () => ipcRenderer.invoke('sql-db-load'),
     exportSqlFile: (defaultName) => ipcRenderer.invoke('sql-db-export', defaultName),
     getSqlDatabaseInfo: () => ipcRenderer.invoke('sql-db-info'),
+    getLocalBackupDirectory: () => ipcRenderer.invoke('get-local-backup-directory'),
+    writeLocalBackup: (fileName, data) => ipcRenderer.invoke('write-local-backup', { fileName, data }),
     openDatabaseFolder: () => ipcRenderer.invoke('open-database-folder'),
     onMessage: (channel, callback) => {
         assertAllowedChannel(channel, ALLOWED_RECEIVE_CHANNELS, 'receive');

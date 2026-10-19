@@ -71,6 +71,45 @@ function getSecureVaultPath() {
     return path.join(userData, '.secure_vault.dat');
 }
 
+
+function getBackupDirectorySettingsPath() {
+    return path.join(getUserDataDir(), '.backup-directory.json');
+}
+
+function readSelectedBackupDirectory() {
+    try {
+        const settingsPath = getBackupDirectorySettingsPath();
+        if (!fs.existsSync(settingsPath)) return null;
+        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        const requested = typeof settings.directory === 'string' ? path.resolve(settings.directory) : '';
+        if (!requested || !fs.existsSync(requested) || !fs.statSync(requested).isDirectory()) return null;
+        return fs.realpathSync(requested);
+    } catch {
+        return null;
+    }
+}
+
+function persistSelectedBackupDirectory(directory) {
+    const canonical = fs.realpathSync(directory);
+    if (!fs.statSync(canonical).isDirectory()) {
+        throw new Error('مسیر انتخاب‌شده پوشه معتبر نیست.');
+    }
+    const settingsPath = getBackupDirectorySettingsPath();
+    const tempPath = settingsPath + '.tmp.' + crypto.randomBytes(8).toString('hex');
+    try {
+        fs.writeFileSync(
+            tempPath,
+            JSON.stringify({ directory: canonical, updatedAt: new Date().toISOString() }),
+            { encoding: 'utf-8', mode: 0o600 }
+        );
+        fs.renameSync(tempPath, settingsPath);
+    } catch (error) {
+        try { fs.unlinkSync(tempPath); } catch {}
+        throw error;
+    }
+    return canonical;
+}
+
 function getAppIcon() {
     const candidates = [
         path.join(__dirname, '../public/favicon.ico'),
@@ -471,12 +510,98 @@ ipcMain.handle('export-app-config', async (event, config) => {
     }
 });
 
-ipcMain.handle('select-directory', async () => {
+ipcMain.handle('select-directory', async (event) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
         properties: ['openDirectory'],
         title: 'انتخاب پوشه ذخیره بک‌آپ'
     });
-    return result.canceled ? null : result.filePaths[0];
+    if (result.canceled || !result.filePaths[0]) return null;
+    try {
+        return persistSelectedBackupDirectory(result.filePaths[0]);
+    } catch (error) {
+        console.error('Unable to save selected backup directory:', error);
+        return null;
+    }
+});
+
+ipcMain.handle('get-local-backup-directory', async (event) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return null;
+    return readSelectedBackupDirectory();
+});
+
+ipcMain.handle('write-local-backup', async (event, payload) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
+
+    const fileName = typeof payload?.fileName === 'string' ? payload.fileName : '';
+    const data = typeof payload?.data === 'string' ? payload.data : null;
+    const safeName = /^(?:AshkeGhalam-Backup-(?:auto|manual)|AshkeGhalam-ManualBackup)-[A-Za-z0-9_-]{1,160}\.json$/;
+    if (!safeName.test(fileName) || path.basename(fileName) !== fileName) {
+        return { success: false, error: 'INVALID_BACKUP_FILENAME' };
+    }
+    if (data === null) return { success: false, error: 'INVALID_BACKUP_DATA' };
+    const sizeBytes = Buffer.byteLength(data, 'utf-8');
+    if (sizeBytes > 100 * 1024 * 1024) {
+        return { success: false, error: 'BACKUP_TOO_LARGE' };
+    }
+
+    const directory = readSelectedBackupDirectory();
+    if (!directory) {
+        return { success: false, error: 'BACKUP_DIRECTORY_NOT_SELECTED' };
+    }
+
+    const targetPath = path.join(directory, fileName);
+    if (path.dirname(targetPath) !== directory) {
+        return { success: false, error: 'INVALID_BACKUP_PATH' };
+    }
+
+    let tempPath = '';
+    try {
+        const directoryStat = await fs.promises.stat(directory);
+        if (!directoryStat.isDirectory()) {
+            return { success: false, error: 'BACKUP_DIRECTORY_UNAVAILABLE' };
+        }
+
+        tempPath = path.join(directory, '.' + fileName + '.' + crypto.randomBytes(8).toString('hex') + '.tmp');
+        await fs.promises.writeFile(tempPath, data, { encoding: 'utf-8', flag: 'wx', mode: 0o600 });
+        await fs.promises.rename(tempPath, targetPath);
+        tempPath = '';
+
+        // Retain up to 100 managed backup files and prune files older than 30 days.
+        const managedPattern = /^(?:AshkeGhalam-Backup-(?:auto|manual)|AshkeGhalam-ManualBackup)-[A-Za-z0-9_-]{1,160}\.json$/;
+        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const entries = [];
+        for (const name of await fs.promises.readdir(directory)) {
+            if (!managedPattern.test(name)) continue;
+            const fullPath = path.join(directory, name);
+            try {
+                const stat = await fs.promises.stat(fullPath);
+                if (!stat.isFile()) continue;
+                if (stat.mtimeMs < cutoff && fullPath !== targetPath) {
+                    await fs.promises.unlink(fullPath).catch(() => {});
+                } else {
+                    entries.push({ fullPath, mtimeMs: stat.mtimeMs });
+                }
+            } catch {}
+        }
+        entries.sort((a, b) => b.mtimeMs - a.mtimeMs);
+        for (const old of entries.slice(100)) {
+            if (old.fullPath !== targetPath) await fs.promises.unlink(old.fullPath).catch(() => {});
+        }
+
+        return {
+            success: true,
+            filePath: targetPath,
+            sizeBytes,
+            sha256: crypto.createHash('sha256').update(data, 'utf-8').digest('hex')
+        };
+    } catch (error) {
+        if (tempPath) await fs.promises.unlink(tempPath).catch(() => {});
+        console.error('Local backup write failed:', error);
+        return { success: false, error: 'BACKUP_WRITE_FAILED' };
+    }
 });
 
 ipcMain.handle('get-user-data-path', async () => {
@@ -838,16 +963,6 @@ ipcMain.handle('open-database-folder', async () => {
         return { success: true, path: dir };
     } catch (e) {
         return { success: false, error: e.message };
-    }
-});
-
-ipcMain.handle('save-backup-file', async (event, { filePath, data }) => {
-    try {
-        fs.writeFileSync(filePath, data, 'utf-8');
-        return { success: true };
-    } catch (error) {
-        console.error('Error saving backup file:', error);
-        return { success: false, error: error.message };
     }
 });
 
