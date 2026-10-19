@@ -119,7 +119,8 @@ class LicenseQuotaService {
             }
 
             try {
-                const hwid = String(stored?.hwid || await hardwareIdService.getHardwareId()).trim();
+                // Never trust a device ID read from localStorage; recompute it using the current native device APIs.
+                const hwid = String(await hardwareIdService.getHardwareId()).trim();
                 const verified = await refreshServerLicense({ hostUrl, licenseKey, workspaceId, hwid });
                 if (!verified) {
                     this.serverReceiptVerifiedInSession = false;
