@@ -61,6 +61,7 @@ export interface RestoreResult {
     success: boolean;
     data?: any;
     error?: string;
+    integrityVerified?: boolean;
 }
 
 // ─── ثابت‌ها ─────────────────────────────────────────────────────────────────
@@ -280,8 +281,31 @@ class HostBackupService {
             clearTimeout(tid);
             if (!response.ok) return { success: false, error: `HTTP ${response.status}` };
             const result = await response.json();
-            if (!result.success) return { success: false, error: result.message };
-            return { success: true, data: result.data };
+            if (!result.success) return { success: false, error: result.message || result.error || 'بازیابی نسخه پشتیبان ناموفق بود' };
+            const payload = result.data;
+            if (!payload || typeof payload !== 'object') {
+                return { success: false, error: 'ساختار نسخه پشتیبان معتبر نیست' };
+            }
+
+            // New backups carry a SHA-256 checksum over both accounting data and assets.
+            // Legacy backups remain readable, but are not marked as payload-verified.
+            let payloadIntegrityVerified = false;
+            if (payload.checksumAlgorithm === 'sha256') {
+                if (!payload.data || typeof payload.data !== 'object' || typeof payload.checksum !== 'string') {
+                    return { success: false, error: 'ساختار کنترل صحت نسخه پشتیبان نامعتبر است' };
+                }
+                const actualChecksum = this.checksum({ data: payload.data, assets: payload.assets ?? {} });
+                if (!/^[a-f0-9]{64}$/i.test(payload.checksum) || actualChecksum !== payload.checksum.toLowerCase()) {
+                    return { success: false, error: 'کنترل صحت نسخه پشتیبان ناموفق است؛ بازیابی لغو شد' };
+                }
+                payloadIntegrityVerified = true;
+            }
+
+            return {
+                success: true,
+                data: payload,
+                integrityVerified: Boolean(result.integrity?.verified && payloadIntegrityVerified)
+            };
         } catch (error: any) {
             return { success: false, error: error?.message };
         }
