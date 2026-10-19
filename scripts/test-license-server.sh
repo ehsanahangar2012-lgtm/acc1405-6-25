@@ -215,4 +215,4 @@ code="$(post_json '{"action":"verify_license","workspace_id":"ws_issued","token"
 [[ "$code" == "403" ]]
 assert_status "$TEST_DIR/issued-after-revoke.json" "SUSPENDED"
 
-echo "PASS: secure issuance, token safety, HWID, RSA signature, quotas, expiry, admin auth, revocation."
+echo "PASS: license lifecycle, HWID/signatures, legacy API retirement, mother-only access, chat isolation, storage and revocation."
