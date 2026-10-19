@@ -187,7 +187,7 @@ jobs:
 
   build-apk:
     environment:
-      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'commercial-release' || 'ci' }}
+      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'commercial-signing' || 'ci' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -292,7 +292,7 @@ jobs:
           if-no-files-found: error
   build-windows:
     environment:
-      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'commercial-release' || 'ci' }}
+      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'commercial-signing' || 'ci' }}
     runs-on: windows-latest
 
     steps:
@@ -408,15 +408,10 @@ jobs:
 
       - name: Validate production release inputs
         shell: bash
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
         run: |
           set -euo pipefail
           VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")"
           test "${GITHUB_REF_NAME}" = "v${VERSION}" || { echo "::error::Tag must match package.json version: v${VERSION}"; exit 1; }
-          test -n "${ANDROID_KEYSTORE_BASE64:-}" || { echo "::error::Release APK needs the Android release keystore secrets."; exit 1; }
-          test -n "${WINDOWS_SIGNING_PFX_BASE64:-}" || { echo "::error::Release EXE needs the Windows code-signing certificate secrets."; exit 1; }
           test -f "release-assets/windows/AshkeGhalam-Setup-v${VERSION}.exe"
           test -f "release-assets/windows/AshkeGhalam-Portable-v${VERSION}.exe"
           test -f "release-assets/windows/AshkeGhalam-Windows-Portable-v${VERSION}.zip"
@@ -434,7 +429,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
           name: AshkeGhalam ${{ github.ref_name }}
           generate_release_notes: true
-          draft: false
+          draft: true
           files: |
             release-assets/windows/*.exe
             release-assets/windows/*.zip
