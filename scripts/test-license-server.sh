@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -46,6 +46,31 @@ PORT="$(node -e "const s=require('node:net').createServer();s.listen(0,'127.0.0.
 php -S "127.0.0.1:$PORT" -t "$TEST_DIR" >"$TEST_DIR/php-server.log" 2>&1 &
 SERVER_PID=$!
 BASE_URL="http://127.0.0.1:$PORT"
+
+# Retired legacy endpoints must fail closed.
+for endpoint in server-api-database.php server-api-upload.php; do
+  code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/$endpoint.json" -w '%{http_code}' "$BASE_URL/$endpoint")"
+  [[ "$code" == "410" ]]
+  php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="ENDPOINT_RETIRED"){fwrite(STDERR,"Retired endpoint returned an unexpected result");exit(1);}' "$TEST_DIR/$endpoint.json"
+done
+if grep -Eq "secure_api_token_change_this" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php"; then
+  echo "Legacy fallback token must not exist in retired endpoints" >&2
+  exit 1
+fi
+
+# Only a server-authorized mother account may access the global host API.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-api-no-auth.json" -w '%{http_code}' "$BASE_URL/host-api.php?action=status")"
+[[ "$code" == "403" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-api-mother.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: default' -H 'X-Workspace-Token: ci-test-admin-secret' "$BASE_URL/host-api.php?action=status")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["success"]??false)!==true){fwrite(STDERR,"Mother host API authorization failed");exit(1);}' "$TEST_DIR/host-api-mother.json"
+
+# Generic legacy API calls are denied without workspace credentials.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/api-no-auth.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"get","table":"companies"}' "$BASE_URL/api.php")"
+[[ "$code" == "403" ]]
+
 for attempt in $(seq 1 40); do
   if curl --silent --fail "$BASE_URL/tenant-manager.php?action=public_key" >/dev/null; then break; fi
   sleep 0.25
@@ -92,6 +117,28 @@ if($raw===false||$sig===false||openssl_verify($raw,$sig,$pub,OPENSSL_ALGO_SHA256
 $p=json_decode($raw,true);if(($p["hwid"]??"")!=="HWID-A"||($p["plan"]??"")!=="BRONZE"||($p["max_customers"]??null)!==50||($p["max_documents"]??null)!==500){fwrite(STDERR,"Wrong receipt entitlements\n");exit(1);}
 ' "$TEST_DIR/valid.json" "$TEST_REGISTRY_PATH"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["workspaces"]["ws_test"]["hwid"]??"")!=="HWID-A"){fwrite(STDERR,"HWID not persisted\n");exit(1);}' "$TEST_REGISTRY_PATH"
+
+# Customer credentials cannot access the mother-only generic host data API.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-api-tenant.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  "$BASE_URL/host-api.php?action=list_files")"
+[[ "$code" == "403" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="MOTHER_PORTAL_ONLY"){fwrite(STDERR,"Tenant reached mother-only host API");exit(1);}' "$TEST_DIR/host-api-tenant.json"
+
+# Seed two tenants and an unscoped historical message; only the caller's own history may be visible.
+php -r '$m=[["id"=>"own-message","workspace_id"=>"ws_test","text"=>"own"],["id"=>"other-message","workspace_id"=>"ws_other","text"=>"private"],["id"=>"legacy-message","text"=>"unscoped"]];file_put_contents($argv[1],json_encode($m,JSON_UNESCAPED_UNICODE));' "$TEST_DIR/data/support_chat.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/api-chat-isolation.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  "$BASE_URL/api.php?action=support_chat")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$m=$j["messages"]??[];if(count($m)!==1||($m[0]["id"]??"")!=="own-message"){fwrite(STDERR,"Support chat tenant isolation failed");exit(1);}' "$TEST_DIR/api-chat-isolation.json"
+
+# A registered customer cannot use generic global CRUD operations.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/api-tenant-crud.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' -d '{"action":"get","table":"companies"}' "$BASE_URL/api.php")"
+[[ "$code" == "403" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="MOTHER_PORTAL_ONLY"){fwrite(STDERR,"Tenant accessed mother-only CRUD");exit(1);}' "$TEST_DIR/api-tenant-crud.json"
 
 # Every data API must require both the registered workspace token and the pinned device.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-no-hwid.json" -w '%{http_code}' \
