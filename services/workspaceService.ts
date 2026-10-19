@@ -168,7 +168,7 @@ class WorkspaceService {
                 console.warn('Secure workspace credentials could not be saved; cloud features remain disabled:', error);
             }
         } else {
-            this.saveLocalConfig();
+            await this.saveLocalConfig();
         }
 
         this.initialized = true;
@@ -188,8 +188,6 @@ class WorkspaceService {
                     licenseKey: ''
                 }));
                 for (const key of LEGACY_WORKSPACE_TOKEN_KEYS) localStorage.removeItem(key);
-                localStorage.removeItem('ashk_license_key');
-                localStorage.removeItem('ashk_active_license_key');
                 this.legacyNativeConfig = null;
                 this.nativeConfigLoadedSecurely = true;
                 return;
