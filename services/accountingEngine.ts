@@ -726,8 +726,37 @@ export class AccountingEngine {
           // received their own INVOICE_PAYMENT reference type.
           this.postStornoReversal(transaction.id, 'TRANSACTION');
         });
+
+        // A payment made by cheque also has its own check journal and status history.
+        const linkedChecks = (useStore.getState().checks || []).filter(check =>
+          check.relatedInvoiceId === invoice.id
+        );
+        linkedChecks.forEach(check => {
+          this.postStornoReversal(check.id, 'CHECK');
+          this.postStornoReversal(check.id, 'CHECK_STATUS');
+        });
       }
     );
+  }
+
+  /**
+   * Reverse a transaction and any linked check journals before its source is deleted.
+   */
+  static reverseTransactionAndCheck(trans: Transaction, check?: Check) {
+    return this.withPostingRollback([trans.personId, check?.personId], () => {
+      this.postStornoReversal(trans.id, 'INVOICE_PAYMENT');
+      this.postStornoReversal(trans.id, 'TRANSACTION');
+      if (check) {
+        this.postStornoReversal(check.id, 'CHECK');
+        this.postStornoReversal(check.id, 'CHECK_STATUS');
+      }
+      if (trans.personId) {
+        PersonLedgerService.removeByReference(trans.personId, trans.id);
+      }
+      if (check?.personId) {
+        PersonLedgerService.removeByReference(check.personId, check.id);
+      }
+    });
   }
 
   /**
