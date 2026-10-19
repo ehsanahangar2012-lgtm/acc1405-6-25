@@ -375,6 +375,16 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-inval
   -H 'Content-Type: application/json' -d '{"action":"save","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A","table":"people","data":{"id":"../../workspaces_auth"}}' "$BASE_URL/host-storage-api.php")"
 [[ "$code" == "400" ]]
 
+# Existing records represented in both storage formats count only once; a new third record is rejected.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-quota-existing.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"save","workspace_id":"ws_quota","workspace_token":"ASHK-CI-QUOTA-0001","hwid":"HWID-Q","table":"people","data":{"id":"p1","name":"Existing duplicate representation"}}' "$BASE_URL/host-storage-api.php")"
+[[ "$code" == "200" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-quota-mixed-representation-denied.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_quota' -H 'X-Workspace-Token: ASHK-CI-QUOTA-0001' -H 'X-Device-HWID: HWID-Q' \
+  -H 'Content-Type: application/json' -d '{"action":"save","key":"people","value":"[{\"id\":\"p1\"},{\"id\":\"p2\"},{\"id\":\"p3\"}]"}' "$BASE_URL/storage.php")"
+[[ "$code" == "409" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="CUSTOMER_QUOTA_EXCEEDED"){fwrite(STDERR,"Key-value storage bypassed the record-oriented quota");exit(1);}' "$TEST_DIR/storage-quota-mixed-representation-denied.json"
+
 # Record-oriented writes cannot exceed the same server-side customer limit enforced by storage.php.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-quota-denied.json" -w '%{http_code}' \
   -H 'Content-Type: application/json' -d '{"action":"save","workspace_id":"ws_quota","workspace_token":"ASHK-CI-QUOTA-0001","hwid":"HWID-Q","table":"people","data":{"id":"p3","name":"Third"}}' "$BASE_URL/host-storage-api.php")"
