@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$ROOT_DIR/host-backend/remote-signature-api.php" "$ROOT_DIR/host-backend/signature-api-simple.php" "$ROOT_DIR/host-backend/deleted-records-api.php" "$ROOT_DIR/host-backend/gemini-api.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$ROOT_DIR/host-backend/remote-signature-api.php" "$ROOT_DIR/host-backend/signature-api-simple.php" "$ROOT_DIR/host-backend/deleted-records-api.php" "$ROOT_DIR/host-backend/gemini-api.php" "$ROOT_DIR/host-backend/certificate-api.php" "$ROOT_DIR/host-backend/signature-api.php" "$ROOT_DIR/host-backend/install.php" "$ROOT_DIR/host-backend/setup-folders.php" "$ROOT_DIR/host-backend/setup-check.php" "$ROOT_DIR/host-backend/backup-signatures.php" "$ROOT_DIR/host-backend/daily-cron.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -79,7 +79,7 @@ if (!$config->validateToken("ci-digital-signature-secret") ||
 ' "$TEST_DIR/digital-signature-config.php"
 
 # Retired legacy endpoints must fail closed.
-for endpoint in server-api-database.php server-api-upload.php audit-trail-api.php; do
+for endpoint in server-api-database.php server-api-upload.php audit-trail-api.php certificate-api.php signature-api.php install.php setup-folders.php setup-check.php; do
   code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/$endpoint.json" -w '%{http_code}' "$BASE_URL/$endpoint")"
   [[ "$code" == "410" ]]
   php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="ENDPOINT_RETIRED"){fwrite(STDERR,"Retired endpoint returned an unexpected result");exit(1);}' "$TEST_DIR/$endpoint.json"
@@ -112,6 +112,13 @@ fi
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/gemini-no-auth.json" -w '%{http_code}' \
   -H 'Content-Type: application/json' -d '{"contents":[{"parts":[{"text":"CI"}]}]}' "$BASE_URL/gemini-api.php")"
 [[ "$code" == "403" ]]
+
+# Backup generation and daily cleanup are CLI-only and cannot be triggered by anonymous HTTP.
+for endpoint in backup-signatures.php daily-cron.php; do
+  code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/$endpoint.json" -w '%{http_code}' "$BASE_URL/$endpoint")"
+  [[ "$code" == "403" ]]
+  php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="CLI_ONLY"){fwrite(STDERR,"Cron endpoint was not protected");exit(1);}' "$TEST_DIR/$endpoint.json"
+done
 
 # Deleted-records data must not be accessible or mutable without workspace credentials.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/deleted-records-no-auth.json" -w '%{http_code}' "$BASE_URL/deleted-records-api.php?action=list")"
