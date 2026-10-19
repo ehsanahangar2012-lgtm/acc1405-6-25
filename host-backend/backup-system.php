@@ -104,43 +104,16 @@ $action = $_POST['action'] ?? $_GET['action'] ?? ($jsonInput['action'] ?? '');
 
 switch ($action) {
     case 'backup_data':
-        $rawBody = json_encode($jsonInput, JSON_UNESCAPED_UNICODE);
-        if (strlen((string)$rawBody) > 50 * 1024 * 1024) {
-            http_response_code(413);
-            echo json_encode(['success' => false, 'error' => 'BACKUP_TOO_LARGE']);
-            break;
-        }
-        $data = json_decode((string)$rawBody, true);
-        if (!is_array($data) || !array_key_exists('payload', $data)) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'INVALID_BACKUP_PAYLOAD']);
-            break;
-        }
-        $type = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($data['type'] ?? 'general'));
-        if ($type === '') $type = 'general';
-        $timestamp = date('Y-m-d_H-i-s') . '_' . bin2hex(random_bytes(4));
-
-        // Scoped, path-safe immediate and daily backups.
-        $targetFolder = $BACKUP_ROOT . '/' . $type;
-        $dailyFolder = $DAILY_BACKUP_ROOT . '/' . $type;
-        foreach ([$targetFolder, $dailyFolder] as $folder) {
-            if (!is_dir($folder)) mkdir($folder, 0700, true);
-            @chmod($folder, 0700);
-            if (!is_file($folder . '/.htaccess')) @file_put_contents($folder . '/.htaccess', "Options -Indexes\nDeny from all\n", LOCK_EX);
-        }
-        $filename = $targetFolder . '/' . $timestamp . '.gz';
-        $savedImmediate = saveCompressedData($data['payload'], $filename, $targetFolder, 10);
-        $daily_filename = $dailyFolder . '/' . date('Y-m-d') . '.gz';
-        // Keep enough dated snapshots for the 30-day cleanup policy; the instant backup folder has its own 10-file cap.
-        $savedDaily = saveCompressedData($data['payload'], $daily_filename, $dailyFolder, 40);
-        if ($savedImmediate === false || $savedDaily === false) {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'error' => 'BACKUP_WRITE_FAILED']);
-            break;
-        }
-        echo json_encode(['success' => true, 'file' => basename($filename)]);
+        // Legacy endpoint writes gzipped plaintext JSON to disk. New financial backups
+        // must use server-api-backup.php, which advertises and enforces AES-256-GCM.
+        http_response_code(410);
+        echo json_encode([
+            'success' => false,
+            'error' => 'ENCRYPTED_BACKUP_API_REQUIRED',
+            'message' => 'ذخیره بکاپ مالی از این API قدیمی غیرفعال است؛ از مسیر بکاپ رمزگذاری‌شده استفاده کنید.'
+        ], JSON_UNESCAPED_UNICODE);
         break;
-        
+
     case 'upload_image':
         if (!isset($_FILES['image']) || !is_array($_FILES['image'])) {
             http_response_code(400);
