@@ -29,6 +29,9 @@ const ALGORITHM = 'RSASSA-PKCS1-v1_5-SHA256';
 function baseUrl(value: string): string {
   const url = String(value || '').trim().replace(/\/+$/, '');
   if (!/^https?:\/\//i.test(url)) throw new Error('نشانی سرور باید با HTTP یا HTTPS شروع شود.');
+  const parsed = new URL(url);
+  const localHost = ['localhost', '127.0.0.1', '::1'].includes(parsed.hostname);
+  if (parsed.protocol !== 'https:' && !localHost) throw new Error('برای تأیید امن لایسنس، اتصال HTTPS الزامی است.');
   return url;
 }
 function fromB64(value: string): Uint8Array {
