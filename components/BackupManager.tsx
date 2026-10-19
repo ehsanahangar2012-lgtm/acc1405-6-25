@@ -19,6 +19,7 @@ import { TripleBackupService, TripleBackupReport } from '../services/tripleBacku
 import { useFinancialStore } from '../store-financial';
 import { APP_VERSION } from '../config';
 import { workspaceService } from '../services/workspaceService';
+import { hasNativeBackupStorage } from '../services/nativeBackupStorage';
 
 type ActiveTab = 'triple' | 'stats' | 'cloud' | 'local_snap' | 'desktop' | 'file' | 'sync' | 'diagnostics' | 'reset';
 
@@ -45,6 +46,7 @@ const BackupManager = () => {
     const [dragOver, setDragOver] = useState(false);
     const [wipeInput, setWipeInput] = useState('');
     const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+    const hasNativeEncryptedStorage = hasNativeBackupStorage();
 
     // Storage Mode and Sync State
     const [storageMode, setStorageMode] = useState<'HOST' | 'LOCAL'>(smartStorage.getStorageMode());
@@ -624,9 +626,13 @@ const BackupManager = () => {
             await autoBackupService.createLocalBackup(state);
             await loadLocalSnapshots();
             if (addNotification) {
-                addNotification('success', 'نسخه پشتیبان سریع (سنسور مرورگر) با موفقیت ثبت شد.');
+                addNotification('success', hasNativeEncryptedStorage
+                    ? 'نسخه پشتیبان محلی رمزگذاری‌شده روی دستگاه ثبت شد.'
+                    : 'نسخه محلی در مخزن مرورگر ثبت شد؛ این نسخه جای فایل پشتیبان مستقل را نمی‌گیرد.');
             } else {
-                alert('نسخه پشتیبان سریع درون مرورگر با موفقیت ثبت شد.');
+                alert(hasNativeEncryptedStorage
+                    ? 'نسخه پشتیبان محلی رمزگذاری‌شده روی دستگاه ثبت شد.'
+                    : 'نسخه محلی در مخزن مرورگر ثبت شد؛ این نسخه جای فایل پشتیبان مستقل را نمی‌گیرد.');
             }
         } catch (error: any) {
             alert(`خطا در ثبت پشتیبان مرورگر: ${error?.message || error}`);
@@ -637,7 +643,7 @@ const BackupManager = () => {
 
     // Restore Local Snapshot
     const handleLocalSnapshotRestore = async (snapshotId: string) => {
-        if (!confirm('آیا از بازیابی این نسخه پشتیبان درون مرورگر مطمئن هستید؟ داده‌های فعلی با این اطلاعات جایگزین خواهند شد.')) {
+        if (!confirm('آیا از بازیابی این نسخه پشتیبان محلی مطمئن هستید؟ داده‌های فعلی با این اطلاعات جایگزین خواهند شد. پیش از ادامه از داشتن یک فایل پشتیبان مستقل مطمئن شوید.')) {
             return;
         }
         setActionLoadingId(snapshotId);
@@ -645,7 +651,7 @@ const BackupManager = () => {
             const data = await autoBackupService.restoreBackup(snapshotId);
             const migrated = backupMigrationService.migrateBackupData(data);
             hydrateStore(migrated);
-            alert('بازیابی داده‌های محلی با موفقیت انجام شد.');
+            alert('بازیابی داده‌های محلی انجام شد. بخش‌های مالی، فاکتورها و مانده‌حساب‌ها را بررسی کنید.');
             window.location.reload();
         } catch (error: any) {
             alert(`خطا در بازیابی پشتیبان محلی: ${error?.message || error}`);
@@ -1293,9 +1299,11 @@ const BackupManager = () => {
                             <div>
                                 <h3 className="text-white font-black text-base flex items-center gap-2">
                                     <HardDrive size={18} className="text-indigo-400" />
-                                    <span>نسخه‌های پشتیبان سریع (سنسور مرورگر IndexedDB)</span>
+                                    <span>{hasNativeEncryptedStorage ? 'نسخه‌های پشتیبان محلی رمزگذاری‌شدهٔ دستگاه' : 'نسخه‌های پشتیبان محلی مرورگر (IndexedDB)'}</span>
                                 </h3>
-                                <p className="text-[11px] text-slate-400 mt-1">سریع‌ترین روش ثبت نسخه محلی در مرورگر فعلی شما، بدون نیاز به دانلود یا آپلود فایل.</p>
+                                <p className="text-sm text-slate-300 mt-1 leading-6">{hasNativeEncryptedStorage
+                                    ? 'در نسخه نصب‌شده ویندوز/اندروید، نسخه محلی با رمزنگاری سیستم‌عامل یا Android Keystore نگهداری می‌شود. برای انتقال به دستگاه دیگر از فایل پشتیبان رمزگذاری‌شده استفاده کنید.'
+                                    : 'این کپی در مخزن محلی مرورگر فعلی ذخیره می‌شود؛ به‌تنهایی در برابر پاک‌سازی پروفایل مرورگر یا خرابی دستگاه حفاظت مستقل ندارد.'}</p>
                             </div>
                             
                             <div className="flex gap-2">
@@ -1321,12 +1329,12 @@ const BackupManager = () => {
                         {loadingLocalList ? (
                             <div className="py-12 flex flex-col items-center justify-center text-indigo-400 animate-pulse">
                                 <Loader2 size={36} className="animate-spin mb-3" />
-                                <span className="text-xs font-black">در حال بازیابی رکوردهای IndexedDB...</span>
+                                <span className="text-sm font-bold">{hasNativeEncryptedStorage ? 'در حال خواندن نسخه‌های رمزگذاری‌شدهٔ دستگاه...' : 'در حال خواندن نسخه‌های محلی مرورگر...'}</span>
                             </div>
                         ) : localSnapshots.length === 0 ? (
                             <div className="py-12 text-center text-slate-500 border-2 border-dashed border-white/5 rounded-2xl">
                                 <HardDrive size={32} className="mx-auto mb-3 text-slate-600" />
-                                <p className="text-xs font-bold">هیچ نسخه پشتیبانی در مرورگر فعلی یافت نشد.</p>
+                                <p className="text-sm font-bold">{hasNativeEncryptedStorage ? 'هنوز نسخه محلی رمزگذاری‌شده‌ای ثبت نشده است.' : 'هیچ نسخه محلی در مخزن مرورگر فعلی پیدا نشد.'}</p>
                                 <p className="text-[10px] text-slate-600 mt-1">با کلیک روی دکمه "ثبت پشتیبان سریع جدید" اولین کپی محلی خود را بسازید.</p>
                             </div>
                         ) : (
