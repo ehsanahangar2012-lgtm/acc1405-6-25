@@ -60,7 +60,7 @@ class AndroidCommercialService {
     /**
      * پیوند به سیستم PWA / هاست سرور اصلی و فعال‌سازی با مشخصات لایسنس سرور مورد نظر
      */
-    async connectToServer(customHostUrl?: string, customSyncToken?: string): Promise<{ success: boolean; message: string; details?: any }> {
+    async connectToServer(customHostUrl?: string, customSyncToken?: string, customWorkspaceId?: string): Promise<{ success: boolean; message: string; details?: any }> {
         if (typeof window === 'undefined') {
             return { success: false, message: 'این عملیات فقط در نسخه نصب‌شده پشتیبانی می‌شود.' };
         }
@@ -84,7 +84,7 @@ class AndroidCommercialService {
             return { success: false, message: 'آدرس سرور باید یک HTTP(S) URL معتبر و بدون اطلاعات ورود داخل URL باشد.' };
         }
 
-        const workspaceId = workspaceService.getWorkspaceId();
+        const workspaceId = (customWorkspaceId || workspaceService.getWorkspaceId()).trim();
         if (!workspaceId || workspaceId === 'default' || workspaceId === 'main') {
             return { success: false, message: 'ابتدا در فعال‌سازی لایسنس یک شناسه فضای کاری اختصاصی و ثبت‌شده برای این مشتری تعیین کنید؛ فضای default برای پرتال مادر رزرو شده است.' };
         }
