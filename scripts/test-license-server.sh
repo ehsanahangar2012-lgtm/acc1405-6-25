@@ -47,6 +47,11 @@ php -S "127.0.0.1:$PORT" -t "$TEST_DIR" >"$TEST_DIR/php-server.log" 2>&1 &
 SERVER_PID=$!
 BASE_URL="http://127.0.0.1:$PORT"
 
+for attempt in $(seq 1 40); do
+  if curl --silent --fail "$BASE_URL/tenant-manager.php?action=public_key" >/dev/null; then break; fi
+  sleep 0.25
+done
+
 # Retired legacy endpoints must fail closed.
 for endpoint in server-api-database.php server-api-upload.php; do
   code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/$endpoint.json" -w '%{http_code}' "$BASE_URL/$endpoint")"
@@ -71,10 +76,6 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/api-no-auth.json" 
   -H 'Content-Type: application/json' -d '{"action":"get","table":"companies"}' "$BASE_URL/api.php")"
 [[ "$code" == "403" ]]
 
-for attempt in $(seq 1 40); do
-  if curl --silent --fail "$BASE_URL/tenant-manager.php?action=public_key" >/dev/null; then break; fi
-  sleep 0.25
-done
 post_json() {
   local body="$1" output="$2"; shift 2
   curl --silent --show-error --max-time 8 "$@" -H 'Content-Type: application/json' -d "$body" -o "$output" -w '%{http_code}' "$BASE_URL/tenant-manager.php"
