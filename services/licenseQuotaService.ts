@@ -41,6 +41,9 @@ class LicenseQuotaService {
     private serverReceiptVerifiedInSession = false;
     private refreshPromise: Promise<boolean> | null = null;
     private serverEntitlements: VerifiedLicensePayload | null = null;
+    private verifiedLicenseKey = '';
+    private verifiedWorkspaceId = '';
+    private verifiedHwid = '';
 
     constructor() {
         if (typeof window !== 'undefined') {
@@ -48,6 +51,9 @@ class LicenseQuotaService {
                 this.cachedManifest = null;
                 this.serverReceiptVerifiedInSession = false;
                 this.serverEntitlements = null;
+                this.verifiedLicenseKey = '';
+                this.verifiedWorkspaceId = '';
+                this.verifiedHwid = '';
                 this.notifyListeners();
                 void this.refreshCachedServerLicense();
             };
@@ -69,6 +75,9 @@ class LicenseQuotaService {
             if (!raw) {
                 this.serverReceiptVerifiedInSession = false;
                 this.serverEntitlements = null;
+                this.verifiedLicenseKey = '';
+                this.verifiedWorkspaceId = '';
+                this.verifiedHwid = '';
                 return false;
             }
             let stored: any;
@@ -92,6 +101,9 @@ class LicenseQuotaService {
                 if (!verified) {
                     this.serverReceiptVerifiedInSession = false;
                     this.serverEntitlements = null;
+                    this.verifiedLicenseKey = '';
+                    this.verifiedWorkspaceId = '';
+                    this.verifiedHwid = '';
                     localStorage.setItem('ashk_server_license_data', JSON.stringify({ ...stored, serverVerified: false }));
                     this.notifyListeners();
                     return false;
@@ -119,11 +131,17 @@ class LicenseQuotaService {
                 localStorage.setItem('ashk_license_type', p.is_unlimited ? 'UNLIMITED' : 'LIMITED');
                 this.serverReceiptVerifiedInSession = true;
                 this.serverEntitlements = p;
+                this.verifiedLicenseKey = licenseKey;
+                this.verifiedWorkspaceId = p.workspace_id;
+                this.verifiedHwid = p.hwid;
                 this.notifyListeners();
                 return true;
             } catch {
                 this.serverReceiptVerifiedInSession = false;
                 this.serverEntitlements = null;
+                this.verifiedLicenseKey = '';
+                this.verifiedWorkspaceId = '';
+                this.verifiedHwid = '';
                 return false;
             }
         })();
@@ -168,8 +186,11 @@ class LicenseQuotaService {
             serverVerified = Boolean(
                 data?.serverVerified === true &&
                 data?.licenseKey === licenseKey &&
+                licenseKey === this.verifiedLicenseKey &&
                 data?.workspaceToken === licenseKey &&
                 data?.syncToken === licenseKey &&
+                data?.workspaceId === this.verifiedWorkspaceId &&
+                String(data?.hwid || '').toUpperCase() === String(this.verifiedHwid || '').toUpperCase() &&
                 typeof data?.hostUrl === 'string' &&
                 /^https?:\/\//i.test(data.hostUrl) &&
                 data?.workspaceId &&
@@ -343,8 +364,11 @@ class LicenseQuotaService {
             serverVerified = Boolean(
                 data?.serverVerified === true &&
                 data?.licenseKey === licenseKey &&
+                licenseKey === this.verifiedLicenseKey &&
                 data?.workspaceToken === licenseKey &&
                 data?.syncToken === licenseKey &&
+                data?.workspaceId === this.verifiedWorkspaceId &&
+                String(data?.hwid || '').toUpperCase() === String(this.verifiedHwid || '').toUpperCase() &&
                 typeof data?.hostUrl === 'string' &&
                 /^https?:\/\//i.test(data.hostUrl) &&
                 data?.workspaceId &&
