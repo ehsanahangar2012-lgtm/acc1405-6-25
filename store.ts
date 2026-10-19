@@ -1549,33 +1549,68 @@ export const useStore = create<AppState>()(
 
       addInvoicePayment: (invoiceId, payment) => {
           const s = get();
-          if (s.currentUser && !s.currentUser.permissions.finance.create) {
-              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ثبت دریافت مالی را ندارید.' }] }));
+          const notifyError = (message: string) => {
+              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message }] }));
               return null;
+          };
+
+          if (s.currentUser && !s.currentUser.permissions.finance.create) {
+              return notifyError('خطا: شما مجوز ثبت دریافت مالی را ندارید.');
           }
 
           const invoice = s.invoices.find(inv => inv.id === invoiceId);
-          if (!invoice) {
-              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message: 'فاکتور مورد نظر یافت نشد.' }] }));
-              return null;
+          if (!invoice) return notifyError('فاکتور مورد نظر یافت نشد.');
+          if (invoice.type !== InvoiceType.SALE && invoice.type !== InvoiceType.PURCHASE) {
+              return notifyError('برای پیش‌فاکتور یا سند غیرمالی نمی‌توان پرداخت ثبت کرد.');
+          }
+          if (!Number.isFinite(payment.amount) || payment.amount <= 0) {
+              return notifyError('مبلغ پرداخت باید عددی معتبر و بزرگ‌تر از صفر باشد.');
+          }
+          if (typeof payment.date !== 'string' || !payment.date.trim()) {
+              return notifyError('تاریخ پرداخت الزامی است.');
+          }
+
+          const amountAlreadyPaid = Number(invoice.cashAmount || 0) + Number(invoice.checkAmount || 0);
+          const remainingBalance = Number(invoice.finalTotal || 0) - amountAlreadyPaid;
+          if (!Number.isFinite(remainingBalance) || remainingBalance <= 0) {
+              return notifyError('این فاکتور ماندهٔ قابل پرداخت ندارد؛ از ثبت پرداخت تکراری جلوگیری شد.');
+          }
+          if (payment.amount > remainingBalance) {
+              return notifyError(`مبلغ پرداخت از ماندهٔ فاکتور بیشتر است. مانده: ${Math.max(0, remainingBalance).toLocaleString('fa-IR')}`);
+          }
+
+          const isSale = invoice.type === InvoiceType.SALE;
+          const isCheck = payment.method === 'CHECK';
+          if (isCheck && (!payment.checkDetails || !payment.checkDetails.checkNumber.trim())) {
+              return notifyError('برای پرداخت با چک، شماره چک و مشخصات آن الزامی است.');
+          }
+          if (isCheck && payment.checkDetails?.sayadId && payment.checkDetails.sayadId.replace(/\D/g, '').length !== 16) {
+              return notifyError('شناسه صیادی چک باید دقیقاً ۱۶ رقم باشد.');
           }
 
           const transId = generateId();
-          const isSale = invoice.type === InvoiceType.SALE;
-          const trackingCode = payment.trackingCode || (payment.method === 'CHECK' ? payment.checkDetails?.checkNumber : ('RCV-' + Date.now().toString().slice(-6)));
-          
+          const trackingCode = payment.trackingCode ||
+              (isCheck ? payment.checkDetails?.checkNumber : ('RCV-' + Date.now().toString().slice(-6)));
+          const methodTitle = payment.method === 'CASH' ? 'نقدی' :
+              payment.method === 'POS' ? 'کارتخوان' :
+              payment.method === 'CARD' ? 'کارت به کارت' : 'چک صیادی';
+          const defaultDesc = isSale
+              ? `دریافت ${methodTitle} بابت فاکتور فروش شماره ${invoice.number}`
+              : `پرداخت ${methodTitle} بابت فاکتور خرید شماره ${invoice.number}`;
+          const description = payment.description || defaultDesc;
+
           let checkToSave: Check | null = null;
           let nextChecks = s.checks;
-
-          if (payment.method === 'CHECK' && payment.checkDetails) {
+          if (isCheck && payment.checkDetails) {
+              // Reuse the payment ID so deleting the payment can also remove its check record.
               checkToSave = {
-                  id: generateId(),
+                  id: transId,
                   bankName: payment.checkDetails.bankName,
                   amount: payment.amount,
                   dueDate: payment.checkDetails.dueDate,
                   issueDate: payment.date,
                   sayadId: payment.checkDetails.sayadId || '',
-                  checkNumber: payment.checkDetails.checkNumber,
+                  checkNumber: payment.checkDetails.checkNumber.trim(),
                   holderName: invoice.personName || 'نامشخص',
                   personId: invoice.personId,
                   personName: invoice.personName,
@@ -1584,15 +1619,7 @@ export const useStore = create<AppState>()(
                   relatedInvoiceId: invoice.id
               };
               nextChecks = [...s.checks, checkToSave];
-              hostDB.save('checks', checkToSave).catch(() => {});
-              persistentStorage.saveData('checks', nextChecks).catch(() => {});
           }
-
-          const isCheck = payment.method === 'CHECK';
-          const methodTitle = payment.method === 'CASH' ? 'نقدی' : payment.method === 'POS' ? 'کارتخوان' : payment.method === 'CARD' ? 'کارت به کارت' : 'چک صیادی';
-          const defaultDesc = isSale 
-              ? `دریافت ${methodTitle} بابت فاکتور فروش شماره ${invoice.number}`
-              : `پرداخت ${methodTitle} بابت فاکتور خرید شماره ${invoice.number}`;
 
           const newTrans: Transaction = {
               id: transId,
@@ -1601,22 +1628,21 @@ export const useStore = create<AppState>()(
               amount: payment.amount,
               personId: invoice.personId,
               personName: invoice.personName,
-              description: payment.description || defaultDesc,
+              description,
               balanceAfter: 0,
-              isDebit: !isSale, // دریافتی فاکتور فروش = بستانکار شخص (isDebit: false)
-              referenceId: invoice.id,
+              isDebit: !isSale,
+              // Give the payment its own reference; invoice linkage remains in relatedInvoiceId.
+              referenceId: transId,
               relatedInvoiceId: invoice.id,
               trackingCode,
               metadata: {
                   invoiceNumber: invoice.number,
                   invoiceId: invoice.id,
-                  paymentMethod: payment.method
+                  paymentMethod: payment.method,
+                  checkId: checkToSave?.id
               }
           };
 
-          const nextTransactions = [...s.transactions, newTrans];
-
-          // به‌روزرسانی مبالغ دریافتی و تاریخچه پرداخت‌های فاکتور
           const updatedInvoice = {
               ...invoice,
               cashAmount: !isCheck ? ((invoice.cashAmount || 0) + payment.amount) : (invoice.cashAmount || 0),
@@ -1630,35 +1656,39 @@ export const useStore = create<AppState>()(
                       amount: payment.amount,
                       method: payment.method,
                       trackingCode,
-                      description: payment.description || defaultDesc
+                      description,
+                      accountingPosted: true
                   }
               ]
           };
 
-          const nextInvoices = s.invoices.map(inv => inv.id === invoiceId ? updatedInvoice : inv);
-
-          if (invoice.personId) {
-              try {
-                  localStorage.removeItem(`ledger-${invoice.personId}`);
-              } catch {}
+          // Post the real dated journal before changing any source records or caches.
+          try {
+              AccountingEngine.postInvoicePayment(updatedInvoice, newTrans, payment.method);
+          } catch (err) {
+              console.error('AccountingEngine error in addInvoicePayment:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return notifyError(`ثبت پرداخت انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}`);
           }
 
-          const exactBalance = invoice.personId 
-              ? PersonLedgerService.getBalance(invoice.personId, nextInvoices, nextTransactions, nextChecks) 
+          const nextInvoices = s.invoices.map(inv => inv.id === invoiceId ? updatedInvoice : inv);
+          const nextTransactions = [...s.transactions, newTrans];
+
+          const exactBalance = invoice.personId
+              ? PersonLedgerService.getBalance(invoice.personId, nextInvoices, nextTransactions, nextChecks)
               : 0;
           newTrans.balanceAfter = exactBalance;
-
-          const updatedPeople = invoice.personId 
+          const updatedPeople = invoice.personId
               ? s.people.map(p => p.id === invoice.personId ? { ...p, balance: exactBalance } : p)
               : s.people;
 
+          if (checkToSave) hostDB.save('checks', checkToSave).catch(() => {});
           hostDB.save('invoices', updatedInvoice).catch(() => {});
           hostDB.save('transactions', newTrans).catch(() => {});
+          persistentStorage.saveData('checks', nextChecks).catch(() => {});
           persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
           persistentStorage.saveData('transactions', nextTransactions).catch(() => {});
-          if (invoice.personId) {
-              persistentStorage.saveData('people', updatedPeople).catch(() => {});
-          }
+          if (invoice.personId) persistentStorage.saveData('people', updatedPeople).catch(() => {});
 
           set(state => ({
               invoices: nextInvoices,
@@ -1670,7 +1700,7 @@ export const useStore = create<AppState>()(
                   {
                       id: generateId(),
                       type: 'success',
-                      message: `دریافتی به مبلغ ${payment.amount.toLocaleString('fa-IR')} برای فاکتور شماره ${invoice.number} ثبت شد و در کاردکس طرف‌حساب منظور گردید.`
+                      message: `پرداخت ${payment.amount.toLocaleString('fa-IR')} برای فاکتور شماره ${invoice.number} ثبت شد و سند حسابداری آن در تاریخ پرداخت صادر گردید.`
                   }
               ]
           }));
@@ -1678,6 +1708,7 @@ export const useStore = create<AppState>()(
           triggerAutoBackup(`پرداخت فاکتور ${invoice.number}`);
           return newTrans;
       },
+
       deleteTransaction: (id) => set(s => {
           if (s.currentUser && !s.currentUser.permissions.finance.delete) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز حذف تراکنش مالی را ندارید.' }] };
