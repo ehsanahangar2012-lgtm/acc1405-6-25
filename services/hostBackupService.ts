@@ -10,7 +10,8 @@
  * 6. بکاپ لوکال در IndexedDB به‌عنوان fallback
  */
 
-import { API_CONFIG, IS_BROWSER_PREVIEW } from '../config';
+import { IS_BROWSER_PREVIEW } from '../config';
+import { workspaceService } from './workspaceService';
 import { idbService } from './indexedDBService';
 import { useFinancialStore } from '../store-financial';
 
@@ -83,14 +84,12 @@ const BACKUP_TABLES = [
 // ─── سرویس ───────────────────────────────────────────────────────────────────
 
 class HostBackupService {
-    private token: string;
-    private backupUrl: string;
     private timerHandle: ReturnType<typeof setInterval> | null = null;
     private isRunning = false;
 
-    constructor() {
-        this.token    = import.meta.env.VITE_API_TOKEN || 'secure_api_token_change_this';
-        this.backupUrl = API_CONFIG.BACKUP_API;
+    private get backupUrl(): string {
+        const base = workspaceService.getBaseUrl();
+        return base ? `${base.replace(/\/+$/, '')}/server-api-backup.php` : '';
     }
 
     // ─── عمومی ───────────────────────────────────────────────────────────────
@@ -201,10 +200,10 @@ class HostBackupService {
 
             // ۴. ارسال به هاست
             let hostResult: BackupResult;
-            if (navigator.onLine) {
+            if (navigator.onLine && workspaceService.isRemoteCloudConfigured()) {
                 hostResult = await this.uploadToHost(payload);
             } else {
-                hostResult = { success: false, error: 'آفلاین' };
+                hostResult = { success: false, error: navigator.onLine ? 'اتصال امن به سرور تنظیم نشده است' : 'آفلاین' };
             }
 
             // ۵. ذخیره لوکال به‌عنوان fallback
@@ -232,12 +231,12 @@ class HostBackupService {
      * دریافت لیست بکاپ‌های هاست
      */
     async listHostBackups(): Promise<HostBackupEntry[]> {
-        if (IS_BROWSER_PREVIEW || !navigator.onLine) return [];
+        if (IS_BROWSER_PREVIEW || !navigator.onLine || !workspaceService.isRemoteCloudConfigured()) return [];
         try {
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), 8000);
             const response = await fetch(`${this.backupUrl}?action=list`, {
-                headers: { 'Authorization': this.token },
+                headers: await workspaceService.getSecureHeaders(),
                 signal: controller.signal,
             });
             clearTimeout(tid);
@@ -267,14 +266,14 @@ class HostBackupService {
      * بازیابی بکاپ از هاست
      */
     async restoreFromHost(backupId: string): Promise<RestoreResult> {
-        if (IS_BROWSER_PREVIEW) {
-            return { success: false, error: 'بازیابی از هاست در محیط آزمایشی غیرفعال است.' };
+        if (IS_BROWSER_PREVIEW || !workspaceService.isRemoteCloudConfigured()) {
+            return { success: false, error: 'اتصال امن بکاپ سرور تنظیم نشده است.' };
         }
         try {
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
             const response = await fetch(`${this.backupUrl}?action=restore&id=${backupId}`, {
-                headers: { 'Authorization': this.token },
+                headers: await workspaceService.getSecureHeaders(),
                 signal: controller.signal,
             });
             clearTimeout(tid);
@@ -303,13 +302,13 @@ class HostBackupService {
     // ─── حذف ───────────────────────────────────────────────────────────────
 
     async deleteHostBackup(backupId: string): Promise<boolean> {
-        if (IS_BROWSER_PREVIEW) return false;
+        if (IS_BROWSER_PREVIEW || !workspaceService.isRemoteCloudConfigured()) return false;
         try {
             const controller = new AbortController();
             const tid = setTimeout(() => controller.abort(), 8000);
             const response = await fetch(this.backupUrl, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': this.token },
+                headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                 body: JSON.stringify({ action: 'delete', id: backupId }),
                 signal: controller.signal,
             });
@@ -411,7 +410,7 @@ class HostBackupService {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': this.token,
+                    ...await workspaceService.getSecureHeaders(),
                 },
                 body: JSON.stringify({ action: 'create', ...payload }),
                 signal: controller.signal,
