@@ -1,6 +1,7 @@
 import CryptoJS from 'crypto-js';
 import type { SignatureRequest, DigitalSignature, AuthLog, OTPResponse, SignatureVerification, SignatureReport, DocumentType, SignatureStatus } from '../types-signature';
 import { hostUrlService } from './hostUrlService';
+import { workspaceService } from './workspaceService';
 import { fetchWithTimeout, safeFetchJson, unpackPayloadFromToken } from '../utils';
 
 const API_BASE = '/remote-signature-api.php';
@@ -34,53 +35,56 @@ class RemoteSignatureService {
       createdAt: new Date().toISOString(),
     };
 
+    const secureHeaders = await workspaceService.getSecureHeaders();
     const res = await safeFetchJson(API_BASE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...secureHeaders },
       body: JSON.stringify({
         action: 'create_request',
         data: request,
       }),
     });
 
-    if (!res || !res.success) {
-      // Fallback local storage or return request
-      return request;
+    if (!res?.success || !res?.data?.id || !res?.data?.signatureToken) {
+      throw new Error('درخواست امضای امن از سرور دریافت نشد');
     }
-    return res.data || request;
+    return res.data;
   }
 
   // ارسال OTP
-  async sendOTP(requestId: string, method: 'sms' | 'email'): Promise<OTPResponse> {
+  async sendOTP(requestId: string, method: 'sms' | 'email', signatureToken: string): Promise<OTPResponse> {
+    if (!signatureToken) throw new Error('لینک امضا نامعتبر است');
     const res = await safeFetchJson(API_BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'send_otp',
         requestId,
+        signatureToken,
         method,
       }),
     });
-    return res || { success: true, message: 'کد تایید ارسال شد (حالت آفلاین/شبیه‌سازی)' };
+    if (!res?.success) throw new Error(res?.error || 'ارسال کد تأیید از سرور انجام نشد');
+    return res as OTPResponse;
   }
 
   // تأیید OTP
-  async verifyOTP(requestId: string, otpCode: string): Promise<{ success: boolean; message: string }> {
+  async verifyOTP(requestId: string, otpCode: string, signatureToken: string): Promise<{ success: boolean; message: string; sessionToken?: string }> {
+    if (!signatureToken) return { success: false, message: 'لینک امضا نامعتبر است' };
     const res = await safeFetchJson(API_BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'verify_otp',
         requestId,
+        signatureToken,
         otpCode,
       }),
     });
-    const result = res || { success: true, message: 'کد تایید شد' };
-    
-    // ثبت لاگ احراز هویت
-    await this.logAuth(requestId, 'otp_sms', result.success);
-    
-    return result;
+    if (!res?.success || !res?.sessionToken) {
+      return { success: false, message: res?.error || 'کد تأیید نامعتبر است' };
+    }
+    return { success: true, message: res.message || 'کد تأیید شد', sessionToken: res.sessionToken };
   }
 
   // دریافت اطلاعات درخواست با توکن
@@ -137,10 +141,15 @@ class RemoteSignatureService {
   // امضای سند
   async signDocument(params: {
     requestId: string;
+    signatureToken: string;
+    sessionToken?: string;
     signatureData: string;
     signatureImage?: string;
   }): Promise<DigitalSignature> {
-    const request = await this.getRequest(params.requestId);
+    const request = await this.getRequestByToken(params.signatureToken);
+    if (!request || request.id !== params.requestId) {
+      throw new Error('درخواست امضا با این لینک تطبیق ندارد');
+    }
     
     // محاسبه هش سند
     const documentHash = request ? await this.calculateDocumentHash(request.documentUrl) : '';
@@ -168,29 +177,40 @@ class RemoteSignatureService {
       body: JSON.stringify({
         action: 'sign_document',
         data: signature,
+        signatureToken: params.signatureToken,
+        sessionToken: params.sessionToken,
       }),
     });
-
-    return res?.data || signature;
+    if (!res?.success || !res?.data) {
+      throw new Error(res?.error || 'ثبت امضا توسط سرور تأیید نشد');
+    }
+    return res.data as DigitalSignature;
   }
 
   // رد امضا
-  async rejectSignature(requestId: string, reason: string): Promise<void> {
-    await safeFetchJson(API_BASE, {
+  async rejectSignature(requestId: string, reason: string, signatureToken: string, sessionToken?: string): Promise<void> {
+    if (!signatureToken) throw new Error('لینک امضا نامعتبر است');
+    const res = await safeFetchJson(API_BASE, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         action: 'reject_signature',
         requestId,
         reason,
+        signatureToken,
+        sessionToken,
       }),
     });
+    if (!res?.success) throw new Error(res?.error || 'ثبت رد امضا توسط سرور تأیید نشد');
   }
 
   // دریافت درخواست
   async getRequest(requestId: string): Promise<SignatureRequest | null> {
-    const res = await safeFetchJson(`${API_BASE}?action=get_request&id=${requestId}`);
-    return res?.data || res || null;
+    const secureHeaders = await workspaceService.getSecureHeaders();
+    const res = await safeFetchJson(`${API_BASE}?action=get_request&id=${encodeURIComponent(requestId)}`, {
+      headers: secureHeaders,
+    });
+    return res?.success ? (res.data || null) : null;
   }
 
   // لیست درخواستها
@@ -201,20 +221,26 @@ class RemoteSignatureService {
     toDate?: string;
   }): Promise<SignatureRequest[]> {
     const params = new URLSearchParams({ action: 'list_requests', ...filters as any });
-    const res = await safeFetchJson(`${API_BASE}?${params}`);
-    return res?.data || (Array.isArray(res) ? res : []);
+    const secureHeaders = await workspaceService.getSecureHeaders();
+    const res = await safeFetchJson(`${API_BASE}?${params}`, { headers: secureHeaders });
+    return res?.success && Array.isArray(res.data) ? res.data : [];
   }
 
   // تأیید امضا
   async verifySignature(signatureId: string): Promise<SignatureVerification> {
-    const res = await safeFetchJson(`${API_BASE}?action=verify_signature&id=${signatureId}`);
-    return res?.data || res || { isValid: true, verifiedAt: new Date().toISOString(), signerName: 'تایید شده' };
+    const secureHeaders = await workspaceService.getSecureHeaders();
+    const res = await safeFetchJson(`${API_BASE}?action=verify_signature&id=${encodeURIComponent(signatureId)}`, {
+      headers: secureHeaders,
+    });
+    if (!res?.success || !res?.data) throw new Error('تأیید امضا از سرور دریافت نشد');
+    return res.data as SignatureVerification;
   }
 
   // گزارش امضاها
   async getReport(): Promise<SignatureReport> {
-    const res = await safeFetchJson(`${API_BASE}?action=get_report`);
-    return res?.data || res || { total: 0, pending: 0, signed: 0, rejected: 0, expired: 0, signersCount: 0 };
+    const secureHeaders = await workspaceService.getSecureHeaders();
+    const res = await safeFetchJson(`${API_BASE}?action=get_report`, { headers: secureHeaders });
+    return res?.success && res?.data ? res.data : { totalRequests: 0, pendingRequests: 0, signedRequests: 0, rejectedRequests: 0, expiredRequests: 0, requestsByType: {}, recentActivity: [] } as unknown as SignatureReport;
   }
 
   // تولید لینک امضا با استفاده از hostUrl
@@ -291,9 +317,10 @@ class RemoteSignatureService {
       userAgent: navigator.userAgent,
     };
 
+    const secureHeaders = await workspaceService.getSecureHeaders();
     await fetch(API_BASE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...secureHeaders },
       body: JSON.stringify({
         action: 'log_auth',
         data: log,
