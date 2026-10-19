@@ -89,7 +89,25 @@ if (!@rename($tempFile, $rateFile)) {
 flock($rateLock, LOCK_UN);
 fclose($rateLock);
 
-$geminiKey = trim((string)getenv('GEMINI_API_KEY'));
+function geminiServerSecret(string $name): string {
+    $value = getenv($name);
+    if (is_string($value) && trim($value) !== '') return trim($value);
+
+    // Compatibility for shared hosting: this file is protected by .htaccess,
+    // excluded from release packages, and must never be tracked in Git.
+    $envFile = __DIR__ . '/.env.local';
+    if (is_file($envFile) && is_readable($envFile)) {
+        foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) continue;
+            $parts = explode('=', $line, 2);
+            if (count($parts) === 2 && trim($parts[0]) === $name) return trim(trim($parts[1]), " \\t\\n\\r\\\"'");
+        }
+    }
+    return '';
+}
+
+$geminiKey = geminiServerSecret('GEMINI_API_KEY');
 if ($geminiKey === '') {
     geminiRespond(503, ['success' => false, 'error' => 'AI_SERVICE_NOT_CONFIGURED']);
 }
