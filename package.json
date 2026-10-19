@@ -13,10 +13,10 @@
     "build": "npm run build:web && node prepare-dist.js && node scripts/create-host-zip.js",
     "build:native-secure": "npm run build:web && node scripts/obfuscate-release.js",
     "build:zip": "node prepare-dist.js && node scripts/create-host-zip.js",
-    "build:installer": "npm run build:web && node prepare-dist.js && node scripts/build-windows.js nsis",
-    "build:exe": "npm run build:web && node prepare-dist.js && node scripts/build-windows.js portable",
-    "build:portable": "npm run build:web && node prepare-dist.js && node scripts/build-windows.js portable",
-    "build:all": "npm run build && node scripts/build-windows.js all && npm run build:apk",
+    "build:installer": "npm run build:web:desktop && node prepare-dist.js && node scripts/build-windows.js nsis",
+    "build:exe": "npm run build:web:desktop && node prepare-dist.js && node scripts/build-windows.js portable",
+    "build:portable": "npm run build:web:desktop && node prepare-dist.js && node scripts/build-windows.js portable",
+    "build:all": "npm run build && npm run build:web:desktop && node prepare-dist.js && node scripts/build-windows.js all && npm run build:apk",
     "build:apk": "vite build --mode android && node prepare-dist.js && node scripts/build-apk.js",
     "apk": "npm run build:apk",
     "prepare-dist": "node prepare-dist.js",
@@ -24,8 +24,9 @@
     "cleanup:builds": "node scripts/cleanup-builds.js",
     "preview": "vite preview",
     "build:web": "vite build",
+    "build:web:desktop": "vite build --mode desktop",
     "build:browser-preview": "vite build --mode browser-preview",
-    "build:windows": "npm run build:web && node prepare-dist.js && node scripts/build-windows.js all"
+    "build:windows": "npm run build:web:desktop && node prepare-dist.js && node scripts/build-windows.js all"
   },
   "dependencies": {
     "@capacitor/camera": "^8.2.4",
