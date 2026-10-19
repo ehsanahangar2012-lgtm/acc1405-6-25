@@ -111,6 +111,8 @@ const LicenseManager: React.FC = () => {
             if (!response?.ok || data?.success !== true || !Array.isArray(data.workspaces)) {
                 throw new Error(data?.message || 'دفتر ثبت لایسنس از سرور دریافت نشد.');
             }
+            // Keep the validated mother-portal credential only in this tab's session for protected master-storage APIs.
+            try { window.sessionStorage.setItem('ashk_mother_admin_secret', secret); } catch {}
             const localRecords = licenseGeneratorService.getAllLicenses();
             const today = new Date().toISOString().slice(0, 10);
             const serverRecords: LicenseRecord[] = data.workspaces
@@ -275,6 +277,7 @@ const LicenseManager: React.FC = () => {
                 status: 'ACTIVE'
             };
 
+            try { window.sessionStorage.setItem('ashk_mother_admin_secret', cleanAdminSecret); } catch {}
             licenseGeneratorService.saveLicenseRecord(newRecord);
             setGeneratedRecord(newRecord);
             await handleLoadServerLicenses();
