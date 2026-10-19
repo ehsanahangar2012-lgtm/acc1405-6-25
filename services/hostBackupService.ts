@@ -14,6 +14,7 @@ import { APP_VERSION, IS_BROWSER_PREVIEW } from '../config';
 import { workspaceService } from './workspaceService';
 import { idbService } from './indexedDBService';
 import { useFinancialStore } from '../store-financial';
+import CryptoJS from 'crypto-js';
 
 // ─── انواع ───────────────────────────────────────────────────────────────────
 
