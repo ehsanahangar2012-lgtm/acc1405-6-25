@@ -65,6 +65,8 @@ export interface BackupResult {
     localFileStatus?: 'SYNCED' | 'WAITING' | 'ERROR';
     localFilePath?: string;
     localFileError?: string;
+    localFileSha256?: string;
+    localFileSizeBytes?: number;
 }
 
 export interface RestoreResult {
@@ -218,6 +220,8 @@ class HostBackupService {
         let localFileStatus: BackupResult['localFileStatus'] = 'WAITING';
         let localFilePath: string | undefined;
         let localFileError: string | undefined;
+        let localFileSha256: string | undefined;
+        let localFileSizeBytes: number | undefined;
         let remoteStatus: BackupResult['remoteStatus'] = 'WAITING';
         let backupId: string | undefined;
 
@@ -258,6 +262,8 @@ class HostBackupService {
                     if (fileResult?.success) {
                         localFileStatus = 'SYNCED';
                         localFilePath = typeof fileResult.filePath === 'string' ? fileResult.filePath : undefined;
+                        localFileSha256 = typeof fileResult.sha256 === 'string' ? fileResult.sha256 : undefined;
+                        localFileSizeBytes = Number.isFinite(fileResult.sizeBytes) ? fileResult.sizeBytes : undefined;
                     } else {
                         localFileError = String(fileResult?.error || 'BACKUP_WRITE_FAILED');
                         localFileStatus = localFileError === 'BACKUP_DIRECTORY_NOT_SELECTED' ? 'WAITING' : 'ERROR';
@@ -305,7 +311,9 @@ class HostBackupService {
                     remoteStatus: 'SYNCED',
                     localFileStatus,
                     localFilePath,
-                    localFileError
+                    localFileError,
+                    localFileSha256,
+                    localFileSizeBytes
                 };
             }
 
@@ -318,6 +326,8 @@ class HostBackupService {
                 localFileStatus,
                 localFilePath,
                 localFileError,
+                localFileSha256,
+                localFileSizeBytes,
                 error: hostResult.error,
                 message: 'نسخه محلی تهیه شد؛ ذخیره روی سرور تأیید نشد.'
             };
@@ -331,6 +341,8 @@ class HostBackupService {
                 localFileStatus,
                 localFilePath,
                 localFileError,
+                localFileSha256,
+                localFileSizeBytes,
                 error: error?.message || 'خطای ناشناخته'
             };
         } finally {
