@@ -92,7 +92,7 @@ const LicenseManager: React.FC = () => {
             alert('نام خریدار و HWID ثبت‌شده از دستگاه مشتری الزامی است.');
             return;
         }
-        const resolvedServerUrl = (licenseServerUrl.trim() || window.location.origin).replace(/\\/+$/, '');
+        const resolvedServerUrl = (licenseServerUrl.trim() || window.location.origin).replace(/\/+$/, '');
         const cleanAdminSecret = adminSecret.trim();
         if (!resolvedServerUrl || !cleanAdminSecret) {
             setIssueError('برای صدور تجاری، نشانی سرور مادر و کلید مدیریت سرور را وارد کنید.');
@@ -106,6 +106,12 @@ const LicenseManager: React.FC = () => {
             const workspaceId = `ws_${newLicenseKey.replace(/[^A-Z0-9]/gi, '').toLowerCase()}`;
             const planConfig = PLAN_CONFIGS[selectedPlan];
             const effectiveExpireDate = planConfig.isUnlimited ? '9999-12-31' : expireDate;
+            if (!planConfig.isUnlimited) {
+                const parsedExpiry = new Date(`${effectiveExpireDate}T00:00:00Z`);
+                if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(effectiveExpireDate) || Number.isNaN(parsedExpiry.getTime()) || parsedExpiry.toISOString().slice(0, 10) !== effectiveExpireDate) {
+                    throw new Error('تاریخ انقضا باید یک تاریخ معتبر میلادی با فرمت YYYY-MM-DD باشد.');
+                }
+            }
 
             const payload = {
                 action: 'add',
@@ -207,7 +213,7 @@ const LicenseManager: React.FC = () => {
             return;
         }
         try {
-            const baseUrl = record.serverUrl.replace(/\\/+$/, '');
+            const baseUrl = record.serverUrl.replace(/\/+$/, '');
             let response: Response | null = null;
             let data: any = null;
             for (const apiUrl of [`${baseUrl}/tenant-manager.php`, `${baseUrl}/host-backend/tenant-manager.php`]) {
@@ -328,7 +334,7 @@ const LicenseManager: React.FC = () => {
                     }`}
                 >
                     <Plus className="w-4 h-4" />
-                    <span>صدور لایسنس و کد فعال‌سازی جدید</span>
+                    <span>صدور لایسنس و ثبت در سرور</span>
                 </button>
 
                 <button
