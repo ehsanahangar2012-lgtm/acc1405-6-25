@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useStore } from '../store';
 import { 
   CheckCircle2, AlertCircle, Info, X, Bell, AlertTriangle, RefreshCw, 
@@ -10,11 +10,12 @@ import { autoSyncService } from '../services/autoSyncService';
 import { toPersianDigits, getPersianDate } from '../utils';
 import { TrialStatusBadge } from './TrialStatusBadge';
 import SmartSectionGuide from './SmartSectionGuide';
+import { androidBackButtonService } from '../services/androidBackButtonService';
 
 interface AndroidHeadsUpItemProps {
     notif: any;
     badge: { label: string; bg: string; icon: React.ReactNode };
-    onDismiss: () => void;
+    onDismiss: (notificationId: string) => void;
     onOpenDrawer: () => void;
 }
 
@@ -28,7 +29,7 @@ const AndroidHeadsUpItem: React.FC<AndroidHeadsUpItemProps> = ({ notif, badge, o
         }, 1000);
 
         const removeTimer = setTimeout(() => {
-            onDismiss();
+            onDismiss(notif.id);
         }, 1220);
 
         return () => {
@@ -40,7 +41,7 @@ const AndroidHeadsUpItem: React.FC<AndroidHeadsUpItemProps> = ({ notif, badge, o
     const handleManualDismiss = () => {
         setIsExiting(true);
         setTimeout(() => {
-            onDismiss();
+            onDismiss(notif.id);
         }, 200);
     };
 
@@ -169,6 +170,39 @@ export const NotificationBar: React.FC = () => {
 
     const activeHeadsUpList = notifications.filter(n => headsUpQueue.includes(n.id));
 
+    const dismissHeadsUp = useCallback((notificationId: string) => {
+        setHeadsUpQueue(prev => prev.filter(id => id !== notificationId));
+        removeNotification(notificationId);
+    }, [removeNotification]);
+
+    // In native Android, Back should close the notification shade before leaving the page.
+    useEffect(() => {
+        return androidBackButtonService.registerHandler(() => {
+            if (showGuideModal) {
+                setShowGuideModal(false);
+                return true;
+            }
+            if (isDrawerOpen) {
+                setIsDrawerOpen(false);
+                return true;
+            }
+            return false;
+        });
+    }, [isDrawerOpen, showGuideModal]);
+
+    // Escape is a reliable desktop/PWA fallback; clicking the backdrop also closes the shade.
+    useEffect(() => {
+        if (!isDrawerOpen && !showGuideModal) return;
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsDrawerOpen(false);
+                setShowGuideModal(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isDrawerOpen, showGuideModal]);
+
     // Category Badge Details
     const getCategoryBadge = (category: 'FINANCIAL' | 'SYNC' | 'OPERATION' | 'SYSTEM') => {
         switch (category) {
@@ -282,10 +316,7 @@ export const NotificationBar: React.FC = () => {
                             key={notif.id}
                             notif={notif}
                             badge={badge}
-                            onDismiss={() => {
-                                setHeadsUpQueue(prev => prev.filter(id => id !== notif.id));
-                                removeNotification(notif.id);
-                            }}
+                            onDismiss={dismissHeadsUp}
                             onOpenDrawer={() => setIsDrawerOpen(true)}
                         />
                     );
@@ -294,10 +325,15 @@ export const NotificationBar: React.FC = () => {
 
             {/* 3. ANDROID NOTIFICATION SHADE / DRAWER (Slides down from top) */}
             <div
-                className={`fixed inset-x-0 top-0 z-[8800] bg-slate-950/98 backdrop-blur-2xl border-b border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] transition-transform duration-300 no-print flex flex-col ${
-                    isDrawerOpen ? 'translate-y-0' : '-translate-y-full'
+                aria-hidden={!isDrawerOpen}
+                className={`fixed inset-x-0 top-0 z-[8800] bg-slate-950/98 border-b border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] transition-transform duration-200 no-print flex flex-col ${
+                    isDrawerOpen ? 'translate-y-0 pointer-events-auto' : '-translate-y-full pointer-events-none'
                 }`}
-                style={{ maxHeight: '82vh' }}
+                style={{
+                    maxHeight: isMobile ? '58vh' : '72vh',
+                    overscrollBehavior: 'contain',
+                    willChange: isDrawerOpen ? 'transform' : 'auto'
+                }}
                 dir="rtl"
             >
                 {/* Drawer Header (Android Quick Settings Bar) */}
@@ -352,10 +388,14 @@ export const NotificationBar: React.FC = () => {
 
                             {/* Close Drawer */}
                             <button
+                                type="button"
                                 onClick={() => setIsDrawerOpen(false)}
-                                className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition-all"
+                                aria-label="بستن مرکز اعلان‌ها"
+                                title="بستن اعلان‌ها"
+                                className="min-w-10 min-h-10 px-2 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center gap-1 transition-all border border-white/10"
                             >
-                                <ChevronUp size={18} />
+                                <X size={18} />
+                                <span className="text-[11px] font-bold">بستن</span>
                             </button>
                         </div>
                     </div>
@@ -439,8 +479,9 @@ export const NotificationBar: React.FC = () => {
                                         </p>
                                     </div>
                                     <button
+                                        type="button"
                                         onClick={() => removeNotification(n.id)}
-                                        className="w-7 h-7 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center shrink-0 transition-colors"
+                                        className="min-w-9 min-h-9 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 flex items-center justify-center shrink-0 transition-colors"
                                         title="حذف"
                                     >
                                         <X size={14} />
@@ -452,12 +493,15 @@ export const NotificationBar: React.FC = () => {
                 </div>
 
                 {/* Drawer Footer Handle */}
-                <div 
+                <button
+                    type="button"
                     onClick={() => setIsDrawerOpen(false)}
-                    className="p-2 border-t border-white/5 flex items-center justify-center cursor-pointer bg-slate-950/60 hover:bg-slate-900/80 transition-colors text-slate-500 hover:text-slate-300"
+                    className="min-h-10 p-2 border-t border-white/5 flex items-center justify-center gap-2 cursor-pointer bg-slate-950/60 hover:bg-slate-900/80 transition-colors text-slate-300"
+                    aria-label="بستن مرکز اعلان‌ها"
                 >
-                    <div className="w-12 h-1 rounded-full bg-white/20"></div>
-                </div>
+                    <ChevronUp size={16} />
+                    <span className="text-xs font-bold">بستن مرکز اعلان‌ها</span>
+                </button>
             </div>
 
             {/* Backdrop for open drawer */}
