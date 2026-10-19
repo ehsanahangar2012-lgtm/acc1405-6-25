@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$ROOT_DIR/host-backend/remote-signature-api.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$ROOT_DIR/host-backend/remote-signature-api.php" "$ROOT_DIR/host-backend/signature-api-simple.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -143,6 +143,41 @@ if($raw===false||$sig===false||openssl_verify($raw,$sig,$pub,OPENSSL_ALGO_SHA256
 $p=json_decode($raw,true);if(($p["hwid"]??"")!=="HWID-A"||($p["plan"]??"")!=="BRONZE"||($p["max_customers"]??null)!==50||($p["max_documents"]??null)!==500){fwrite(STDERR,"Wrong receipt entitlements\n");exit(1);}
 ' "$TEST_DIR/valid.json" "$TEST_REGISTRY_PATH"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["workspaces"]["ws_test"]["hwid"]??"")!=="HWID-A"){fwrite(STDERR,"HWID not persisted\n");exit(1);}' "$TEST_REGISTRY_PATH"
+
+# Simple public-link signatures: tenant-authenticated creation, no overwrite, exact link proof on sign.
+cat > "$TEST_DIR/simple-signature-create.json" <<'JSON'
+{"action":"createRequest","request":{"id":"client-id-must-be-ignored","token":"a1234567-89ab-4cde-8fab-0123456789ab~YWJj","documentId":"DOC-SIMPLE-CI","documentType":"INVOICE","documentPreview":"{\"customer\":\"CI sample\"}","createdAt":"2099-01-01T00:00:00Z","expiresAt":"2099-01-03T00:00:00Z","status":"SIGNED"}}
+JSON
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/simple-signature-no-auth.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' --data-binary @"$TEST_DIR/simple-signature-create.json" "$BASE_URL/signature-api-simple.php")"
+[[ "$code" == "403" ]]
+
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/simple-signature-created.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' --data-binary @"$TEST_DIR/simple-signature-create.json" "$BASE_URL/signature-api-simple.php")"
+[[ "$code" == "201" ]]
+SIMPLE_TOKEN='a1234567-89ab-4cde-8fab-0123456789ab~YWJj'
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$r=$j["request"]??[];if(($j["success"]??false)!==true||($r["workspace_id"]??"")!=="ws_test"||($r["id"]??"")==="client-id-must-be-ignored"||($r["status"]??"")!=="PENDING"||($r["token"]??"")!==$argv[2]){fwrite(STDERR,"Simple signature request was not issued securely");exit(1);}' "$TEST_DIR/simple-signature-created.json" "$SIMPLE_TOKEN"
+SIMPLE_ID="$(php -r '$j=json_decode(file_get_contents($argv[1]),true);echo $j["request"]["id"]??"";' "$TEST_DIR/simple-signature-created.json")"
+
+# Reusing any existing token from any workspace is rejected rather than overwritten.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/simple-signature-duplicate.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' --data-binary @"$TEST_DIR/simple-signature-create.json" "$BASE_URL/signature-api-simple.php")"
+[[ "$code" == "409" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/simple-signature-public.json" -w '%{http_code}' \
+  --get --data-urlencode 'action=getRequest' --data-urlencode "token=$SIMPLE_TOKEN" "$BASE_URL/signature-api-simple.php")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$r=$j["request"]??[];if(($r["id"]??"")!==$argv[2]||isset($r["workspace_id"])||($r["status"]??"")!=="PENDING"){fwrite(STDERR,"Public simple signature read exposed tenant metadata or wrong request");exit(1);}' "$TEST_DIR/simple-signature-public.json" "$SIMPLE_ID"
+
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$token=$argv[2];file_put_contents($argv[3],json_encode(["action"=>"signRequest","token"=>$token,"signerName"=>"CI signer","signatureData"=>"ci-signature"],JSON_UNESCAPED_UNICODE));' "$TEST_DIR/simple-signature-created.json" "$SIMPLE_TOKEN" "$TEST_DIR/simple-signature-sign.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/simple-signature-signed.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' --data-binary @"$TEST_DIR/simple-signature-sign.json" "$BASE_URL/signature-api-simple.php")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$r=$j["request"]??[];if(($r["status"]??"")!=="SIGNED"||($r["signerName"]??"")!=="CI signer"||($r["signatureData"]??"")!=="ci-signature"){fwrite(STDERR,"Simple signature was not server-confirmed");exit(1);}' "$TEST_DIR/simple-signature-signed.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/simple-signature-replay.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' --data-binary @"$TEST_DIR/simple-signature-sign.json" "$BASE_URL/signature-api-simple.php")"
+[[ "$code" == "409" ]]
 
 # Remote-signature management and issuance require a licensed, device-bound workspace.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-no-auth-list.json" -w '%{http_code}' "$BASE_URL/remote-signature-api.php?action=list_requests")"
@@ -292,4 +327,4 @@ code="$(post_json '{"action":"verify_license","workspace_id":"ws_issued","token"
 [[ "$code" == "403" ]]
 assert_status "$TEST_DIR/issued-after-revoke.json" "SUSPENDED"
 
-echo "PASS: license lifecycle, HWID/RSA, retired legacy APIs, digital-signature token safety, tenant-scoped remote signatures, OTP sessions, storage and revocation."
+echo "PASS: license lifecycle, HWID/RSA, retired APIs, host-package data isolation, tenant-scoped signatures, OTP sessions, token collision protection, storage and revocation."
