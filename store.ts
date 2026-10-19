@@ -160,9 +160,9 @@ interface AppState {
   updatePerson: (id: string, up: Partial<Person>) => void;
   deletePerson: (id: string) => void;
   
-  addInvoice: (i: Invoice) => void;
+  addInvoice: (i: Invoice) => boolean;
   deleteInvoice: (id: string) => void;
-  updateInvoice: (id: string, updated: Invoice) => void;
+  updateInvoice: (id: string, updated: Invoice) => boolean;
   setInvoiceSignature: (id: string, signature: string, role?: 'warehouse' | 'sales' | 'customer' | 'driver') => void;
   
   addCheck: (c: Check, personId?: string) => void;
@@ -593,7 +593,9 @@ export const useStore = create<AppState>()(
           };
       }),
 
-      addInvoice: (i) => set(s => {
+      addInvoice: (i) => {
+          let saved = false;
+          set(s => {
           if (s.currentUser && !s.currentUser.permissions.invoices.create) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ثبت فاکتور را ندارید.' }] };
           }
@@ -689,14 +691,31 @@ export const useStore = create<AppState>()(
               });
           }
 
+          const invoiceChecks = (i.checks || []).map(check => ({
+              ...check,
+              personId: i.personId,
+              personName: i.personName,
+              relatedInvoiceId: i.id
+          }));
+          const updatedChecks = [
+              ...s.checks.filter(existing => !invoiceChecks.some(check => check.id === existing.id)),
+              ...invoiceChecks
+          ];
+          invoiceChecks.forEach(check => hostDB.save('checks', check).catch(() => {}));
+          persistentStorage.saveData('checks', updatedChecks).catch(() => {});
+
+          saved = true;
           triggerAutoBackup(`ثبت فاکتور ${i.number}`);
           return { 
               invoices: updated, 
+              checks: updatedChecks,
               people: updatedPeople,
               transactions: newTransactions,
               notifications: [...s.notifications, { id: generateId(), type: 'success', message: 'فاکتور و تراکنش‌های مالی ثبت شد.' }]
           };
-      }),
+          });
+          return saved;
+      },
 
       deleteInvoice: (id) => set(s => {
           if (s.currentUser && !s.currentUser.permissions.invoices.delete) {
@@ -765,7 +784,9 @@ export const useStore = create<AppState>()(
           };
       }),
 
-      updateInvoice: (id, updated) => set(s => {
+      updateInvoice: (id, updated) => {
+          let saved = false;
+          set(s => {
           if (s.currentUser && !s.currentUser.permissions.invoices.edit) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ویرایش فاکتور را ندارید.' }] };
           }
@@ -892,19 +913,35 @@ export const useStore = create<AppState>()(
               newTransList.forEach(t => t.balanceAfter = exactBal);
           }
 
+          const invoiceChecks = (finalUpdated.checks || []).map(check => ({
+              ...check,
+              personId: finalUpdated.personId,
+              personName: finalUpdated.personName,
+              relatedInvoiceId: id
+          }));
+          const nextChecks = [
+              ...s.checks.filter(existing => !invoiceChecks.some(check => check.id === existing.id)),
+              ...invoiceChecks
+          ];
+          invoiceChecks.forEach(check => hostDB.save('checks', check).catch(() => {}));
+          persistentStorage.saveData('checks', nextChecks).catch(() => {});
           hostDB.save('invoices', finalUpdated).catch(() => {});
           persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
           persistentStorage.saveData('people', updatedPeople).catch(() => {});
           persistentStorage.saveData('transactions', nextTransactions).catch(() => {});
 
+          saved = true;
           triggerAutoBackup(`ویرایش فاکتور ${finalUpdated.number}`);
           return { 
               invoices: nextInvoices, 
+              checks: nextChecks,
               transactions: nextTransactions,
               people: updatedPeople,
               notifications: [...s.notifications, { id: generateId(), type: 'success', message: 'فاکتور با موفقیت اصلاح شد؛ سند قبلی ابطال و سند جدید جایگزین شد.' }] 
           };
-      }),
+          });
+          return saved;
+      },
 
       setInvoiceSignature: (id, signature, role = 'customer') => set(s => {
           const updated = s.invoices.map(inv => inv.id === id ? { 
