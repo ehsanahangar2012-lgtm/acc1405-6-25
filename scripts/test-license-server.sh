@@ -139,10 +139,12 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-storage-den
 [[ "$code" == "403" ]]
 php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["status"]??"")!=="ADMIN_AUTH_REQUIRED"){fwrite(STDERR,"Expected protected master storage denial\n");exit(1);}' "$TEST_DIR/master-storage-denied.json"
 
-# A query-string token must not authenticate protected storage APIs.
+# A query-string token must not authenticate protected storage APIs (even on POST).
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-storage-query.json" -w '%{http_code}' \
-  "$BASE_URL/host-storage-api.php?action=test&workspace_id=default&workspace_token=ci-test-admin-secret")"
+  -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"default"}' \
+  "$BASE_URL/host-storage-api.php?workspace_token=ci-test-admin-secret")"
 [[ "$code" == "403" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["status"]??"")!=="ADMIN_AUTH_REQUIRED"){fwrite(STDERR,"Query-string token was accepted for master storage");exit(1);}' "$TEST_DIR/master-storage-query.json"
 
 # A verified mother-portal admin secret may access the reserved master workspace.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-storage-allowed.json" -w '%{http_code}' \
