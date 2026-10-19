@@ -36,13 +36,14 @@ jobs:
       - name: Type-check project
         run: bun run lint
 
-      - name: Validate PHP server endpoints syntax
+      - name: Setup PHP for server syntax checks
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: openssl
-        env:
-          fail-fast: true
+
+      - name: Validate PHP server endpoints syntax
+        shell: bash
         run: |
           set -euo pipefail
           php -l host-backend/license_validator.php
