@@ -70,8 +70,72 @@ const LicenseManager: React.FC = () => {
     }, []);
 
     const loadLicenses = () => {
-        const list = licenseGeneratorService.getAllLicenses();
-        setLicenses(list);
+        setLicenses(licenseGeneratorService.getAllLicenses());
+    };
+
+    const handleLoadServerLicenses = async () => {
+        const baseUrl = (licenseServerUrl.trim() || window.location.origin).replace(/\/+$/, '');
+        const secret = adminSecret.trim();
+        if (!secret) {
+            setIssueError('برای خواندن دفتر ثبت سرور، کلید مدیریت سرور را وارد کنید.');
+            return;
+        }
+        try {
+            let response: Response | null = null;
+            let data: any = null;
+            for (const endpoint of [`${baseUrl}/tenant-manager.php`, `${baseUrl}/host-backend/tenant-manager.php`]) {
+                const candidate = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
+                    body: JSON.stringify({ action: 'list' }),
+                    cache: 'no-store'
+                });
+                response = candidate;
+                data = await candidate.json().catch(() => null);
+                if (candidate.status !== 404) break;
+            }
+            if (!response?.ok || data?.success !== true || !Array.isArray(data.workspaces)) {
+                throw new Error(data?.message || 'دفتر ثبت لایسنس از سرور دریافت نشد.');
+            }
+
+            const serverRecords: LicenseRecord[] = data.workspaces
+                .filter((item: any) => item?.workspace_id && !['default', 'main'].includes(String(item.workspace_id)))
+                .map((item: any) => {
+                    const rawPlan = String(item.plan || 'TRIAL');
+                    const plan = (Object.prototype.hasOwnProperty.call(PLAN_CONFIGS, rawPlan) ? rawPlan : 'TRIAL') as LicensePlan;
+                    const status: LicenseRecord['status'] =
+                        item.status === 'SUSPENDED' ? 'REVOKED' :
+                        item.status === 'EXPIRED' ? 'EXPIRED' : 'ACTIVE';
+                    return {
+                        id: `LIC-SERVER-${item.workspace_id}`,
+                        licenseKey: String(item.token || ''),
+                        activationCode: '',
+                        workspaceId: String(item.workspace_id),
+                        serverUrl: baseUrl,
+                        clientName: String(item.title || item.contact_person || 'مشتری'),
+                        clientPhone: String(item.phone || ''),
+                        hwid: String(item.hwid || ''),
+                        plan,
+                        maxCustomers: Number.isFinite(Number(item.max_customers)) ? Number(item.max_customers) : PLAN_CONFIGS[plan].maxCustomers,
+                        maxDocuments: Number.isFinite(Number(item.max_documents)) ? Number(item.max_documents) : PLAN_CONFIGS[plan].maxDocuments,
+                        isUnlimited: item.is_unlimited === true || item.is_unlimited === 1,
+                        issueDate: String(item.created_at || new Date().toISOString()).slice(0, 10),
+                        expireDate: String(item.expire_date || ''),
+                        pricePaid: Number(item.price_paid) || 0,
+                        notes: String(item.notes || ''),
+                        status
+                    } satisfies LicenseRecord;
+                });
+
+            const serverWorkspaceIds = new Set(serverRecords.map(record => record.workspaceId));
+            const localLegacy = licenseGeneratorService.getAllLicenses().filter(
+                record => !record.workspaceId || !serverWorkspaceIds.has(record.workspaceId)
+            );
+            setLicenses([...serverRecords, ...localLegacy]);
+            setIssueError('');
+        } catch (error: any) {
+            setIssueError(error?.message || 'خطا در دریافت دفتر ثبت سرور.');
+        }
     };
 
     const handlePlanChange = (plan: LicensePlan) => {
@@ -125,6 +189,7 @@ const LicenseManager: React.FC = () => {
                 plan: selectedPlan,
                 max_customers: planConfig.maxCustomers,
                 max_documents: planConfig.maxDocuments,
+                price_paid: pricePaid,
                 features: planConfig.isUnlimited
                     ? ['ALL_MODULES', 'OFFLINE_STORAGE', 'UNLIMITED_CUSTOMERS', 'UNLIMITED_DOCUMENTS']
                     : ['BASIC_MODULES'],
@@ -185,6 +250,7 @@ const LicenseManager: React.FC = () => {
 
             licenseGeneratorService.saveLicenseRecord(newRecord);
             setGeneratedRecord(newRecord);
+            await handleLoadServerLicenses();
             loadLicenses();
         } catch (error: any) {
             setIssueError(error?.message || 'ثبت امن لایسنس روی سرور انجام نشد.');
@@ -229,7 +295,7 @@ const LicenseManager: React.FC = () => {
             }
             if (!response?.ok || data?.success !== true) throw new Error(data?.message || 'ابطال سروری انجام نشد.');
             licenseGeneratorService.revokeLicense(id);
-            loadLicenses();
+            await handleLoadServerLicenses();
             alert('لایسنس در سرور نیز غیرفعال شد.');
         } catch (error: any) {
             alert(error?.message || 'خطا در ارتباط با سرور مادر.');
@@ -657,6 +723,14 @@ const LicenseManager: React.FC = () => {
                                 className="w-full bg-slate-950 border border-slate-800 rounded-2xl pr-10 pl-4 py-2.5 text-xs text-white outline-none focus:border-teal-500 transition"
                             />
                         </div>
+
+                        <button
+                            onClick={() => void handleLoadServerLicenses()}
+                            className="bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            <span>بارگذاری از سرور مادر</span>
+                        </button>
 
                         <button
                             onClick={handleExportBackup}
