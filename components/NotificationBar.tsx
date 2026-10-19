@@ -346,7 +346,7 @@ export const NotificationBar: React.FC = () => {
                     isDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'
                 }`}
                 style={{
-                    maxHeight: isMobile ? 'min(46dvh, 420px)' : 'min(72vh, 680px)',
+                    maxHeight: isMobile ? 'min(40dvh, 380px)' : 'min(72vh, 680px)',
                     overflow: 'hidden',
                     overscrollBehavior: 'contain',
                     transform: isDrawerOpen ? 'translateY(0)' : 'translateY(-105%)',
@@ -477,7 +477,7 @@ export const NotificationBar: React.FC = () => {
                 </div>
 
                 {/* Notifications List Container */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2.5 custom-scrollbar">
+                <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2.5 custom-scrollbar">
                     {filteredNotifications.length === 0 ? (
                         <div className="py-12 text-center space-y-2">
                             <div className="w-12 h-12 rounded-full bg-white/5 mx-auto flex items-center justify-center text-slate-600">
