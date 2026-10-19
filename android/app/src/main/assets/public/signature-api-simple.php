@@ -162,7 +162,16 @@ try {
                 simpleSignatureRespond(400, ['success' => false, 'error' => 'INVALID_FIELD', 'field' => $required]);
             }
         }
+        // Serialize token creation globally to prevent two workspaces from claiming
+        // the same public link token concurrently.
+        $tokenLock = @fopen($root . '.token-' . $uuid . '.lock', 'c');
+        if ($tokenLock === false || !flock($tokenLock, LOCK_EX)) {
+            if (is_resource($tokenLock)) fclose($tokenLock);
+            simpleSignatureRespond(503, ['success' => false, 'error' => 'TOKEN_LOCK_UNAVAILABLE']);
+        }
         if (simpleSignatureLocate($root, $uuid) !== null) {
+            flock($tokenLock, LOCK_UN);
+            fclose($tokenLock);
             simpleSignatureRespond(409, ['success' => false, 'error' => 'LINK_TOKEN_ALREADY_EXISTS']);
         }
         $now = time();
@@ -183,10 +192,15 @@ try {
         }
         @chmod($tenantDir, 0700);
         $filePath = $tenantDir . $uuid . '.json';
-        if (file_exists($filePath)) simpleSignatureRespond(409, ['success' => false, 'error' => 'LINK_TOKEN_ALREADY_EXISTS']);
-        if (!simpleSignatureSave($filePath, $record)) {
-            simpleSignatureRespond(500, ['success' => false, 'error' => 'REQUEST_SAVE_FAILED']);
+        if (file_exists($filePath)) {
+            flock($tokenLock, LOCK_UN);
+            fclose($tokenLock);
+            simpleSignatureRespond(409, ['success' => false, 'error' => 'LINK_TOKEN_ALREADY_EXISTS']);
         }
+        $saved = simpleSignatureSave($filePath, $record);
+        flock($tokenLock, LOCK_UN);
+        fclose($tokenLock);
+        if (!$saved) simpleSignatureRespond(500, ['success' => false, 'error' => 'REQUEST_SAVE_FAILED']);
         simpleSignatureRespond(201, ['success' => true, 'request' => $record]);
     }
 
