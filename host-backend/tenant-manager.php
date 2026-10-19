@@ -5,6 +5,9 @@
  */
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, private, max-age=0');
+header('Pragma: no-cache');
+header('X-Content-Type-Options: nosniff');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Admin-Secret');
@@ -85,6 +88,14 @@ if (!$signingReady && function_exists('openssl_pkey_new') && function_exists('op
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $action = $input['action'] ?? $_GET['action'] ?? 'list';
+
+// Public-key lookup is read-only; every license operation (including verification and administration) must use POST.
+if ($action !== 'public_key' && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    header('Allow: POST, OPTIONS');
+    http_response_code(405);
+    echo json_encode(['success' => false, 'allowed' => false, 'status' => 'METHOD_NOT_ALLOWED', 'message' => 'این عملیات فقط از طریق درخواست POST مجاز است.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 $adminSecret = (string)($_SERVER['HTTP_X_ADMIN_SECRET'] ?? $input['admin_secret'] ?? '');
 
 // اگر اکشن عمومی برای بررسی وضعیت باشد
