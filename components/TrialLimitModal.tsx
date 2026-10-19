@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Lock, 
     ShieldAlert, 
-    CheckCircle2, 
+
     Copy, 
     Check, 
     PhoneCall, 
@@ -15,11 +15,10 @@ import {
     Sparkles, 
     Users, 
     FileText,
-    Loader2,
+
     Globe,
 } from 'lucide-react';
 import { hardwareIdService } from '../services/hardwareIdService';
-import { licenseGeneratorService } from '../services/licenseGeneratorService';
 import { 
     licenseQuotaService, 
     MAX_TRIAL_CUSTOMERS, 
@@ -47,9 +46,7 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
     const [hwid, setHwid] = useState('');
     const [copiedHwid, setCopiedHwid] = useState(false);
     const [licenseKey, setLicenseKey] = useState('');
-    const [activationCode, setActivationCode] = useState('');
-    const [isActivating, setIsActivating] = useState(false);
-    const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [statusMessage, setStatusMessage] = useState<{ type: 'error'; text: string } | null>(null);
 
     const isAndroid = isAndroidApp();
     const customerCount = people.length;
@@ -70,27 +67,22 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
         setTimeout(() => setCopiedHwid(false), 2000);
     };
 
-    const handleActivate = async (e: React.FormEvent) => {
+    const handleActivate = (e: React.FormEvent) => {
         e.preventDefault();
-        if (!licenseKey.trim() || !activationCode.trim()) {
-            setStatusMessage({ type: 'error', text: 'لطفاً شماره لایسنس و کد فعال‌سازی را کامل وارد کنید.' });
+        const cleanKey = licenseKey.trim().toUpperCase();
+        if (!cleanKey) {
+            setStatusMessage({ type: 'error', text: 'لطفاً کلید لایسنس را وارد کنید.' });
             return;
         }
 
-        setIsActivating(true);
+        // Legacy ACT codes depended on an embedded client secret and are intentionally disabled.
+        // Delegate activation to the server-authoritative flow; this modal must not report success.
+        const workspaceId = `ws_${cleanKey.replace(/[^A-Z0-9]/gi, '').toLowerCase()}`;
         setStatusMessage(null);
-
-        const result = await licenseGeneratorService.applyLicenseToCurrentDevice(licenseKey.trim(), activationCode.trim());
-
-        setIsActivating(false);
-        if (result.success) {
-            setStatusMessage({ type: 'success', text: result.message });
-            setTimeout(() => {
-                if (onClose) onClose();
-            }, 1800);
-        } else {
-            setStatusMessage({ type: 'error', text: result.message });
-        }
+        window.dispatchEvent(new CustomEvent('open-activation-dashboard', {
+            detail: { licenseKey: cleanKey, workspaceId }
+        }));
+        onClose?.();
     };
 
     if (!isOpen) return null;
@@ -114,7 +106,7 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
                             </h2>
                             <p className="text-xs text-slate-400 mt-0.5">
                                 {isAndroid 
-                                    ? 'جهت ثبت اسناد بیشتر، با یک کلیک به سیستم PWA لینک کنید یا لایسنس را فعال فرمایید'
+                                    ? 'برای ثبت اسناد بیشتر، کلید لایسنس را در سرور مادر به‌صورت آنلاین تأیید کنید'
                                     : 'جهت ثبت نامحدود مشتریان و اسناد، لایسنس خود را فعال فرمایید'}
                             </p>
                         </div>
@@ -179,12 +171,12 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
                     <div className="bg-slate-950/80 border border-slate-800 p-4 rounded-2xl space-y-2">
                         <div className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
                             <Sparkles className="w-4 h-4" />
-                            <span>مراحل ساده دریافت لایسنس دائمی و نامحدود:</span>
+                            <span>مراحل فعال‌سازی امن لایسنس:</span>
                         </div>
                         <ol className="text-xs text-slate-300 space-y-1.5 list-decimal list-inside pr-1 leading-relaxed">
                             <li>کد اختصاصی دستگاه (HWID) زیر را با دکمه کپی بردارید.</li>
-                            <li>کد را از طریق تماس یا پیام‌رسان برای پشتیبانی و صاحب اثر ارسال نمایید.</li>
-                            <li>کلید لایسنس و کد فعال‌سازی دریافت‌شده را در فرم زیر وارد کرده و دکمه فعال‌سازی را بزنید.</li>
+                            <li>کلید لایسنس صادرشده را در کادر زیر وارد کنید.</li>
+                            <li>سرور مادر، وضعیت لایسنس، شناسه دستگاه و امضای دیجیتال را آنلاین بررسی می‌کند.</li>
                         </ol>
                     </div>
 
@@ -239,60 +231,21 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
                     <form onSubmit={handleActivate} className="space-y-4 pt-2 border-t border-slate-800">
                         <div className="text-xs font-bold text-white flex items-center gap-1.5">
                             <KeyRound className="w-4 h-4 text-teal-400" />
-                            <span>ثبت کلید لایسنس و فعال‌سازی فوری:</span>
+                            <span>تأیید آنلاین کلید لایسنس:</span>
                         </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                                <label className="text-[11px] text-slate-400 font-bold">شماره لایسنس (License Key):</label>
-                                <input
-                                    type="text"
-                                    value={licenseKey}
-                                    onChange={e => setLicenseKey(e.target.value)}
-                                    placeholder="ASHK-XXXX-XXXX-XXXX"
-                                    className="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl p-2.5 text-white font-mono text-xs outline-none focus:border-teal-500 text-left transition"
-                                />
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-[11px] text-slate-400 font-bold">کد فعال‌سازی (Activation Code):</label>
-                                <input
-                                    type="text"
-                                    value={activationCode}
-                                    onChange={e => setActivationCode(e.target.value)}
-                                    placeholder="ACT-XXXX-XXXX-XXXX"
-                                    className="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl p-2.5 text-white font-mono text-xs outline-none focus:border-teal-500 text-left transition"
-                                />
-                            </div>
+                        <div className="space-y-1">
+                            <label className="text-[11px] text-slate-400 font-bold">کلید لایسنس (License Key):</label>
+                            <input type="text" value={licenseKey} onChange={e => setLicenseKey(e.target.value)} placeholder="ASHK-XXXX-XXXX-XXXX" autoComplete="off" className="w-full bg-slate-950/90 border border-slate-700/80 rounded-xl p-2.5 text-white font-mono text-xs outline-none focus:border-teal-500 text-left transition" />
                         </div>
-
                         {statusMessage && (
-                            <div className={`p-3 rounded-xl text-xs font-bold flex items-center gap-2 ${
-                                statusMessage.type === 'success' 
-                                    ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400' 
-                                    : 'bg-rose-500/10 border border-rose-500/30 text-rose-400'
-                            }`}>
-                                {statusMessage.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
+                            <div className="p-3 rounded-xl text-xs font-bold flex items-center gap-2 bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                                <Lock className="w-4 h-4" />
                                 <span>{statusMessage.text}</span>
                             </div>
                         )}
-
-                        <button
-                            type="submit"
-                            disabled={isActivating}
-                            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs shadow-lg shadow-teal-900/30 transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                        >
-                            {isActivating ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>در حال بررسی امضای لایسنس...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    <span>تأیید و فعال‌سازی نامحدود نرم‌افزار</span>
-                                </>
-                            )}
+                        <button type="submit" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs shadow-lg shadow-teal-900/30 transition flex items-center justify-center gap-2 cursor-pointer">
+                            <Globe className="w-4 h-4" />
+                            <span>تأیید آنلاین و فعال‌سازی</span>
                         </button>
                     </form>
 
