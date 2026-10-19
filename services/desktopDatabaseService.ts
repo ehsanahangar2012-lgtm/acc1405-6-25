@@ -15,7 +15,9 @@ export interface DatabaseStatusInfo {
 }
 
 class DesktopDatabaseService {
-    private saveDebounceTimer: any = null;
+    private saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+    private pendingSaveData: any = undefined;
+    private pendingSaveResolvers: Array<(success: boolean) => void> = [];
     private readonly DEBOUNCE_MS = 400; // تاخیر بهینه جهت پیشگیری کامل از لگ و کندی در تایپ و محاسبات
 
     /**
@@ -49,35 +51,55 @@ class DesktopDatabaseService {
     /**
      * ذخیره snapshot JSON در دیسک با Debounce جهت کاهش کار ذخیره‌سازی
      */
+    private async writeStateSnapshot(stateData: any): Promise<boolean> {
+        try {
+            const api = (window as any).electronDesktopAPI;
+            const res = await api.saveSqlDatabase(stateData);
+            return Boolean(res && res.success && res.encryptedAtRest === true);
+        } catch (error) {
+            console.error('[DesktopDB] خطا در ذخیره امن فایل وضعیت:', error);
+            return false;
+        }
+    }
+
+    private async flushPendingSave(): Promise<boolean> {
+        if (this.saveDebounceTimer) {
+            clearTimeout(this.saveDebounceTimer);
+            this.saveDebounceTimer = null;
+        }
+        const stateData = this.pendingSaveData;
+        this.pendingSaveData = undefined;
+        const resolvers = this.pendingSaveResolvers.splice(0);
+        if (stateData === undefined) {
+            resolvers.forEach(resolve => resolve(false));
+            return false;
+        }
+        const success = await this.writeStateSnapshot(stateData);
+        // Every coalesced persistence request is settled after the latest snapshot
+        // has actually been written (or has failed), never left pending forever.
+        resolvers.forEach(resolve => resolve(success));
+        return success;
+    }
+
     async saveToDatabase(stateData: any, immediate = false): Promise<boolean> {
         if (!this.isDesktopDatabaseAvailable()) return false;
+
+        this.pendingSaveData = stateData;
+        const result = new Promise<boolean>(resolve => this.pendingSaveResolvers.push(resolve));
 
         if (this.saveDebounceTimer) {
             clearTimeout(this.saveDebounceTimer);
             this.saveDebounceTimer = null;
         }
-
-        const executeSave = async () => {
-            try {
-                const api = (window as any).electronDesktopAPI;
-                const res = await api.saveSqlDatabase(stateData);
-                return Boolean(res && res.success);
-            } catch (e) {
-                console.error('[DesktopDB] خطا در ذخیره روی دیتابیس هارد دیسک:', e);
-                return false;
-            }
-        };
-
         if (immediate) {
-            return executeSave();
+            void this.flushPendingSave();
+            return result;
         }
 
-        return new Promise((resolve) => {
-            this.saveDebounceTimer = setTimeout(async () => {
-                const ok = await executeSave();
-                resolve(ok);
-            }, this.DEBOUNCE_MS);
-        });
+        this.saveDebounceTimer = setTimeout(() => {
+            void this.flushPendingSave();
+        }, this.DEBOUNCE_MS);
+        return result;
     }
 
     /**
