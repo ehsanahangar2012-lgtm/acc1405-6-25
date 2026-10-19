@@ -13,8 +13,8 @@
 در PowerShell ویندوز، با نصب بودن JDK، اجرا کنید:
 
 ```powershell
-$Keystore = Join-Path $HOME 'AshkeGhalam-Android-Release.jks'
-keytool -genkeypair -v -keystore $Keystore -storetype JKS -alias ashkghalam-release -keyalg RSA -keysize 2048 -validity 10000
+$Keystore = Join-Path $HOME 'AshkGhalam-Android-Release.p12'
+keytool -genkeypair -v -keystore $Keystore -storetype PKCS12 -alias ashkghalam-release -keyalg RSA -keysize 2048 -validity 10000
 ```
 
 - رمز keystore و رمز کلید را در prompt وارد کنید؛ آن‌ها را در فرمان، فایل متنی، چت یا Git ذخیره نکنید.
