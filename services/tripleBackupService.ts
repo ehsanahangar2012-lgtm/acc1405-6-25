@@ -78,10 +78,14 @@ export class TripleBackupService {
         // Android portable file export is user-initiated from the Commercial Hub, so this
         // tier stays WAITING until a native file has actually been written by this flow.
         let tier2Status: BackupTierStatus['status'] = 'WAITING';
+        let tier2FileSha256: string | undefined;
+        let tier2FileSizeBytes = 0;
         let tier3Status: BackupTierStatus['status'] = 'WAITING';
         try {
             const result = await hostBackupService.createBackup(accountingData, 'manual', 'پشتیبان چندمسیره');
             tier2Status = result.localFileStatus || 'WAITING';
+            tier2FileSha256 = result.localFileSha256;
+            tier2FileSizeBytes = Number(result.localFileSizeBytes) || 0;
             tier3Status = result.remoteStatus || (result.remoteSaved ? 'SYNCED' : 'WAITING');
         } catch {
             tier2Status = 'ERROR';
@@ -117,8 +121,8 @@ export class TripleBackupService {
                     lastBackupDate: tier2Status === 'SYNCED' ? nowPersian : undefined,
                     status: tier2Status,
                     itemCount: tier2Status === 'SYNCED' ? count : 0,
-                    sha256Hash: tier2Status === 'SYNCED' ? undefined : undefined,
-                    sizeBytes: tier2Status === 'SYNCED' ? sizeBytes : 0
+                    sha256Hash: tier2Status === 'SYNCED' && tier2FileSha256 ? tier2FileSha256.substring(0, 16) + '...' : undefined,
+                    sizeBytes: tier2Status === 'SYNCED' ? tier2FileSizeBytes : 0
                 },
                 {
                     tierId: 'cloud_vault',
