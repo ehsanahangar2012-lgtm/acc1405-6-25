@@ -43,14 +43,13 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
     const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
     const [manifest, setManifest] = useState<AppManifest | null>(null);
     const [licenseKey, setLicenseKey] = useState('');
-    const [activationCode, setActivationCode] = useState('');
-    const [companyName, setCompanyName] = useState('');
+        const [companyName, setCompanyName] = useState('');
     const [workspaceId, setWorkspaceId] = useState('default');
     const [serverUrl, setServerUrl] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [copiedHwid, setCopiedHwid] = useState(false);
     const [copiedSig, setCopiedSig] = useState(false);
-    const [activeTab, setActiveTab] = useState<'online' | 'offline' | 'manifest'>('online');
+    const [activeTab, setActiveTab] = useState<'online' | 'manifest'>('online');
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
     const [showGuideModal, setShowGuideModal] = useState(false);
 
@@ -226,14 +225,6 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
         }
     };
 
-    const handleOfflineActivation = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setActiveTab('online');
-        setMessage({
-            type: 'error',
-            text: 'کدهای آفلاین قدیمی با رازِ تعبیه‌شده در کلاینت قابل جعل بودند و دیگر پذیرفته نمی‌شوند. لطفاً لایسنس ثبت‌شده را از طریق سرور مادر و تب فعال‌سازی آنلاین بررسی کنید.'
-        });
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md dir-rtl text-right font-sans">
@@ -326,18 +317,6 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                     {/* Tabs */}
                     <div className="flex border-b border-slate-800 text-xs font-bold gap-2">
                         <button
-                            onClick={() => setActiveTab('offline')}
-                            className={`pb-3 px-4 flex items-center gap-2 border-b-2 transition ${
-                                activeTab === 'offline' 
-                                    ? 'border-teal-400 text-teal-300' 
-                                    : 'border-transparent text-slate-400 hover:text-slate-200'
-                            }`}
-                        >
-                            <Lock className="w-4 h-4" />
-                            <span>فعال‌سازی آفلاین (پیش‌فرض ایران)</span>
-                        </button>
-
-                        <button
                             onClick={() => setActiveTab('online')}
                             className={`pb-3 px-4 flex items-center gap-2 border-b-2 transition ${
                                 activeTab === 'online' 
@@ -363,60 +342,6 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                             </button>
                         )}
                     </div>
-
-                    {/* Offline Tab */}
-                    {activeTab === 'offline' && (
-                        <form onSubmit={handleOfflineActivation} className="space-y-4">
-                            <p className="text-xs text-slate-400 leading-relaxed bg-slate-950/40 p-3 rounded-xl border border-slate-800">
-                                به دلیل محدودیت‌های اینترنت، این سامانه می‌تواند کاملاً آفلاین و بدون اتصال به سرور فعال شود. کافیست شناسه HWID بالا را برای پشتیبانی ارسال کرده و کد فعال‌سازی آفلاین دریافت کنید.
-                            </p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-300 mb-1.5">شماره لایسنس (License Key):</label>
-                                    <input 
-                                        type="text"
-                                        value={licenseKey}
-                                        onChange={(e) => setLicenseKey(e.target.value)}
-                                        placeholder="مثال: LIC-2026-98765"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-teal-500 outline-none dir-ltr text-left"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-300 mb-1.5">نام شرکت / کسب‌وکار:</label>
-                                    <input 
-                                        type="text"
-                                        value={companyName}
-                                        onChange={(e) => setCompanyName(e.target.value)}
-                                        placeholder="نام برند یا فروشگاه"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-teal-500 outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-300 mb-1.5">کد فعال‌سازی آفلاین (Activation Code):</label>
-                                <textarea
-                                    value={activationCode}
-                                    onChange={(e) => setActivationCode(e.target.value)}
-                                    placeholder="کد فعال‌سازی دریافتی از پشتیبانی را اینجا پیست کنید..."
-                                    rows={3}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-teal-300 font-mono focus:border-teal-500 outline-none dir-ltr text-left resize-none"
-                                    required
-                                />
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 disabled:opacity-50"
-                            >
-                                {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                                <span>ثبت و فعال‌سازی آفلاین لایسنس</span>
-                            </button>
-                        </form>
-                    )}
 
                     {/* Online Tab */}
                     {activeTab === 'online' && (
@@ -534,9 +459,9 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                             </button>
                         </div>
                         <div className="text-xs text-slate-300 space-y-2 leading-relaxed">
-                            <p>۱. <strong>شناسه HWID:</strong> یک کد یکتا و غیرقابل دستکاری است که از ترکیب سخت‌افزار دستگاه شما (پردازنده، کارت شبکه و...) تولید می‌شود.</p>
+                            <p>۱. <strong>شناسه HWID:</strong> شناسه این نصب برای ثبت و پشتیبانی است؛ به‌تنهایی گواه امنیتی محسوب نمی‌شود.</p>
                             <p>۲. <strong>اسکوپ‌بندی داده‌ها (Database Scoping):</strong> با وارد کردن لایسنس، دیتابیس دستگاه شما ایزوله شده و هیچ تداخلی با سایر لایسنس‌ها یا مشتریان نخواهد داشت.</p>
-                            <p>۳. <strong>کارکرد ۱۰۰٪ آفلاین:</strong> کد فعال‌سازی آفلاین امکان فعال نمودن سیستم را بدون نیاز به اینترنت فراهم می‌سازد.</p>
+                            <p>۳. <strong>تأیید تجاری:</strong> لایسنس تجاری تنها با بررسی آنلاین امضای دیجیتال و وضعیت جاری آن در سرور معتبر است.</p>
                         </div>
                         <button
                             onClick={() => setShowGuideModal(false)}
