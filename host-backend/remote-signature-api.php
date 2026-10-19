@@ -203,8 +203,10 @@ function signerProofValid(array $request, array $input, array $otpCodes): bool {
     $providedToken = (string)($input['signatureToken'] ?? ($input['data']['signatureToken'] ?? ''));
     if (!signerTokenMatches($request, $providedToken)) return false;
 
+    $authMethod = strtolower((string)($request['authMethod'] ?? ''));
+    if ($authMethod === 'link') return true; // Explicit link-only request: possession of the link is the proof.
     $expected = expectedOtpMethod($request);
-    if ($expected === '') return true; // Explicit link-only request: possession of the link is the proof.
+    if ($expected === '') return false;
 
     $sessionToken = (string)($input['sessionToken'] ?? ($input['data']['sessionToken'] ?? ''));
     if ($sessionToken === '') return false;
