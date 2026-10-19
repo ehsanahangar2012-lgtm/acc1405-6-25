@@ -525,17 +525,29 @@ function getSqlDumpFilePath() {
     return path.join(getDatabaseDir(), 'ashke_ghalam_dump.sql');
 }
 
-// ساخت و ذخیره اسکریپت استاندارد SQL DDL/DML سازگار با MySQL/MariaDB سی‌پنل و SQLite
+// Generate a MySQL/MariaDB dump for cPanel/phpMyAdmin.
+// The local .db file is a JSON Zustand snapshot, not a SQLite database.
 function generateRelationalSqlDump(state) {
     try {
         const parsed = typeof state === 'string' ? JSON.parse(state) : state;
-        const s = parsed.state || parsed;
+        const s = parsed && parsed.state ? parsed.state : parsed;
+        const sqlText = (value) => String(value ?? '')
+            .replace(/\\/g, '\\\\')
+            .replace(/\0/g, '')
+            .replace(/'/g, "''")
+            .replace(/\r/g, '\\r')
+            .replace(/\n/g, '\\n');
+        const sqlNumber = (value) => {
+            const number = Number(value);
+            return Number.isFinite(number) ? number : 0;
+        };
+        const sqlString = (value) => "'" + sqlText(value) + "'";
         const lines = [
             '-- =====================================================',
-            '-- پایگاه داده جامع حسابداری اشک قلم (نسخه ۱۶.۱۲.۰)',
-            '-- تولید شده به صورت ایزوله روی سیستم کاربر',
+            '-- خروجی داده‌های اشک قلم برای انتقال به MariaDB / MySQL',
+            '-- فایل محلی برنامه یک snapshot از Zustand با قالب JSON است، نه SQLite.',
             `-- تاریخ ایجاد: ${new Date().toISOString()}`,
-            '-- سازگار با MariaDB / MySQL 5.7+ / SQLite / cPanel',
+            '-- سازگار با MariaDB / MySQL و phpMyAdmin در cPanel',
             '-- =====================================================',
             '',
             'SET NAMES utf8mb4;',
@@ -618,47 +630,70 @@ function generateRelationalSqlDump(state) {
             ''
         ];
 
-        // افزودن داده‌های رکوردهای اشخاص
+        // Export account/person records.
         if (Array.isArray(s.people) && s.people.length > 0) {
             lines.push('-- رکوردهای اشخاص');
             s.people.forEach(p => {
                 if (!p || !p.id) return;
-                const safeName = (p.name || '').replace(/'/g, "''");
-                const safePhone = (p.phone || '').replace(/'/g, "''");
-                const safeCat = (p.category || '').replace(/'/g, "''");
-                const safeAddr = (p.address || '').replace(/'/g, "''");
-                const safeCode = (p.code || '').replace(/'/g, "''");
-                lines.push(`REPLACE INTO \`people\` (\`id\`, \`code\`, \`name\`, \`phone\`, \`category\`, \`balance\`, \`address\`) VALUES ('${p.id}', '${safeCode}', '${safeName}', '${safePhone}', '${safeCat}', ${Number(p.balance) || 0}, '${safeAddr}');`);
+                lines.push(`REPLACE INTO \`people\` (\`id\`, \`code\`, \`name\`, \`phone\`, \`category\`, \`balance\`, \`address\`) VALUES (${sqlString(p.id)}, ${sqlString(p.code)}, ${sqlString(p.name)}, ${sqlString(p.phone)}, ${sqlString(p.category)}, ${sqlNumber(p.balance)}, ${sqlString(p.address)});`);
             });
             lines.push('');
         }
 
-        // افزودن داده‌های رکوردهای کالاها
+        // Export inventory items.
         if (Array.isArray(s.products) && s.products.length > 0) {
             lines.push('-- رکوردهای کالاها');
             s.products.forEach(p => {
                 if (!p || !p.id) return;
-                const safeName = (p.name || '').replace(/'/g, "''");
-                const safeCode = (p.code || '').replace(/'/g, "''");
-                const safeUnit = (p.unit || 'عدد').replace(/'/g, "''");
-                const safeCat = (p.category || '').replace(/'/g, "''");
-                lines.push(`REPLACE INTO \`products\` (\`id\`, \`code\`, \`name\`, \`stock\`, \`buy_price\`, \`sell_price\`, \`unit\`, \`category\`) VALUES ('${p.id}', '${safeCode}', '${safeName}', ${Number(p.stock) || 0}, ${Number(p.buyPrice) || 0}, ${Number(p.sellPrice) || 0}, '${safeUnit}', '${safeCat}');`);
+                lines.push(`REPLACE INTO \`products\` (\`id\`, \`code\`, \`name\`, \`stock\`, \`buy_price\`, \`sell_price\`, \`unit\`, \`category\`) VALUES (${sqlString(p.id)}, ${sqlString(p.code)}, ${sqlString(p.name)}, ${sqlNumber(p.stock)}, ${sqlNumber(p.buyPrice)}, ${sqlNumber(p.sellPrice)}, ${sqlString(p.unit || 'عدد')}, ${sqlString(p.category)});`);
             });
             lines.push('');
         }
 
-        // رکوردهای فاکتورها
+        // Export invoices. String() conversion is intentional: invoice numbers are
+        // numeric in some versions and strings (with prefixes) in others.
         if (Array.isArray(s.invoices) && s.invoices.length > 0) {
             lines.push('-- رکوردهای فاکتورها');
             s.invoices.forEach(inv => {
                 if (!inv || !inv.id) return;
-                const safeNum = (inv.number || '').replace(/'/g, "''");
-                const safeType = (inv.type || '').replace(/'/g, "''");
-                const safeDate = (inv.date || '').replace(/'/g, "''");
-                const safePid = (inv.personId || '').replace(/'/g, "''");
-                const safeItems = JSON.stringify(inv.items || []).replace(/'/g, "''");
-                lines.push(`REPLACE INTO \`invoices\` (\`id\`, \`number\`, \`type\`, \`date\`, \`person_id\`, \`total\`, \`tax\`, \`discount\`, \`items_json\`) VALUES ('${inv.id}', '${safeNum}', '${safeType}', '${safeDate}', '${safePid}', ${Number(inv.total) || 0}, ${Number(inv.tax) || 0}, ${Number(inv.discount) || 0}, '${safeItems}');`);
+                lines.push(`REPLACE INTO \`invoices\` (\`id\`, \`number\`, \`type\`, \`date\`, \`person_id\`, \`total\`, \`tax\`, \`discount\`, \`items_json\`) VALUES (${sqlString(inv.id)}, ${sqlString(inv.number)}, ${sqlString(inv.type)}, ${sqlString(inv.date)}, ${sqlString(inv.personId)}, ${sqlNumber(inv.total ?? inv.finalTotal)}, ${sqlNumber(inv.tax)}, ${sqlNumber(inv.discount)}, ${sqlString(JSON.stringify(inv.items || []))});`);
             });
+            lines.push('');
+        }
+
+        // Export check records using the fields available in the current app model.
+        if (Array.isArray(s.checks) && s.checks.length > 0) {
+            lines.push('-- رکوردهای چک');
+            s.checks.forEach(check => {
+                if (!check || !check.id) return;
+                lines.push(`REPLACE INTO \`checks\` (\`id\`, \`bank_name\`, \`amount\`, \`due_date\`, \`status\`, \`sayad_id\`, \`person_id\`) VALUES (${sqlString(check.id)}, ${sqlString(check.bankName)}, ${sqlNumber(check.amount)}, ${sqlString(check.dueDate)}, ${sqlString(check.status)}, ${sqlString(check.sayadId)}, ${sqlString(check.personId)});`);
+            });
+            lines.push('');
+        }
+
+        // Export cash/treasury transactions.
+        if (Array.isArray(s.transactions) && s.transactions.length > 0) {
+            lines.push('-- تراکنش‌های مالی و خزانه‌داری');
+            s.transactions.forEach(transaction => {
+                if (!transaction || !transaction.id) return;
+                lines.push(`REPLACE INTO \`transactions\` (\`id\`, \`type\`, \`amount\`, \`date\`, \`description\`) VALUES (${sqlString(transaction.id)}, ${sqlString(transaction.type)}, ${sqlNumber(transaction.amount)}, ${sqlString(transaction.date)}, ${sqlString(transaction.description)});`);
+            });
+            lines.push('');
+        }
+
+        // Export inventory vouchers.
+        if (Array.isArray(s.vouchers) && s.vouchers.length > 0) {
+            lines.push('-- حواله‌های انبار');
+            s.vouchers.forEach(voucher => {
+                if (!voucher || !voucher.id) return;
+                lines.push(`REPLACE INTO \`vouchers\` (\`id\`, \`number\`, \`date\`, \`description\`, \`items_json\`) VALUES (${sqlString(voucher.id)}, ${sqlNumber(voucher.number)}, ${sqlString(voucher.date)}, ${sqlString(voucher.notes || voucher.returnReason || voucher.type)}, ${sqlString(JSON.stringify(voucher.items || []))});`);
+            });
+            lines.push('');
+        }
+
+        // Export system settings as one JSON row for migration/archive purposes.
+        if (s.config && typeof s.config === 'object') {
+            lines.push(`REPLACE INTO \`system_meta\` (\`key_name\`, \`value_data\`) VALUES (${sqlString('config')}, ${sqlString(JSON.stringify(s.config))});`);
             lines.push('');
         }
 
