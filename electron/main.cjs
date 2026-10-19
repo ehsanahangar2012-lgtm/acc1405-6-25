@@ -7,15 +7,9 @@ const crypto = require('crypto');
 const url = require('url');
 const packageMeta = require('../package.json');
 
-// بهینه‌سازی حداکثری پرفورمنس، رفع لگ، رندر فوق سریع و شتاب‌دهنده سخت‌افزاری GPU در ویندوز
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
-app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
-app.commandLine.appendSwitch('enable-fast-unload');
-app.commandLine.appendSwitch('renderer-process-limit', '6');
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096 --expose-gc');
+// Keep Chromium's platform defaults for GPU selection, process limits, and memory management.
+// Forcing unsupported GPU paths or extra renderer processes can increase crashes, RAM use, and stutter.
+// Performance changes should be based on measurements on representative Windows hardware.
 
 let mainWindow = null;
 let splashWindow = null;
