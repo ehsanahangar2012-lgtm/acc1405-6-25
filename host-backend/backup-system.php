@@ -108,37 +108,75 @@ $action = $_POST['action'] ?? $_GET['action'] ?? '';
 
 switch ($action) {
     case 'backup_data':
-        $data = json_decode(file_get_contents('php://input'), true);
-        $type = $data['type'] ?? 'general';
-        $timestamp = date('Y-m-d_H-i-s');
-        
-        // بک‌آپ فوری (حداکثر 10 فایل)
+        $rawBody = file_get_contents('php://input');
+        if (strlen((string)$rawBody) > 50 * 1024 * 1024) {
+            http_response_code(413);
+            echo json_encode(['success' => false, 'error' => 'BACKUP_TOO_LARGE']);
+            break;
+        }
+        $data = json_decode((string)$rawBody, true);
+        if (!is_array($data) || !array_key_exists('payload', $data)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'INVALID_BACKUP_PAYLOAD']);
+            break;
+        }
+        $type = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($data['type'] ?? 'general'));
+        if ($type === '') $type = 'general';
+        $timestamp = date('Y-m-d_H-i-s') . '_' . bin2hex(random_bytes(4));
+
+        // Scoped, path-safe immediate and daily backups.
         $targetFolder = $BACKUP_ROOT . '/' . $type;
-        $filename = $targetFolder . '/' . $timestamp . '.gz';
-        saveCompressedData($data['payload'], $filename, $targetFolder, 10);
-        
-        // بک‌آپ روزانه (حداکثر 10 فایل)
         $dailyFolder = $DAILY_BACKUP_ROOT . '/' . $type;
+        foreach ([$targetFolder, $dailyFolder] as $folder) {
+            if (!is_dir($folder)) mkdir($folder, 0700, true);
+            @chmod($folder, 0700);
+            if (!is_file($folder . '/.htaccess')) @file_put_contents($folder . '/.htaccess', "Options -Indexes\nDeny from all\n", LOCK_EX);
+        }
+        $filename = $targetFolder . '/' . $timestamp . '.gz';
+        $savedImmediate = saveCompressedData($data['payload'], $filename, $targetFolder, 10);
         $daily_filename = $dailyFolder . '/' . date('Y-m-d') . '.gz';
-        saveCompressedData($data['payload'], $daily_filename, $dailyFolder, 10);
-        
+        $savedDaily = saveCompressedData($data['payload'], $daily_filename, $dailyFolder, 10);
+        if ($savedImmediate === false || $savedDaily === false) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'BACKUP_WRITE_FAILED']);
+            break;
+        }
         echo json_encode(['success' => true, 'file' => basename($filename)]);
         break;
         
     case 'upload_image':
-        if (isset($_FILES['image'])) {
-            $folder = $_POST['folder'] ?? 'general';
-            $target_dir = $IMAGES_ROOT . '/' . $folder . '/';
-            if (!is_dir($target_dir)) mkdir($target_dir, 0755, true);
-            
-            $filename = uniqid() . '_' . basename($_FILES['image']['name']);
-            $target_file = $target_dir . $filename;
-            
-            if (move_uploaded_file($_FILES['image']['tmp_name'], $target_file)) {
-                echo json_encode(['success' => true, 'url' => '/uploads/' . $folder . '/' . $filename]);
-            } else {
-                echo json_encode(['success' => false, 'error' => 'Upload failed']);
-            }
+        if (!isset($_FILES['image']) || !is_array($_FILES['image'])) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'IMAGE_REQUIRED']);
+            break;
+        }
+        $file = $_FILES['image'];
+        if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || ($file['size'] ?? 0) > 5 * 1024 * 1024) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'INVALID_IMAGE_SIZE']);
+            break;
+        }
+        $folder = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($_POST['folder'] ?? 'general'));
+        if ($folder === '') $folder = 'general';
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = $finfo ? finfo_file($finfo, $file['tmp_name']) : false;
+        if ($finfo) finfo_close($finfo);
+        $extensions = ['image/jpeg' => 'jpg', 'image/png' => 'png'];
+        if (!isset($extensions[$mime])) {
+            http_response_code(415);
+            echo json_encode(['success' => false, 'error' => 'UNSUPPORTED_IMAGE_TYPE']);
+            break;
+        }
+        $target_dir = $IMAGES_ROOT . '/' . $folder . '/';
+        if (!is_dir($target_dir)) mkdir($target_dir, 0700, true);
+        @chmod($target_dir, 0700);
+        $filename = bin2hex(random_bytes(12)) . '_' . time() . '.' . $extensions[$mime];
+        $target_file = $target_dir . $filename;
+        if (move_uploaded_file($file['tmp_name'], $target_file)) {
+            echo json_encode(['success' => true, 'url' => '/uploads/' . (strpos($target_dir, '/tenants/') !== false ? 'tenants/' . $workspace . '/' : '') . $folder . '/' . $filename]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'UPLOAD_FAILED']);
         }
         break;
         
@@ -159,7 +197,8 @@ switch ($action) {
         break;
         
     case 'get_backup_list':
-        $type = $_GET['type'] ?? 'invoices';
+        $type = preg_replace('/[^a-zA-Z0-9_-]/', '', (string)($_GET['type'] ?? 'invoices'));
+        if ($type === '') $type = 'invoices';
         $files = glob($BACKUP_ROOT . '/' . $type . '/*.gz');
         $list = array_map(function($file) {
             return [
