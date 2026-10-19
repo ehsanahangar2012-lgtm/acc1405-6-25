@@ -34,7 +34,7 @@ class LicenseValidator {
 
         // اگر سیستم روی حالت ثبت خودکار باشد و فضای کاری هنوز ثبت نشده باشد
         if (!isset($workspaces[$workspaceId])) {
-            if (!empty($configData['auto_register_new_tenants'])) {
+            if (!empty($configData['auto_register_new_tenants']) && getenv('ASHK_ALLOW_AUTO_REGISTER_TENANTS') === '1') {
                 // ثبت خودکار با مهلت تست ۳۰ روزه
                 $workspaces[$workspaceId] = [
                     'workspace_id' => $workspaceId,
@@ -97,8 +97,13 @@ class LicenseValidator {
             'allowed' => true,
             'status' => 'ACTIVE',
             'title' => $ws['title'] ?? '',
+            'plan' => $ws['plan'] ?? 'TRIAL',
             'expire_date' => $ws['expire_date'] ?? 'نامحدود',
             'is_unlimited' => !empty($ws['is_unlimited']),
+            'max_customers' => isset($ws['max_customers']) ? (int)$ws['max_customers'] : 30,
+            'max_documents' => isset($ws['max_documents']) ? (int)$ws['max_documents'] : 100,
+            'max_users' => isset($ws['max_users']) ? (int)$ws['max_users'] : 1,
+            'features' => is_array($ws['features'] ?? null) ? $ws['features'] : ['BASIC_MODULES'],
             'message' => 'دسترسی مجاز و فعال است.'
         ];
     }
@@ -108,29 +113,22 @@ class LicenseValidator {
      */
     private static function initDefaultConfig() {
         $dir = dirname(self::$configFile);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
+        if (!is_dir($dir) && !mkdir($dir, 0750, true) && !is_dir($dir)) {
+            throw new RuntimeException('Unable to create license data directory.');
         }
 
+        // Safe by default: no sample client and no automatic tenant enrollment.
         $defaultData = [
-            'auto_register_new_tenants' => true, // در صورت نیاز می‌توان false کرد
-            'admin_secret_key' => 'ADMIN_SECRET_' . substr(md5(uniqid(mt_rand(), true)), 0, 16),
-            'workspaces' => [
-                'sample_tenant' => [
-                    'workspace_id' => 'sample_tenant',
-                    'title' => 'مشتری نمونه آزمایشی',
-                    'token' => 'TKN_SECURE_987654321',
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'expire_date' => date('Y-m-d', strtotime('+1 year')),
-                    'status' => 'ACTIVE',
-                    'max_users' => 10,
-                    'is_unlimited' => false,
-                    'contact_person' => 'مدیر شعبه'
-                ]
-            ]
+            'auto_register_new_tenants' => false,
+            'admin_secret_key' => 'ADMIN_SECRET_' . bin2hex(random_bytes(24)),
+            'workspaces' => []
         ];
 
-        file_put_contents(self::$configFile, json_encode($defaultData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+        $encoded = json_encode($defaultData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        if ($encoded === false || file_put_contents(self::$configFile, $encoded, LOCK_EX) === false) {
+            throw new RuntimeException('Unable to initialize license registry.');
+        }
+        @chmod(self::$configFile, 0600);
     }
 
     private static function generateSecureToken() {
