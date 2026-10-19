@@ -71,24 +71,25 @@ class LicenseQuotaService {
             localStorage.getItem('ashk_active_license_key') ||
             ''
         ).trim();
-        const activationCode = (localStorage.getItem('ashk_activation_code') || '').trim();
 
         let serverVerified = false;
         try {
             const data = JSON.parse(localStorage.getItem('ashk_server_license_data') || 'null');
             serverVerified = Boolean(
                 data?.serverVerified === true &&
-                data?.licenseKey &&
-                data.licenseKey === licenseKey &&
+                data?.licenseKey === licenseKey &&
+                data?.workspaceToken === licenseKey &&
+                data?.syncToken === licenseKey &&
+                typeof data?.hostUrl === 'string' &&
+                /^https?:\\/\\//i.test(data.hostUrl) &&
                 data?.workspaceId &&
                 data.workspaceId !== 'default' &&
                 data.workspaceId !== 'main'
             );
         } catch {}
 
-        // Legacy local ACT codes used a client-embedded secret and are not commercial proof.
-        const offlineLicenseConfirmed = false;
-        return serverVerified || offlineLicenseConfirmed;
+        // Local activation codes and editable status flags alone must never grant commercial features.
+        return serverVerified;
     }
 
     /**
@@ -102,6 +103,11 @@ class LicenseQuotaService {
         hostUrl?: string;
         syncToken?: string;
         workspaceId?: string;
+        plan?: string;
+        maxCustomers?: number;
+        maxDocuments?: number;
+        isUnlimited?: boolean;
+        features?: string[];
         verifiedByServer?: boolean;
     }): void {
         if (typeof window === 'undefined') return;
@@ -133,11 +139,18 @@ class LicenseQuotaService {
         const serverData = {
             companyName,
             plan,
-            planTitle: 'نسخه تجاری همراه (فعال‌شده با لایسنس سرور اصلی - نامحدود)',
+            planTitle: details?.isUnlimited === false
+                ? `نسخه تجاری محدود (${plan})`
+                : 'نسخه تجاری همراه (فعال‌شده با لایسنس سرور اصلی)',
             expireDate,
             licenseKey,
             hostUrl: details?.hostUrl || localStorage.getItem('ashk_host_url') || '',
             syncToken: details?.syncToken || localStorage.getItem('ashk_host_sync_token') || '',
+            workspaceToken: details?.syncToken || localStorage.getItem('ashk_host_sync_token') || '',
+            maxCustomers: Number.isFinite(details?.maxCustomers) ? details?.maxCustomers : (plan === 'HEMAYAT' ? MAX_HEMAYAT_CUSTOMERS : -1),
+            maxDocuments: Number.isFinite(details?.maxDocuments) ? details?.maxDocuments : (plan === 'HEMAYAT' ? MAX_HEMAYAT_DOCUMENTS : -1),
+            isUnlimited: details?.isUnlimited ?? (plan !== 'HEMAYAT'),
+            features: details?.features || (plan === 'HEMAYAT' ? ['BASIC_MODULES'] : ['ALL_MODULES']),
             linkedAt: new Date().toISOString()
         };
         localStorage.setItem('ashk_server_license_data', JSON.stringify({ ...serverData, serverVerified: true, workspaceId: details.workspaceId }));
@@ -262,7 +275,7 @@ class LicenseQuotaService {
         // پلتفرم اندروید
         if (isAndroidApp()) {
             if (this.isAndroidActivatedOrLinked()) {
-                return 'COMMERCIAL_ANDROID_LINKED';
+                return localStorage.getItem('ashk_license_plan') || 'COMMERCIAL_ANDROID_LINKED';
             }
             return 'ANDROID_TRIAL_50';
         }
@@ -288,7 +301,7 @@ class LicenseQuotaService {
 
         if (isLicensed) {
             // نسخه همراه متصل به PWA یا فعال‌شده با لایسنس سرور اصلی
-            if (isAndroidApp() || currentPlan === 'COMMERCIAL_ANDROID_LINKED' || currentPlan === 'COMMERCIAL_ANDROID') {
+            if ((isAndroidApp() || currentPlan === 'COMMERCIAL_ANDROID_LINKED' || currentPlan === 'COMMERCIAL_ANDROID') && !['HEMAYAT', 'BRONZE', 'SILVER'].includes(currentPlan)) {
                 const serverLicense = this.getMainServerLicenseInfo();
                 return {
                     isLicensed: true,
@@ -332,6 +345,47 @@ class LicenseQuotaService {
                     planTitle: `نسخه حامی اشک قلم (ویژه کسب‌وکارهای نوپا - سقف ${maxCust} طرف حساب / ${maxDoc} سند)`,
                     companyName: localStorage.getItem('ashk_company_name') || 'نسخه حامی فعال',
                     expireDate: 'دائمی (۱۰ ساله)',
+                    hwid: hwidStr
+                };
+            }
+
+            // Apply the exact entitlements returned by the server for every limited commercial plan.
+            let serverLicense: any = {};
+            try {
+                serverLicense = JSON.parse(localStorage.getItem('ashk_server_license_data') || 'null') || {};
+            } catch {}
+            const unlimitedPlan = serverLicense.isUnlimited === true ||
+                ['GOLD', 'ENTERPRISE', 'UNLIMITED', 'COMMERCIAL_ANDROID_LINKED', 'COMMERCIAL_ANDROID'].includes(currentPlan);
+            if (!unlimitedPlan) {
+                const defaults: Record<string, [number, number]> = {
+                    HEMAYAT: [MAX_HEMAYAT_CUSTOMERS, MAX_HEMAYAT_DOCUMENTS],
+                    BRONZE: [50, 500],
+                    SILVER: [200, 2000],
+                    TRIAL: [MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS],
+                    LICENSED: [MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS]
+                };
+                const [defaultCustomers, defaultDocuments] = defaults[currentPlan] || [MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS];
+                const rawCustomers = Number(serverLicense.maxCustomers);
+                const rawDocuments = Number(serverLicense.maxDocuments);
+                const maxCust = Number.isFinite(rawCustomers) && rawCustomers >= 0 ? rawCustomers : defaultCustomers;
+                const maxDoc = Number.isFinite(rawDocuments) && rawDocuments >= 0 ? rawDocuments : defaultDocuments;
+                const isCustomerLimitReached = customerCount >= maxCust;
+                const isDocumentLimitReached = documentCount >= maxDoc;
+                return {
+                    isLicensed: true,
+                    isTrial: false,
+                    customerCount,
+                    maxCustomers: maxCust,
+                    remainingCustomers: Math.max(0, maxCust - customerCount),
+                    isCustomerLimitReached,
+                    documentCount,
+                    maxDocuments: maxDoc,
+                    remainingDocuments: Math.max(0, maxDoc - documentCount),
+                    isDocumentLimitReached,
+                    isExceeded: isCustomerLimitReached || isDocumentLimitReached,
+                    planTitle: `پلن تجاری ${currentPlan} (${maxCust} طرف حساب / ${maxDoc} سند)`,
+                    companyName: serverLicense.companyName || localStorage.getItem('ashk_company_name') || 'مشتری مجاز اشک قلم',
+                    expireDate: serverLicense.expireDate || 'ثبت‌شده در سرور',
                     hwid: hwidStr
                 };
             }
