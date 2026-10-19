@@ -17,7 +17,6 @@ import {
     FileText,
     Loader2,
     Globe,
-    RefreshCw
 } from 'lucide-react';
 import { hardwareIdService } from '../services/hardwareIdService';
 import { licenseGeneratorService } from '../services/licenseGeneratorService';
@@ -30,7 +29,6 @@ import {
     MAX_ANDROID_DEFAULT_CUSTOMERS,
     MAX_ANDROID_DEFAULT_DOCUMENTS
 } from '../services/licenseQuotaService';
-import { androidCommercialService } from '../services/androidCommercialService';
 import { isAndroidApp } from '../utils';
 import { useStore } from '../store';
 
@@ -51,7 +49,6 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
     const [licenseKey, setLicenseKey] = useState('');
     const [activationCode, setActivationCode] = useState('');
     const [isActivating, setIsActivating] = useState(false);
-    const [isLinkingPwa, setIsLinkingPwa] = useState(false);
     const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
     const isAndroid = isAndroidApp();
@@ -71,26 +68,6 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
         navigator.clipboard.writeText(hwid);
         setCopiedHwid(true);
         setTimeout(() => setCopiedHwid(false), 2000);
-    };
-
-    const handleLinkPwaAndActivate = async () => {
-        setIsLinkingPwa(true);
-        setStatusMessage(null);
-        try {
-            const result = await androidCommercialService.linkToPwaAndActivate();
-            if (result.success) {
-                setStatusMessage({ type: 'success', text: result.message });
-                setTimeout(() => {
-                    if (onClose) onClose();
-                }, 1600);
-            } else {
-                setStatusMessage({ type: 'error', text: result.message });
-            }
-        } catch (e: any) {
-            setStatusMessage({ type: 'error', text: 'خطا در برقراری ارتباط با PWA و هاست سرور' });
-        } finally {
-            setIsLinkingPwa(false);
-        }
     };
 
     const handleActivate = async (e: React.FormEvent) => {
@@ -185,39 +162,16 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
                         </div>
                     </div>
 
-                    {/* PWA Link Banner for Mobile Platform */}
+                    {/* Explain the required license-first sequence; server reachability is not a license. */}
                     {isAndroid && (
-                        <div className="bg-gradient-to-r from-teal-950/70 via-slate-900 to-slate-900 border border-teal-500/40 p-4 rounded-2xl space-y-3 shadow-lg">
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs font-black text-white flex items-center gap-1.5">
-                                    <Globe className="w-4 h-4 text-teal-400" />
-                                    <span>پیوند مستقیم با سیستم PWA و فعال‌سازی با لایسنس سرور اصلی</span>
-                                </span>
-                                <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2.5 py-0.5 rounded-full font-bold border border-teal-500/30">
-                                    یک‌کلیکه
-                                </span>
+                        <div className="bg-slate-900 border border-amber-500/30 p-4 rounded-2xl space-y-2">
+                            <div className="flex items-center gap-2 text-xs font-black text-amber-300">
+                                <Globe className="w-4 h-4" />
+                                <span>ابتدا لایسنس معتبر دستگاه را فعال کنید</span>
                             </div>
                             <p className="text-xs text-slate-300 leading-relaxed">
-                                این اپلیکیشن پلتفرم همراه سامانه PWA است. با کلیک بر روی دکمه زیر، مشخصات لایسنس فعال در سرور اصلی به صورت خودکار دریافت شده و برنامه بدون محدودیت فعال می‌گردد.
+                                اتصال به سرور به‌تنهایی محدودیت اسناد را حذف نمی‌کند. شماره لایسنس و کد فعال‌سازی اختصاصی را در فرم زیر وارد کنید؛ پس از تأیید، می‌توانید سرور را از بخش «اتصال سرور و همگام‌سازی» متصل کنید.
                             </p>
-                            <button
-                                type="button"
-                                onClick={handleLinkPwaAndActivate}
-                                disabled={isLinkingPwa}
-                                className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/30 disabled:opacity-50"
-                            >
-                                {isLinkingPwa ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        <span>در حال برقراری پیوند با PWA و دریافت مشخصات لایسنس سرور...</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <RefreshCw className="w-4 h-4" />
-                                        <span>🔗 پیوند به سیستم PWA و فعال‌سازی با لایسنس سرور اصلی</span>
-                                    </>
-                                )}
-                            </button>
                         </div>
                     )}
 
