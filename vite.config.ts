@@ -203,9 +203,9 @@ function excludeMotherPortalAdminToolsPlugin(enabled: boolean): any {
       const normalizedId = id.replace(/\\/g, '/');
       if (normalizedId.endsWith('/App.tsx')) {
         const transformed = code
-          .replace("import('./pages/LicenseManager')", "import('./pages/LicenseManagerUnavailable')")
-          .replace("import('./pages/DebugCenter')", "import('./pages/DebugCenterUnavailable')")
-          .replace("import('./pages/InstallAndroid')", "import('./pages/InstallAndroidClient')");
+          .replaceAll("import('./pages/LicenseManager')", "import('./pages/LicenseManagerUnavailable')")
+          .replaceAll("import('./pages/DebugCenter')", "import('./pages/DebugCenterUnavailable')")
+          .replaceAll("import('./pages/InstallAndroid')", "import('./pages/InstallAndroidClient')");
         return transformed === code ? null : { code: transformed, map: null };
       }
       if (normalizedId.endsWith('/components/Sidebar.tsx')) {
