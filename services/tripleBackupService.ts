@@ -89,7 +89,7 @@ export class TripleBackupService {
             timestamp: Date.now(),
             persianDate: nowPersian,
             sha256: hash,
-            overallSuccess: tier1Status === 'SYNCED' && tier2Status === 'SYNCED' && tier3Status === 'SYNCED',
+            overallSuccess: tier1Status === 'SYNCED' && tier3Status === 'SYNCED' && tier2Status !== 'WAITING',
             tiers: [
                 {
                     tierId: 'windows_local',
