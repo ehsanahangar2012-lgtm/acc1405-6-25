@@ -10,7 +10,7 @@
  * 6. بکاپ لوکال در IndexedDB به‌عنوان fallback
  */
 
-import { IS_BROWSER_PREVIEW } from '../config';
+import { APP_VERSION, IS_BROWSER_PREVIEW } from '../config';
 import { workspaceService } from './workspaceService';
 import { idbService } from './indexedDBService';
 import { useFinancialStore } from '../store-financial';
@@ -70,7 +70,7 @@ const LAST_BACKUP_KEY     = 'host_last_backup_time';
 const BACKUP_INTERVAL_MS  = 24 * 60 * 60 * 1000; // ۲۴ ساعت
 const MAX_HOST_BACKUPS    = 10; // نگهداری حداکثر ۱۰ فایل در هاست
 const FETCH_TIMEOUT_MS    = 30_000; // ۳۰ ثانیه - بکاپ داده بزرگ است
-const APP_VERSION         = '16.54.0';
+// Read the release version from the shared application configuration.
 
 // جداول اصلی که باید بکاپ شوند
 const BACKUP_TABLES = [
