@@ -209,10 +209,18 @@ function excludeMotherPortalAdminToolsPlugin(enabled: boolean): any {
         return transformed === code ? null : { code: transformed, map: null };
       }
       if (normalizedId.endsWith('/components/Sidebar.tsx')) {
-        const transformed = code.replace(
-          "...(!isNativeClient ? [{ to: '/license-manager', icon: KeyRound, label: 'صدور لایسنس و مدیریت کلاینت‌ها (پرتال مدیر)', perm: 'settings' }] : []),",
-          "...([]),"
-        );
+        let transformed = code
+          .replace("...(!isNativeClient ? [{ to: '/license-manager', icon: KeyRound, label: 'صدور لایسنس و مدیریت کلاینت‌ها (پرتال مدیر)', perm: 'settings' }] : []),", "...([]),")
+          .replaceAll("import { AppDownloadCenterModal } from './AppDownloadCenterModal';", "")
+          .replaceAll("const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);", "")
+          .replaceAll("<AppDownloadCenterModal isOpen={isDownloadModalOpen} onClose={() => setIsDownloadModalOpen(false)} />", "");
+        const downloadButtonStart = transformed.indexOf("          {/* Download App Package Button: owner web portal only */}");
+        const downloadButtonEnd = downloadButtonStart >= 0
+          ? transformed.indexOf("\n          )}", downloadButtonStart)
+          : -1;
+        if (downloadButtonStart >= 0 && downloadButtonEnd >= 0) {
+          transformed = transformed.slice(0, downloadButtonStart) + transformed.slice(downloadButtonEnd + 12);
+        }
         return transformed === code ? null : { code: transformed, map: null };
       }
       return null;
