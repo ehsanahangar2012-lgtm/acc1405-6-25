@@ -16,6 +16,7 @@ import { smartStorage } from '../services/smartStorageService';
 import { TripleBackupService, TripleBackupReport } from '../services/tripleBackupService';
 import { useFinancialStore } from '../store-financial';
 import { APP_VERSION } from '../config';
+import { workspaceService } from '../services/workspaceService';
 
 type ActiveTab = 'triple' | 'stats' | 'cloud' | 'local_snap' | 'desktop' | 'file' | 'sync' | 'diagnostics' | 'reset';
 
@@ -231,7 +232,7 @@ const BackupManager = () => {
         // 2. Host API Status
         const hostStart = Date.now();
         try {
-            const res = await fetch(`${hostUrl}/host-api.php?action=status`);
+            const res = await fetch(`${hostUrl}/host-api.php?action=status`, { headers: await workspaceService.getSecureHeaders() });
             const data = await res.json();
             if (data.success) {
                 diagnostics.push({
@@ -279,7 +280,7 @@ const BackupManager = () => {
 
             const writeRes = await fetch(`${hostUrl}/host-api.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                 body: JSON.stringify({
                     action: 'save',
                     table: testTable,
@@ -298,7 +299,7 @@ const BackupManager = () => {
 
                 await fetch(`${hostUrl}/host-api.php`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                     body: JSON.stringify({
                         action: 'delete',
                         table: testTable,
@@ -347,7 +348,7 @@ const BackupManager = () => {
 
         // Load host files list
         try {
-            const res = await fetch(`${hostUrl}/host-api.php?action=list_files`);
+            const res = await fetch(`${hostUrl}/host-api.php?action=list_files`, { headers: await workspaceService.getSecureHeaders() });
             const data = await res.json();
             if (data.success) {
                 setDiagHostFiles(data.files || []);
@@ -359,7 +360,7 @@ const BackupManager = () => {
         setDiagFileLoading(true);
         const hostUrl = 'https://acc.ashkghalam.ir';
         try {
-            const res = await fetch(`${hostUrl}/host-api.php?action=read_file&file=${filename}`);
+            const res = await fetch(`${hostUrl}/host-api.php?action=read_file&file=${encodeURIComponent(filename)}`, { headers: await workspaceService.getSecureHeaders() });
             const data = await res.json();
             if (data.success) {
                 setDiagFileContent(data.content);
@@ -386,7 +387,7 @@ const BackupManager = () => {
 
             const writeRes = await fetch(`${hostUrl}/host-api.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                 body: JSON.stringify({
                     action: 'save',
                     table: table,
@@ -398,7 +399,7 @@ const BackupManager = () => {
             if (writeData.success) {
                 await fetch(`${hostUrl}/host-api.php`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                     body: JSON.stringify({
                         action: 'delete',
                         table: table,
@@ -729,17 +730,8 @@ const BackupManager = () => {
         }
 
         try {
-            // Force reset host state log if connected
-            try {
-                const baseUrl = window.location.hostname === 'localhost' ? '' : window.location.origin;
-                await fetch(`${baseUrl}/server-api-database.php`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'reset_all', table: 'system' })
-                });
-            } catch (e) {
-                console.log('Skipping host reset request.');
-            }
+            // No legacy global database reset calls; server-side tenant data is managed
+            // only through the authenticated backup/recovery workflows.
 
             localStorage.clear();
             sessionStorage.clear();
