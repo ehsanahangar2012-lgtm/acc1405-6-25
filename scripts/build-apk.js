@@ -18,7 +18,8 @@ const releaseSigningReady = [
   process.env.ANDROID_KEY_PASSWORD
 ].every(value => typeof value === 'string' && value.trim().length > 0);
 const isReleaseBuild = releaseSigningReady;
-const apkName = isReleaseBuild
+const nonCommercialDistribution = process.env.ANDROID_NONCOMMERCIAL_DISTRIBUTION === '1' && !releaseSigningReady;
+const apkName = isReleaseBuild || nonCommercialDistribution
   ? `AshkeGhalam-v${appVersion}.apk`
   : `AshkeGhalam-v${appVersion}-debug.apk`;
 const apkSource = isReleaseBuild
@@ -106,7 +107,12 @@ for (const directory of destinations) {
   fs.copyFileSync(apkSource, path.join(directory, apkName));
 }
 
-console.log(`Built real ${isReleaseBuild ? 'signed release' : 'debug/test'} APK: ${apkName} (${(apkBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+const buildLabel = isReleaseBuild
+  ? 'signed release'
+  : nonCommercialDistribution
+    ? 'non-commercial distribution (debug signing identity; future update compatibility is not guaranteed)'
+    : 'debug/test';
+console.log(`Built real ${buildLabel} APK: ${apkName} (${(apkBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
 if (!isReleaseBuild) {
-  console.log('Production signing is not configured. Set ANDROID_KEYSTORE_PATH, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS, and ANDROID_KEY_PASSWORD to produce the hardened, signed release APK.');
+  console.log('No commercial signing key was used. Android requires a signature to install an APK; this build uses Gradle debug signing, not a commercial publisher certificate.');
 }
