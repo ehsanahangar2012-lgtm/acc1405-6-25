@@ -83,6 +83,7 @@ jobs:
           php -l host-backend/host-api.php
           php -l host-backend/remote-signature-api.php
           php -l host-backend/signature-api-simple.php
+          php -l host-backend/deleted-records-api.php
           php -l host-backend/server-api-database.php
           php -l host-backend/server-api-upload.php
           php -l android/app/src/main/assets/public/license_validator.php
@@ -96,6 +97,7 @@ jobs:
           php -l android/app/src/main/assets/public/remote-signature-api.php
           php -l public/signature-api-simple.php
           php -l android/app/src/main/assets/public/signature-api-simple.php
+          php -l android/app/src/main/assets/public/deleted-records-api.php
 
       - name: Test server license registration and lifecycle
         shell: bash
