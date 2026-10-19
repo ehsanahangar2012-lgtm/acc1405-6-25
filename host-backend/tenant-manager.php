@@ -18,17 +18,24 @@ require_once __DIR__ . '/license_validator.php';
 $authFile = __DIR__ . '/data/workspaces_auth.json';
 
 if (!file_exists($authFile)) {
-    LicenseValidator::validateAccess('sample_tenant'); // ایجاد خودکار فایل پیش‌فرض
+    // Create a closed-by-default registry. Admin must read/configure this random key on the server.
+    LicenseValidator::validateAccess('__initialize_registry__');
 }
 
-$config = json_decode(file_get_contents($authFile), true) ?: [
-    'admin_secret_key' => 'ASHK_MASTER_ADMIN_2026',
-    'workspaces' => []
-];
+$config = json_decode((string)@file_get_contents($authFile), true);
+if (!is_array($config) || !is_array($config['workspaces'] ?? null) || empty($config['admin_secret_key'])) {
+    http_response_code(500);
+    echo json_encode([
+        'success' => false,
+        'message' => 'فهرست لایسنس سرور پیکربندی معتبر ندارد؛ فایل data/workspaces_auth.json را بررسی کنید.'
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $action = $input['action'] ?? $_GET['action'] ?? 'list';
-$adminSecret = $_SERVER['HTTP_X_ADMIN_SECRET'] ?? $input['admin_secret'] ?? $_GET['admin_secret'] ?? '';
+$adminSecret = (string)($_SERVER['HTTP_X_ADMIN_SECRET'] ?? $input['admin_secret'] ?? '');
 
 // اگر اکشن عمومی برای بررسی وضعیت باشد
 if ($action === 'verify_license') {
@@ -52,22 +59,40 @@ if ($action === 'verify_license') {
         exit;
     }
 
+    $workspaceEntry = $config['workspaces'][$wsId];
+    $submittedHwid = trim((string)($input['hwid'] ?? ''));
+    $registeredHwid = trim((string)($workspaceEntry['hwid'] ?? ''));
+    if ($registeredHwid !== '' && ($submittedHwid === '' || !hash_equals(strtoupper($registeredHwid), strtoupper($submittedHwid)))) {
+        http_response_code(403);
+        echo json_encode([
+            'allowed' => false,
+            'status' => 'HWID_MISMATCH',
+            'message' => 'این لایسنس برای شناسه سخت‌افزاری دیگری ثبت شده است.'
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     $validation = LicenseValidator::validateAccess($wsId, $tkn);
+    if (!empty($validation['allowed'])) {
+        $validation['plan'] = $workspaceEntry['plan'] ?? 'TRIAL';
+        $validation['max_customers'] = isset($workspaceEntry['max_customers']) ? (int)$workspaceEntry['max_customers'] : 30;
+        $validation['max_documents'] = isset($workspaceEntry['max_documents']) ? (int)$workspaceEntry['max_documents'] : 100;
+        $validation['features'] = is_array($workspaceEntry['features'] ?? null) ? $workspaceEntry['features'] : ['BASIC_MODULES'];
+    }
     echo json_encode($validation, JSON_UNESCAPED_UNICODE);
     exit;
 }
 
-// برای عملیات مدیریتی، بررسی کلید مدیریت سرور (اختیاری یا اجباری بر اساس تنظیمات)
-if (!empty($config['admin_secret_key']) && $config['admin_secret_key'] !== 'DISABLED') {
-    if ($adminSecret !== $config['admin_secret_key']) {
-        // برای راحتی در استفاده اول، اگر کلید پیش‌فرض بود راهنمایی ارسال می‌شود
-        echo json_encode([
-            'success' => false,
-            'message' => 'کلید امنیتی مدیریت سرور (Admin Secret) نامعتبر است.',
-            'tip' => 'کلید مدیریت در فایل /data/workspaces_auth.json تعریف شده است.'
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+// Every registry mutation/list operation requires the server-only admin secret.
+// DISABLED / empty keys fail closed; the secret is accepted only in a POST body or header.
+$configuredAdminSecret = (string)($config['admin_secret_key'] ?? '');
+if ($configuredAdminSecret === '' || $configuredAdminSecret === 'DISABLED' || $adminSecret === '' || !hash_equals($configuredAdminSecret, $adminSecret)) {
+    http_response_code(401);
+    echo json_encode([
+        'success' => false,
+        'message' => 'کلید امنیتی مدیریت سرور نامعتبر است؛ مقدار admin_secret_key را در فایل سمت سرور بررسی کنید.'
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 switch ($action) {
@@ -85,7 +110,7 @@ switch ($action) {
     case 'add':
     case 'update':
         $wsId = preg_replace('/[^a-zA-Z0-9_-]/', '', trim($input['workspace_id'] ?? ''));
-        if (empty($wsId)) {
+        if (empty($wsId) || in_array($wsId, ['default', 'main'], true)) {
             echo json_encode(['success' => false, 'message' => 'شناسه فضای کاری (Workspace ID) الزامی است.'], JSON_UNESCAPED_UNICODE);
             exit;
         }
@@ -101,6 +126,11 @@ switch ($action) {
             'status' => in_array($input['status'] ?? '', ['ACTIVE', 'SUSPENDED', 'EXPIRED']) ? $input['status'] : ($existing['status'] ?? 'ACTIVE'),
             'max_users' => intval($input['max_users'] ?? ($existing['max_users'] ?? 10)),
             'is_unlimited' => !empty($input['is_unlimited']),
+            'plan' => preg_match('/^(TRIAL|HEMAYAT|BRONZE|SILVER|GOLD|ENTERPRISE)$/', (string)($input['plan'] ?? ($existing['plan'] ?? 'TRIAL'))) ? (string)($input['plan'] ?? ($existing['plan'] ?? 'TRIAL')) : 'TRIAL',
+            'max_customers' => max(-1, intval($input['max_customers'] ?? ($existing['max_customers'] ?? 30))),
+            'max_documents' => max(-1, intval($input['max_documents'] ?? ($existing['max_documents'] ?? 100))),
+            'features' => is_array($input['features'] ?? null) ? array_values(array_filter($input['features'], 'is_string')) : ($existing['features'] ?? ['BASIC_MODULES']),
+            'hwid' => trim($input['hwid'] ?? ($existing['hwid'] ?? '')),
             'contact_person' => trim($input['contact_person'] ?? ($existing['contact_person'] ?? '')),
             'phone' => trim($input['phone'] ?? ($existing['phone'] ?? '')),
             'notes' => trim($input['notes'] ?? ($existing['notes'] ?? ''))
@@ -113,6 +143,19 @@ switch ($action) {
             'message' => 'اطلاعات و لایسنس فضای کاری با موفقیت در سرور ذخیره شد.',
             'workspace' => $config['workspaces'][$wsId]
         ], JSON_UNESCAPED_UNICODE);
+        break;
+
+    case 'revoke_license':
+        $wsId = trim((string)($input['workspace_id'] ?? ''));
+        if ($wsId === '' || in_array($wsId, ['default', 'main'], true) || !isset($config['workspaces'][$wsId])) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'لایسنس/فضای کاری یافت نشد.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $config['workspaces'][$wsId]['status'] = 'SUSPENDED';
+        $config['workspaces'][$wsId]['revoked_at'] = date('Y-m-d H:i:s');
+        file_put_contents($authFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+        echo json_encode(['success' => true, 'message' => 'لایسنس در سرور ابطال شد.'], JSON_UNESCAPED_UNICODE);
         break;
 
     case 'delete':
