@@ -53,3 +53,7 @@ backups/
 /downloads/
 /public/downloads/
 /android/app/ashk-release.jks
+
+# Runtime server backup-encryption key material (never package or commit)
+host-backend/data/.backup-encryption-key
+host-backend/data/.backup-encryption-key.lock

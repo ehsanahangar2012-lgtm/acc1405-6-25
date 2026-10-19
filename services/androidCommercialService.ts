@@ -461,7 +461,7 @@ class AndroidCommercialService {
             data
         };
         const encryptedJson = backupEncryptionService.encryptJson(backupPayload, passphrase);
-        const dateStr = getPersianDate().replace(/[/ :]/g, '-');
+        const dateStr = new Date().toISOString().slice(0, 10);
         const fileName = `AshkeGhalam-Android-Backup-v${APP_VERSION}-${dateStr}.agbak`;
 
         if (isAndroidApp()) {
