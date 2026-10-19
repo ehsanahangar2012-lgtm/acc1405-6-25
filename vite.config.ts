@@ -242,7 +242,13 @@ export default defineConfig(({ mode }) => {
         }
       }
     },
-    build: { outDir: 'dist' },
+    build: {
+      outDir: 'dist',
+      sourcemap: false,
+      minify: 'esbuild',
+      cssMinify: true,
+      reportCompressedSize: false,
+    },
     css: mode === 'android'
       ? { postcss: { plugins: [tailwindPostCss(), androidLegacyCssPlugin()] } }
       : undefined,
