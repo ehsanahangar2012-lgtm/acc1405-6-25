@@ -4,8 +4,9 @@
  */
 
 import { CompanyProfile } from '../types';
-import { API_CONFIG } from '../config';
-import { safeFetchJson, isHostConnectedOrAllowed } from '../utils';
+import { persistentStorage } from './persistentStorage';
+import { workspaceService } from './workspaceService';
+import { isHostConnectedOrAllowed } from '../utils';
 
 export interface CompanyVaultSyncResult {
     success: boolean;
@@ -16,7 +17,7 @@ export interface CompanyVaultSyncResult {
 }
 
 export class CompanyHostSyncService {
-    private static baseUrl = API_CONFIG.BASE_URL;
+    private static readonly STORAGE_KEY = 'company_vault';
 
     /**
      * ذخیره‌سازی ابری تمامی شرکت‌های ثبت‌شده به همراه لوگوها، امضاها و مهرها در بخش مجزای هاست
@@ -32,17 +33,8 @@ export class CompanyHostSyncService {
             };
         }
         try {
-            const data = await safeFetchJson(`${this.baseUrl}/api.php?action=company_vault`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ companies })
-            });
-
-            if (!data) {
-                throw new Error('پاسخ نامعتبر از هاست');
-            }
+            const saved = await persistentStorage.saveData(this.STORAGE_KEY, companies);
+            if (!saved) throw new Error('ذخیره‌سازی امن اطلاعات شرکت‌ها روی سرور تأیید نشد.');
             
             // ذخیره وضعیت محلی
             localStorage.setItem('company_vault_last_sync', Date.now().toString());
@@ -51,7 +43,7 @@ export class CompanyHostSyncService {
                 success: true,
                 count: companies.length,
                 timestamp: new Date().toLocaleTimeString('fa-IR'),
-                message: data.message || 'اطلاعات شرکت‌ها با موفقیت در مخزن مجزای هاست ذخیره شد.'
+                message: 'اطلاعات شرکت‌ها در فضای کاری امن ذخیره شد.'
             };
         } catch (error: any) {
             console.warn('Company Vault Sync Fallback (offline mode):', error.message);
@@ -78,14 +70,11 @@ export class CompanyHostSyncService {
             };
         }
         try {
-            const data = await safeFetchJson(`${this.baseUrl}/api.php?action=company_vault`, {
-                method: 'GET'
-            });
-
-            if (!data) throw new Error('خطا در فراخوانی اطلاعات از هاست');
+            const data = await persistentStorage.loadData(this.STORAGE_KEY, true);
+            if (!Array.isArray(data)) throw new Error('اطلاعات فضای کاری از سرور در دسترس نیست.');
             return {
                 success: true,
-                companies: data.companies || []
+                companies: data as CompanyProfile[]
             };
         } catch (err: any) {
             console.warn('Could not fetch from host vault:', err.message);
