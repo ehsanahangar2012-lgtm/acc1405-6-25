@@ -81,9 +81,18 @@ if ($action === 'verify_license') {
     }
 
     $workspaceEntry = $config['workspaces'][$wsId];
-    $submittedHwid = trim((string)($input['hwid'] ?? ''));
-    $registeredHwid = trim((string)($workspaceEntry['hwid'] ?? ''));
-    if ($registeredHwid !== '' && ($submittedHwid === '' || !hash_equals(strtoupper($registeredHwid), strtoupper($submittedHwid)))) {
+    $submittedHwid = strtoupper(trim((string)($input['hwid'] ?? '')));
+    $registeredHwid = strtoupper(trim((string)($workspaceEntry['hwid'] ?? '')));
+    if ($submittedHwid === '' || strlen($submittedHwid) > 256 || preg_match('/[\\x00-\\x1F\\x7F]/', $submittedHwid)) {
+        http_response_code(400);
+        echo json_encode([
+            'allowed' => false,
+            'status' => 'INVALID_HWID',
+            'message' => 'شناسه سخت‌افزاری معتبر برای فعال‌سازی ارسال نشده است.'
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($registeredHwid !== '' && !hash_equals($registeredHwid, $submittedHwid)) {
         http_response_code(403);
         echo json_encode([
             'allowed' => false,
@@ -91,6 +100,25 @@ if ($action === 'verify_license') {
             'message' => 'این لایسنس برای شناسه سخت‌افزاری دیگری ثبت شده است.'
         ], JSON_UNESCAPED_UNICODE);
         exit;
+    }
+
+    // First activation permanently binds an unbound license to this device on the server.
+    // Persist the binding before signing any receipt; a failed write must fail closed.
+    if ($registeredHwid === '') {
+        $config['workspaces'][$wsId]['hwid'] = $submittedHwid;
+        $savedRegistry = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+        if ($savedRegistry === false || file_put_contents($authFile, $savedRegistry, LOCK_EX) === false) {
+            http_response_code(503);
+            echo json_encode([
+                'allowed' => false,
+                'status' => 'HWID_BIND_FAILED',
+                'message' => 'ثبت امن دستگاه روی سرور انجام نشد؛ فعال‌سازی متوقف شد.'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        @chmod($authFile, 0600);
+        $workspaceEntry = $config['workspaces'][$wsId];
+        $registeredHwid = $submittedHwid;
     }
 
     $validation = LicenseValidator::validateAccess($wsId, $tkn);
@@ -121,7 +149,7 @@ if ($action === 'verify_license') {
             'issuer' => 'ashkghalam-license-v1',
             'workspace_id' => $wsId,
             'license_key_hash' => hash('sha256', strtoupper($tkn)),
-            'hwid' => strtoupper($registeredHwid !== '' ? $registeredHwid : $submittedHwid),
+            'hwid' => $registeredHwid,
             'plan' => $plan,
             'max_customers' => $maxCustomers,
             'max_documents' => $maxDocuments,
