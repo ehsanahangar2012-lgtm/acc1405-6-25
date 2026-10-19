@@ -59,6 +59,21 @@ export class AccountingEngine {
       throw new Error(`قالب تاریخ سند معتبر نیست: ${date}. قالب مورد انتظار سال/ماه/روز است.`);
     }
 
+    const globalConfig = useStore.getState().config;
+    const targetYear = dateKey.slice(0, 4);
+    const configuredYear = String(globalConfig.fiscalYear || '').trim();
+    const fiscalStartKey = globalConfig.fiscalStartDate ? dateComparisonKey(globalConfig.fiscalStartDate) : null;
+    const fiscalEndKey = globalConfig.fiscalEndDate ? dateComparisonKey(globalConfig.fiscalEndDate) : null;
+    if (globalConfig.fiscalStartDate && !fiscalStartKey) {
+      throw new Error('تاریخ شروع سال مالی در تنظیمات نامعتبر است.');
+    }
+    if (globalConfig.fiscalEndDate && !fiscalEndKey) {
+      throw new Error('تاریخ پایان سال مالی در تنظیمات نامعتبر است.');
+    }
+    if (fiscalStartKey && fiscalEndKey && (dateKey < fiscalStartKey || dateKey > fiscalEndKey)) {
+      throw new Error(`تاریخ ${date} خارج از بازه سال مالی پیکربندی‌شده است.`);
+    }
+
     const periods = finStore.fiscalPeriods || [];
     const matchedPeriod = periods.find(p => {
       const startKey = dateComparisonKey(p.startDate);
@@ -66,14 +81,30 @@ export class AccountingEngine {
       return Boolean(startKey && endKey && startKey <= dateKey && dateKey <= endKey);
     });
 
-    if (periods.length > 0 && !matchedPeriod) {
-      throw new Error(`برای تاریخ ${date} دوره مالی تعریف‌شده‌ای وجود ندارد.`);
+    if (!matchedPeriod) {
+      const targetYearHasPeriods = periods.some(period =>
+        dateComparisonKey(period.startDate)?.slice(0, 4) === targetYear
+      );
+      const currentYear = dateComparisonKey(getPersianDate())?.slice(0, 4);
+      // Legacy/default stores only carried 1404 periods. Do not reject invoices dated
+      // in the current Jalali year solely because its monthly periods were never opened.
+      // A year that already has periods is treated strictly, so gaps and closed periods
+      // are not bypassed.
+      const mayUseUninitializedCurrentYear =
+        !targetYearHasPeriods &&
+        targetYear === currentYear &&
+        (!configuredYear || configuredYear === targetYear);
+
+      if (!mayUseUninitializedCurrentYear) {
+        const currentConfiguredYear = configuredYear || 'تنظیم‌نشده';
+        throw new Error(
+          `برای تاریخ ${date} دورهٔ مالیِ باز پیدا نشد. سال مالی فعال: ${currentConfiguredYear}؛ از بخش سال مالی، سال موردنظر را افتتاح یا بازهٔ آن را اصلاح کنید.`
+        );
+      }
     }
     if (matchedPeriod && (matchedPeriod.status === 'CLOSED' || matchedPeriod.status === 'LOCKED')) {
       throw new Error(`خطای انطباق: دوره مالی مربوط به تاریخ ${date} بسته یا قفل شده است.`);
     }
-
-    const globalConfig = useStore.getState().config;
     const fiscalStartKey = globalConfig.fiscalStartDate ? dateComparisonKey(globalConfig.fiscalStartDate) : null;
     const fiscalEndKey = globalConfig.fiscalEndDate ? dateComparisonKey(globalConfig.fiscalEndDate) : null;
     if (globalConfig.fiscalStartDate && !fiscalStartKey) {
@@ -202,7 +233,7 @@ export class AccountingEngine {
    */
   static postInvoice(invoice: Invoice) {
     // Keep a rollback point: a failure must not erase the previous posting or leave half a document.
-    const previousEntries = [...(useFinancialStore.getState().accountingEntries || [])];
+    let previousEntries = [...(useFinancialStore.getState().accountingEntries || [])];
     const personId = invoice.personId;
     let previousLedgerCache: string | null = null;
     if (personId && typeof window !== 'undefined') {
@@ -244,6 +275,11 @@ export class AccountingEngine {
       embeddedCashAmount = cashAmount - separatelyPostedCash;
       embeddedCheckAmount = checkAmount - separatelyPostedChecks;
     }
+
+    // Snapshot after input validation. The compatibility rule above permits current-year
+    // invoices without prior monthly periods, but deliberately does not create/close a year.
+    // Preserve any pre-existing entries while rolling back a failed invoice posting.
+    previousEntries = [...(useFinancialStore.getState().accountingEntries || [])];
 
     // Keep the accounting audit trail: reverse any currently active postings first,
     // then append the replacement invoice entries. The catch below restores the snapshot
