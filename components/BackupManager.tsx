@@ -63,57 +63,49 @@ const BackupManager = () => {
     const [isDesktopEnv, setIsDesktopEnv] = useState(false);
 
     useEffect(() => {
-        const checkEnv = () => {
+        const checkEnv = async () => {
             const electronAPI = (window as any).electronDesktopAPI;
             const tauriAPI = (window as any).__TAURI__;
             setIsDesktopEnv(Boolean(electronAPI) || Boolean(tauriAPI));
+
+            if (electronAPI && typeof electronAPI.invoke === 'function') {
+                try {
+                    const selectedPath = await electronAPI.invoke('get-local-backup-directory');
+                    const safePath = typeof selectedPath === 'string' ? selectedPath : '';
+                    setDesktopBackupPath(safePath);
+                    if (safePath) localStorage.setItem('desktop_auto_backup_path', safePath);
+                    else localStorage.removeItem('desktop_auto_backup_path');
+                } catch {
+                    setDesktopBackupPath('');
+                }
+            } else {
+                // A path typed or cached by the old UI is not proof of filesystem permission.
+                setDesktopBackupPath('');
+                localStorage.removeItem('desktop_auto_backup_path');
+            }
         };
-        checkEnv();
+        void checkEnv();
     }, []);
 
     const handleSelectDesktopPath = async () => {
-        // ۱. بررسی پشتیبانی از File System Access API در Edge WebView2 و مرورگرهای مدرن
-        if ('showDirectoryPicker' in window) {
-            try {
-                const dirHandle = await (window as any).showDirectoryPicker({
-                    mode: 'readwrite',
-                    startIn: 'documents'
-                });
-                if (dirHandle && dirHandle.name) {
-                    const customPath = `پوشه انتخاب‌شده: ${dirHandle.name}`;
-                    setDesktopBackupPath(customPath);
-                    localStorage.setItem('desktop_auto_backup_path', customPath);
-                    addNotification('success', `مسیر با موفقیت تنظیم شد: ${dirHandle.name}`);
-                    return;
-                }
-            } catch (err: any) {
-                if (err.name !== 'AbortError') {
-                    console.warn('Directory picker cancelled or error:', err);
-                }
-            }
-        }
-
-        // ۲. پشتیبانی از API دسکتاپ الکترون یا تائوری در صورت وجود
         const electronAPI = (window as any).electronDesktopAPI;
-        if (electronAPI && electronAPI.invoke) {
-            try {
-                const path = await electronAPI.invoke('select-directory');
-                if (path) {
-                    setDesktopBackupPath(path);
-                    localStorage.setItem('desktop_auto_backup_path', path);
-                    addNotification('success', 'مسیر بک‌آپ خودکار با موفقیت تنظیم شد');
-                    return;
-                }
-            } catch (error) {
-                console.error('Error selecting path:', error);
-            }
+        if (!electronAPI || typeof electronAPI.invoke !== 'function') {
+            addNotification('error', 'انتخاب پوشه و بکاپ مستقل خودکار فعلاً فقط در نسخه نصب‌شده ویندوز پشتیبانی می‌شود. در مرورگر از خروجی فایل پشتیبان استفاده کنید.');
+            return;
         }
 
-        // ۳. اگر دسترسی مستقیم مسدود باشد، مقداردهی پیش‌فرض هوشمند در ویندوز
-        const defaultWinPath = 'C:\\Users\\Default\\Documents\\AshkeGhalam_Backups';
-        setDesktopBackupPath(defaultWinPath);
-        localStorage.setItem('desktop_auto_backup_path', defaultWinPath);
-        addNotification('info', 'مسیر استاندارد پیش‌فرض ویندوز تنظیم گردید.');
+        try {
+            const selectedPath = await electronAPI.invoke('select-directory');
+            if (!selectedPath || typeof selectedPath !== 'string') {
+                addNotification('info', 'انتخاب پوشه لغو شد؛ تنظیم قبلی تغییر نکرد.');
+                return;
+            }
+            setDesktopBackupPath(selectedPath);
+            localStorage.setItem('desktop_auto_backup_path', selectedPath);
+            addNotification('success', 'پوشه انتخاب شد. بکاپ مستقل فقط پس از نوشتن واقعی فایل تأیید می‌شود.');
+        } catch (error: any) {
+            addNotification('error', 'انتخاب پوشه انجام نشد: ' + (error?.message || 'خطای نامشخص'));
+        }
     };
 
     // Load lists
@@ -476,7 +468,7 @@ const BackupManager = () => {
     const { counts: entityCounts, totalRecords } = getSystemStats();
 
     // 1. Export JSON with Cryptographic Signature
-    const handleFullBackupExport = () => {
+    const handleFullBackupExport = async () => {
         setLocalLoading(true);
         try {
             const allBranches = (companies || []).flatMap(c => (c.branches || []).map(b => ({ ...b, companyId: c.id })));
@@ -503,22 +495,38 @@ const BackupManager = () => {
                 financialData: useFinancialStore.getState(),
                 signature: ''
             };
-            
+
             backupData.signature = securityService.signBackup(backupData);
             const dateStr = getPersianDate().replace(/\//g, '-');
-            downloadJSON(backupData, `AshkeGhalam-Backup-Signed-${dateStr}`);
-            
-            // Log backup on background
-            backupService.backupData('full-export', backupData).catch(() => {});
-            
-            if (addNotification) {
-                addNotification('success', 'فایل پشتیبان کامل با کنترل یکپارچگی و شامل دفتر مالی با موفقیت صادر شد.');
-            } else {
-                alert('فایل پشتیبان کامل با کنترل یکپارچگی صادر و دانلود شد.');
+            const desktopAPI = (window as any).electronDesktopAPI;
+            let savedNativePath = '';
+
+            if (desktopAPI && typeof desktopAPI.writeLocalBackup === 'function') {
+                const fileName = 'AshkeGhalam-ManualBackup-' + Date.now() + '.json';
+                const result = await desktopAPI.writeLocalBackup(fileName, JSON.stringify(backupData, null, 2));
+                if (result?.success && typeof result.filePath === 'string') {
+                    savedNativePath = result.filePath;
+                } else if (result?.error && result.error !== 'BACKUP_DIRECTORY_NOT_SELECTED') {
+                    throw new Error('ذخیره فایل پشتیبان روی دیسک ناموفق بود: ' + result.error);
+                }
             }
-        } catch (error) {
+
+            backupService.backupData('full-export', backupData).catch(() => {});
+            if (savedNativePath) {
+                if (addNotification) addNotification('success', 'فایل پشتیبان مستقل روی دیسک ذخیره شد: ' + savedNativePath);
+                else alert('فایل پشتیبان مستقل روی دیسک ذخیره شد.');
+            } else {
+                downloadJSON(backupData, 'AshkeGhalam-Backup-Signed-' + dateStr);
+                if (addNotification) {
+                    addNotification('info', 'فایل پشتیبان دانلود شد. برای ذخیره خودکار در پوشه مستقل ویندوز، ابتدا پوشه را انتخاب کنید.');
+                } else {
+                    alert('فایل پشتیبان دانلود شد؛ ذخیره خودکار در پوشه مستقل نیازمند انتخاب پوشه است.');
+                }
+            }
+        } catch (error: any) {
             console.error(error);
-            alert('خطا در صدور فایل پشتیبان');
+            if (addNotification) addNotification('error', 'صدور فایل پشتیبان ناموفق بود: ' + (error?.message || 'خطای نامشخص'));
+            else alert('خطا در صدور فایل پشتیبان');
         } finally {
             setLocalLoading(false);
         }
@@ -1089,11 +1097,11 @@ const BackupManager = () => {
                                     <span>تنظیم دایرکتوری ذخیره‌سازی و پشتیبان‌گیری ویندوز</span>
                                 </h3>
                                 <p className="text-[11px] text-slate-400 mt-1">
-                                    مسیر دلخواه روی هارد دیسک (مانند درایو D، هارد اکسترنال یا فلش) را جهت ذخیره خودکار و ایزوله فایل‌های مالی انتخاب یا وارد نمایید.
+                                    پوشه را از پنجره ویندوز انتخاب کنید. بکاپ خودکار فقط پس از انتخاب واقعی پوشه و تأیید نوشتن فایل فعال می‌شود؛ فایل‌های محلی در حال حاضر رمزگذاری‌شده نیستند.
                                 </p>
                             </div>
                             <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold">
-                                استقلال ۱۰۰٪ داده‌ها فعال ✓
+                                {isDesktopEnv ? (desktopBackupPath ? 'پوشه مستقل انتخاب شده' : 'پوشه مستقل انتخاب نشده') : 'ذخیره مستقل در این محیط غیرفعال'}
                             </span>
                         </div>
                         
@@ -1101,15 +1109,12 @@ const BackupManager = () => {
                             <div>
                                 <label className="block text-xs font-bold text-slate-300 mb-2">مسیر محلی ذخیره خودکار بک‌آپ در ویندوز</label>
                                 <div className="flex flex-col sm:flex-row gap-2">
-                                    <input 
+                                    <input
                                         type="text"
                                         value={desktopBackupPath}
-                                        onChange={(e) => {
-                                            setDesktopBackupPath(e.target.value);
-                                            localStorage.setItem('desktop_auto_backup_path', e.target.value);
-                                        }}
-                                        placeholder="مثال: D:\AshkeGhalam_Backups یا برای انتخاب کلیک کنید"
-                                        className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-teal-500 font-mono text-left"
+                                        readOnly
+                                        placeholder="ابتدا روی «انتخاب پوشه» کلیک کنید"
+                                        className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:outline-none focus:border-teal-500 font-mono text-left"
                                         dir="ltr"
                                     />
                                     <button
@@ -1123,36 +1128,15 @@ const BackupManager = () => {
                                 </div>
                             </div>
 
-                            {/* Preset Paths */}
-                            <div className="pt-2 border-t border-slate-700/50">
-                                <span className="text-[11px] text-slate-400 block mb-2 font-bold">مسیرهای سریع و پیشنهادی ویندوز:</span>
-                                <div className="flex flex-wrap gap-2">
-                                    {[
-                                        { label: 'پوشه اسناد (Documents)', path: 'C:\\Users\\Default\\Documents\\AshkeGhalam_Backups' },
-                                        { label: 'درایو مستقل D', path: 'D:\\AshkeGhalam_Backups' },
-                                        { label: 'پوشه ایزوله سیستم (%AppData%)', path: '%APPDATA%\\AshkeGhalam\\Backups' }
-                                    ].map((preset, idx) => (
-                                        <button
-                                            key={idx}
-                                            type="button"
-                                            onClick={() => {
-                                                setDesktopBackupPath(preset.path);
-                                                localStorage.setItem('desktop_auto_backup_path', preset.path);
-                                                addNotification('success', `مسیر تنظیم گردید: ${preset.path}`);
-                                            }}
-                                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-700/80 text-teal-300 border border-teal-500/30 rounded-lg text-xs font-mono transition"
-                                        >
-                                            {preset.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            <p className="text-xs leading-relaxed text-slate-400">
+                                واردکردن آدرس یا انتخاب مسیر پیشنهادی به‌تنهایی دسترسی فایل‌سیستم ایجاد نمی‌کند. برای فعال‌سازی ذخیره واقعی، از دکمه بالا پوشه را در پنجره امن ویندوز انتخاب کنید.
+                            </p>
 
                             {/* Immediate Backup Action */}
                             <div className="pt-3 border-t border-slate-700/50 flex flex-col sm:flex-row items-center justify-between gap-3">
                                 <div className="text-[11px] text-slate-300 flex items-center gap-2">
                                     <ShieldCheck size={16} className="text-teal-400 shrink-0" />
-                                    <span>داده‌های اصلی نرم‌افزار در پایگاه داده مستقل ذخیره بوده و بک‌آپ‌ها به صورت موازی در این دایرکتوری بایگانی می‌شوند.</span>
+                                    <span>نسخه مستقل در این پوشه فقط پس از تأیید نوشتن واقعی فایل ثبت می‌شود؛ در نبود پوشه، خروجی دستی دانلود خواهد شد.</span>
                                 </div>
                                 <button
                                     type="button"
