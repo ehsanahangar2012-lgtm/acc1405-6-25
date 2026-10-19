@@ -374,6 +374,39 @@ class HostBackupService {
     }
 
     /**
+     * Detailed result for cloud UI: empty is distinct from offline/unconfigured/server error.
+     */
+    async listHostBackupsDetailed(): Promise<{ success: boolean; backups: HostBackupEntry[]; error?: string }> {
+        if (IS_BROWSER_PREVIEW) return { success: false, backups: [], error: 'فهرست سرور در پیش‌نمایش مرورگر فعال نیست.' };
+        if (!navigator.onLine) return { success: false, backups: [], error: 'دستگاه آفلاین است.' };
+        if (!workspaceService.isRemoteCloudConfigured()) return { success: false, backups: [], error: 'اتصال امن فضای کاری تنظیم نشده است.' };
+
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 10000);
+        try {
+            const response = await fetch(`${this.backupUrl}?action=list`, {
+                headers: await workspaceService.getSecureHeaders(),
+                signal: controller.signal,
+                cache: 'no-store'
+            });
+            if (!response.ok) return { success: false, backups: [], error: `خطای سرور (${response.status})` };
+            const result = await response.json();
+            if (result?.success !== true || !Array.isArray(result.backups)) {
+                return { success: false, backups: [], error: result?.error || 'پاسخ فهرست پشتیبان‌ها معتبر نیست.' };
+            }
+            return { success: true, backups: result.backups };
+        } catch (error: any) {
+            return {
+                success: false,
+                backups: [],
+                error: error?.name === 'AbortError' ? 'مهلت ارتباط با سرور تمام شد.' : (error?.message || 'ارتباط با سرور ناموفق بود.')
+            };
+        } finally {
+            clearTimeout(tid);
+        }
+    }
+
+    /**
      * دریافت لیست بکاپ‌های لوکال از IndexedDB
      */
     async listLocalBackups(): Promise<HostBackupEntry[]> {

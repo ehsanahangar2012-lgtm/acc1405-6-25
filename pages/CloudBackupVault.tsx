@@ -46,15 +46,22 @@ export default function CloudBackupVault() {
         : false;
       setEncryptionReady(ready);
       if (configured) {
-        const entries = await hostBackupService.listHostBackups();
-        setSnapshots(entries);
         if (!ready) {
+          const entries = await hostBackupService.listHostBackupsDetailed();
+          setSnapshots(entries.success ? entries.backups : []);
           setNotice({
             kind: 'warning',
-            text: 'سرور فعلی رمزنگاری AES-256-GCM را تأیید نکرده است؛ این نسخه از برنامه بکاپ جدید را به آن ارسال نمی‌کند. ابتدا نسخهٔ جدید host-backend را نصب و وضعیت را تازه‌سازی کنید.'
+            text: entries.success
+              ? 'سرور فعلی رمزنگاری AES-256-GCM را تأیید نکرده است؛ این نسخه از برنامه بکاپ جدید را به آن ارسال نمی‌کند. ابتدا نسخهٔ جدید host-backend را نصب و وضعیت را تازه‌سازی کنید.'
+              : 'رمزنگاری سرور تأیید نشد و فهرست بکاپ‌ها هم قابل تأیید نیست. ' + (entries.error || '')
           });
         } else {
-          setNotice(null);
+          const entries = await hostBackupService.listHostBackupsDetailed();
+          setSnapshots(entries.success ? entries.backups : []);
+          setNotice(entries.success ? null : {
+            kind: 'error',
+            text: 'خواندن فهرست از سرور تأیید نشد؛ فهرست خالی را به معنی نبود بکاپ تلقی نکنید. ' + (entries.error || '')
+          });
         }
       } else {
         setSnapshots([]);
