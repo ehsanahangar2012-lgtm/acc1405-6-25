@@ -73,8 +73,21 @@ const LicenseManager: React.FC = () => {
         setLicenses(licenseGeneratorService.getAllLicenses());
     };
 
+    const getSecureServerBaseUrl = (value: string) => {
+        const base = (value.trim() || window.location.origin).replace(/\/+$/, '');
+        const parsed = new URL(base);
+        if (parsed.protocol !== 'https:' && !['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)) {
+            throw new Error('برای عملیات مدیریتی لایسنس، اتصال HTTPS الزامی است.');
+        }
+        return base;
+    };
+
     const handleLoadServerLicenses = async () => {
-        const baseUrl = (licenseServerUrl.trim() || window.location.origin).replace(/\/+$/, '');
+        let baseUrl = '';
+        try { baseUrl = getSecureServerBaseUrl(licenseServerUrl); } catch (error: any) {
+            setIssueError(error?.message || 'نشانی سرور امن نیست.');
+            return;
+        }
         const secret = adminSecret.trim();
         if (!secret) {
             setIssueError('برای خواندن دفتر ثبت سرور، کلید مدیریت سرور را وارد کنید.');
@@ -156,7 +169,11 @@ const LicenseManager: React.FC = () => {
             alert('نام خریدار و HWID ثبت‌شده از دستگاه مشتری الزامی است.');
             return;
         }
-        const resolvedServerUrl = (licenseServerUrl.trim() || window.location.origin).replace(/\/+$/, '');
+        let resolvedServerUrl = '';
+        try { resolvedServerUrl = getSecureServerBaseUrl(licenseServerUrl); } catch (error: any) {
+            setIssueError(error?.message || 'نشانی سرور امن نیست.');
+            return;
+        }
         const cleanAdminSecret = adminSecret.trim();
         if (!resolvedServerUrl || !cleanAdminSecret) {
             setIssueError('برای صدور تجاری، نشانی سرور مادر و کلید مدیریت سرور را وارد کنید.');
@@ -279,7 +296,7 @@ const LicenseManager: React.FC = () => {
             return;
         }
         try {
-            const baseUrl = record.serverUrl.replace(/\/+$/, '');
+            const baseUrl = getSecureServerBaseUrl(record.serverUrl);
             let response: Response | null = null;
             let data: any = null;
             for (const apiUrl of [`${baseUrl}/tenant-manager.php`, `${baseUrl}/host-backend/tenant-manager.php`]) {
