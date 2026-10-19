@@ -10,6 +10,8 @@ export const MAX_TRIAL_DOCUMENTS = 100;
 
 export const MAX_ANDROID_DEFAULT_CUSTOMERS = 30;
 export const MAX_ANDROID_DEFAULT_DOCUMENTS = 50;
+export const MAX_TRIAL_USERS = 1;
+export const MAX_ANDROID_DEFAULT_USERS = 1;
 
 export const MAX_HEMAYAT_CUSTOMERS = 70;
 export const MAX_HEMAYAT_DOCUMENTS = 450;
@@ -433,7 +435,7 @@ class LicenseQuotaService {
     }
 
     private getCurrentEntitlements(): {
-        plan: string; maxCustomers: number; maxDocuments: number; isUnlimited: boolean;
+        plan: string; maxCustomers: number; maxDocuments: number; maxUsers: number; isUnlimited: boolean;
         expireDate: string; features: string[];
     } {
         const p = this.serverEntitlements;
@@ -456,10 +458,14 @@ class LicenseQuotaService {
         const maxDocuments = isUnlimited ? -1 :
             (p && Number.isFinite(p.max_documents) && p.max_documents >= 0 ? p.max_documents :
                 (fallback[1] >= 0 ? fallback[1] : MAX_TRIAL_DOCUMENTS));
+        const maxUsers = p && Number.isInteger(p.max_users) && p.max_users >= 1
+            ? p.max_users
+            : MAX_TRIAL_USERS;
         return {
             plan,
             maxCustomers,
             maxDocuments,
+            maxUsers,
             isUnlimited,
             expireDate: p?.is_unlimited ? 'دائمی' : (p?.expire_date || ''),
             features: Array.isArray(p?.features) ? p.features : ['BASIC_MODULES']
@@ -553,6 +559,37 @@ class LicenseQuotaService {
             companyName: 'نسخه مستقل محلی',
             expireDate: 'تا پایان سقف آزمایشی',
             hwid: hwidStr
+        };
+    }
+
+    /** Maximum user seats come only from a verified server receipt for native clients. */
+    getMaxUsers(): number {
+        if (!this.isFullyLicensedSync()) {
+            return isAndroidApp() ? MAX_ANDROID_DEFAULT_USERS : MAX_TRIAL_USERS;
+        }
+        return this.serverEntitlements?.max_users ?? MAX_TRIAL_USERS;
+    }
+
+    canAddUser(currentUserCount: number): { allowed: boolean; reason?: string } {
+        // The mother web portal owns customer/license administration; seat enforcement applies
+        // to installed customer clients, not the central administration portal.
+        const isNativeClient = isAndroidApp() ||
+            (typeof window !== 'undefined' && Boolean((window as any).electronDesktopAPI));
+        if (!isNativeClient) return { allowed: true };
+
+        const maxUsers = this.getMaxUsers();
+        if (currentUserCount < maxUsers) return { allowed: true };
+
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
+                detail: { reason: 'USERS_LIMIT', current: currentUserCount, max: maxUsers, platform: isAndroidApp() ? 'android' : 'desktop' }
+            }));
+        }
+        return {
+            allowed: false,
+            reason: this.isFullyLicensedSync()
+                ? `سقف کاربران پلن ${this.serverEntitlements?.plan || 'تجاری'} (${maxUsers} کاربر) تکمیل شده است. برای افزایش سهمیه با پشتیبانی تماس بگیرید.`
+                : `نسخه پایه این برنامه حداکثر ${maxUsers} کاربر دارد؛ برای افزودن کاربران بیشتر، لایسنس آنلاین را فعال کنید.`
         };
     }
 
