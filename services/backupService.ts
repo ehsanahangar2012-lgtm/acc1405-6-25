@@ -7,24 +7,13 @@ export class BackupService {
     }
     
     async backupData(type: string, data: any): Promise<boolean> {
-        const baseUrl = this.getBaseUrl();
-        if (!baseUrl) return false;
-        
-        try {
-            const response = await fetch(`${baseUrl}/backup-system.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
-                body: JSON.stringify({
-                    action: 'backup_data',
-                    type,
-                    payload: data
-                })
-            });
-            const result = await response.json();
-            return result.success;
-        } catch (error) {
-            return false;
-        }
+        // The legacy backup-system.php endpoint stores compressed but unencrypted JSON.
+        // Do not send financial, company, user, or configuration data to that endpoint.
+        // Use hostBackupService/server-api-backup.php, which requires authenticated AES-256-GCM
+        // encryption at rest, for actual cloud backup operations.
+        void type;
+        void data;
+        return false;
     }
     
     async uploadImage(file: File, folder: string): Promise<string | null> {
