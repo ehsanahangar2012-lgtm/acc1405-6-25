@@ -3277,10 +3277,11 @@ export const useStore = create<AppState>()(
           }
           const oldVoucher = s.vouchers.find(v => v.id === id);
           if (!oldVoucher) return {};
+          const finalUpdated: Voucher = { ...updated, id };
 
           const stockError = validateVoucherInventoryChange(s.products, [
               { voucher: oldVoucher, multiplier: -1 },
-              { voucher: { ...updated, id }, multiplier: 1 }
+              { voucher: finalUpdated, multiplier: 1 }
           ], false);
           if (stockError) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `ویرایش حواله انجام نشد: ${stockError}` }] };
