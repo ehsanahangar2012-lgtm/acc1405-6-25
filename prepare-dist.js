@@ -119,6 +119,10 @@ function copyBackendSafely(sourceDir, destinationDir, relativePath = '') {
     }
 }
 
+if (fs.existsSync('host-backend')) {
+    copyBackendSafely('host-backend', 'dist');
+}
+
 // ۵. کپی فایل‌های PHP موجود در روت
 fs.readdirSync('.').filter(f => f.endsWith('.php')).forEach(f => {
     fs.copyFileSync(f, path.join('dist', f));
