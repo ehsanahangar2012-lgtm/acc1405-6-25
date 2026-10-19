@@ -43,7 +43,25 @@ export default function FiscalYear() {
         if (confirm(`آیا از افتتاح سال مالی جدید ${openingYear} بر اساس مانده‌های سال ${prevOpeningYear} اطمینان دارید؟ سند افتتاحیه صادر خواهد شد.`)) {
             try {
                 financialStore.openFiscalYear(openingYear, prevOpeningYear);
-                showToast(`سال مالی ${openingYear} با موفقیت افتتاح شد و دوره‌های ۱۲گانه صادر شدند.`);
+
+                // Switch the active posting range as part of opening the year.
+                // Without this, AccountingEngine keeps rejecting new-year entries
+                // because SystemConfig still points to the previous fiscal year.
+                const nextStartDate = `${openingYear}/01/01`;
+                const nextEndDate = `${openingYear}/12/29`;
+                updateConfig({
+                    fiscalYear: openingYear,
+                    fiscalStartDate: nextStartDate,
+                    fiscalEndDate: nextEndDate
+                });
+                setFiscalYear(openingYear);
+                setFiscalStartDate(nextStartDate);
+                setFiscalEndDate(nextEndDate);
+                setClosingYear(openingYear);
+                setPrevOpeningYear(openingYear);
+                setOpeningYear(String(Number(openingYear) + 1));
+
+                showToast(`سال مالی ${openingYear} افتتاح و به‌عنوان سال فعال تنظیم شد؛ دوره‌های ۱۲گانه ایجاد شدند.`);
             } catch (err: any) {
                 alert(`خطا در افتتاح سال مالی: ${err.message}`);
             }
