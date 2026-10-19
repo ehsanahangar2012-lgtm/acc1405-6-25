@@ -111,14 +111,7 @@ foreach ($folders as $folder) {
     }
 }
 
-// محافظت با .htaccess
-$htaccess = "Options -Indexes\nDeny from all\n<FilesMatch \"\\.(jpg|jpeg|png|gif)$\">\n    Allow from all\n</FilesMatch>";
-file_put_contents(DATA_ROOT . '/.htaccess', $htaccess, LOCK_EX);
-file_put_contents(BACKUP_ROOT . '/.htaccess', "Options -Indexes\nDeny from all", LOCK_EX);
-
-// The validated storage helpers below are the single source of truth.
-
-// Protect tenant data and backups. Logs are stored inside the protected tenant directory.
+// Protect tenant data and backups. Logs are tenant-local and are not shared across customers.
 $denyRules = "<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n  Deny from all\n</IfModule>\nOptions -Indexes\n";
 if (!is_file(DATA_ROOT . '/.htaccess')) @file_put_contents(DATA_ROOT . '/.htaccess', $denyRules, LOCK_EX);
 if (!is_file(BACKUP_ROOT . '/.htaccess')) @file_put_contents(BACKUP_ROOT . '/.htaccess', $denyRules, LOCK_EX);
@@ -155,8 +148,8 @@ function tableGroupIds(array $tables): ?array {
             if (!is_array($list) || !storageIsList($list)) return null;
             foreach ($list as $record) {
                 if (!is_array($record)) return null;
-                $id = (string)($record['id'] ?? '');
-                $ids[$id !== '' ? 'id:' . $id : 'row:' . hash('sha256', json_encode($record))] = true;
+                $id = trim((string)($record['id'] ?? ''));
+                $ids[$id !== '' ? 'id:' . $id : 'row:' . hash('sha256', (string)json_encode($record))] = true;
             }
         }
         $tableDir = DATA_ROOT . '/' . $table;
@@ -166,7 +159,7 @@ function tableGroupIds(array $tables): ?array {
                 $raw = @file_get_contents($file);
                 $record = is_string($raw) ? json_decode($raw, true) : null;
                 if (!is_array($record)) return null;
-                $recordId = (string)($record['id'] ?? $id);
+                $recordId = trim((string)($record['id'] ?? $id));
                 $ids['id:' . ($recordId !== '' ? $recordId : $id)] = true;
             }
         }
@@ -191,7 +184,7 @@ function hasStorageRecordId(array $tables, string $id): bool {
         $rootFile = DATA_ROOT . '/' . $table . '.json';
         if (is_file($rootFile)) {
             $list = json_decode((string)@file_get_contents($rootFile), true);
-            if (!is_array($list)) return false;
+            if (!is_array($list) || !storageIsList($list)) return false;
             foreach ($list as $record) {
                 if (is_array($record) && isset($record['id']) && hash_equals((string)$record['id'], $id)) return true;
             }
@@ -227,7 +220,7 @@ function saveData($table, $data) {
         return ['success' => false, 'error' => 'TABLE_STORAGE_UNAVAILABLE'];
     }
     @chmod($tableDir, 0700);
-    if (!is_file($tableDir . '/.htaccess')) @file_put_contents($tableDir . '/.htaccess', "Require all denied\nDeny from all\nOptions -Indexes\n", LOCK_EX);
+    if (!is_file($tableDir . '/.htaccess')) @file_put_contents($tableDir . '/.htaccess', $GLOBALS['denyRules'] ?? "Require all denied\nDeny from all\nOptions -Indexes\n", LOCK_EX);
     $file = $tableDir . '/' . $id . '.json';
 
     $category = in_array($table, ['people', 'customers', 'clients'], true) ? 'customers' :
@@ -290,15 +283,35 @@ function getData($table, $id = null) {
         if (!storageValidId((string)$id)) return null;
         $file = DATA_ROOT . '/' . $table . '/' . $id . '.json';
         if (is_file($file)) return json_decode((string)@file_get_contents($file), true);
+        $root = DATA_ROOT . '/' . $table . '.json';
+        $list = is_file($root) ? json_decode((string)@file_get_contents($root), true) : [];
+        if (is_array($list) && storageIsList($list)) {
+            foreach ($list as $record) if (is_array($record) && (string)($record['id'] ?? '') === (string)$id) return $record;
+        }
         return null;
     }
-    $files = glob(DATA_ROOT . '/' . $table . '/*.json') ?: [];
-    $data = [];
-    foreach ($files as $file) {
-        $record = json_decode((string)@file_get_contents($file), true);
-        if (is_array($record)) $data[] = $record;
+
+    $byId = [];
+    $root = DATA_ROOT . '/' . $table . '.json';
+    if (is_file($root)) {
+        $list = json_decode((string)@file_get_contents($root), true);
+        if (is_array($list) && storageIsList($list)) {
+            foreach ($list as $record) {
+                if (!is_array($record)) continue;
+                $idValue = trim((string)($record['id'] ?? ''));
+                $key = $idValue !== '' ? $idValue : hash('sha256', (string)json_encode($record));
+                $byId[$key] = $record;
+            }
+        }
     }
-    return $data;
+    foreach (glob(DATA_ROOT . '/' . $table . '/*.json') ?: [] as $file) {
+        $record = json_decode((string)@file_get_contents($file), true);
+        if (!is_array($record)) continue;
+        $idValue = trim((string)($record['id'] ?? basename($file, '.json')));
+        $key = $idValue !== '' ? $idValue : basename($file, '.json');
+        $byId[$key] = $record;
+    }
+    return array_values($byId);
 }
 function deleteData($table, $id) {
     global $access;
@@ -315,6 +328,22 @@ function deleteData($table, $id) {
         }
     }
     $deleted = is_file($file) && @unlink($file);
+
+    // When a legacy key-value table exists too, keep it consistent with record deletion.
+    $rootFile = DATA_ROOT . '/' . $table . '.json';
+    if (is_file($rootFile)) {
+        $raw = @file_get_contents($rootFile);
+        $list = is_string($raw) ? json_decode($raw, true) : null;
+        if (is_array($list) && storageIsList($list)) {
+            $filtered = array_values(array_filter($list, static fn($record) =>
+                !is_array($record) || (string)($record['id'] ?? '') !== (string)$id
+            ));
+            if (count($filtered) !== count($list)) {
+                $encoded = json_encode($filtered, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                if (is_string($encoded) && storageAtomicWrite($rootFile, $encoded)) $deleted = true;
+            }
+        }
+    }
     if (is_resource($lock)) {
         flock($lock, LOCK_UN);
         fclose($lock);
@@ -351,7 +380,6 @@ function uploadImage($base64, $folder, $filename) {
     if (!storageAtomicWrite($path, $bytes)) return ['success' => false, 'error' => 'IMAGE_WRITE_FAILED'];
     return ['success' => true, 'url' => str_replace(DIRECTORY_SEPARATOR, '/', substr($path, strlen(__DIR__)))];
 }
-
 function createBackup() {
     $timestamp = date('Y-m-d_H-i-s');
     $manualDir = BACKUP_ROOT . '/manual';
@@ -367,208 +395,32 @@ function createBackup() {
     ];
     foreach ($GLOBALS['ALLOWED_TABLES'] ?? [] as $table) {
         $records = getData($table);
-        if (!is_array($records)) {
-            return ['success' => false, 'error' => 'BACKUP_READ_FAILED', 'table' => $table];
-        }
+        if (!is_array($records)) return ['success' => false, 'error' => 'BACKUP_READ_FAILED', 'table' => $table];
         $backup['data'][$table] = $records;
     }
     $encoded = json_encode($backup, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if (!is_string($encoded)) return ['success' => false, 'error' => 'BACKUP_ENCODE_FAILED'];
     $path = $manualDir . '/backup_' . $timestamp . '_' . bin2hex(random_bytes(3)) . '.json';
-    if (!storageAtomicWrite($path, $encoded)) {
-        return ['success' => false, 'error' => 'BACKUP_WRITE_FAILED'];
-    }
+    if (!storageAtomicWrite($path, $encoded)) return ['success' => false, 'error' => 'BACKUP_WRITE_FAILED'];
     return ['success' => true, 'file' => basename($path), 'size' => filesize($path)];
 }
 
-// Keep the legacy API router separate from the secure storage helpers.
-
-// Handle authenticated, workspace-bound storage actions.
-$action = trim((string)($input['action'] ?? ''));
-try {
-    switch ($action) {
-        case 'save':
-            $table = $input['table'] ?? '';
-            $data = $input['data'] ?? null;
-            if (!storageValidTable($table) || !is_array($data)) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => !storageValidTable($table) ? 'INVALID_TABLE' : 'INVALID_RECORD']);
-                break;
-            }
-            if ($table === 'companies') {
-                foreach (['logo', 'stamp', 'signature'] as $imageField) {
-                    if (isset($data[$imageField]) && is_string($data[$imageField]) && strpos($data[$imageField], 'data:image') === 0) {
-                        $savedImage = uploadImage($data[$imageField], 'companies', (string)($data['id'] ?? 'company') . '_' . $imageField);
-                        if (empty($savedImage['success'])) {
-                            http_response_code(400);
-                            echo json_encode($savedImage);
-                            break 2;
-                        }
-                        $data[$imageField] = $savedImage['url'];
-                    }
-                }
-            }
-            if ($table === 'checks' && isset($data['imageUrl']) && is_string($data['imageUrl']) && strpos($data['imageUrl'], 'data:image') === 0) {
-                $savedImage = uploadImage($data['imageUrl'], 'checks', (string)($data['id'] ?? 'check'));
-                if (empty($savedImage['success'])) {
-                    http_response_code(400);
-                    echo json_encode($savedImage);
-                    break;
-                }
-                $data['imageUrl'] = $savedImage['url'];
-            }
-            $result = saveData($table, $data);
-            if (empty($result['success'])) {
-                http_response_code(in_array($result['error'] ?? '', ['CUSTOMER_QUOTA_EXCEEDED','DOCUMENT_QUOTA_EXCEEDED','USER_QUOTA_EXCEEDED'], true) ? 409 : 400);
-            }
-            echo json_encode($result, JSON_UNESCAPED_UNICODE);
-            break;
-
-        case 'get':
-            $table = (string)($input['table'] ?? '');
-            $id = $input['id'] ?? null;
-            if (!storageValidTable($table) || ($id !== null && !storageValidId((string)$id))) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'INVALID_TABLE_OR_ID']);
-                break;
-            }
-            echo json_encode(['success' => true, 'data' => getData($table, $id)], JSON_UNESCAPED_UNICODE);
-            break;
-
-        case 'delete':
-            $result = deleteData($input['table'] ?? '', (string)($input['id'] ?? ''));
-            if (empty($result['success'])) http_response_code(400);
-            echo json_encode($result, JSON_UNESCAPED_UNICODE);
-            break;
-
-        case 'sync':
-            $items = $input['data'] ?? null;
-            if (!is_array($items) || count($items) > 1000) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'INVALID_SYNC_PAYLOAD']);
-                break;
-            }
-            $synced = 0;
-            $failed = false;
-            foreach ($items as $item) {
-                if (!is_array($item)) {
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'error' => 'INVALID_SYNC_ITEM', 'synced' => $synced]);
-                    $failed = true;
-                    break;
-                }
-                $result = saveData($item['table'] ?? '', $item['data'] ?? null);
-                if (empty($result['success'])) {
-                    http_response_code(in_array($result['error'] ?? '', ['CUSTOMER_QUOTA_EXCEEDED','DOCUMENT_QUOTA_EXCEEDED','USER_QUOTA_EXCEEDED'], true) ? 409 : 400);
-                    echo json_encode(['success' => false, 'error' => $result['error'] ?? 'SYNC_FAILED', 'synced' => $synced]);
-                    $failed = true;
-                    break;
-                }
-                $synced++;
-            }
-            if (!$failed) echo json_encode(['success' => true, 'synced' => $synced]);
-            break;
-
-        case 'backup':
-            echo json_encode(createBackup(), JSON_UNESCAPED_UNICODE);
-            break;
-
-        case 'restore':
-            $backup = $input['backup'] ?? null;
-            if (!is_array($backup) || !is_array($backup['data'] ?? null)) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'INVALID_BACKUP']);
-                break;
-            }
-            $restored = 0;
-            $failed = false;
-            foreach ($backup['data'] as $table => $records) {
-                if (!storageValidTable($table) || !is_array($records) || count($records) > 50000) {
-                    http_response_code(400);
-                    echo json_encode(['success' => false, 'error' => 'INVALID_BACKUP_TABLE', 'restored' => $restored]);
-                    $failed = true;
-                    break;
-                }
-                foreach ($records as $record) {
-                    $result = saveData($table, $record);
-                    if (empty($result['success'])) {
-                        http_response_code(in_array($result['error'] ?? '', ['CUSTOMER_QUOTA_EXCEEDED','DOCUMENT_QUOTA_EXCEEDED','USER_QUOTA_EXCEEDED'], true) ? 409 : 400);
-                        echo json_encode(['success' => false, 'error' => $result['error'] ?? 'RESTORE_FAILED', 'restored' => $restored]);
-                        $failed = true;
-                        break 2;
-                    }
-                    $restored++;
-                }
-            }
-            if (!$failed) echo json_encode(['success' => true, 'restored' => $restored]);
-            break;
-
-        case 'upload_image':
-            if (!isset($_FILES['image']) || !is_array($_FILES['image']) ||
-                ($_FILES['image']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK ||
-                !is_uploaded_file($_FILES['image']['tmp_name'] ?? '')) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'INVALID_UPLOAD']);
-                break;
-            }
-            $folder = trim((string)($_POST['folder'] ?? 'general'));
-            $filename = trim((string)($_POST['filename'] ?? bin2hex(random_bytes(8))));
-            if (!preg_match('/^[A-Za-z0-9_-]{1,64}$/', $folder) ||
-                !preg_match('/^[A-Za-z0-9_-]{1,160}$/', $filename) ||
-                (int)($_FILES['image']['size'] ?? 0) > 5000000 ||
-                !function_exists('getimagesize')) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'INVALID_OR_OVERSIZED_UPLOAD']);
-                break;
-            }
-            $imageInfo = @getimagesize($_FILES['image']['tmp_name']);
-            if (!is_array($imageInfo)) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'INVALID_IMAGE_DATA']);
-                break;
-            }
-            $extensions = [IMAGETYPE_PNG => 'png', IMAGETYPE_JPEG => 'jpg', IMAGETYPE_GIF => 'gif'];
-            if (defined('IMAGETYPE_WEBP')) $extensions[IMAGETYPE_WEBP] = 'webp';
-            $ext = $extensions[$imageInfo[2] ?? 0] ?? null;
-            if ($ext === null) {
-                http_response_code(400);
-                echo json_encode(['success' => false, 'error' => 'UNSUPPORTED_IMAGE_TYPE']);
-                break;
-            }
-            $targetDir = IMAGES_ROOT . '/' . $folder;
-            if (!is_dir($targetDir) && !@mkdir($targetDir, 0700, true) && !is_dir($targetDir)) {
-                http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'IMAGE_STORAGE_UNAVAILABLE']);
-                break;
-            }
-            @chmod($targetDir, 0700);
-            $targetFile = $targetDir . '/' . $filename . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-            if (!@move_uploaded_file($_FILES['image']['tmp_name'], $targetFile)) {
-                http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'UPLOAD_FAILED']);
-                break;
-            }
-            @chmod($targetFile, 0600);
-            $url = str_replace(DIRECTORY_SEPARATOR, '/', substr($targetFile, strlen(__DIR__)));
-            echo json_encode(['success' => true, 'url' => $url]);
-            break;
-
-        case 'stats':
-            $stats = [];
-            foreach (['companies', 'products', 'people', 'invoices', 'vouchers', 'checks', 'transactions'] as $table) {
-                $files = glob(DATA_ROOT . '/' . $table . '/*.json') ?: [];
-                $stats[$table] = count($files);
-            }
-            echo json_encode(['success' => true, 'stats' => $stats]);
-            break;
-
-        default:
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'INVALID_ACTION']);
+function restoreBackup($backupData) {
+    if (!is_array($backupData) || !is_array($backupData['data'] ?? null)) {
+        return ['success' => false, 'error' => 'INVALID_BACKUP'];
     }
-} catch (Throwable $e) {
-    logAction('ERROR', ['message' => $e->getMessage()]);
-    http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'INTERNAL_ERROR']);
+    $restored = 0;
+    foreach ($backupData['data'] as $table => $records) {
+        if (!storageValidTable($table) || !is_array($records) || count($records) > 50000) {
+            return ['success' => false, 'error' => 'INVALID_BACKUP_TABLE', 'restored' => $restored];
+        }
+        foreach ($records as $record) {
+            $result = saveData($table, $record);
+            if (empty($result['success'])) return ['success' => false, 'error' => $result['error'] ?? 'RESTORE_FAILED', 'restored' => $restored];
+            $restored++;
+        }
+    }
+    return ['success' => true, 'restored' => $restored];
 }
 
+// Authenticated, workspace-bound storage actions.
