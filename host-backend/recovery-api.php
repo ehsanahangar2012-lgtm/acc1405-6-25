@@ -64,7 +64,11 @@ if ($workspaceId === 'default' || $workspaceId === 'main') {
     // Password recovery must not inherit that bypass: a host admin must set
     // recovery_api_token in workspaces_auth.json or ASHK_RECOVERY_API_TOKEN
     // in the server environment. Do not put this secret in the repository.
-    $expectedToken = (string)($config['recovery_api_token'] ?? getenv('ASHK_RECOVERY_API_TOKEN') ?: '');
+    $expectedToken = trim((string)($config['recovery_api_token'] ?? ''));
+    if ($expectedToken === '') {
+        $environmentToken = getenv('ASHK_RECOVERY_API_TOKEN');
+        $expectedToken = is_string($environmentToken) ? trim($environmentToken) : '';
+    }
     if ($expectedToken === '' || !hash_equals($expectedToken, $token)) {
         recoveryRespond(401, ['success' => false, 'error' => 'RECOVERY_NOT_CONFIGURED']);
     }
