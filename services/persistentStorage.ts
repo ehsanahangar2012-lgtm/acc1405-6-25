@@ -44,7 +44,7 @@ class PersistentStorage {
         const timeout = setTimeout(() => controller.abort(), 8000);
         try {
             const storageEndpoint = `${baseUrl}/storage.php`;
-            const workspaceHeaders = workspaceService.getHeaders();
+            const workspaceHeaders = await workspaceService.getSecureHeaders();
 
             const response = await fetch(storageEndpoint, {
                 method: 'POST',
