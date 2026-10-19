@@ -415,9 +415,9 @@ const Sidebar = () => {
             سیستم و تنظیمات
           </div>
           {bottomItems.map(item => renderLink(item))}
-          
+
+          {/* Download App Package Button: owner web portal only */}
           {!isNativeClient && (
-            {/* Download App Package Button */}
             <button
               type="button"
               onClick={() => setIsDownloadModalOpen(true)}
@@ -427,7 +427,6 @@ const Sidebar = () => {
               <FolderArchive className="w-4 h-4 shrink-0 text-emerald-400 group-hover:scale-110 transition-transform" />
               <span className="truncate">مرکز دانلود نرم‌افزار (EXE / APK)</span>
             </button>
-  
           )}
         </div>
       </nav>
