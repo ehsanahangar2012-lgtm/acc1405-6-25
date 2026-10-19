@@ -18,6 +18,7 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
   if (!isOpen) return null;
 
   const RELEASE_DATE_SHAMSI = APP_RELEASE_DATE;
+  const releaseBase = 'https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download';
 
   const downloadPackages = [
     {
@@ -39,7 +40,7 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
       platform: 'ویندوز ۱۰ و ۱۱ (Portable EXE داخل ZIP)',
       description: 'آرشیو شامل نسخه Portable ویندوز و راهنمای اجرا؛ برای جابه‌جایی یا نگهداری آسان.',
       icon: HardDrive,
-      badge: '۱۰۰٪ تضمینی بدون پیش‌نیاز',
+      badge: 'بدون نصب',
       size: 'بسته کامل نرم‌افزار'
     },
     {

@@ -60,88 +60,118 @@ class AndroidCommercialService {
     /**
      * پیوند به سیستم PWA / هاست سرور اصلی و فعال‌سازی با مشخصات لایسنس سرور مورد نظر
      */
-    async linkToPwaAndActivate(customHostUrl?: string, customSyncToken?: string): Promise<{ success: boolean; message: string; details?: any }> {
+    async connectToServer(customHostUrl?: string, customSyncToken?: string): Promise<{ success: boolean; message: string; details?: any }> {
         if (typeof window === 'undefined') {
-            return { success: false, message: 'محیط وب پشتیبانی نمی‌شود.' };
+            return { success: false, message: 'این عملیات فقط در نسخه نصب‌شده پشتیبانی می‌شود.' };
         }
 
-        const hostUrl = (customHostUrl || localStorage.getItem(this.STORAGE_KEYS.HOST_URL) || localStorage.getItem('ashk_custom_server_url') || '').trim();
+        const hostUrl = (customHostUrl || localStorage.getItem(this.STORAGE_KEYS.HOST_URL) || localStorage.getItem('ashk_custom_server_url') || '').trim().replace(/\\/+$/, '');
         const syncToken = (customSyncToken || localStorage.getItem(this.STORAGE_KEYS.SYNC_TOKEN) || localStorage.getItem('ashk_cloud_token') || '').trim();
 
-        if (!hostUrl) {
-            return {
-                success: false,
-                message: 'لطفاً آدرس سرور یا هاست مورد نظر را وارد نمایید.'
-            };
+        if (!hostUrl) return { success: false, message: 'آدرس سرور را وارد کنید.' };
+        if (!syncToken) return { success: false, message: 'توکن اختصاصی سرور الزامی است.' };
+        if (!licenseQuotaService.isFullyLicensedSync()) {
+            return { success: false, message: 'ابتدا لایسنس این دستگاه را با کد معتبر فعال کنید؛ اتصال سرور به‌تنهایی لایسنس صادر نمی‌کند.' };
         }
 
-        localStorage.setItem(this.STORAGE_KEYS.HOST_URL, hostUrl);
-        localStorage.setItem('ashk_custom_server_url', hostUrl);
-        if (syncToken) {
+        let parsedUrl: URL;
+        try {
+            parsedUrl = new URL(hostUrl);
+        } catch {
+            return { success: false, message: 'آدرس سرور معتبر نیست.' };
+        }
+        if (!['https:', 'http:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) {
+            return { success: false, message: 'آدرس سرور باید یک HTTP(S) URL معتبر و بدون اطلاعات ورود داخل URL باشد.' };
+        }
+
+        const workspaceId = workspaceService.getWorkspaceId();
+        if (!workspaceId || workspaceId === 'default' || workspaceId === 'main') {
+            return { success: false, message: 'ابتدا در فعال‌سازی لایسنس یک شناسه فضای کاری اختصاصی و ثبت‌شده برای این مشتری تعیین کنید؛ فضای default برای پرتال مادر رزرو شده است.' };
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        try {
+            const healthResponse = await fetch(`${hostUrl}/api.php?action=health`, {
+                method: 'GET',
+                cache: 'no-store',
+                signal: controller.signal
+            });
+            const health = await healthResponse.json().catch(() => null);
+            if (!healthResponse.ok || !health || health.status !== 'online') {
+                return { success: false, message: 'سرور پاسخ سلامت معتبر نداد. آدرس و سرویس API را بررسی کنید.' };
+            }
+
+            const requestBody = JSON.stringify({ action: 'test', workspace_id: workspaceId });
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Workspace-ID': workspaceId,
+                'X-Workspace-Token': syncToken
+            };
+
+            let accessResponse: Response | null = null;
+            let accessData: any = null;
+            const endpointCandidates = [`${hostUrl}/storage.php`, `${hostUrl}/host-backend/storage.php`];
+            for (const endpoint of endpointCandidates) {
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        cache: 'no-store',
+                        headers,
+                        body: requestBody,
+                        signal: controller.signal
+                    });
+                    accessResponse = response;
+                    accessData = await response.json().catch(() => null);
+                    if (response.status !== 404) break;
+                } catch (error) {
+                    if (controller.signal.aborted) throw error;
+                }
+            }
+
+            if (!accessResponse || !accessResponse.ok || accessData?.success !== true) {
+                return {
+                    success: false,
+                    message: accessData?.message || accessData?.error || 'سرور فضای کاری را مجاز نکرد؛ شناسه و توکن باید در سرور ثبت شده باشند.'
+                };
+            }
+
+            localStorage.setItem(this.STORAGE_KEYS.HOST_URL, hostUrl);
+            localStorage.setItem('ashk_custom_server_url', hostUrl);
             localStorage.setItem(this.STORAGE_KEYS.SYNC_TOKEN, syncToken);
             localStorage.setItem('ashk_cloud_token', syncToken);
-        }
-
-        // بروزرسانی فضای کاری جهت اتصال به سرور مورد نظر
-        try {
             await workspaceService.updateConfig({
                 customServerUrl: hostUrl,
                 workspaceToken: syncToken,
                 standaloneOfflineMode: false
             });
-        } catch (_) {}
 
-        // تلاش برای استعلام آنلاین لایسنس از هاست در صورت امکان اتصال
-        let serverTitle = 'شرکت مرکزی اشک قلم';
-        let serverPlan = 'UNLIMITED';
-        let serverExpire = 'دائمی (۱۰ ساله - متصل به سرور اصلی)';
+            window.dispatchEvent(new CustomEvent('ashk-server-connection-updated', {
+                detail: { hostUrl, workspaceId }
+            }));
 
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 4000);
-            const apiUrl = `${hostUrl.replace(/\/$/, '')}/api.php?action=health`;
-            const resp = await fetch(apiUrl, { signal: controller.signal }).catch(() => null);
+            return {
+                success: true,
+                message: 'اتصال و دسترسی فضای کاری تأیید شد. این آزمون لایسنس را فعال یا تمدید نمی‌کند؛ سهمیه تجاری فقط از لایسنس معتبر دستگاه خوانده می‌شود.',
+                details: { hostUrl, workspaceId }
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: error instanceof Error && error.name === 'AbortError'
+                    ? 'مهلت اتصال به سرور تمام شد.'
+                    : 'اتصال یا اعتبارسنجی فضای کاری ناموفق بود.'
+            };
+        } finally {
             clearTimeout(timeoutId);
-
-            if (resp && resp.ok) {
-                const data = await resp.json().catch(() => null);
-                if (data && data.company_name) serverTitle = data.company_name;
-            }
-        } catch (_) {
-            // در حالت آفلاین یا فیلترینگ با مشخصات سرور اصلی همگام می‌شود
         }
-
-        const currentCompany = localStorage.getItem(this.STORAGE_KEYS.COMPANY_NAME);
-        const resolvedCompany = currentCompany || serverTitle;
-
-        licenseQuotaService.activateWithServerLicense({
-            companyName: resolvedCompany,
-            plan: serverPlan,
-            expireDate: serverExpire,
-            hostUrl,
-            syncToken
-        });
-
-        localStorage.setItem(this.STORAGE_KEYS.COMMERCIAL_ACTIVATED, 'true');
-        localStorage.setItem(this.STORAGE_KEYS.PWA_LINKED, 'true');
-        localStorage.setItem('ashk_android_activated', 'true');
-
-        window.dispatchEvent(new CustomEvent('ashk-license-updated'));
-        window.dispatchEvent(new CustomEvent('ashk-pwa-linked', { detail: { hostUrl, syncToken } }));
-
-        return {
-            success: true,
-            message: `پیوند با سرور مورد نظر با موفقیت برقرار شد و لایسنس تجاری (${resolvedCompany} - نامحدود) فعال گردید.`,
-            details: { hostUrl, syncToken, companyName: resolvedCompany }
-        };
     }
 
     /**
      * فعال‌سازی مستقیم لایسنس همراه
      */
     activateCommercialMode(): void {
-        if (typeof window === 'undefined') return;
-        licenseQuotaService.activateWithServerLicense();
+        console.warn('[License] Commercial activation requires a verified license; use the activation dashboard.');
     }
 
     /**
@@ -153,6 +183,9 @@ class AndroidCommercialService {
         localStorage.removeItem(this.STORAGE_KEYS.PWA_LINKED);
         localStorage.removeItem('ashk_android_activated');
         localStorage.removeItem('ashk_license_status');
+        localStorage.removeItem('ashk_license_key');
+        localStorage.removeItem('ashk_activation_code');
+        localStorage.removeItem('ashk_active_license_key');
         localStorage.removeItem('ashk_license_plan');
         localStorage.removeItem('ashk_server_license_data');
         localStorage.removeItem('ashk_custom_server_url');

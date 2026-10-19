@@ -34,6 +34,24 @@ $adminSecret = $_SERVER['HTTP_X_ADMIN_SECRET'] ?? $input['admin_secret'] ?? $_GE
 if ($action === 'verify_license') {
     $wsId = trim($input['workspace_id'] ?? $_GET['workspace_id'] ?? '');
     $tkn = trim($input['token'] ?? $_GET['token'] ?? '');
+
+    // The reserved mother-server workspaces are not client licenses.
+    // Never auto-register an unknown workspace during an activation check.
+    if (
+        $wsId === '' ||
+        in_array($wsId, ['default', 'main'], true) ||
+        $tkn === '' ||
+        !isset($config['workspaces'][$wsId])
+    ) {
+        http_response_code(403);
+        echo json_encode([
+            'allowed' => false,
+            'status' => 'NOT_FOUND',
+            'message' => 'شناسه فضای کاری اختصاصی در سرور ثبت نشده است یا کلید لایسنس خالی است.'
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     $validation = LicenseValidator::validateAccess($wsId, $tkn);
     echo json_encode($validation, JSON_UNESCAPED_UNICODE);
     exit;

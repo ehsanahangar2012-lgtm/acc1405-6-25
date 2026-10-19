@@ -209,6 +209,9 @@ class LicenseGeneratorService {
             if (typeof window !== 'undefined') {
                 localStorage.setItem('ashk_license_status', 'ACTIVATED');
                 localStorage.setItem('ashk_license_type', p.isUnlimited ? 'UNLIMITED' : 'LIMITED');
+                localStorage.setItem('ashk_license_key', licenseKey.trim().toUpperCase());
+                localStorage.setItem('ashk_activation_code', activationCode.trim());
+                localStorage.removeItem('ashk_server_license_data');
             }
 
             // ارسال رویداد جهت به‌روزرسانی آنی تمامی کامپوننت‌ها

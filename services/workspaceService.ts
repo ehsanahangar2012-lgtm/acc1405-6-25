@@ -126,14 +126,45 @@ class WorkspaceService {
             ''
         ).trim();
 
-        const isLinkedOrLicensed = 
-            localStorage.getItem('ashk_pwa_linked') === 'true' || 
-            localStorage.getItem('ashk_android_activated') === 'true' ||
-            Boolean(localStorage.getItem('ashk_server_license_data'));
+        const localStatus = localStorage.getItem('ashk_license_status');
+        const localKey = (
+            localStorage.getItem('ashk_license_key') ||
+            localStorage.getItem('ashk_active_license_key') ||
+            ''
+        ).trim();
+        const activationCode = (localStorage.getItem('ashk_activation_code') || '').trim();
+        let serverVerified = false;
+        try {
+            const serverData = JSON.parse(localStorage.getItem('ashk_server_license_data') || 'null');
+            serverVerified = Boolean(
+                serverData?.serverVerified === true &&
+                serverData?.workspaceId &&
+                serverData.workspaceId !== 'default' &&
+                serverData.workspaceId !== 'main' &&
+                serverData?.licenseKey &&
+                serverData.licenseKey === localKey
+            );
+        } catch {}
+        const offlineLicenseConfirmed = Boolean(
+            localStatus === 'ACTIVATED' &&
+            localKey &&
+            activationCode &&
+            !localKey.startsWith('PWA-HOST-LIC-')
+        );
+        const licenseConfirmed = Boolean(localStatus === 'ACTIVATED' && (offlineLicenseConfirmed || serverVerified));
 
-        // در اندروید و ویندوز، بدون ورود صریح آدرس سرور و (توکن ابری یا لایسنس معتبر)، دسترسی به هاست مسدود است و دیتابیس کاملاً محلی است
+        // Native clients never use the shared default tenant. A device must have a valid
+        // activation record, its own registered workspace and an explicit server token.
         if (isAndroidApp() || isDesktopApp()) {
-            return Boolean(customUrl && (token || isLinkedOrLicensed));
+            const workspaceId = this.getWorkspaceId();
+            return Boolean(
+                customUrl &&
+                token &&
+                licenseConfirmed &&
+                workspaceId &&
+                workspaceId !== 'default' &&
+                workspaceId !== 'main'
+            );
         }
 
         // در وب عادی تنها در صورتی که هاست مشخص و توکن وجود داشته باشد سینک مجاز است

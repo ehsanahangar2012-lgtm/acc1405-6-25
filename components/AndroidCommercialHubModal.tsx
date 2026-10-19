@@ -79,13 +79,13 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
         return () => unsub();
     }, [invoices]);
 
-    const handleLinkPwaAndActivate = async () => {
+    const handleConnectToServer = async () => {
         setIsLinking(true);
         setLinkSuccessMsg(null);
         try {
-            const res = await androidCommercialService.linkToPwaAndActivate(targetHostUrl, targetSyncToken);
+            const res = await androidCommercialService.connectToServer(targetHostUrl, targetSyncToken);
             if (res.success) {
-                setIsLicensed(true);
+                setIsLicensed(licenseQuotaService.isFullyLicensedSync());
                 setLinkSuccessMsg(res.message);
             } else {
                 alert(res.message);
@@ -340,14 +340,14 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-black text-white flex items-center gap-1.5">
                                                 <Globe className="w-4 h-4 text-teal-400" />
-                                                <span>اتصال به سرور اختصاصی و فعال‌سازی با مشخصات لایسنس</span>
+                                                <span>اتصال به سرور پس از تأیید لایسنس</span>
                                             </span>
                                             <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full font-bold border border-teal-500/30">
-                                                سقف ۵۰ سند ➔ نامحدود
+                                                لایسنس معتبر الزامی است
                                             </span>
                                         </div>
                                         <p className="text-xs text-slate-300 leading-relaxed">
-                                            در حالت پیش‌فرض و نصب خام، برنامه بدون اتصال به هیچ سروری با داده‌های محلی و سقف ۵۰ سند کار می‌کند. جهت اتصال به سرور مورد نظر، مشخصات زیر را وارد کرده و پیوند را برقرار فرمایید:
+                                            ابتدا لایسنس دستگاه را فعال کنید. سپس شناسه فضای کاری ثبت‌شده، آدرس سرور و توکن اختصاصی را وارد کنید. اتصال موفق، به‌تنهایی سقف اسناد را حذف یا لایسنس را فعال نمی‌کند:
                                         </p>
 
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -382,19 +382,19 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                         <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-800">
                                             <button
                                                 type="button"
-                                                onClick={handleLinkPwaAndActivate}
+                                                onClick={handleConnectToServer}
                                                 disabled={isLinking}
                                                 className="w-full sm:w-auto flex-1 py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/30 disabled:opacity-50"
                                             >
                                                 {isLinking ? (
                                                     <>
                                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                                        <span>در حال اتصال و اعمال لایسنس سرور...</span>
+                                                        <span>در حال بررسی اتصال و مجوز فضای کاری...</span>
                                                     </>
                                                 ) : (
                                                     <>
                                                         <RefreshCw className="w-4 h-4" />
-                                                        <span>🔗 اتصال به سرور و رفع محدودیت اسناد</span>
+                                                        <span>🔗 آزمون اتصال سرور</span>
                                                     </>
                                                 )}
                                             </button>

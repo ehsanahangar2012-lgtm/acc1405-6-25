@@ -26,6 +26,7 @@ import {
 import { hardwareIdService, DeviceInfo } from '../services/hardwareIdService';
 import { encryptedStorageService, AppManifest } from '../services/encryptedStorageService';
 import { idbService } from '../services/indexedDBService';
+import { workspaceService } from '../services/workspaceService';
 
 interface ActivationDashboardProps {
     isOpen?: boolean;
@@ -95,45 +96,101 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
 
         try {
             const hwid = deviceInfo?.hwid || await hardwareIdService.getHardwareId();
-            
-            // ارسال درخواست اعتبارسنجی به هاست
-            const targetApi = serverUrl.trim() 
-                ? `${serverUrl.replace(/\/$/, '')}/host-backend/tenant-manager.php`
-                : '/host-backend/tenant-manager.php';
+            const cleanWorkspaceId = workspaceId.trim();
+            const cleanLicenseKey = licenseKey.trim();
+            const resolvedServerUrl = (serverUrl.trim() || window.location.origin).replace(/\/+$/, '');
 
-            const response = await fetch(targetApi, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'verify_license',
-                    workspace_id: workspaceId,
-                    token: licenseKey.trim(),
-                    hwid
-                })
+            if (!cleanWorkspaceId || ['default', 'main'].includes(cleanWorkspaceId) || !cleanLicenseKey) {
+                setMessage({ type: 'error', text: 'برای فعال‌سازی آنلاین، شناسه فضای کاری اختصاصی ثبت‌شده و کلید لایسنس لازم است؛ default/main برای پرتال مادر رزرو شده‌اند.' });
+                return;
+            }
+
+            // Accept only a response from a registered tenant entry in the server registry.
+            const requestBody = JSON.stringify({
+                action: 'verify_license',
+                workspace_id: cleanWorkspaceId,
+                token: cleanLicenseKey,
+                hwid
             });
+            const apiCandidates = [
+                `${resolvedServerUrl}/tenant-manager.php`,
+                `${resolvedServerUrl}/host-backend/tenant-manager.php`
+            ];
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            let response: Response | null = null;
+            let data: any = null;
+            try {
+                for (const targetApi of apiCandidates) {
+                    try {
+                        const candidate = await fetch(targetApi, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: requestBody,
+                            signal: controller.signal,
+                            cache: 'no-store'
+                        });
+                        response = candidate;
+                        data = await candidate.json().catch(() => null);
+                        if (candidate.status !== 404) break;
+                    } catch (error) {
+                        if (controller.signal.aborted) throw error;
+                    }
+                }
+            } finally {
+                clearTimeout(timeoutId);
+            }
 
-            const data = await response.json();
-
-            if (data && (data.allowed || data.success)) {
+            if (response?.ok && data?.allowed === true && data?.status === 'ACTIVE') {
+                const resolvedCompany = data.title || companyName || 'مشتری مجاز هاست';
+                const resolvedExpireDate = data.expire_date || '1410-12-29';
+                const resolvedUnlimited = data.is_unlimited === true;
                 const newManifest = encryptedStorageService.createManifestObject({
-                    licenseKey: licenseKey.trim(),
+                    licenseKey: cleanLicenseKey,
                     hardwareId: hwid,
-                    workspaceId,
-                    workspaceToken: licenseKey.trim(),
-                    companyName: data.title || companyName || 'مشتری مجاز هاست',
-                    expireDate: data.expire_date || '1410-12-29',
-                    isUnlimited: !!data.is_unlimited,
-                    customApiBaseUrl: serverUrl
+                    workspaceId: cleanWorkspaceId,
+                    workspaceToken: cleanLicenseKey,
+                    companyName: resolvedCompany,
+                    expireDate: resolvedExpireDate,
+                    isUnlimited: resolvedUnlimited,
+                    standaloneOfflineMode: false,
+                    customApiBaseUrl: resolvedServerUrl
                 });
 
                 await encryptedStorageService.saveAppManifest(newManifest);
-                idbService.setScope({ workspaceId, licenseKey: licenseKey.trim() });
+                idbService.setScope({ workspaceId: cleanWorkspaceId, licenseKey: cleanLicenseKey });
+                localStorage.setItem('ashk_license_status', 'ACTIVATED');
+                localStorage.setItem('ashk_license_key', cleanLicenseKey);
+                localStorage.removeItem('ashk_activation_code');
+                localStorage.setItem('ashk_license_type', resolvedUnlimited ? 'UNLIMITED' : 'LIMITED');
+                localStorage.setItem('ashk_license_plan', resolvedUnlimited ? 'UNLIMITED' : 'LICENSED');
+                localStorage.setItem('ashk_server_license_data', JSON.stringify({
+                    serverVerified: true,
+                    workspaceId: cleanWorkspaceId,
+                    licenseKey: cleanLicenseKey,
+                    companyName: resolvedCompany,
+                    expireDate: resolvedExpireDate,
+                    isUnlimited: resolvedUnlimited,
+                    hostUrl: resolvedServerUrl,
+                    verifiedAt: new Date().toISOString()
+                }));
+                localStorage.setItem('ashk_host_url', resolvedServerUrl);
+                localStorage.setItem('ashk_custom_server_url', resolvedServerUrl);
+                localStorage.setItem('ashk_host_sync_token', cleanLicenseKey);
+                localStorage.setItem('ashk_cloud_token', cleanLicenseKey);
+                await workspaceService.updateConfig({
+                    workspaceId: cleanWorkspaceId,
+                    workspaceToken: cleanLicenseKey,
+                    customServerUrl: resolvedServerUrl,
+                    licenseKey: cleanLicenseKey,
+                    standaloneOfflineMode: false
+                });
 
                 setManifest(newManifest);
-                setMessage({ type: 'success', text: 'فعال‌سازی آنلاین با موفقیت انجام شد و مانیفست دستگاه ذخیره گردید.' });
+                setMessage({ type: 'success', text: 'سرور معتبر بودن لایسنس را تأیید کرد؛ اتصال به فضای کاری اختصاصی ثبت شد.' });
                 if (onActivationSuccess) onActivationSuccess(newManifest);
             } else {
-                setMessage({ type: 'error', text: data.message || 'اعتبارسنجی لایسنس در سرور با خطا مواجه شد.' });
+                setMessage({ type: 'error', text: data?.message || 'سرور، فضای کاری یا کلید لایسنس را تأیید نکرد. لایسنس فعال نشد.' });
             }
         } catch (err: any) {
             // در صورت عدم دسترسی به اینترنت، پیشنهاد فعال‌سازی آفلاین
@@ -179,6 +236,18 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
 
                 await encryptedStorageService.saveAppManifest(newManifest);
                 idbService.setScope({ workspaceId: newManifest.workspaceId, licenseKey: newManifest.licenseKey });
+                localStorage.setItem('ashk_license_status', 'ACTIVATED');
+                localStorage.setItem('ashk_license_key', newManifest.licenseKey);
+                localStorage.setItem('ashk_activation_code', activationCode.trim());
+                localStorage.setItem('ashk_license_type', newManifest.isUnlimited ? 'UNLIMITED' : 'LIMITED');
+                localStorage.removeItem('ashk_server_license_data');
+                await workspaceService.updateConfig({
+                    workspaceId: newManifest.workspaceId,
+                    licenseKey: newManifest.licenseKey,
+                    standaloneOfflineMode: true,
+                    workspaceToken: '',
+                    customServerUrl: ''
+                });
 
                 setManifest(newManifest);
                 setMessage({ type: 'success', text: 'فعال‌سازی آفلاین کاملاً معتبر و موفقیت‌آمیز بود! مانیفست دستگاه ثبت گردید.' });

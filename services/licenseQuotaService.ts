@@ -64,25 +64,34 @@ class LicenseQuotaService {
      */
     isAndroidActivatedOrLinked(): boolean {
         if (typeof window === 'undefined') return false;
+        if (localStorage.getItem('ashk_license_status') !== 'ACTIVATED') return false;
 
-        // ۱. پیوند صریح با سیستم PWA یا هاست سرور اصلی
-        if (localStorage.getItem('ashk_pwa_linked') === 'true') {
-            return true;
-        }
+        const licenseKey = (
+            localStorage.getItem('ashk_license_key') ||
+            localStorage.getItem('ashk_active_license_key') ||
+            ''
+        ).trim();
+        const activationCode = (localStorage.getItem('ashk_activation_code') || '').trim();
 
-        // ۲. فعال‌سازی صریح پلتفرم اندروید
-        if (localStorage.getItem('ashk_android_activated') === 'true') {
-            return true;
-        }
+        let serverVerified = false;
+        try {
+            const data = JSON.parse(localStorage.getItem('ashk_server_license_data') || 'null');
+            serverVerified = Boolean(
+                data?.serverVerified === true &&
+                data?.licenseKey &&
+                data.licenseKey === licenseKey &&
+                data?.workspaceId &&
+                data.workspaceId !== 'default' &&
+                data.workspaceId !== 'main'
+            );
+        } catch {}
 
-        // ۳. بررسی لایسنس فعال با کلید اختصاصی یا داده‌های سرور اصلی
-        const localStatus = localStorage.getItem('ashk_license_status');
-        const hasLicenseKey = Boolean(localStorage.getItem('ashk_license_key') || localStorage.getItem('ashk_activation_code'));
-        if (localStatus === 'ACTIVATED' && (hasLicenseKey || localStorage.getItem('ashk_server_license_data'))) {
-            return true;
-        }
-
-        return false;
+        const offlineLicenseConfirmed = Boolean(
+            licenseKey &&
+            activationCode &&
+            !licenseKey.startsWith('PWA-HOST-LIC-')
+        );
+        return serverVerified || offlineLicenseConfirmed;
     }
 
     /**
@@ -95,13 +104,27 @@ class LicenseQuotaService {
         licenseKey?: string;
         hostUrl?: string;
         syncToken?: string;
+        workspaceId?: string;
+        verifiedByServer?: boolean;
     }): void {
         if (typeof window === 'undefined') return;
+        if (
+            details?.verifiedByServer !== true ||
+            !details.licenseKey?.trim() ||
+            !details.hostUrl?.trim() ||
+            !details.syncToken?.trim() ||
+            !details.workspaceId ||
+            details.workspaceId === 'default' ||
+            details.workspaceId === 'main'
+        ) {
+            console.warn('[License] Refusing activation without server-verified tenant license.');
+            return;
+        }
 
-        const companyName = details?.companyName || localStorage.getItem('ashk_company_name') || 'شرکت تجاری فعال سرور اصلی';
+        const companyName = details.companyName || localStorage.getItem('ashk_company_name') || 'شرکت تجاری فعال سرور اصلی';
         const plan = details?.plan || 'UNLIMITED';
         const expireDate = details?.expireDate || 'دائمی (۱۰ ساله - متصل به سرور اصلی)';
-        const licenseKey = details?.licenseKey || `PWA-HOST-LIC-${Date.now().toString(36).toUpperCase()}`;
+        const licenseKey = details.licenseKey.trim();
 
         localStorage.setItem('ashk_pwa_linked', 'true');
         localStorage.setItem('ashk_android_activated', 'true');
@@ -120,7 +143,7 @@ class LicenseQuotaService {
             syncToken: details?.syncToken || localStorage.getItem('ashk_host_sync_token') || '',
             linkedAt: new Date().toISOString()
         };
-        localStorage.setItem('ashk_server_license_data', JSON.stringify(serverData));
+        localStorage.setItem('ashk_server_license_data', JSON.stringify({ ...serverData, serverVerified: true, workspaceId: details.workspaceId }));
 
         try {
             const manifest = encryptedStorageService.createManifestObject({
@@ -176,13 +199,13 @@ class LicenseQuotaService {
 
         // بررسی کش سریع
         const localStatus = localStorage.getItem('ashk_license_status');
-        if (localStatus === 'ACTIVATED') {
+        if (localStatus === 'ACTIVATED' && this.isFullyLicensedSync()) {
             return true;
         }
 
         try {
             const manifest = await encryptedStorageService.getAppManifest();
-            if (manifest && manifest.status === 'ACTIVATED') {
+            if (manifest && manifest.status === 'ACTIVATED' && this.isFullyLicensedSync()) {
                 this.cachedManifest = manifest;
                 return true;
             }
@@ -206,9 +229,27 @@ class LicenseQuotaService {
 
         // ۱. بررسی وضعیت لایسنس فعال روی سیستم (فقط در صورت داشتن وضعیت ACTIVATED و کلید معتبر یا مانیفست تایید شده)
         const localStatus = localStorage.getItem('ashk_license_status');
-        const hasKey = Boolean(localStorage.getItem('ashk_license_key') || localStorage.getItem('ashk_activation_code') || localStorage.getItem('ashk_server_license_data'));
-        
-        if (localStatus === 'ACTIVATED' && hasKey) {
+        const licenseKey = (
+            localStorage.getItem('ashk_license_key') ||
+            localStorage.getItem('ashk_active_license_key') ||
+            ''
+        ).trim();
+        const activationCode = (localStorage.getItem('ashk_activation_code') || '').trim();
+        let serverVerified = false;
+        try {
+            const data = JSON.parse(localStorage.getItem('ashk_server_license_data') || 'null');
+            serverVerified = Boolean(
+                data?.serverVerified === true &&
+                data?.licenseKey === licenseKey &&
+                data?.workspaceId &&
+                data.workspaceId !== 'default' &&
+                data.workspaceId !== 'main'
+            );
+        } catch {}
+        const offlineLicenseConfirmed = Boolean(
+            licenseKey && activationCode && !licenseKey.startsWith('PWA-HOST-LIC-')
+        );
+        if (localStatus === 'ACTIVATED' && (serverVerified || offlineLicenseConfirmed)) {
             return true;
         }
 
