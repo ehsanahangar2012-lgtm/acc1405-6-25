@@ -280,6 +280,19 @@ export class AccountingEngine {
         );
       }
 
+      // Check receipts reduce customer receivables and increase checks held.
+      if (invoice.checkAmount > 0) {
+        this.postDoubleEntry(
+          invoice.date,
+          `دریافت چک بابت ${docDescription}`,
+          '1140',
+          '1130',
+          invoice.checkAmount,
+          invoice.id,
+          'INVOICE'
+        );
+      }
+
       // Sub-ledger updates
       if (invoice.personId) {
         PersonLedgerService.addEntry(invoice.personId, {
@@ -353,6 +366,19 @@ export class AccountingEngine {
           '2110',
           '1110',
           invoice.cashAmount,
+          invoice.id,
+          'INVOICE'
+        );
+      }
+
+      // Issued checks reduce accounts payable and increase check liabilities.
+      if (invoice.checkAmount > 0) {
+        this.postDoubleEntry(
+          invoice.date,
+          `پرداخت چک بابت ${docDescription}`,
+          '2110',
+          '2130',
+          invoice.checkAmount,
           invoice.id,
           'INVOICE'
         );
