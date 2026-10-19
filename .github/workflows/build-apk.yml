@@ -249,7 +249,7 @@ jobs:
             echo "::error::Set all four Android signing secrets to enable release signing."
             exit 1
           fi
-          KEYSTORE_PATH="$GITHUB_WORKSPACE/android/app/ashk-release.jks"
+          KEYSTORE_PATH="$GITHUB_WORKSPACE/android/app/ashk-release.p12"
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
           {
             echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH"
