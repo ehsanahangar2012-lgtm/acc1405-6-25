@@ -200,7 +200,8 @@ function consumeRateLimit(string $key, int $limit, int $windowSeconds): bool {
 }
 
 function signerProofValid(array $request, array $input, array $otpCodes): bool {
-    $providedToken = (string)($input['signatureToken'] ?? ($input['data']['signatureToken'] ?? ''));
+    $nestedData = is_array($input['data'] ?? null) ? $input['data'] : [];
+    $providedToken = (string)($input['signatureToken'] ?? ($nestedData['signatureToken'] ?? ''));
     if (!signerTokenMatches($request, $providedToken)) return false;
 
     $authMethod = strtolower((string)($request['authMethod'] ?? ''));
@@ -208,7 +209,7 @@ function signerProofValid(array $request, array $input, array $otpCodes): bool {
     $expected = expectedOtpMethod($request);
     if ($expected === '') return false;
 
-    $sessionToken = (string)($input['sessionToken'] ?? ($input['data']['sessionToken'] ?? ''));
+    $sessionToken = (string)($input['sessionToken'] ?? ($nestedData['sessionToken'] ?? ''));
     if ($sessionToken === '') return false;
     $challenge = $otpCodes[(string)($request['id'] ?? '')] ?? [];
     $sessionHash = (string)($challenge['sessionTokenHash'] ?? '');
@@ -309,7 +310,7 @@ try {
             // A public link returns only the information needed by its recipient.
             $publicRequest = array_intersect_key($request, array_flip([
                 'id', 'documentId', 'documentType', 'documentTitle', 'documentUrl',
-                'signerName', 'signerPhone', 'signerEmail', 'authMethod',
+                'signerName', 'signerPhone', 'signerEmail', 'authMethod', 'requesterName',
                 'signatureToken', 'status', 'expiresAt', 'createdAt'
             ]));
             signatureRespond(200, ['success' => true, 'data' => $publicRequest]);
