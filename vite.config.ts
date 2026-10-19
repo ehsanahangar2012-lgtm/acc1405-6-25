@@ -194,6 +194,31 @@ function androidLegacyCssPlugin(): any {
   };
 }
 
+function excludeMotherPortalAdminToolsPlugin(enabled: boolean): any {
+  return {
+    name: 'ashk-exclude-mother-portal-admin-tools',
+    enforce: 'pre',
+    transform(code: string, id: string) {
+      if (!enabled) return null;
+      const normalizedId = id.replace(/\\/g, '/');
+      if (normalizedId.endsWith('/App.tsx')) {
+        const transformed = code
+          .replace("import('./pages/LicenseManager')", "import('./pages/LicenseManagerUnavailable')")
+          .replace("import('./pages/DebugCenter')", "import('./pages/DebugCenterUnavailable')");
+        return transformed === code ? null : { code: transformed, map: null };
+      }
+      if (normalizedId.endsWith('/components/Sidebar.tsx')) {
+        const transformed = code.replace(
+          "...(!isNativeClient ? [{ to: '/license-manager', icon: KeyRound, label: 'صدور لایسنس و مدیریت کلاینت‌ها (پرتال مدیر)', perm: 'settings' }] : []),",
+          "...([]),"
+        );
+        return transformed === code ? null : { code: transformed, map: null };
+      }
+      return null;
+    }
+  };
+}
+
 function browserPreviewIsolationPlugin(): any {
   return {
     name: 'ashk-browser-preview-isolation',
@@ -230,6 +255,7 @@ function browserPreviewIsolationPlugin(): any {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
+  const excludeMotherPortalAdminTools = mode === 'android' || mode === 'desktop' || mode === 'browser-preview';
   return {
     base: './',
     server: {
@@ -253,6 +279,7 @@ export default defineConfig(({ mode }) => {
       ? { postcss: { plugins: [tailwindPostCss(), androidLegacyCssPlugin()] } }
       : undefined,
     plugins: [
+      excludeMotherPortalAdminToolsPlugin(excludeMotherPortalAdminTools),
       react(),
       ...(mode === 'browser-preview' ? [browserPreviewIsolationPlugin()] : [])
     ],
