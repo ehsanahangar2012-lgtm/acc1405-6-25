@@ -1,17 +1,13 @@
-// Electron Preload Script
+// Sandboxed Electron preload. Keep this file self-contained; sandboxed preloads
+// cannot reliably require application files from the package.
 const { contextBridge, ipcRenderer } = require('electron');
+const versionArg = process.argv.find((arg) => arg.startsWith('--ashk-app-version='));
+const appVersion = versionArg ? versionArg.slice('--ashk-app-version='.length) : '0.0.0';
 
 contextBridge.exposeInMainWorld('electronDesktopAPI', {
     platform: process.platform,
     isDesktop: true,
-    getVersion: () => {
-        try {
-            const pkg = require('../package.json');
-            return pkg.version || '0.0.0';
-        } catch {
-            return '0.0.0';
-        }
-    },
+    getVersion: () => appVersion,
     sendMessage: (channel, data) => ipcRenderer.send(channel, data),
     invoke: (channel, data) => ipcRenderer.invoke(channel, data),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),

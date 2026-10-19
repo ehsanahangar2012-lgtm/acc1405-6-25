@@ -229,7 +229,9 @@ function createWindow() {
             devTools: !app.isPackaged,
             webSecurity: true,
             allowRunningInsecureContent: false,
-            partition: 'persist:ashke-ghalam-isolated-secure'
+            partition: 'persist:ashke-ghalam-isolated-secure',
+            // Keep the displayed version synchronous while the preload remains sandboxed.
+            additionalArguments: [`--ashk-app-version=${app.getVersion()}`]
         },
         backgroundColor: '#111827',
         show: false
