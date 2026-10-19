@@ -420,6 +420,30 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-api-valid.j
 [[ "$code" == "200" ]]
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||!is_array($r["backups"]??null)){fwrite(STDERR,"Device-bound host backup access failed\\n");exit(1);}' "$TEST_DIR/backup-api-valid.json"
 
+# Backup IDs must survive index rebuild; restores must reject a tampered archive.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-create-integrity.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' -d '{"action":"create","id":"backup_ci_integrity_001","timestamp":1760000000000,"label":"CI Integrity","data":{"probe":"intact"},"assets":{"companies":[]},"checksum":"ci"}' "$BASE_URL/server-api-backup.php")"
+[[ "$code" == "200" ]]
+rm -f "$TEST_DIR/backups/tenants/ws_test/backups_index.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-api-rebuilt-list.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' -d '{"action":"list"}' "$BASE_URL/server-api-backup.php")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$b=$j["backups"][0]??[];if(($b["id"]??"")!=="backup_ci_integrity_001"||!preg_match("/^[a-f0-9]{64}$/", $b["fileSha256"]??"")){fwrite(STDERR,"Backup index rebuild lost the original ID or SHA256 fingerprint");exit(1);}' "$TEST_DIR/backup-api-rebuilt-list.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-restore-integrity.json" -w '%{http_code}' \
+  -G --data-urlencode 'action=restore' --data-urlencode 'id=backup_ci_integrity_001' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' "$BASE_URL/server-api-backup.php")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["success"]??false)!==true||empty($j["integrity"]["verified"])||($j["data"]["data"]["probe"]??"")!=="intact"){fwrite(STDERR,"Valid backup restore or integrity verification failed");exit(1);}' "$TEST_DIR/backup-restore-integrity.json"
+printf ' ' >> "$TEST_DIR/backups/tenants/ws_test/backup_backup_ci_integrity_001.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-restore-tampered.json" -w '%{http_code}' \
+  -G --data-urlencode 'action=restore' --data-urlencode 'id=backup_ci_integrity_001' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' "$BASE_URL/server-api-backup.php")"
+[[ "$code" == "409" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="BACKUP_INTEGRITY_FAILED"){fwrite(STDERR,"Tampered backup was not rejected");exit(1);}' "$TEST_DIR/backup-restore-tampered.json"
+
+
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-system-no-auth.json" -w '%{http_code}' \
   -H 'X-Workspace-ID: ws_test' -H 'Content-Type: application/json' -d '{"action":"backup_data","type":"ci_test","payload":{"probe":"should-deny"}}' "$BASE_URL/backup-system.php")"
 [[ "$code" == "403" ]]
