@@ -28,6 +28,8 @@ export interface HostBackupEntry {
     checksum: string;
     version: string;          // نسخه اپ
     hasAssets: boolean;       // آیا لوگو/امضا دارد
+    encryptedAtRest?: boolean;
+    encryption?: string;
 }
 
 export interface BackupAssets {
@@ -94,10 +96,45 @@ const BACKUP_TABLES = [
 class HostBackupService {
     private timerHandle: ReturnType<typeof setInterval> | null = null;
     private isRunning = false;
+    private remoteEncryptionCapability: { checkedAt: number; supported: boolean } | null = null;
 
     private get backupUrl(): string {
         const base = workspaceService.getBaseUrl();
         return base ? `${base.replace(/\/+$/, '')}/server-api-backup.php` : '';
+    }
+
+    /**
+     * Only enable server uploads after the authenticated endpoint confirms that it
+     * encrypts backup files at rest. Old host deployments fail closed and never
+     * receive a new plaintext backup from this client.
+     */
+    async supportsEncryptedServerBackups(forceRefresh = false): Promise<boolean> {
+        if (IS_BROWSER_PREVIEW || !navigator.onLine || !workspaceService.isRemoteCloudConfigured()) return false;
+        if (!forceRefresh && this.remoteEncryptionCapability && Date.now() - this.remoteEncryptionCapability.checkedAt < 60_000) {
+            return this.remoteEncryptionCapability.supported;
+        }
+        let supported = false;
+        const controller = new AbortController();
+        const tid = setTimeout(() => controller.abort(), 8000);
+        try {
+            const response = await fetch(`${this.backupUrl}?action=capabilities`, {
+                headers: await workspaceService.getSecureHeaders(),
+                signal: controller.signal,
+                cache: 'no-store'
+            });
+            if (response.ok) {
+                const result = await response.json();
+                supported = result?.success === true &&
+                    result?.encryptedAtRest === true &&
+                    result?.backupEncryption === 'AES-256-GCM';
+            }
+        } catch {
+            supported = false;
+        } finally {
+            clearTimeout(tid);
+        }
+        this.remoteEncryptionCapability = { checkedAt: Date.now(), supported };
+        return supported;
     }
 
     // ─── عمومی ───────────────────────────────────────────────────────────────
@@ -241,7 +278,9 @@ class HostBackupService {
             let hostResult: BackupResult;
             if (navigator.onLine && workspaceService.isRemoteCloudConfigured()) {
                 hostResult = await this.uploadToHost(payload);
-                remoteStatus = hostResult.success ? 'SYNCED' : 'ERROR';
+                remoteStatus = hostResult.success
+                    ? 'SYNCED'
+                    : hostResult.error === 'REMOTE_BACKUP_ENCRYPTION_NOT_CONFIGURED' ? 'WAITING' : 'ERROR';
             } else {
                 hostResult = {
                     success: false,
@@ -497,6 +536,14 @@ class HostBackupService {
     }
 
     private async uploadToHost(payload: any): Promise<BackupResult> {
+        if (!(await this.supportsEncryptedServerBackups())) {
+            return {
+                success: false,
+                remoteSaved: false,
+                remoteStatus: 'WAITING',
+                error: 'REMOTE_BACKUP_ENCRYPTION_NOT_CONFIGURED'
+            };
+        }
         const controller = new AbortController();
         const tid = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
         try {
@@ -506,7 +553,7 @@ class HostBackupService {
                     'Content-Type': 'application/json',
                     ...await workspaceService.getSecureHeaders(),
                 },
-                body: JSON.stringify({ action: 'create', ...payload }),
+                body: JSON.stringify({ action: 'create', requireEncryption: true, ...payload }),
                 signal: controller.signal,
             });
             clearTimeout(tid);
@@ -514,9 +561,12 @@ class HostBackupService {
                 return { success: false, error: `HTTP ${response.status}` };
             }
             const result = await response.json();
-            return result.success
-                ? { success: true, backupId: result.id || payload.id }
-                : { success: false, error: result.message || 'خطای سرور' };
+            if (!result.success) return { success: false, error: result.message || result.error || 'خطای سرور' };
+            if (result.encryptedAtRest !== true || result.encryption !== 'AES-256-GCM') {
+                this.remoteEncryptionCapability = { checkedAt: Date.now(), supported: false };
+                return { success: false, error: 'REMOTE_BACKUP_ENCRYPTION_NOT_CONFIRMED' };
+            }
+            return { success: true, backupId: result.id || payload.id, remoteSaved: true, remoteStatus: 'SYNCED' };
         } catch (error: any) {
             clearTimeout(tid);
             return { success: false, error: error?.message || 'خطای شبکه' };
