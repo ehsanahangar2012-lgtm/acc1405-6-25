@@ -1,7 +1,7 @@
 import { registerPlugin } from '@capacitor/core';
 
 type NativeSecureStoragePlugin = {
-  getItem(options: { key: string }): Promise<{ value: string | null }>;
+  getItem(options: { key: string }): Promise<{ found: boolean; value?: string }>;
   setItem(options: { key: string; value: string }): Promise<{ success: boolean }>;
   removeItem(options: { key: string }): Promise<{ success: boolean }>;
 };
@@ -30,9 +30,11 @@ function validKey(key: string): void {
 export async function getAndroidEncryptedItem(key: string): Promise<string | null> {
   validKey(key);
   const result = await nativeSecureStorage.getItem({ key });
-  if (!result || (result.value !== null && typeof result.value !== 'string')) {
+  if (!result || typeof result.found !== 'boolean') {
     throw new Error('ANDROID_SECURE_STORAGE_BAD_RESPONSE');
   }
+  if (!result.found) return null;
+  if (typeof result.value !== 'string') throw new Error('ANDROID_SECURE_STORAGE_BAD_RESPONSE');
   return result.value;
 }
 

@@ -68,7 +68,8 @@ public class NativeSecureStoragePlugin extends Plugin {
             String encoded = prefs.getString(key, null);
             JSObject response = new JSObject();
             if (encoded == null) {
-                response.put("value", (String) null);
+                // Explicit presence flag: JSON encoders may omit null-valued fields.
+                response.put("found", false);
                 call.resolve(response);
                 return;
             }
@@ -87,6 +88,7 @@ public class NativeSecureStoragePlugin extends Plugin {
             cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), new GCMParameterSpec(GCM_TAG_BITS, iv));
             cipher.updateAAD(key.getBytes(StandardCharsets.UTF_8));
             byte[] plaintext = cipher.doFinal(ciphertext);
+            response.put("found", true);
             response.put("value", new String(plaintext, StandardCharsets.UTF_8));
             Arrays.fill(plaintext, (byte) 0);
             call.resolve(response);
