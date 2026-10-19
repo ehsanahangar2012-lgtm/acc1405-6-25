@@ -263,6 +263,8 @@ jobs:
 
       - name: Verify APK signature and enforce release build type
         shell: bash
+        env:
+          EXPECTED_ANDROID_SIGNER_SHA256: ${{ vars.ANDROID_SIGNER_SHA256 }}
         run: |
           set -euo pipefail
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
@@ -279,7 +281,15 @@ jobs:
           fi
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
           test -x "$APKSIGNER" || { echo "::error::Android apksigner tool is missing."; exit 1; }
-          "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
+          VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --print-certs "$APK_PATH" 2>&1)"
+          printf '%s\n' "$VERIFY_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            ACTUAL_SHA256="$(printf '%s\n' "$VERIFY_OUTPUT" | sed -nE 's/.*Signer #1 certificate SHA-256 digest: ([0-9a-fA-F:]+).*/\1/p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            EXPECTED_SHA256="$(printf '%s' "${EXPECTED_ANDROID_SIGNER_SHA256:-}" | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
+            [[ "$EXPECTED_SHA256" =~ ^[0-9A-F]{64}$ ]] || { echo "::error::Set the environment variable ANDROID_SIGNER_SHA256 to the release certificate SHA-256 fingerprint."; exit 1; }
+            [[ "$ACTUAL_SHA256" == "$EXPECTED_SHA256" ]] || { echo "::error::APK signer fingerprint does not match ANDROID_SIGNER_SHA256."; exit 1; }
+            echo "Android release signer fingerprint matches the approved identity."
+          fi
 
       - name: Verify Android package excludes server and admin tooling
         run: node scripts/sanitize-client-build.js android/app/src/main/assets/public --verify-only
@@ -338,6 +348,8 @@ jobs:
       - name: Verify Windows Authenticode signatures for commercial release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
+        env:
+          EXPECTED_WINDOWS_SIGNING_PUBLISHER: ${{ vars.WINDOWS_SIGNING_PUBLISHER }}
         run: |
           $version = node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)"
           $files = @(
@@ -352,7 +364,15 @@ jobs:
             if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate) {
               throw "Commercial EXE is not signed by a currently trusted publisher: $file (status: $($signature.Status))"
             }
-            Write-Host "$file signature verified. Publisher: $($signature.SignerCertificate.Subject)"
+            $publisher = $signature.SignerCertificate.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+            $expectedPublisher = $env:EXPECTED_WINDOWS_SIGNING_PUBLISHER
+            if ([string]::IsNullOrWhiteSpace($expectedPublisher)) {
+              throw "Set the commercial-signing environment variable WINDOWS_SIGNING_PUBLISHER to the exact legal publisher name."
+            }
+            if ($publisher -ne $expectedPublisher) {
+              throw "Unexpected EXE publisher. Expected '$expectedPublisher', got '$publisher'."
+            }
+            Write-Host "$file signature verified. Publisher: $publisher"
             Write-Host "Publisher certificate SHA-256: $([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($signature.SignerCertificate.RawData)))"
           }
 
