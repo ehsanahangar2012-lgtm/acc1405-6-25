@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$ROOT_DIR/host-backend/remote-signature-api.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -144,6 +144,58 @@ $p=json_decode($raw,true);if(($p["hwid"]??"")!=="HWID-A"||($p["plan"]??"")!=="BR
 ' "$TEST_DIR/valid.json" "$TEST_REGISTRY_PATH"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["workspaces"]["ws_test"]["hwid"]??"")!=="HWID-A"){fwrite(STDERR,"HWID not persisted\n");exit(1);}' "$TEST_REGISTRY_PATH"
 
+# Remote-signature management and issuance require a licensed, device-bound workspace.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-no-auth-list.json" -w '%{http_code}' "$BASE_URL/remote-signature-api.php?action=list_requests")"
+[[ "$code" == "403" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-no-auth-create.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"create_request","data":{"documentId":"DOC-X","documentType":"INVOICE","documentTitle":"Unauthorized","documentUrl":"https://example.invalid/doc.pdf","signerName":"CI","authMethod":"link"}}' \
+  "$BASE_URL/remote-signature-api.php")"
+[[ "$code" == "403" ]]
+
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-created.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"create_request","data":{"id":"client-supplied-id","signatureToken":"client-supplied-token","documentId":"DOC-CI","documentType":"INVOICE","documentTitle":"CI signature test","documentUrl":"https://example.invalid/ci.pdf","signerName":"CI Signer","signerNationalId":"0000000000","signerPhone":"09000000000","signerEmail":"ci@example.invalid","authMethod":"otp_sms","status":"signed"}}' \
+  "$BASE_URL/remote-signature-api.php")"
+[[ "$code" == "201" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$r=$j["data"]??[];if(($j["success"]??false)!==true||($r["workspace_id"]??"")!=="ws_test"||($r["id"]??"")==="client-supplied-id"||($r["signatureToken"]??"")==="client-supplied-token"||strlen($r["signatureToken"]??"")!==64||($r["status"]??"")!=="pending"){fwrite(STDERR,"Remote-signature request was not securely issued");exit(1);}' "$TEST_DIR/remote-signature-created.json"
+SIG_ID="$(php -r '$j=json_decode(file_get_contents($argv[1]),true);echo $j["data"]["id"]??"";' "$TEST_DIR/remote-signature-created.json")"
+SIG_TOKEN="$(php -r '$j=json_decode(file_get_contents($argv[1]),true);echo rawurlencode($j["data"]["signatureToken"]??"");' "$TEST_DIR/remote-signature-created.json")"
+
+# External link access exposes the matching request only; tenant listing remains isolated.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-public.json" -w '%{http_code}' "$BASE_URL/remote-signature-api.php?action=get_by_token&token=$SIG_TOKEN")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$r=$j["data"]??[];if(($r["id"]??"")!==$argv[2]||isset($r["workspace_id"])||isset($r["requesterUserId"])){fwrite(STDERR,"Public signature link leaked workspace metadata or returned wrong request");exit(1);}' "$TEST_DIR/remote-signature-public.json" "$SIG_ID"
+php -r '$p=$argv[1];$r=json_decode(file_get_contents($p),true)?:[];$r[]=["id"=>"other-tenant-request","workspace_id"=>"ws_other","status"=>"pending","documentType"=>"INVOICE","createdAt"=>date(DATE_ATOM)];file_put_contents($p,json_encode($r));' "$TEST_DIR/signatures/requests.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-tenant-list.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  "$BASE_URL/remote-signature-api.php?action=list_requests")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$a=$j["data"]??[];if(count($a)!==1||($a[0]["id"]??"")!==$argv[2]){fwrite(STDERR,"Remote-signature list leaked another tenant request");exit(1);}' "$TEST_DIR/remote-signature-tenant-list.json" "$SIG_ID"
+
+# A valid link alone cannot bypass OTP when the request policy requires OTP.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-otp-bypass.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' \
+  -d "{\"action\":\"sign_document\",\"signatureToken\":\"$(php -r '$j=json_decode(file_get_contents($argv[1]),true);echo $j["data"]["signatureToken"];' "$TEST_DIR/remote-signature-created.json")\",\"data\":{\"requestId\":\"$SIG_ID\",\"signatureData\":\"forged-signature\"}}" \
+  "$BASE_URL/remote-signature-api.php")"
+[[ "$code" == "403" ]]
+
+# Seed a test OTP challenge rather than send a real SMS, then verify and consume a one-time session.
+php -r '$p=$argv[1];$r=json_decode(file_get_contents($p),true)?:[];$r[$argv[2]]=["requestId"=>$argv[2],"workspace_id"=>"ws_test","codeHash"=>password_hash("123456",PASSWORD_DEFAULT),"attempts"=>0,"expiresAt"=>time()+600];file_put_contents($argv[1],json_encode($r));' "$TEST_DIR/signatures/otp_codes.json" "$SIG_ID"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-verified.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' \
+  -d "{\"action\":\"verify_otp\",\"requestId\":\"$SIG_ID\",\"signatureToken\":\"$(php -r '$j=json_decode(file_get_contents($argv[1]),true);echo $j["data"]["signatureToken"];' "$TEST_DIR/remote-signature-created.json")\",\"otpCode\":\"123456\"}" \
+  "$BASE_URL/remote-signature-api.php")"
+[[ "$code" == "200" ]]
+SESSION_TOKEN="$(php -r '$j=json_decode(file_get_contents($argv[1]),true);echo $j["sessionToken"]??"";' "$TEST_DIR/remote-signature-verified.json")"
+[[ "${#SESSION_TOKEN}" == "64" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-signed.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' \
+  -d "{\"action\":\"sign_document\",\"signatureToken\":\"$(php -r '$j=json_decode(file_get_contents($argv[1]),true);echo $j["data"]["signatureToken"];' "$TEST_DIR/remote-signature-created.json")\",\"sessionToken\":\"$SESSION_TOKEN\",\"data\":{\"requestId\":\"$SIG_ID\",\"signatureData\":\"ci-verified-signature\"}}" \
+  "$BASE_URL/remote-signature-api.php")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["success"]??false)!==true||($j["data"]["requestId"]??"")!==$argv[2]){fwrite(STDERR,"OTP-verified remote signature did not save");exit(1);}' "$TEST_DIR/remote-signature-signed.json" "$SIG_ID"
+
 # Customer credentials cannot access the mother-only generic host data API.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-api-tenant.json" -w '%{http_code}' \
   -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
@@ -240,4 +292,4 @@ code="$(post_json '{"action":"verify_license","workspace_id":"ws_issued","token"
 [[ "$code" == "403" ]]
 assert_status "$TEST_DIR/issued-after-revoke.json" "SUSPENDED"
 
-echo "PASS: license lifecycle, HWID/signatures, legacy API retirement, mother-only access, chat isolation, storage and revocation."
+echo "PASS: license lifecycle, HWID/RSA, retired legacy APIs, digital-signature token safety, tenant-scoped remote signatures, OTP sessions, storage and revocation."
