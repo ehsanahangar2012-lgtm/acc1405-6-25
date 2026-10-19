@@ -32,8 +32,14 @@ if (is_array($headers)) {
         elseif (strcasecmp((string)$k, 'X-Device-HWID') === 0) $hwidHeader = (string)$v;
     }
 }
-$rawBody = file_get_contents('php://input');
-$input = is_string($rawBody) ? json_decode($rawBody, true) : null;
+$contentType = strtolower((string)($_SERVER['CONTENT_TYPE'] ?? $_SERVER['HTTP_CONTENT_TYPE'] ?? ''));
+if (strpos($contentType, 'application/json') !== false || trim($contentType) === '') {
+    $rawBody = file_get_contents('php://input');
+    $input = is_string($rawBody) && trim($rawBody) !== '' ? json_decode($rawBody, true) : [];
+} else {
+    // File upload actions use multipart/form-data; the credentials may still be sent as headers.
+    $input = $_POST;
+}
 if (!is_array($input)) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'INVALID_JSON_BODY']);
@@ -424,3 +430,216 @@ function restoreBackup($backupData) {
 }
 
 // Authenticated, workspace-bound storage actions.
+
+function hostStorageRespond(int $status, array $payload): void {
+    http_response_code($status);
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+}
+function hostStorageWriteResult(array $result): void {
+    if (empty($result['success'])) {
+        $error = (string)($result['error'] ?? 'STORAGE_OPERATION_FAILED');
+        $status = in_array($error, ['CUSTOMER_QUOTA_EXCEEDED', 'DOCUMENT_QUOTA_EXCEEDED', 'USER_QUOTA_EXCEEDED'], true)
+            ? 409
+            : (in_array($error, ['QUOTA_LOCK_UNAVAILABLE', 'TABLE_STORAGE_UNAVAILABLE'], true) ? 503 : 400);
+        hostStorageRespond($status, $result);
+        return;
+    }
+    hostStorageRespond(200, $result);
+}
+
+$action = trim((string)($input['action'] ?? $_POST['action'] ?? ''));
+$method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'POST'));
+
+try {
+    switch ($action) {
+        case 'save': {
+            $table = $input['table'] ?? '';
+            $data = $input['data'] ?? null;
+            if (!storageValidTable($table) || !is_array($data)) {
+                hostStorageRespond(400, ['success' => false, 'error' => !storageValidTable($table) ? 'INVALID_TABLE' : 'INVALID_RECORD']);
+                break;
+            }
+
+            // Preserve legacy company image fields, but only replace data URIs with validated, server-written files.
+            if ($table === 'companies') {
+                foreach (['logo', 'stamp', 'signature'] as $imageField) {
+                    if (isset($data[$imageField]) && is_string($data[$imageField]) && strpos($data[$imageField], 'data:image') === 0) {
+                        $image = uploadImage($data[$imageField], 'companies', (string)($data['id'] ?? 'company') . '_' . $imageField);
+                        if (empty($image['success'])) {
+                            hostStorageRespond(400, $image);
+                            break 2;
+                        }
+                        $data[$imageField] = $image['url'];
+                    }
+                }
+            }
+            if ($table === 'checks' && isset($data['imageUrl']) && is_string($data['imageUrl']) && strpos($data['imageUrl'], 'data:image') === 0) {
+                $image = uploadImage($data['imageUrl'], 'checks', (string)($data['id'] ?? 'check'));
+                if (empty($image['success'])) {
+                    hostStorageRespond(400, $image);
+                    break;
+                }
+                $data['imageUrl'] = $image['url'];
+            }
+            hostStorageWriteResult(saveData($table, $data));
+            break;
+        }
+
+        case 'get': {
+            $table = (string)($input['table'] ?? '');
+            $id = $input['id'] ?? null;
+            if (!storageValidTable($table) || ($id !== null && $id !== '' && !storageValidId((string)$id))) {
+                hostStorageRespond(400, ['success' => false, 'error' => 'INVALID_TABLE_OR_ID']);
+                break;
+            }
+            hostStorageRespond(200, ['success' => true, 'data' => getData($table, $id)]);
+            break;
+        }
+
+        case 'delete': {
+            $table = $input['table'] ?? '';
+            $id = (string)($input['id'] ?? '');
+            hostStorageWriteResult(deleteData($table, $id));
+            break;
+        }
+
+        case 'sync': {
+            $items = $input['data'] ?? null;
+            if (!is_array($items) || count($items) > 1000) {
+                hostStorageRespond(400, ['success' => false, 'error' => 'INVALID_SYNC_PAYLOAD']);
+                break;
+            }
+            $synced = 0;
+            $failed = false;
+            foreach ($items as $item) {
+                if (!is_array($item)) {
+                    http_response_code(400);
+                    hostStorageRespond(400, ['success' => false, 'error' => 'INVALID_SYNC_ITEM', 'synced' => $synced]);
+                    $failed = true;
+                    break;
+                }
+                $result = saveData($item['table'] ?? '', $item['data'] ?? null);
+                if (empty($result['success'])) {
+                    $error = (string)($result['error'] ?? 'SYNC_FAILED');
+                    $status = in_array($error, ['CUSTOMER_QUOTA_EXCEEDED', 'DOCUMENT_QUOTA_EXCEEDED', 'USER_QUOTA_EXCEEDED'], true) ? 409 :
+                        (in_array($error, ['QUOTA_LOCK_UNAVAILABLE', 'TABLE_STORAGE_UNAVAILABLE'], true) ? 503 : 400);
+                    hostStorageRespond($status, ['success' => false, 'error' => $error, 'synced' => $synced]);
+                    $failed = true;
+                    break;
+                }
+                $synced++;
+            }
+            if (!$failed) hostStorageRespond(200, ['success' => true, 'synced' => $synced]);
+            break;
+        }
+
+        case 'backup': {
+            $result = createBackup();
+            if (empty($result['success'])) http_response_code(500);
+            hostStorageRespond(200, $result);
+            break;
+        }
+
+        case 'restore': {
+            $result = restoreBackup($input['backup'] ?? null);
+            if (empty($result['success'])) {
+                $err = (string)($result['error'] ?? 'RESTORE_FAILED');
+                $status = in_array($err, ['CUSTOMER_QUOTA_EXCEEDED', 'DOCUMENT_QUOTA_EXCEEDED', 'USER_QUOTA_EXCEEDED'], true) ? 409 :
+                    (in_array($err, ['QUOTA_LOCK_UNAVAILABLE', 'TABLE_STORAGE_UNAVAILABLE'], true) ? 503 : 400);
+                hostStorageRespond($status, $result);
+            } else {
+                hostStorageRespond(200, $result);
+            }
+            break;
+        }
+
+        case 'upload_image': {
+            $file = $_FILES['image'] ?? null;
+            if (!is_array($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK ||
+                !isset($file['tmp_name']) || !is_uploaded_file((string)$file['tmp_name'])) {
+                hostStorageRespond(400, ['success' => false, 'error' => 'INVALID_UPLOAD']);
+                break;
+            }
+            $folder = trim((string)($_POST['folder'] ?? 'general'));
+            $filename = trim((string)($_POST['filename'] ?? bin2hex(random_bytes(8))));
+            $size = (int)($file['size'] ?? 0);
+            if (!preg_match('/^[A-Za-z0-9_-]{1,64}$/', $folder) ||
+                !preg_match('/^[A-Za-z0-9_-]{1,160}$/', $filename) ||
+                $size < 1 || $size > 5000000 || !function_exists('getimagesize')) {
+                hostStorageRespond(400, ['success' => false, 'error' => 'INVALID_OR_OVERSIZED_UPLOAD']);
+                break;
+            }
+            $info = @getimagesize((string)$file['tmp_name']);
+            if (!is_array($info)) {
+                hostStorageRespond(400, ['success' => false, 'error' => 'INVALID_IMAGE_DATA']);
+                break;
+            }
+            $extensions = [IMAGETYPE_PNG => 'png', IMAGETYPE_JPEG => 'jpg', IMAGETYPE_GIF => 'gif'];
+            if (defined('IMAGETYPE_WEBP')) $extensions[IMAGETYPE_WEBP] = 'webp';
+            $ext = $extensions[$info[2] ?? 0] ?? null;
+            if ($ext === null) {
+                hostStorageRespond(400, ['success' => false, 'error' => 'UNSUPPORTED_IMAGE_TYPE']);
+                break;
+            }
+            $targetDir = IMAGES_ROOT . '/' . $folder;
+            if (!is_dir($targetDir) && !@mkdir($targetDir, 0700, true) && !is_dir($targetDir)) {
+                hostStorageRespond(500, ['success' => false, 'error' => 'IMAGE_STORAGE_UNAVAILABLE']);
+                break;
+            }
+            @chmod($targetDir, 0700);
+            $target = $targetDir . '/' . $filename . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
+            if (!@move_uploaded_file((string)$file['tmp_name'], $target)) {
+                hostStorageRespond(500, ['success' => false, 'error' => 'UPLOAD_FAILED']);
+                break;
+            }
+            @chmod($target, 0600);
+            hostStorageRespond(200, ['success' => true, 'url' => str_replace(DIRECTORY_SEPARATOR, '/', substr($target, strlen(__DIR__)))]);
+            break;
+        }
+
+        case 'saveImage': {
+            $folder = trim((string)($input['folder'] ?? 'general'));
+            $filename = trim((string)($input['filename'] ?? bin2hex(random_bytes(8))));
+            $image = uploadImage((string)($input['base64'] ?? ''), $folder, $filename);
+            if (empty($image['success'])) {
+                hostStorageRespond(400, $image);
+            } else {
+                hostStorageRespond(200, ['success' => true, 'data' => $image['url']]);
+            }
+            break;
+        }
+
+        case 'deleteImage': {
+            $requested = trim((string)($input['path'] ?? ''));
+            if ($requested === '' || str_contains($requested, "\\0")) {
+                hostStorageRespond(400, ['success' => false, 'error' => 'INVALID_IMAGE_PATH']);
+                break;
+            }
+            $resolved = realpath(__DIR__ . DIRECTORY_SEPARATOR . ltrim($requested, '/\\\\'));
+            $imagesRoot = realpath(IMAGES_ROOT);
+            $prefix = $imagesRoot ? rtrim($imagesRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR : '';
+            if ($resolved && is_file($resolved) && $prefix !== '' && strpos($resolved, $prefix) === 0) {
+                if (!@unlink($resolved)) hostStorageRespond(500, ['success' => false, 'error' => 'IMAGE_DELETE_FAILED']);
+                else hostStorageRespond(200, ['success' => true]);
+            } else {
+                hostStorageRespond(404, ['success' => false, 'error' => 'IMAGE_NOT_FOUND']);
+            }
+            break;
+        }
+
+        case 'stats': {
+            $stats = [];
+            foreach (['companies', 'products', 'people', 'invoices', 'vouchers', 'checks', 'transactions'] as $table) {
+                $stats[$table] = count(getData($table) ?: []);
+            }
+            hostStorageRespond(200, ['success' => true, 'stats' => $stats]);
+            break;
+        }
+
+        default:
+            hostStorageRespond(400, ['success' => false, 'error' => 'INVALID_ACTION']);
+    }
+} catch (Throwable $e) {
+    error_log('Host storage API error: ' . $e->getMessage());
+    hostStorageRespond(500, ['success' => false, 'error' => 'INTERNAL_ERROR']);
+}
