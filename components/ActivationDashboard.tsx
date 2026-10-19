@@ -1,5 +1,5 @@
 // Activation Dashboard Component (داشبورد فعال‌سازی، لایسنس و قفل سخت‌افزاری HWID)
-// امکان فعال‌سازی آنلاین و آفلاین بدون نیاز به اتصال به اینترنت، مدیریت AppManifest و اسکوپ داده‌ها
+// فعال‌سازی آنلاین با تأیید امضای دیجیتال سرور و مدیریت AppManifest
 
 import React, { useState, useEffect } from 'react';
 import { 
@@ -50,7 +50,7 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [copiedHwid, setCopiedHwid] = useState(false);
     const [copiedSig, setCopiedSig] = useState(false);
-    const [activeTab, setActiveTab] = useState<'online' | 'offline' | 'manifest'>('offline');
+    const [activeTab, setActiveTab] = useState<'online' | 'offline' | 'manifest'>('online');
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
     const [showGuideModal, setShowGuideModal] = useState(false);
 
