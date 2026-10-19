@@ -2218,10 +2218,15 @@ export const useStore = create<AppState>()(
                         localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
                         await idbService.remove(name).catch(() => {});
                         await idbService.remove('ashke-ghalam-rbac-v14-accounting').catch(() => {});
-                        return portableState;
+                    } else {
+                        console.warn('[Store] Legacy state stays in its original location because OS encryption migration failed.');
                     }
-                    console.warn('[Store] Legacy localStorage state could not be migrated to OS-encrypted storage yet.');
+                    // Never copy a legacy plaintext Windows state into IndexedDB when
+                    // the OS-encrypted file write fails. Preserve the source for recovery.
+                    return portableState;
                 }
+                console.warn('[Store] Legacy Windows state could not be decrypted; preserving the original copy.');
+                return val;
             }
             try {
                 await idbService.set(name, val);
