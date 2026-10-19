@@ -26,9 +26,7 @@ import {
     MAX_HEMAYAT_CUSTOMERS, 
     MAX_HEMAYAT_DOCUMENTS,
     MAX_ANDROID_DEFAULT_CUSTOMERS,
-    MAX_ANDROID_DEFAULT_DOCUMENTS,
-    MAX_TRIAL_USERS,
-    MAX_ANDROID_DEFAULT_USERS
+    MAX_ANDROID_DEFAULT_DOCUMENTS
 } from '../services/licenseQuotaService';
 import { isAndroidApp } from '../utils';
 import { useStore } from '../store';
