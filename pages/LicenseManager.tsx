@@ -97,7 +97,7 @@ const LicenseManager: React.FC = () => {
         try {
             let response: Response | null = null;
             let data: any = null;
-            for (const endpoint of [`${baseUrl}/tenant-manager.php`, `${baseUrl}/host-backend/tenant-manager.php`]) {
+            for (const endpoint of [baseUrl + '/tenant-manager.php', baseUrl + '/host-backend/tenant-manager.php']) {
                 const candidate = await fetch(endpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
@@ -111,41 +111,50 @@ const LicenseManager: React.FC = () => {
             if (!response?.ok || data?.success !== true || !Array.isArray(data.workspaces)) {
                 throw new Error(data?.message || 'دفتر ثبت لایسنس از سرور دریافت نشد.');
             }
-
+            const localRecords = licenseGeneratorService.getAllLicenses();
+            const today = new Date().toISOString().slice(0, 10);
             const serverRecords: LicenseRecord[] = data.workspaces
                 .filter((item: any) => item?.workspace_id && !['default', 'main'].includes(String(item.workspace_id)))
                 .map((item: any) => {
+                    const workspaceId = String(item.workspace_id);
+                    const prior = localRecords.find(record => record.workspaceId === workspaceId);
                     const rawPlan = String(item.plan || 'TRIAL');
                     const plan = (Object.prototype.hasOwnProperty.call(PLAN_CONFIGS, rawPlan) ? rawPlan : 'TRIAL') as LicensePlan;
-                    const status: LicenseRecord['status'] =
-                        item.status === 'SUSPENDED' ? 'REVOKED' :
-                        item.status === 'EXPIRED' ? 'EXPIRED' : 'ACTIVE';
+                    const expireDate = String(item.expire_date || '');
+                    const isUnlimited = item.is_unlimited === true || item.is_unlimited === 1 || item.is_unlimited === '1';
+                    const isExpired = !isUnlimited && /^\d{4}-\d{2}-\d{2}$/.test(expireDate) && expireDate < today;
+                    const status: LicenseRecord['status'] = isExpired || item.status === 'EXPIRED'
+                        ? 'EXPIRED' : item.status === 'ACTIVE' ? 'ACTIVE' : 'REVOKED';
+                    const maxCustomers = Number(item.max_customers ?? prior?.maxCustomers ?? PLAN_CONFIGS[plan].maxCustomers);
+                    const maxDocuments = Number(item.max_documents ?? prior?.maxDocuments ?? PLAN_CONFIGS[plan].maxDocuments);
                     return {
-                        id: `LIC-SERVER-${item.workspace_id}`,
+                        id: 'LIC-SERVER-' + workspaceId,
                         licenseKey: String(item.token || ''),
                         activationCode: '',
-                        workspaceId: String(item.workspace_id),
+                        workspaceId,
                         serverUrl: baseUrl,
-                        clientName: String(item.title || item.contact_person || 'مشتری'),
-                        clientPhone: String(item.phone || ''),
-                        hwid: String(item.hwid || ''),
+                        clientName: String(item.title || item.contact_person || prior?.clientName || 'مشتری'),
+                        clientPhone: String(item.phone || prior?.clientPhone || ''),
+                        hwid: String(item.hwid || prior?.hwid || ''),
                         plan,
-                        maxCustomers: Number.isFinite(Number(item.max_customers)) ? Number(item.max_customers) : PLAN_CONFIGS[plan].maxCustomers,
-                        maxDocuments: Number.isFinite(Number(item.max_documents)) ? Number(item.max_documents) : PLAN_CONFIGS[plan].maxDocuments,
-                        isUnlimited: item.is_unlimited === true || item.is_unlimited === 1,
-                        issueDate: String(item.created_at || new Date().toISOString()).slice(0, 10),
-                        expireDate: String(item.expire_date || ''),
-                        pricePaid: Number(item.price_paid) || 0,
-                        notes: String(item.notes || ''),
+                        maxCustomers: Number.isFinite(maxCustomers) ? maxCustomers : PLAN_CONFIGS[plan].maxCustomers,
+                        maxDocuments: Number.isFinite(maxDocuments) ? maxDocuments : PLAN_CONFIGS[plan].maxDocuments,
+                        isUnlimited,
+                        issueDate: String(item.created_at || prior?.issueDate || new Date().toISOString()).slice(0, 10),
+                        expireDate,
+                        pricePaid: Number(item.price_paid ?? prior?.pricePaid) || 0,
+                        notes: String(item.notes || prior?.notes || ''),
                         status
                     } satisfies LicenseRecord;
                 });
-
             const serverWorkspaceIds = new Set(serverRecords.map(record => record.workspaceId));
-            const localLegacy = licenseGeneratorService.getAllLicenses().filter(
-                record => !record.workspaceId || !serverWorkspaceIds.has(record.workspaceId)
-            );
-            setLicenses([...serverRecords, ...localLegacy]);
+            const removedRecords = localRecords.filter(record => Boolean(record.workspaceId) && !serverWorkspaceIds.has(record.workspaceId))
+                .map(record => ({ ...record, status: 'REVOKED' as const }));
+            const legacyOfflineRecords = localRecords.filter(record => !record.workspaceId)
+                .map(record => ({ ...record, status: 'REVOKED' as const }));
+            const reconciledRecords = [...serverRecords, ...removedRecords, ...legacyOfflineRecords];
+            licenseGeneratorService.replaceAllLicenses(reconciledRecords);
+            setLicenses(reconciledRecords);
             setIssueError('');
         } catch (error: any) {
             setIssueError(error?.message || 'خطا در دریافت دفتر ثبت سرور.');
@@ -247,7 +256,7 @@ const LicenseManager: React.FC = () => {
             }
 
             const newRecord: LicenseRecord = {
-                id: `LIC-${Date.now()}`,
+                id: 'LIC-SERVER-' + workspaceId,
                 licenseKey: newLicenseKey,
                 activationCode: '',
                 workspaceId,
