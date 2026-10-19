@@ -1,6 +1,12 @@
 // Hardware Identifier Service (HWID)
 // شناسایی و قفل سخت‌افزاری دستگاه جهت استقلال داده‌های مشتریان، تفکیک لایسنس و اجرای آفلاین
 import CryptoJS from 'crypto-js';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+interface AshkDeviceIdentifierPlugin {
+    getId(): Promise<{ id: string }>;
+}
+const ashkDeviceIdentifier = registerPlugin<AshkDeviceIdentifierPlugin>('AshkDeviceIdentifier');
 
 export interface DeviceInfo {
     hwid: string;
@@ -62,7 +68,27 @@ class HardwareIdService {
             }
         }
 
-        // ۲. محاسبه اثرانگشت سخت‌افزاری مرورگر / کلاینت وب (Web HWID Fingerprint)
+        // Android native builds use ANDROID_ID via a local Capacitor plugin instead of a copyable localStorage fingerprint.
+        if (typeof window !== 'undefined' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+            if (!Capacitor.isPluginAvailable('AshkDeviceIdentifier')) {
+                throw new Error('افزونه شناسه امن دستگاه اندروید در دسترس نیست؛ فعال‌سازی تجاری متوقف شد.');
+            }
+            const result = await ashkDeviceIdentifier.getId();
+            const nativeHwid = String(result?.id || '').trim().toUpperCase();
+            if (!/^ASHK-ANDROID-[A-F0-9]{64}$/.test(nativeHwid)) {
+                throw new Error('شناسه امن دستگاه اندروید معتبر نیست؛ فعال‌سازی متوقف شد.');
+            }
+            this.cachedHwid = nativeHwid;
+            this.cachedInfo = {
+                hwid: nativeHwid,
+                platform: 'Android',
+                isDesktop: false,
+                generatedAt: new Date().toISOString()
+            };
+            return nativeHwid;
+        }
+
+        // ۲. Web/PWA fallback fingerprint. It is not used by the native Android or Electron clients.
         try {
             if (typeof window !== 'undefined' && window.localStorage) {
                 const storedHwid = localStorage.getItem(HWID_CACHE_KEY);
