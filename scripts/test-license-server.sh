@@ -351,6 +351,16 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-quota-invo
 [[ "$code" == "409" ]]
 php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="DOCUMENT_QUOTA_EXCEEDED"||($j["max"]??null)!==3){fwrite(STDERR,"Server-side document quota was not enforced");exit(1);}' "$TEST_DIR/storage-quota-invoices-denied.json"
 
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-quota-users-ok.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_quota' -H 'X-Workspace-Token: ASHK-CI-QUOTA-0001' -H 'X-Device-HWID: HWID-Q' \
+  -H 'Content-Type: application/json' -d '{"action":"save","key":"users","value":"[{\"id\":\"u1\"},{\"id\":\"u2\"},{\"id\":\"u3\"},{\"id\":\"u4\"},{\"id\":\"u5\"}]"}' "$BASE_URL/storage.php")"
+[[ "$code" == "200" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-quota-users-denied.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_quota' -H 'X-Workspace-Token: ASHK-CI-QUOTA-0001' -H 'X-Device-HWID: HWID-Q' \
+  -H 'Content-Type: application/json' -d '{"action":"save","key":"users","value":"[{\"id\":\"u1\"},{\"id\":\"u2\"},{\"id\":\"u3\"},{\"id\":\"u4\"},{\"id\":\"u5\"},{\"id\":\"u6\"}]"}' "$BASE_URL/storage.php")"
+[[ "$code" == "409" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="USER_QUOTA_EXCEEDED"||($j["max"]??null)!==5){fwrite(STDERR,"Server-side user-seat quota was not enforced");exit(1);}' "$TEST_DIR/storage-quota-users-denied.json"
+
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-valid.json" -w '%{http_code}' \
   -H 'Content-Type: application/json' -d '{"action":"stats","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A"}' "$BASE_URL/host-storage-api.php")"
 [[ "$code" == "200" ]]
