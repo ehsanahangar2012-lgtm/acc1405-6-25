@@ -78,6 +78,19 @@ class PersonLedgerService {
             return true;
         });
 
+        // Build indexes once. Re-filtering every transaction list for every invoice
+        // made posting progressively slower as a customer's history grew.
+        const transactionsByInvoice = new Map<any, any[]>();
+        const transactionReferenceIds = new Set<any>();
+        personTransactions.forEach((transaction: any) => {
+            transactionReferenceIds.add(transaction.referenceId);
+            if (transaction.relatedInvoiceId !== undefined && transaction.relatedInvoiceId !== null) {
+                const related = transactionsByInvoice.get(transaction.relatedInvoiceId) || [];
+                related.push(transaction);
+                transactionsByInvoice.set(transaction.relatedInvoiceId, related);
+            }
+        });
+
         personTransactions.forEach((t: any) => {
             // تعیین بدهکار / بستانکار بر اساس استاندارد حسابداری ایران
             let isDebit = false;
@@ -117,29 +130,37 @@ class PersonLedgerService {
         personInvoices.forEach((inv: any) => {
             const isSale = inv.type === InvoiceType.SALE;
             const timestamp = inv.createdAt ? new Date(inv.createdAt).getTime() : 1;
-            const invoiceTransactions = personTransactions.filter((t: any) => t.relatedInvoiceId === inv.id);
+            const invoiceTransactions = transactionsByInvoice.get(inv.id) || [];
+            let checkTransactionTotal = 0;
+            let cashTransactionTotal = 0;
 
-            const checkTransactions = invoiceTransactions.filter((t: any) =>
-                t.type === 'CHECK_INFO' ||
-                t.type === 'CHECK' ||
-                t.metadata?.paymentMethod === 'CHECK'
-            );
-            const checkTransactionTotal = checkTransactions.reduce((sum: number, t: any) =>
-                sum + Math.max(0, Number(t.amount) || 0), 0);
+            // Tally both payment types in one pass instead of allocating and reducing
+            // multiple filtered arrays for each historical invoice.
+            invoiceTransactions.forEach((t: any) => {
+                const amount = Math.max(0, Number(t.amount) || 0);
+                const isCheckTransaction =
+                    t.type === 'CHECK_INFO' ||
+                    t.type === 'CHECK' ||
+                    t.metadata?.paymentMethod === 'CHECK';
+                if (isCheckTransaction) {
+                    checkTransactionTotal += amount;
+                }
+
+                const isCashTransaction =
+                    (t.type === 'CASH_PAYMENT' ||
+                     t.type === 'INVOICE_RECEIPT' ||
+                     t.type === 'GENERAL_INCOME' ||
+                     t.type === 'EXPENSE' ||
+                     ['CASH', 'POS', 'CARD'].includes(t.metadata?.paymentMethod)) &&
+                    t.type !== 'CHECK_INFO' &&
+                    t.type !== 'CHECK' &&
+                    t.metadata?.paymentMethod !== 'CHECK';
+                if (isCashTransaction) {
+                    cashTransactionTotal += amount;
+                }
+            });
+
             const missingCheckAmount = Math.max(0, Number(inv.checkAmount || 0) - checkTransactionTotal);
-
-            const cashTransactions = invoiceTransactions.filter((t: any) =>
-                (t.type === 'CASH_PAYMENT' ||
-                 t.type === 'INVOICE_RECEIPT' ||
-                 t.type === 'GENERAL_INCOME' ||
-                 t.type === 'EXPENSE' ||
-                 ['CASH', 'POS', 'CARD'].includes(t.metadata?.paymentMethod)) &&
-                t.type !== 'CHECK_INFO' &&
-                t.type !== 'CHECK' &&
-                t.metadata?.paymentMethod !== 'CHECK'
-            );
-            const cashTransactionTotal = cashTransactions.reduce((sum: number, t: any) =>
-                sum + Math.max(0, Number(t.amount) || 0), 0);
             const missingCashAmount = Math.max(0, Number(inv.cashAmount || 0) - cashTransactionTotal);
 
             if (missingCashAmount > 0) {
@@ -184,12 +205,19 @@ class PersonLedgerService {
             }
         });
 
+        // Index invoice-linked check IDs once; avoid scanning every invoice and
+        // every transaction again for each standalone check.
+        const invoiceCheckIds = new Set<any>();
+        personInvoices.forEach((inv: any) => {
+            (inv.checks || []).forEach((invoiceCheck: any) => invoiceCheckIds.add(invoiceCheck.id));
+        });
+
         // ۴. چک‌های مستقل ثبت‌شده برای شخص (خارج از فاکتورها و تراکنش‌ها)
-        const personChecks = checks.filter((c: any) => 
-            c.personId === personId && 
+        const personChecks = checks.filter((c: any) =>
+            c.personId === personId &&
             !c.relatedInvoiceId &&
-            !personInvoices.some((inv: any) => inv.checks?.some((ic: any) => ic.id === c.id)) &&
-            !personTransactions.some((t: any) => t.referenceId === c.id)
+            !invoiceCheckIds.has(c.id) &&
+            !transactionReferenceIds.has(c.id)
         );
 
         personChecks.forEach((c: any) => {
