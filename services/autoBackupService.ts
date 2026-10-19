@@ -10,9 +10,12 @@
 import { hostBackupService, BackupResult, HostBackupEntry } from './hostBackupService';
 import { idbService } from './indexedDBService';
 import { useFinancialStore } from '../store-financial';
+import { hasNativeBackupStorage, getNativeBackupValue, setNativeBackupValue, removeNativeBackupValue } from './nativeBackupStorage';
 
 const LOCAL_IDB_KEY = 'auto_backups';
 const MAX_LOCAL_BACKUPS = 10;
+const NATIVE_BACKUP_INDEX_KEY = 'auto-backups:index';
+const nativeBackupRecordKey = (id: string) => `auto-backups:record:${id}`;
 
 interface LocalBackup {
     id: string;
@@ -75,29 +78,42 @@ class AutoBackupService {
      * بکاپ لوکال در IndexedDB (برای حالت آفلاین)
      */
     async createLocalBackup(state: any): Promise<void> {
-        try {
-            const id = Date.now().toString();
-            const data = JSON.stringify({ ...state, financialData: useFinancialStore.getState() });
-            const backup: LocalBackup = {
-                id,
-                timestamp: Date.now(),
-                data,
-                size: data.length,
-                label: `بکاپ لوکال - ${new Intl.DateTimeFormat('fa-IR').format(new Date())}`,
-            };
+        const id = Date.now().toString();
+        const data = JSON.stringify({ ...state, financialData: useFinancialStore.getState() });
+        const backup: LocalBackup = {
+            id,
+            timestamp: Date.now(),
+            data,
+            size: new Blob([data]).size,
+            label: `بکاپ محلی رمزگذاری‌شده - ${new Intl.DateTimeFormat('fa-IR').format(new Date())}`,
+        };
 
+        try {
             const stored = await this.getLocalBackups();
             stored.push(backup);
-
-            // نگهداری MAX_LOCAL_BACKUPS بکاپ آخر
             stored.sort((a, b) => b.timestamp - a.timestamp);
-            if (stored.length > MAX_LOCAL_BACKUPS) {
-                stored.splice(MAX_LOCAL_BACKUPS);
-            }
+            const retained = stored.slice(0, MAX_LOCAL_BACKUPS);
+            const retainedIds = new Set(retained.map(item => item.id));
 
-            await idbService.save(LOCAL_IDB_KEY, { id: LOCAL_IDB_KEY, backups: stored });
+            if (hasNativeBackupStorage()) {
+                // Store each full backup under OS-encrypted storage; only IDs live in the index.
+                await setNativeBackupValue(nativeBackupRecordKey(id), JSON.stringify(backup));
+                await setNativeBackupValue(NATIVE_BACKUP_INDEX_KEY, JSON.stringify(retained.map(item => item.id)));
+                for (const old of stored) {
+                    if (!retainedIds.has(old.id)) {
+                        await removeNativeBackupValue(nativeBackupRecordKey(old.id)).catch(() => {});
+                    }
+                }
+                await this.removeLegacyLocalBackupCopies();
+            } else {
+                // Browser/PWA IndexedDB fallback: this is browser-local storage, not
+                // hardware-backed encrypted storage, and is labelled that way in the UI.
+                await idbService.save('backups', { id: LOCAL_IDB_KEY, backups: retained });
+            }
         } catch (error) {
-            console.warn('خطا در بکاپ لوکال:', error);
+            // Native encryption/storage failures are not silently downgraded to plaintext IDB.
+            console.warn('خطا در بکاپ محلی:', error);
+            throw error;
         }
     }
 
@@ -108,12 +124,59 @@ class AutoBackupService {
         return this.getLocalBackups();
     }
 
+    private async readLegacyLocalBackups(): Promise<LocalBackup[]> {
+        for (const storeName of ['backups', LOCAL_IDB_KEY]) {
+            try {
+                const result = await idbService.get(storeName, LOCAL_IDB_KEY);
+                if (Array.isArray(result?.backups)) return result.backups;
+            } catch {}
+        }
+        return [];
+    }
+
     private async getLocalBackups(): Promise<LocalBackup[]> {
-        try {
-            const result = await idbService.get('backups', LOCAL_IDB_KEY);
-            return Array.isArray(result?.backups) ? result.backups : [];
-        } catch {
-            return [];
+        if (hasNativeBackupStorage()) {
+            const indexText = await getNativeBackupValue(NATIVE_BACKUP_INDEX_KEY);
+            if (indexText !== null) {
+                let ids: unknown;
+                try { ids = JSON.parse(indexText); } catch {
+                    throw new Error('فهرست بکاپ رمزگذاری‌شده معتبر نیست.');
+                }
+                if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string' || !/^[0-9]{1,32}$/.test(id))) {
+                    throw new Error('شناسه‌های بکاپ محلی معتبر نیستند.');
+                }
+                const items: LocalBackup[] = [];
+                for (const id of ids) {
+                    const raw = await getNativeBackupValue(nativeBackupRecordKey(id));
+                    if (raw === null) continue;
+                    const item = JSON.parse(raw);
+                    if (item?.id === id && typeof item.data === 'string' && Number.isFinite(item.timestamp)) items.push(item as LocalBackup);
+                }
+                return items.sort((a, b) => b.timestamp - a.timestamp);
+            }
+
+            // One-time migration: encrypt older IDB snapshots before removing their plaintext copies.
+            const legacy = await this.readLegacyLocalBackups();
+            if (legacy.length === 0) {
+                await setNativeBackupValue(NATIVE_BACKUP_INDEX_KEY, '[]');
+                return [];
+            }
+            const valid = legacy.filter(item => item && /^[0-9]{1,32}$/.test(String(item.id)) && typeof item.data === 'string')
+                .sort((a, b) => b.timestamp - a.timestamp).slice(0, MAX_LOCAL_BACKUPS);
+            for (const item of valid) {
+                await setNativeBackupValue(nativeBackupRecordKey(item.id), JSON.stringify(item));
+            }
+            await setNativeBackupValue(NATIVE_BACKUP_INDEX_KEY, JSON.stringify(valid.map(item => item.id)));
+            await this.removeLegacyLocalBackupCopies();
+            return valid;
+        }
+
+        return this.readLegacyLocalBackups();
+    }
+
+    private async removeLegacyLocalBackupCopies(): Promise<void> {
+        for (const storeName of ['backups', LOCAL_IDB_KEY]) {
+            try { await idbService.delete(storeName, LOCAL_IDB_KEY); } catch {}
         }
     }
 
@@ -121,8 +184,17 @@ class AutoBackupService {
      * بازیابی بکاپ لوکال
      */
     async restoreBackup(backupId: string): Promise<any> {
+        if (hasNativeBackupStorage()) {
+            if (typeof backupId !== 'string' || !/^[0-9]{1,32}$/.test(backupId)) throw new Error('شناسه بکاپ معتبر نیست.');
+            const raw = await getNativeBackupValue(nativeBackupRecordKey(backupId));
+            if (raw === null) throw new Error('بکاپ محلی رمزگذاری‌شده پیدا نشد.');
+            const backup = JSON.parse(raw) as LocalBackup;
+            const restored = JSON.parse(backup.data);
+            if (!restored || typeof restored !== 'object' || Array.isArray(restored)) throw new Error('ساختار داده بازیابی‌شده معتبر نیست.');
+            return restored;
+        }
         const backups = await this.getLocalBackups();
-        const backup = backups.find(b => b.id === backupId);
+        const backup = backups.find(item => item.id === backupId);
         if (!backup) throw new Error('بکاپ یافت نشد');
         return JSON.parse(backup.data);
     }
@@ -150,12 +222,25 @@ class AutoBackupService {
 
     async deleteBackup(backupId: string): Promise<void> {
         const backups = await this.getLocalBackups();
-        const filtered = backups.filter(b => b.id !== backupId);
-        await idbService.save(LOCAL_IDB_KEY, { id: LOCAL_IDB_KEY, backups: filtered });
+        const filtered = backups.filter(item => item.id !== backupId);
+        if (hasNativeBackupStorage()) {
+            await removeNativeBackupValue(nativeBackupRecordKey(backupId)).catch(() => {});
+            await setNativeBackupValue(NATIVE_BACKUP_INDEX_KEY, JSON.stringify(filtered.map(item => item.id)));
+            return;
+        }
+        await idbService.save('backups', { id: LOCAL_IDB_KEY, backups: filtered });
     }
 
     async clearAllBackups(): Promise<void> {
+        if (hasNativeBackupStorage()) {
+            const items = await this.getLocalBackups();
+            for (const item of items) await removeNativeBackupValue(nativeBackupRecordKey(item.id)).catch(() => {});
+            await setNativeBackupValue(NATIVE_BACKUP_INDEX_KEY, '[]');
+            await this.removeLegacyLocalBackupCopies();
+            return;
+        }
         await idbService.delete('backups', LOCAL_IDB_KEY);
+        await idbService.delete(LOCAL_IDB_KEY, LOCAL_IDB_KEY).catch(() => {});
     }
 }
 
