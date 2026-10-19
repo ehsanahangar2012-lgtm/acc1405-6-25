@@ -44,13 +44,16 @@ class LicenseQuotaService {
     private verifiedLicenseKey = '';
     private verifiedWorkspaceId = '';
     private verifiedHwid = '';
+    private receiptRenewalTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor() {
         if (typeof window !== 'undefined') {
             const refresh = () => {
                 this.cachedManifest = null;
+                this.clearReceiptRenewal();
                 this.serverReceiptVerifiedInSession = false;
                 this.serverEntitlements = null;
+                this.clearReceiptRenewal();
                 this.verifiedLicenseKey = '';
                 this.verifiedWorkspaceId = '';
                 this.verifiedHwid = '';
@@ -64,6 +67,26 @@ class LicenseQuotaService {
             });
             void this.refreshCachedServerLicense();
         }
+    }
+
+    private clearReceiptRenewal(): void {
+        if (this.receiptRenewalTimer) clearTimeout(this.receiptRenewalTimer);
+        this.receiptRenewalTimer = null;
+    }
+
+    private scheduleReceiptRenewal(expiresAt: number): void {
+        this.clearReceiptRenewal();
+        if (typeof window === 'undefined') return;
+        const delay = Math.max(5_000, expiresAt * 1000 - Date.now() - 30_000);
+        this.receiptRenewalTimer = setTimeout(() => {
+            this.serverReceiptVerifiedInSession = false;
+            this.serverEntitlements = null;
+            this.verifiedLicenseKey = '';
+            this.verifiedWorkspaceId = '';
+            this.verifiedHwid = '';
+            this.notifyListeners();
+            void this.refreshCachedServerLicense();
+        }, delay);
     }
 
     private async refreshCachedServerLicense(): Promise<boolean> {
@@ -131,6 +154,7 @@ class LicenseQuotaService {
                 localStorage.setItem('ashk_license_type', p.is_unlimited ? 'UNLIMITED' : 'LIMITED');
                 this.serverReceiptVerifiedInSession = true;
                 this.serverEntitlements = p;
+                this.scheduleReceiptRenewal(p.expires_at);
                 this.verifiedLicenseKey = licenseKey;
                 this.verifiedWorkspaceId = p.workspace_id;
                 this.verifiedHwid = p.hwid;
@@ -200,7 +224,8 @@ class LicenseQuotaService {
         } catch {}
 
         // Local flags are only cache metadata. A fresh signed server receipt must have been verified in this session.
-        return serverVerified && this.serverReceiptVerifiedInSession;
+        return serverVerified && this.serverReceiptVerifiedInSession &&
+            !!this.serverEntitlements && this.serverEntitlements.expires_at > Math.floor(Date.now() / 1000);
     }
 
     /**
@@ -376,7 +401,8 @@ class LicenseQuotaService {
                 data.workspaceId !== 'main'
             );
         } catch {}
-        if (localStatus === 'ACTIVATED' && serverVerified && this.serverReceiptVerifiedInSession) {
+        if (localStatus === 'ACTIVATED' && serverVerified && this.serverReceiptVerifiedInSession &&
+            !!this.serverEntitlements && this.serverEntitlements.expires_at > Math.floor(Date.now() / 1000)) {
             return true;
         }
 
