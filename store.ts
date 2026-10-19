@@ -704,25 +704,11 @@ export const useStore = create<AppState>()(
           const finalUpdated = { ...updated, id };
           const nextInvoices = s.invoices.map(v => v.id === id ? finalUpdated : v);
 
-          // پاکسازی کامل کش‌های مرورگر و سشن مربوط به این فاکتور
-          if (typeof sessionStorage !== 'undefined') {
-              try {
-                  sessionStorage.removeItem(`invoice_preview_${id}`);
-                  sessionStorage.removeItem(`invoice_${id}`);
-              } catch {}
-          }
-
-          // پاکسازی کش کاردکس اشخاص درگیر
+          // Cache cleanup is intentionally deferred until accounting succeeds.
+          // If posting fails, the previous invoice and its cached ledger must remain intact.
           const affectedPersonIds = new Set<string>();
           if (oldInvoice?.personId) affectedPersonIds.add(oldInvoice.personId);
           if (finalUpdated?.personId) affectedPersonIds.add(finalUpdated.personId);
-
-          affectedPersonIds.forEach(pid => {
-              try {
-                  localStorage.removeItem(`ledger-${pid}`);
-              } catch {}
-              PersonLedgerService.removeByReference(pid, id);
-          });
 
           // ویرایش فقط پس از ثبت موفق سند حسابداری ادامه پیدا می‌کند.
           try {
@@ -737,6 +723,14 @@ export const useStore = create<AppState>()(
                       message: `ویرایش فاکتور انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}`
                   }]
               };
+          }
+
+          // Invalidate transient invoice previews only after accounting posting succeeds.
+          if (typeof sessionStorage !== 'undefined') {
+              try {
+                  sessionStorage.removeItem(`invoice_preview_${id}`);
+                  sessionStorage.removeItem(`invoice_${id}`);
+              } catch {}
           }
 
           // بازتولید تراکنش‌های مرتبط با فاکتور
