@@ -5,6 +5,7 @@ const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const url = require('url');
+const packageMeta = require('../package.json');
 
 // بهینه‌سازی حداکثری پرفورمنس، رفع لگ، رندر فوق سریع و شتاب‌دهنده سخت‌افزاری GPU در ویندوز
 app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
@@ -363,7 +364,7 @@ function createWindow() {
 
 // IPC Handlers
 ipcMain.handle('get-app-version', async () => {
-    return app.getVersion() || '16.22.0';
+    return app.getVersion() || packageMeta.version || '0.0.0';
 });
 
 ipcMain.handle('open-external-url', async (event, url) => {
