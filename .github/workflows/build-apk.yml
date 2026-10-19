@@ -40,7 +40,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: openssl
+          extensions: openssl, sqlite3, pdo_sqlite, mbstring
 
       - name: Validate PHP server endpoints syntax
         shell: bash
@@ -52,6 +52,10 @@ jobs:
           php -l host-backend/host-storage-api.php
           php -l host-backend/server-api-backup.php
           php -l host-backend/backup-system.php
+          php -l host-backend/api.php
+          php -l host-backend/host-api.php
+          php -l host-backend/server-api-database.php
+          php -l host-backend/server-api-upload.php
           php -l android/app/src/main/assets/public/license_validator.php
           php -l android/app/src/main/assets/public/tenant-manager.php
           php -l android/app/src/main/assets/public/storage.php
