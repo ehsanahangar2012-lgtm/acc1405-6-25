@@ -330,7 +330,7 @@ export const NotificationBar: React.FC = () => {
                     isDrawerOpen ? 'translate-y-0 pointer-events-auto' : '-translate-y-full pointer-events-none'
                 }`}
                 style={{
-                    maxHeight: isMobile ? '58vh' : '72vh',
+                    maxHeight: isMobile ? '52vh' : '72vh',
                     overflow: 'hidden',
                     overscrollBehavior: 'contain',
                     transform: isDrawerOpen ? 'translateY(0)' : 'translateY(-105%)',
