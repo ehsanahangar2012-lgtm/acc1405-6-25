@@ -10,8 +10,6 @@ interface SyncMetadata {
 }
 
 class HostDatabaseService {
-    private baseUrl = API_CONFIG.DATABASE_API;
-    private token = import.meta.env.VITE_API_TOKEN || 'secure_api_token_change_this';
     private syncMetadata: Map<string, SyncMetadata> = new Map();
 
     constructor() {
@@ -103,42 +101,9 @@ class HostDatabaseService {
             console.warn('PersistentStorage load warning:', cloudErr);
         }
 
-        // ۲. بازگشت از طریق API هاست
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
-        try {
-            const metadata = this.syncMetadata.get(table);
-            const since = metadata?.lastSync ? Math.floor(metadata.lastSync / 1000) : null;
-            
-            let url = `${this.baseUrl}?action=get&table=${table}`;
-            if (id) {
-                url += `&id=${id}`;
-            } else if (since) {
-                url += `&since=${since}`;
-            }
-            
-            const response = await fetch(url, {
-                headers: { 'Authorization': this.token },
-                signal: controller.signal
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                if (result.success) {
-                    this.syncMetadata.set(table, {
-                        lastSync: result.timestamp ? result.timestamp * 1000 : Date.now(),
-                        version: result.version || 1
-                    });
-                    this.saveMetadata();
-                    return result.data;
-                }
-            }
-            return null;
-        } catch (error) {
-            return null;
-        } finally {
-            clearTimeout(timeout);
-        }
+        // The authenticated workspace storage API is the only cloud data source.
+        // Never fall back to the legacy global API with a token embedded in the client.
+        return null;
     }
 
     // بروزرسانی داده
@@ -148,44 +113,25 @@ class HostDatabaseService {
 
     // حذف داده
     async delete(table: string, id: string) {
+        let cloudSaveSucceeded = false;
         try {
             const currentList = await persistentStorage.loadData(table);
             if (Array.isArray(currentList)) {
                 const filtered = currentList.filter(item => item && item.id !== id && (!item.data || item.data.id !== id));
-                await persistentStorage.saveData(table, filtered);
+                cloudSaveSucceeded = await persistentStorage.saveData(table, filtered);
             }
-            this.syncMetadata.delete(`${table}:${id}`);
-            this.saveMetadata();
         } catch (e) {
             console.warn('PersistentStorage delete warning:', e);
         }
 
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 6000);
-        try {
-            const response = await fetch(this.baseUrl, {
-                method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': this.token
-                },
-                body: JSON.stringify({ action: 'delete', table, id }),
-                signal: controller.signal
-            });
-            
-            this.syncMetadata.delete(`${table}:${id}`);
-            this.saveMetadata();
-            
-            if (response.ok) {
-                return await response.json();
-            }
-            return { success: true };
-        } catch (error) {
-            syncQueue.enqueue('delete', table, { id });
-            return { success: true };
-        } finally {
-            clearTimeout(timeout);
+        this.syncMetadata.delete(`${table}:${id}`);
+        this.saveMetadata();
+        if (!workspaceService.isRemoteCloudConfigured()) {
+            return { success: true, localOnly: true };
         }
+        return cloudSaveSucceeded
+            ? { success: true }
+            : { success: false, message: 'حذف ابری از مسیر احرازشده تأیید نشد.' };
     }
 
     // پردازش صف - اکنون از syncQueue مرکزی استفاده می‌کند
