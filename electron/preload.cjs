@@ -27,7 +27,10 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
     'open-database-folder',
     'get-local-backup-directory',
     'write-local-backup',
-    'decrypt-local-backup'
+    'decrypt-local-backup',
+    'secure-backup-store-get',
+    'secure-backup-store-set',
+    'secure-backup-store-remove'
 ]);
 const ALLOWED_SEND_CHANNELS = new Set(['backup-completed-exit']);
 const ALLOWED_RECEIVE_CHANNELS = new Set(['trigger-backup-and-exit']);
