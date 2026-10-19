@@ -234,3 +234,43 @@ body.light .print-content {
   background: #ffffff !important;
   color: #0f172a !important;
 }
+
+
+/* Notification surfaces: explicit light-theme colors override legacy dark utilities. */
+body.light [data-notification-surface] {
+  color: #172033 !important;
+  border-color: #d5deea !important;
+}
+body.light [data-notification-surface="drawer"],
+body.light [data-notification-surface="toast"] {
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16) !important;
+}
+body.light [data-notification-surface] :is(.text-white, .text-slate-100, .text-slate-200) {
+  color: #172033 !important;
+}
+body.light [data-notification-surface] .text-slate-300 { color: #334155 !important; }
+body.light [data-notification-surface] .text-slate-400 { color: #475569 !important; }
+body.light [data-notification-surface] .text-slate-500,
+body.light [data-notification-surface] .text-slate-600 { color: #64748b !important; }
+body.light [data-notification-surface] :is(
+  [class*="bg-slate-950"], [class*="bg-slate-900"], [class*="bg-slate-800"],
+  [class*="bg-slate-700"]
+) {
+  background-color: #f8fafc !important;
+  color: #172033 !important;
+  border-color: #dce4ee !important;
+  box-shadow: none !important;
+}
+body.light [data-notification-surface] [class*="bg-white/"] {
+  background-color: #edf2f7 !important;
+}
+body.light [data-notification-surface] :is([class*="border-white/"], [class*="divide-white/"]) {
+  border-color: #dce4ee !important;
+}
+body.light [data-notification-surface] button[class*="bg-teal-600"] {
+  background-color: #0f766e !important;
+  color: #ffffff !important;
+}

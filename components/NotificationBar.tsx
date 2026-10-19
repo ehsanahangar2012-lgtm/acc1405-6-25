@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useStore } from '../store';
 import { 
   CheckCircle2, AlertCircle, Info, X, Bell, AlertTriangle, RefreshCw, 
@@ -36,7 +36,7 @@ const AndroidHeadsUpItem: React.FC<AndroidHeadsUpItemProps> = ({ notif, badge, o
             clearTimeout(fadeTimer);
             clearTimeout(removeTimer);
         };
-    }, [onDismiss]);
+    }, [onDismiss, notif.id]);
 
     const handleManualDismiss = () => {
         setIsExiting(true);
@@ -47,6 +47,8 @@ const AndroidHeadsUpItem: React.FC<AndroidHeadsUpItemProps> = ({ notif, badge, o
 
     return (
         <div
+            data-notification-surface="toast"
+            role="status"
             className={`pointer-events-auto w-full max-w-md bg-slate-900/95 hover:bg-slate-900 border border-white/10 rounded-2xl p-2.5 shadow-2xl backdrop-blur-xl flex items-center justify-between gap-3 transition-all ${
                 isExiting ? 'animate-notif-out' : 'animate-notif-in'
             }`}
@@ -95,6 +97,8 @@ export const NotificationBar: React.FC = () => {
     const [syncing, setSyncing] = useState(false);
     const [showGuideModal, setShowGuideModal] = useState(false);
     const [currentTime, setCurrentTime] = useState('');
+    const drawerTouchStartY = useRef<number | null>(null);
+    const seenHeadsUpIds = useRef<Set<string>>(new Set());
 
     // Update real-time clock for android status bar
     useEffect(() => {
@@ -109,14 +113,23 @@ export const NotificationBar: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
-    // Listen to new notifications and trigger Android Heads-Up Banner
+    // Show a heads-up only once per notification. Dismissing a toast must not
+    // delete the underlying notification or replay older items from the drawer.
     useEffect(() => {
-        if (notifications.length > 0) {
-            const latest = notifications[notifications.length - 1];
-            if (!headsUpQueue.includes(latest.id)) {
-                setHeadsUpQueue(prev => [...prev.slice(-2), latest.id]);
-            }
-        }
+        const currentIds = new Set(notifications.map(n => n.id));
+        seenHeadsUpIds.current = new Set(
+            [...seenHeadsUpIds.current].filter(id => currentIds.has(id))
+        );
+
+        const latest = notifications[notifications.length - 1];
+        const shouldShow = Boolean(latest && !seenHeadsUpIds.current.has(latest.id));
+        if (latest && shouldShow) seenHeadsUpIds.current.add(latest.id);
+
+        setHeadsUpQueue(prev => {
+            const current = prev.filter(id => currentIds.has(id));
+            if (latest && shouldShow) return [...current.slice(-1), latest.id];
+            return current.slice(-2);
+        });
     }, [notifications]);
 
     // Detect category helper if not explicitly supplied
@@ -171,9 +184,9 @@ export const NotificationBar: React.FC = () => {
     const activeHeadsUpList = notifications.filter(n => headsUpQueue.includes(n.id));
 
     const dismissHeadsUp = useCallback((notificationId: string) => {
+        // A heads-up is transient UI. Keep the underlying notification in the center.
         setHeadsUpQueue(prev => prev.filter(id => id !== notificationId));
-        removeNotification(notificationId);
-    }, [removeNotification]);
+    }, []);
 
     // In native Android, Back should close the notification shade before leaving the page.
     useEffect(() => {
@@ -276,7 +289,7 @@ export const NotificationBar: React.FC = () => {
 
                     {/* Center: Quick Android Ticker Message or drag hint */}
                     <div 
-                        onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+                        onClick={() => setIsDrawerOpen(open => !open)}
                         className="flex items-center gap-1.5 text-[10px] text-slate-400 truncate max-w-[160px] sm:max-w-xs md:max-w-md cursor-pointer"
                     >
                         {notifications.length > 0 ? (
@@ -291,7 +304,7 @@ export const NotificationBar: React.FC = () => {
 
                     {/* Right: Notification count badge & swipe indicator */}
                     <div 
-                        onClick={() => setIsDrawerOpen(!isDrawerOpen)}
+                        onClick={() => setIsDrawerOpen(open => !open)}
                         className="flex items-center gap-2 font-bold shrink-0 cursor-pointer"
                     >
                         {notifications.length > 0 && (
@@ -325,12 +338,15 @@ export const NotificationBar: React.FC = () => {
 
             {/* 3. ANDROID NOTIFICATION SHADE / DRAWER (Slides down from top) */}
             <div
+                data-notification-surface="drawer"
+                role="dialog"
+                aria-label="مرکز اعلان‌ها"
                 aria-hidden={!isDrawerOpen}
                 className={`fixed inset-x-0 top-0 z-[8800] bg-slate-950/98 border-b border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.8)] transition-transform duration-200 no-print flex flex-col ${
-                    isDrawerOpen ? 'translate-y-0 pointer-events-auto' : '-translate-y-full pointer-events-none'
+                    isDrawerOpen ? 'pointer-events-auto' : 'pointer-events-none'
                 }`}
                 style={{
-                    maxHeight: isMobile ? '52vh' : '72vh',
+                    maxHeight: isMobile ? 'min(46dvh, 420px)' : 'min(72vh, 680px)',
                     overflow: 'hidden',
                     overscrollBehavior: 'contain',
                     transform: isDrawerOpen ? 'translateY(0)' : 'translateY(-105%)',
@@ -340,7 +356,21 @@ export const NotificationBar: React.FC = () => {
                 dir="rtl"
             >
                 {/* Drawer Header (responsive so the close action stays visible on narrow phones) */}
-                <div className="p-3 sm:p-4 border-b border-white/10 space-y-2.5 shrink-0">
+                <div
+                    className="p-3 sm:p-4 border-b border-white/10 space-y-2.5 shrink-0"
+                    onTouchStart={(event) => {
+                        drawerTouchStartY.current = event.touches[0]?.clientY ?? null;
+                    }}
+                    onTouchEnd={(event) => {
+                        const startY = drawerTouchStartY.current;
+                        const endY = event.changedTouches[0]?.clientY;
+                        drawerTouchStartY.current = null;
+                        // Swipe up on the panel header to close the shade on phones.
+                        if (startY !== null && endY !== undefined && startY - endY > 60) {
+                            setIsDrawerOpen(false);
+                        }
+                    }}
+                >
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
                         <div className="flex items-center justify-between gap-3 w-full sm:w-auto min-w-0">
                             <div className="flex items-center gap-3 min-w-0">
@@ -432,15 +462,17 @@ export const NotificationBar: React.FC = () => {
                             })}
                         </div>
 
-                        {/* Test Notification Quick Actions (Helpful for quick verification) */}
-                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                            <span>تست سیستم:</span>
-                            <button onClick={() => triggerDemoAlert('FINANCIAL')} className="text-amber-400 hover:underline px-1">مالی</button>
-                            <span>•</span>
-                            <button onClick={() => triggerDemoAlert('SYNC')} className="text-cyan-400 hover:underline px-1">سینک</button>
-                            <span>•</span>
-                            <button onClick={() => triggerDemoAlert('OPERATION')} className="text-emerald-400 hover:underline px-1">تایید</button>
-                        </div>
+                        {/* Demo triggers are only available in development builds. */}
+                        {import.meta.env.DEV && (
+                            <div className="flex items-center gap-1 text-[10px] text-slate-500">
+                                <span>تست سیستم:</span>
+                                <button onClick={() => triggerDemoAlert('FINANCIAL')} className="text-amber-400 hover:underline px-1">مالی</button>
+                                <span>•</span>
+                                <button onClick={() => triggerDemoAlert('SYNC')} className="text-cyan-400 hover:underline px-1">سینک</button>
+                                <span>•</span>
+                                <button onClick={() => triggerDemoAlert('OPERATION')} className="text-emerald-400 hover:underline px-1">تایید</button>
+                            </div>
+                        )}
                     </div>
                 </div>
 

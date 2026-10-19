@@ -224,8 +224,9 @@ interface AppState {
 export const useStore = create<AppState>()(
   persist(
     (set, get) => {
-      // Expose store to window for external access
-      if (typeof window !== 'undefined') {
+      // Expose the store only during local development for debugging.
+      // Production renderers must not receive a write-capable global state handle.
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
         (window as any).__ZUSTAND_STORE__ = { getState: get, setState: set };
       }
 

@@ -7,9 +7,9 @@ contextBridge.exposeInMainWorld('electronDesktopAPI', {
     getVersion: () => {
         try {
             const pkg = require('../package.json');
-            return pkg.version || '16.24.0';
+            return pkg.version || '0.0.0';
         } catch {
-            return '16.24.0';
+            return '0.0.0';
         }
     },
     sendMessage: (channel, data) => ipcRenderer.send(channel, data),

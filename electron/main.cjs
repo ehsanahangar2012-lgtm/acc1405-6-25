@@ -225,7 +225,7 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: getPreloadPath(),
-            sandbox: false,
+            sandbox: true,
             devTools: !app.isPackaged,
             webSecurity: true,
             allowRunningInsecureContent: false,
