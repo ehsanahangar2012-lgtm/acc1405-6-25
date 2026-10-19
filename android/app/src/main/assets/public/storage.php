@@ -29,32 +29,68 @@ function storageIsList(array $value): bool {
     }
     return true;
 }
-function storageCollectionCount(string $dataDir, string $key, ?string $overrideKey, ?string $overrideValue, bool &$corrupt): int {
+function storageCollectionIds(string $dataDir, string $key, ?string $overrideKey, ?string $overrideValue, bool &$corrupt): array {
+    $ids = [];
     $file = $dataDir . DIRECTORY_SEPARATOR . $key . '.json';
     if ($overrideKey !== null && $key === $overrideKey) {
         $raw = $overrideValue ?? '';
+        $list = json_decode($raw, true);
+        if (!is_array($list) || !storageIsList($list)) {
+            $corrupt = true;
+        } else {
+            foreach ($list as $record) {
+                if (!is_array($record)) {
+                    $corrupt = true;
+                    continue;
+                }
+                $id = trim((string)($record['id'] ?? ''));
+                $fingerprint = $id !== '' ? 'id:' . $id : 'row:' . hash('sha256', (string)json_encode($record));
+                $ids[$fingerprint] = true;
+            }
+        }
     } elseif (is_file($file)) {
         $raw = @file_get_contents($file);
-        if (!is_string($raw)) {
+        $list = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($list) || !storageIsList($list)) {
             $corrupt = true;
-            return 0;
+        } else {
+            foreach ($list as $record) {
+                if (!is_array($record)) {
+                    $corrupt = true;
+                    continue;
+                }
+                $id = trim((string)($record['id'] ?? ''));
+                $fingerprint = $id !== '' ? 'id:' . $id : 'row:' . hash('sha256', (string)json_encode($record));
+                $ids[$fingerprint] = true;
+            }
         }
-    } else {
-        return 0;
     }
-    $value = json_decode($raw, true);
-    if (!is_array($value) || !storageIsList($value)) {
-        $corrupt = true;
-        return 0;
+
+    // The older record-oriented API uses table/<id>.json; include those rows too
+    // and de-duplicate by stable id so neither storage endpoint can evade quotas.
+    $tableDir = $dataDir . DIRECTORY_SEPARATOR . $key;
+    if (is_dir($tableDir)) {
+        foreach (glob($tableDir . DIRECTORY_SEPARATOR . '*.json') ?: [] as $recordFile) {
+            $raw = @file_get_contents($recordFile);
+            $record = is_string($raw) ? json_decode($raw, true) : null;
+            if (!is_array($record)) {
+                $corrupt = true;
+                continue;
+            }
+            $fallbackId = basename($recordFile, '.json');
+            $id = trim((string)($record['id'] ?? $fallbackId));
+            $ids['id:' . ($id !== '' ? $id : $fallbackId)] = true;
+        }
     }
-    return count($value);
+    return $ids;
 }
 function storageAliasGroupCount(string $dataDir, array $keys, ?string $overrideKey, ?string $overrideValue, bool &$corrupt): int {
-    $count = 0;
+    $ids = [];
     foreach ($keys as $key) {
-        $count = max($count, storageCollectionCount($dataDir, $key, $overrideKey, $overrideValue, $corrupt));
+        $found = storageCollectionIds($dataDir, $key, $overrideKey, $overrideValue, $corrupt);
+        foreach ($found as $id => $_) $ids[$id] = true;
     }
-    return $count;
+    return count($ids);
 }
 function storageQuotaSnapshot(string $dataDir, ?string $overrideKey = null, ?string $overrideValue = null): ?array {
     $corrupt = false;
