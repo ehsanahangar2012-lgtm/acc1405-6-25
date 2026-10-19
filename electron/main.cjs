@@ -688,22 +688,88 @@ ipcMain.handle('write-local-backup', async (event, payload) => {
     }
 });
 
-ipcMain.handle('decrypt-local-backup', async (event, fileText) => {
+// OS-encrypted internal backup store used by automatic/offline backups.
+// Values are indexed by a hashed key; renderer never receives a filesystem path.
+function nativeBackupStorePath(key) {
+    if (typeof key !== 'string' || !/^[A-Za-z0-9_.:-]{1,180}$/.test(key)) {
+        throw new Error('INVALID_NATIVE_BACKUP_KEY');
+    }
+    const fileName = crypto.createHash('sha256').update(key, 'utf8').digest('hex') + '.json';
+    return path.join(getUserDataDir(), 'native-backups', fileName);
+}
+
+ipcMain.handle('secure-backup-store-get', async (event, payload) => {
     if (!mainWindow || event.sender !== mainWindow.webContents) {
         return { success: false, error: 'UNAUTHORIZED_RENDERER' };
     }
-    if (typeof fileText !== 'string' || Buffer.byteLength(fileText, 'utf-8') > 140 * 1024 * 1024) {
-        return { success: false, error: 'INVALID_LOCAL_BACKUP_INPUT' };
+    try {
+        const key = payload?.key;
+        const filePath = nativeBackupStorePath(key);
+        if (!fs.existsSync(filePath)) return { success: true, value: null, encryptedAtRest: true };
+
+        const raw = await fs.promises.readFile(filePath, 'utf-8');
+        const envelope = parseJsonSafely(raw);
+        const expectedKeyHash = crypto.createHash('sha256').update(key, 'utf8').digest('hex');
+        if (envelope?.format !== DESKTOP_ENCRYPTED_FORMAT ||
+            envelope?.purpose !== 'ASHKEGHALAM_NATIVE_BACKUP_STORE_V1' ||
+            envelope?.keyHash !== expectedKeyHash) {
+            return { success: false, error: 'NATIVE_BACKUP_ENVELOPE_INVALID' };
+        }
+
+        const plaintext = await decryptDesktopEnvelope(envelope);
+        let parsed;
+        try { parsed = JSON.parse(plaintext); } catch {}
+        if (!parsed || parsed.key !== key || typeof parsed.value !== 'string') {
+            return { success: false, error: 'NATIVE_BACKUP_VALUE_INVALID' };
+        }
+        return { success: true, value: parsed.value, encryptedAtRest: true };
+    } catch (error) {
+        console.error('Native encrypted backup read failed:', error);
+        return { success: false, error: error?.message || 'NATIVE_BACKUP_READ_FAILED' };
+    }
+});
+
+ipcMain.handle('secure-backup-store-set', async (event, payload) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
+    const key = payload?.key;
+    const value = payload?.value;
+    if (typeof value !== 'string' || Buffer.byteLength(value, 'utf-8') > 80 * 1024 * 1024) {
+        return { success: false, error: 'INVALID_NATIVE_BACKUP_VALUE' };
+    }
+    let filePath = '';
+    try {
+        filePath = nativeBackupStorePath(key);
+        const keyHash = crypto.createHash('sha256').update(key, 'utf8').digest('hex');
+        const serialized = JSON.stringify({ key, value });
+        const baseEnvelope = JSON.parse(await encryptDesktopText(serialized));
+        const envelope = {
+            ...baseEnvelope,
+            purpose: 'ASHKEGHALAM_NATIVE_BACKUP_STORE_V1',
+            keyHash
+        };
+        await writeTextAtomically(filePath, JSON.stringify(envelope, null, 2));
+        return { success: true, encryptedAtRest: true, sizeBytes: Buffer.byteLength(JSON.stringify(envelope), 'utf-8') };
+    } catch (error) {
+        console.error('Native encrypted backup write failed:', error);
+        return { success: false, error: error?.message || 'NATIVE_BACKUP_WRITE_FAILED' };
+    }
+});
+
+ipcMain.handle('secure-backup-store-remove', async (event, payload) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
     }
     try {
-        const envelope = parseJsonSafely(fileText);
-        if (envelope?.format !== DESKTOP_ENCRYPTED_FORMAT) {
-            return { success: false, error: 'NOT_A_DEVICE_LOCAL_BACKUP' };
-        }
-        const data = await decryptDesktopEnvelope(envelope);
-        return { success: true, data };
+        const filePath = nativeBackupStorePath(payload?.key);
+        await fs.promises.unlink(filePath).catch(error => {
+            if (error?.code !== 'ENOENT') throw error;
+        });
+        return { success: true };
     } catch (error) {
-        return { success: false, error: error?.message || 'LOCAL_BACKUP_DECRYPT_FAILED' };
+        console.error('Native encrypted backup delete failed:', error);
+        return { success: false, error: error?.message || 'NATIVE_BACKUP_DELETE_FAILED' };
     }
 });
 
