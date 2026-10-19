@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -57,6 +57,23 @@ post_json() {
 assert_status() {
   php -r '$j=json_decode(file_get_contents($argv[1]),true); if (($j["status"]??"") !== $argv[2]) {fwrite(STDERR,"Expected ".$argv[2].", got ".($j["status"]??"missing")."\n"); exit(1);}' "$1" "$2"
 }
+# Protected storage must fail closed for default/main unless the master secret is supplied.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-storage-denied.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"default"}' "$BASE_URL/host-storage-api.php")"
+[[ "$code" == "403" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["status"]??"")!=="ADMIN_AUTH_REQUIRED"){fwrite(STDERR,"Expected protected master storage denial\n");exit(1);}' "$TEST_DIR/master-storage-denied.json"
+
+# A query-string token must not authenticate protected storage APIs.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-storage-query.json" -w '%{http_code}' \
+  "$BASE_URL/host-storage-api.php?action=test&workspace_id=default&workspace_token=ci-test-admin-secret")"
+[[ "$code" == "403" ]]
+
+# A verified mother-portal admin secret may access the reserved master workspace.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-storage-allowed.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"default","workspace_token":"ci-test-admin-secret"}' "$BASE_URL/host-storage-api.php")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["success"]??false)!==true||($j["workspace"]??"")!=="default"){fwrite(STDERR,"Master storage did not accept verified admin\n");exit(1);}' "$TEST_DIR/master-storage-allowed.json"
+
 # Verification must use POST; do not expose license keys through query-string logs.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/get-verify.json" -w '%{http_code}' "$BASE_URL/tenant-manager.php?action=verify_license&workspace_id=ws_test&token=ASHK-CI-TEST-0001&hwid=HWID-GET")"
 [[ "$code" == "405" ]]
