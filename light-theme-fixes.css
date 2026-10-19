@@ -302,3 +302,34 @@ body.light main [class*="bg-gradient"][class*="-900"]:not(button):not(a) [class*
 body.light main [class*="bg-gradient"][class*="-950"]:not(button):not(a) [class*="border-white/"] {
   border-color: #d5deea !important;
 }
+
+
+/* Deep-color headers used by commercial/cloud service pages must remain readable
+   in light mode. Keep interactive buttons/links out of the descendant text override. */
+body.light main [class*="bg-gradient"]:is(
+  [class*="from-emerald-800"], [class*="to-teal-900"],
+  [class*="from-blue-900"], [class*="to-cyan-950"],
+  [class*="from-purple-900"], [class*="to-indigo-950"],
+  [class*="from-amber-900"], [class*="to-amber-950"],
+  [class*="from-slate-900"], [class*="from-teal-950"],
+  [class*="from-indigo-950"], [class*="from-emerald-950"],
+  [class*="from-purple-950"], [class*="from-blue-950"]
+):not(button):not(a) {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08) !important;
+}
+
+body.light main [class*="bg-gradient"]:is(
+  [class*="from-emerald-800"], [class*="to-teal-900"],
+  [class*="from-blue-900"], [class*="to-cyan-950"],
+  [class*="from-purple-900"], [class*="to-indigo-950"],
+  [class*="from-amber-900"], [class*="to-amber-950"],
+  [class*="from-slate-900"], [class*="from-teal-950"],
+  [class*="from-indigo-950"], [class*="from-emerald-950"],
+  [class*="from-purple-950"], [class*="from-blue-950"]
+) :is(.text-white, .text-slate-100, .text-slate-200, .text-sky-100, .text-indigo-100, .text-emerald-100, .text-teal-100, .text-amber-100, .text-blue-100, .text-slate-300, .text-slate-400):not(button *):not(a *) {
+  color: #172033 !important;
+}
