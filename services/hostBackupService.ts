@@ -11,6 +11,7 @@
  */
 
 import { APP_VERSION, IS_BROWSER_PREVIEW } from '../config';
+import { isDesktopApp } from '../utils';
 import { workspaceService } from './workspaceService';
 import { idbService } from './indexedDBService';
 import { useFinancialStore } from '../store-financial';
@@ -56,6 +57,11 @@ export interface BackupResult {
     backupId?: string;
     message?: string;
     error?: string;
+    remoteSaved?: boolean;
+    remoteStatus?: 'SYNCED' | 'WAITING' | 'ERROR';
+    localFileStatus?: 'SYNCED' | 'WAITING' | 'ERROR';
+    localFilePath?: string;
+    localFileError?: string;
 }
 
 export interface RestoreResult {
@@ -159,22 +165,33 @@ class HostBackupService {
      */
     async createBackup(state: any, type: 'auto' | 'manual' = 'manual', reason?: string): Promise<BackupResult> {
         if (this.isRunning) {
-            return { success: false, error: 'بکاپ دیگری در حال اجراست' };
+            return {
+                success: false,
+                remoteSaved: false,
+                remoteStatus: 'WAITING',
+                localFileStatus: 'WAITING',
+                error: 'بکاپ دیگری در حال اجراست'
+            };
         }
         this.isRunning = true;
 
+        let localFileStatus: BackupResult['localFileStatus'] = 'WAITING';
+        let localFilePath: string | undefined;
+        let localFileError: string | undefined;
+        let remoteStatus: BackupResult['remoteStatus'] = 'WAITING';
+        let backupId: string | undefined;
+
         try {
-            console.log(`📦 شروع بکاپ فول ${type} (${reason || 'سیستم'})...`);
-
-            // ۱. استخراج داده‌های اصلی
             const backupData = this.extractBackupData(state);
-
-            // ۲. استخراج فایل‌های باینری شرکت (لوگو، امضا، مهر)، تصاویر چک‌ها و امضاها
             const assets = this.extractCompanyAssets(state);
-
-            // ۳. ساخت پکیج بکاپ کامل
             const now = new Date();
-            const backupId = `backup_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
+            backupId = 'backup_' +
+                now.getFullYear() +
+                String(now.getMonth() + 1).padStart(2, '0') +
+                String(now.getDate()).padStart(2, '0') + '_' +
+                String(now.getHours()).padStart(2, '0') +
+                String(now.getMinutes()).padStart(2, '0') +
+                String(now.getSeconds()).padStart(2, '0');
 
             const payload = {
                 id: backupId,
@@ -186,43 +203,94 @@ class HostBackupService {
                 assets,
                 checksumAlgorithm: 'sha256',
                 checksum: this.checksum({ data: backupData, assets }),
-                hasAssets: (assets.companies && assets.companies.some(c => c.logo || c.stamp || c.signature)) || 
-                           (assets.checkImages && assets.checkImages.length > 0) || 
-                           (assets.signatures && assets.signatures.length > 0),
+                hasAssets: (assets.companies && assets.companies.some(c => c.logo || c.stamp || c.signature)) ||
+                    (assets.checkImages && assets.checkImages.length > 0) ||
+                    (assets.signatures && assets.signatures.length > 0),
             };
 
-            // In browser preview, store only to this browser's IndexedDB; never contact the host.
+            // Save an independent file copy only inside the folder chosen in the native dialog.
+            if (!IS_BROWSER_PREVIEW && isDesktopApp()) {
+                const desktopAPI = typeof window !== 'undefined' ? (window as any).electronDesktopAPI : null;
+                if (desktopAPI && typeof desktopAPI.writeLocalBackup === 'function') {
+                    const fileName = 'AshkeGhalam-Backup-' + type + '-' + backupId + '-' +
+                        Date.now().toString(36) + '.json';
+                    const fileResult = await desktopAPI.writeLocalBackup(fileName, JSON.stringify(payload, null, 2));
+                    if (fileResult?.success) {
+                        localFileStatus = 'SYNCED';
+                        localFilePath = typeof fileResult.filePath === 'string' ? fileResult.filePath : undefined;
+                    } else {
+                        localFileError = String(fileResult?.error || 'BACKUP_WRITE_FAILED');
+                        localFileStatus = localFileError === 'BACKUP_DIRECTORY_NOT_SELECTED' ? 'WAITING' : 'ERROR';
+                    }
+                }
+            }
+
+            // Browser previews remain local-only and are never treated as a server backup.
             if (IS_BROWSER_PREVIEW) {
                 await this.saveLocally(payload);
                 return {
                     success: true,
                     backupId,
-                    message: 'نسخه آزمایشی: پشتیبان فقط به‌صورت محلی ذخیره شد.'
+                    remoteSaved: false,
+                    remoteStatus: 'WAITING',
+                    localFileStatus: 'WAITING',
+                    message: 'نسخه آزمایشی: پشتیبان فقط در حافظه محلی برنامه ذخیره شد.'
                 };
             }
 
-            // ۴. ارسال به هاست
             let hostResult: BackupResult;
             if (navigator.onLine && workspaceService.isRemoteCloudConfigured()) {
                 hostResult = await this.uploadToHost(payload);
+                remoteStatus = hostResult.success ? 'SYNCED' : 'ERROR';
             } else {
-                hostResult = { success: false, error: navigator.onLine ? 'اتصال امن به سرور تنظیم نشده است' : 'آفلاین' };
+                hostResult = {
+                    success: false,
+                    error: navigator.onLine ? 'اتصال امن به سرور تنظیم نشده است' : 'دستگاه آفلاین است'
+                };
+                remoteStatus = 'WAITING';
             }
 
-            // ۵. ذخیره لوکال به‌عنوان fallback
+            // IndexedDB remains a fast fallback, but is not an independent filesystem copy.
             await this.saveLocally(payload);
 
             if (hostResult.success) {
                 localStorage.setItem(LAST_BACKUP_KEY, String(Date.now()));
-                console.log(`✅ بکاپ ${backupId} با موفقیت در هاست ذخیره شد`);
-                return { success: true, backupId };
-            } else {
-                console.warn(`⚠️ بکاپ در هاست ناموفق (ذخیره لوکال انجام شد): ${hostResult.error}`);
-                return { success: false, backupId, error: hostResult.error, message: 'بکاپ لوکال انجام شد' };
+                console.log('Backup ' + backupId + ' successfully stored on host.');
+                return {
+                    success: true,
+                    backupId,
+                    remoteSaved: true,
+                    remoteStatus: 'SYNCED',
+                    localFileStatus,
+                    localFilePath,
+                    localFileError
+                };
             }
+
+            console.warn('Host backup failed; local fallback was stored: ' + (hostResult.error || 'unknown'));
+            return {
+                success: false,
+                backupId,
+                remoteSaved: false,
+                remoteStatus,
+                localFileStatus,
+                localFilePath,
+                localFileError,
+                error: hostResult.error,
+                message: 'نسخه محلی تهیه شد؛ ذخیره روی سرور تأیید نشد.'
+            };
         } catch (error: any) {
             console.error('خطا در ایجاد بکاپ:', error);
-            return { success: false, error: error?.message || 'خطای ناشناخته' };
+            return {
+                success: false,
+                backupId,
+                remoteSaved: false,
+                remoteStatus: remoteStatus === 'SYNCED' ? 'SYNCED' : 'ERROR',
+                localFileStatus,
+                localFilePath,
+                localFileError,
+                error: error?.message || 'خطای ناشناخته'
+            };
         } finally {
             this.isRunning = false;
         }

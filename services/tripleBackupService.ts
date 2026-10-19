@@ -14,7 +14,7 @@ import { useFinancialStore } from '../store-financial';
 import { getPersianDate } from '../utils';
 
 export interface BackupTierStatus {
-    tierId: 'windows_local' | 'android_storage' | 'cloud_vault';
+    tierId: 'windows_local' | 'device_file' | 'cloud_vault';
     name: string;
     description: string;
     lastBackupDate?: string;
@@ -63,22 +63,17 @@ export class TripleBackupService {
             tier1Status = 'ERROR';
         }
 
-        // A genuinely separate OS-file backup is not implemented yet. Never claim
-        // that another key in the same IndexedDB database is an independent copy.
-        const tier2Status: BackupTierStatus['status'] = 'WAITING';
-
-        // Tier 3 is successful only after a configured, authenticated host backup confirms success.
+        // Only a confirmed native filesystem write counts as the independent device copy.
+        // Android filesystem export remains pending until its native adapter is implemented.
+        let tier2Status: BackupTierStatus['status'] = 'WAITING';
         let tier3Status: BackupTierStatus['status'] = 'WAITING';
-        if (
-            workspaceService.isRemoteCloudConfigured() &&
-            (typeof navigator === 'undefined' || navigator.onLine)
-        ) {
-            try {
-                const result = await hostBackupService.createBackup(accountingData, 'manual', 'پشتیبان چندمسیره');
-                tier3Status = result.success ? 'SYNCED' : 'ERROR';
-            } catch {
-                tier3Status = 'ERROR';
-            }
+        try {
+            const result = await hostBackupService.createBackup(accountingData, 'manual', 'پشتیبان چندمسیره');
+            tier2Status = result.localFileStatus || 'WAITING';
+            tier3Status = result.remoteStatus || (result.remoteSaved ? 'SYNCED' : 'WAITING');
+        } catch {
+            tier2Status = 'ERROR';
+            tier3Status = 'ERROR';
         }
 
         const count = Object.keys(completeData || {}).reduce((acc, key) => {
@@ -89,7 +84,7 @@ export class TripleBackupService {
             timestamp: Date.now(),
             persianDate: nowPersian,
             sha256: hash,
-            overallSuccess: tier1Status === 'SYNCED' && tier3Status === 'SYNCED' && tier2Status !== 'WAITING',
+            overallSuccess: tier1Status === 'SYNCED' && tier2Status === 'SYNCED' && tier3Status === 'SYNCED',
             tiers: [
                 {
                     tierId: 'windows_local',
@@ -102,12 +97,14 @@ export class TripleBackupService {
                     sizeBytes: tier1Status === 'SYNCED' ? sizeBytes : 0
                 },
                 {
-                    tierId: 'android_storage',
-                    name: 'نسخه مستقل روی فایل‌سیستم دستگاه',
-                    description: 'ذخیره‌سازی مستقل روی دیسک ویندوز یا پوشه خصوصی اندروید هنوز پیاده‌سازی نشده است؛ این لایه عمداً موفق گزارش نمی‌شود',
+                    tierId: 'device_file',
+                    name: 'نسخه مستقل روی دیسک ویندوز',
+                    description: 'پس از انتخاب پوشه با پنجره ویندوز، فایل واقعی در آن ذخیره می‌شود؛ خروجی مستقل فایل‌سیستم اندروید هنوز پیاده‌سازی نشده است',
+                    lastBackupDate: tier2Status === 'SYNCED' ? nowPersian : undefined,
                     status: tier2Status,
-                    itemCount: 0,
-                    sizeBytes: 0
+                    itemCount: tier2Status === 'SYNCED' ? count : 0,
+                    sha256Hash: tier2Status === 'SYNCED' ? hash.substring(0, 16) + '...' : undefined,
+                    sizeBytes: tier2Status === 'SYNCED' ? sizeBytes : 0
                 },
                 {
                     tierId: 'cloud_vault',
