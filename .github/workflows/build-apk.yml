@@ -58,7 +58,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Type-check project
-        run: bun run lint
+        run: bun run lint && bun run test:backup-encryption
 
       - name: Setup PHP for server syntax checks
         uses: shivammathur/setup-php@v2
@@ -230,7 +230,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Type-check project
-        run: bun run lint
+        run: bun run lint && bun run test:backup-encryption
 
       - name: Restore optional Android release keystore
         shell: bash
@@ -321,7 +321,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Type-check project
-        run: bun run lint
+        run: bun run lint && bun run test:backup-encryption
 
       - name: Restore optional Windows signing certificate
         shell: pwsh

@@ -26,7 +26,8 @@
     "build:web": "vite build",
     "build:web:desktop": "vite build --mode desktop",
     "build:browser-preview": "vite build --mode browser-preview && node scripts/sanitize-client-build.js dist",
-    "build:windows": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js all --client-build"
+    "build:windows": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js all --client-build",
+    "test:backup-encryption": "bun run scripts/test-backup-encryption.ts"
   },
   "dependencies": {
     "@capacitor/camera": "^8.2.4",
