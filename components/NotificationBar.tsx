@@ -331,30 +331,45 @@ export const NotificationBar: React.FC = () => {
                 }`}
                 style={{
                     maxHeight: isMobile ? '58vh' : '72vh',
+                    overflow: 'hidden',
                     overscrollBehavior: 'contain',
+                    transform: isDrawerOpen ? 'translateY(0)' : 'translateY(-105%)',
+                    visibility: isDrawerOpen ? 'visible' : 'hidden',
                     willChange: isDrawerOpen ? 'transform' : 'auto'
                 }}
                 dir="rtl"
             >
-                {/* Drawer Header (Android Quick Settings Bar) */}
-                <div className="p-4 border-b border-white/10 space-y-3 shrink-0">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center border border-teal-500/20">
-                                <Bell size={18} />
+                {/* Drawer Header (responsive so the close action stays visible on narrow phones) */}
+                <div className="p-3 sm:p-4 border-b border-white/10 space-y-2.5 shrink-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+                        <div className="flex items-center justify-between gap-3 w-full sm:w-auto min-w-0">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-9 h-9 rounded-2xl bg-teal-500/10 text-teal-400 flex items-center justify-center border border-teal-500/20 shrink-0">
+                                    <Bell size={18} />
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="text-sm font-black text-white flex items-center gap-2">
+                                        مرکز اعلان‌های سیستم
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-slate-300 font-mono shrink-0">
+                                            {toPersianDigits(notifications.length.toString())}
+                                        </span>
+                                    </h3>
+                                    <p className="hidden sm:block text-[10px] text-slate-400 font-medium">هشدارهای مالی، خطاهای سینک و تاییدیه‌ها</p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-sm font-black text-white flex items-center gap-2">
-                                    مرکز اعلان‌های سیستم
-                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-slate-300 font-mono">
-                                        {toPersianDigits(notifications.length.toString())}
-                                    </span>
-                                </h3>
-                                <p className="text-[10px] text-slate-400 font-medium">هشدارهای مالی، خطاهای سینک و تاییدیه‌ها</p>
-                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsDrawerOpen(false)}
+                                aria-label="بستن مرکز اعلان‌ها"
+                                title="بستن اعلان‌ها"
+                                className="min-w-10 min-h-10 px-2 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center gap-1 transition-all border border-white/10 shrink-0"
+                            >
+                                <X size={18} />
+                                <span className="text-[11px] font-bold">بستن</span>
+                            </button>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
                             {/* Smart Guide Button */}
                             <button
                                 onClick={() => setShowGuideModal(true)}
@@ -386,17 +401,7 @@ export const NotificationBar: React.FC = () => {
                                 </button>
                             )}
 
-                            {/* Close Drawer */}
-                            <button
-                                type="button"
-                                onClick={() => setIsDrawerOpen(false)}
-                                aria-label="بستن مرکز اعلان‌ها"
-                                title="بستن اعلان‌ها"
-                                className="min-w-10 min-h-10 px-2 rounded-xl bg-white/10 hover:bg-white/15 text-white flex items-center justify-center gap-1 transition-all border border-white/10"
-                            >
-                                <X size={18} />
-                                <span className="text-[11px] font-bold">بستن</span>
-                            </button>
+
                         </div>
                     </div>
 
