@@ -124,15 +124,19 @@ echo.
 
 if exist "AshkeGhalam-Portable-v${APP_VERSION}.exe" (
     start "" "AshkeGhalam-Portable-v${APP_VERSION}.exe"
-) else if exist "AshkeGhalam-Setup-v${APP_VERSION}.exe" (
+    exit /b 0
+)
+if exist "AshkeGhalam-Setup-v${APP_VERSION}.exe" (
     start "" "AshkeGhalam-Setup-v${APP_VERSION}.exe"
-) else (
-    echo [اطلاعیه] در حال راه اندازی پرتابل از فایل های محلی...
-    start "" index.html
+    exit /b 0
 )
 
-echo برنامه با موفقیت اجرا شد.
-exit /b 0`;
+echo [خطا] فایل اجرایی نسخه ${APP_VERSION} کنار این اسکریپت پیدا نشد.
+echo این اسکریپت فقط لانچر است؛ index.html جایگزین EXE مستقل نیست.
+echo بسته‌های آزمون را از بخش Artifacts در GitHub Actions دریافت کنید:
+echo https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/actions/workflows/build-apk.yml
+pause
+exit /b 1`;
 
     // اسکریپت بات اختصاصی بیلد اندروید
     const apkBatCode = `@echo off
@@ -154,7 +158,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [1/2] پاکسازی نسخه های قدیمی و پکیج بندی جدید...
-node scripts/build-apk.js
+npm run build:apk
 if %errorlevel% neq 0 (
     echo.
     echo [خطا] در فرآیند پکیج بندی خطایی رخ داد.
@@ -260,7 +264,7 @@ pause`;
                                     <span>مراحل تولید و راه‌اندازی بسته مستقل ویندوز (بدون نیاز به نصب نرم‌افزار جانبی)</span>
                                 </h2>
                                 <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                                    نرم‌افزار با معماری بومی C++ و وب‌ویو نیتیو کامپایل شده است؛ سبک و سریع با نگهداری دائمی دیتابیس در AppData.
+                                    نسخه فعلی به‌صورت برنامه مستقل دسکتاپ با Electron بسته‌بندی می‌شود؛ داده‌ها محلی نگهداری می‌شوند. مهاجرت به Tauri یا ‎.NET/SQLite هنوز انجام نشده و پس از آزمون کارایی برنامه‌ریزی می‌شود.
                                 </p>
                             </div>
 
@@ -289,11 +293,11 @@ pause`;
                             <div className={`p-5 rounded-2xl border transition-all ${activeGuideStep === 2 ? 'bg-indigo-950/60 border-indigo-500 shadow-lg' : 'bg-slate-950/70 border-white/5'}`} onClick={() => setActiveGuideStep(2)}>
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center font-black text-xs">۲</span>
-                                    <span className="text-[10px] text-teal-400 font-bold">لانچر بومی C++</span>
+                                    <span className="text-[10px] text-teal-400 font-bold">بسته‌بندی فعلی Electron</span>
                                 </div>
-                                <h4 className="text-xs font-bold text-white mb-1.5">حذف وابستگی الکترون</h4>
+                                <h4 className="text-xs font-bold text-white mb-1.5">اجرای مستقل دسکتاپ</h4>
                                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                                    اتصال مستقیم به موتور WebView2 سیستم‌عامل ویندوز با مصرف رم کمتر از ۱۰۰ مگابایت و سرعت اجرای آنی.
+                                    ساخت فعلی از Electron و Chromium استفاده می‌کند؛ بنابراین ادعای مصرف RAM زیر ۱۰۰ مگابایت یا اجرای آنی تأیید نشده است. نسخه WebView2/Tauri یا ‎.NET/SQLite باید جداگانه ساخته و با داده‌های واقعی بنچمارک شود.
                                 </p>
                             </div>
 
@@ -757,7 +761,7 @@ pause`;
                         </span>
                         <h2 className="text-xl font-black text-white">فعال‌سازی لایسنس تجاری روی کلاینت‌ها</h2>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                            شناسه سخت‌افزاری اختصاصی دستگاه استخراج شده و کد فعال‌سازی آفلاین با امضای دیجیتال HMAC-SHA256 تولید می‌گردد.
+                            شناسه دستگاه برای فعال‌سازی استفاده می‌شود. روش آفلاین فعلی مبتنی بر HMAC-SHA256 با راز تعبیه‌شده در برنامه است و برای انتشار تجاری امن کافی نیست؛ پیش از انتشار رسمی باید به امضای نامتقارن با کلید خصوصی خارج از کلاینت مهاجرت کند.
                         </p>
                     </div>
 
@@ -845,10 +849,10 @@ pause`;
                             <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-1.5">
                                 <h4 className="font-bold text-indigo-400 flex items-center gap-1.5">
                                     <Monitor size={16} />
-                                    <span>۱. مزیت نسخه مستقل ویندوز C++/WebView2:</span>
+                                    <span>۱. نسخه مستقل ویندوز فعلی (Electron):</span>
                                 </h4>
                                 <p>
-                                    به جای استفاده از الکترون که صدها مگابایت رم اشغال می‌کند، برنامه با کلاینت بومی C++ و وب‌ویو نیتیو سیستم‌عامل ویندوز اجرا می‌شود. دیتابیس در مسیر <code className="text-indigo-300 font-mono">%APPDATA%\AshkeGhalam</code> نگهداری شده و با حذف یا ارتقای نرم‌افزار، اطلاعات پاک نمی‌شود.
+                                    نسخه فعلی با Electron بسته‌بندی می‌شود و موتور Chromium دارد؛ بنابراین مصرف RAM و حجم بسته باید اندازه‌گیری شود، نه اینکه مصرف زیر ۱۰۰ مگابایت فرض شود. مسیر داده‌ها باید در آزمون ارتقا و حذف بررسی شود. گزینه‌های Tauri یا ‎.NET/SQLite در مرحله بعد ارزیابی می‌شوند.
                                 </p>
                             </div>
 
