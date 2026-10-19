@@ -327,9 +327,7 @@ for action in load save; do
   else
     body='{"action":"save","key":"workspaces_auth","value":"{}"}'
   fi
-  code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-registry-$action.json" -w '%{http_code}' \\
-    -H 'Content-Type: application/json' -d "$body" \\
-    -H 'X-Workspace-ID: default' -H 'X-Workspace-Token: ci-test-admin-secret' "$BASE_URL/storage.php")"
+  code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-registry-$action.json" -w '%{http_code}' -H 'Content-Type: application/json' -d "$body" -H 'X-Workspace-ID: default' -H 'X-Workspace-Token: ci-test-admin-secret' "$BASE_URL/storage.php")"
   [[ "$code" == "403" ]]
   php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="RESERVED_STORAGE_KEY"){fwrite(STDERR,"Generic storage exposed a reserved server file");exit(1);}' "$TEST_DIR/master-registry-$action.json"
 done
