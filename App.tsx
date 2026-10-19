@@ -220,6 +220,10 @@ const LoginPage = () => {
         const cleanName = setupFullName.trim();
         const cleanEmail = setupEmail.trim();
 
+        if (!cleanName) {
+            setError('نام کامل مدیر را وارد کنید.');
+            return;
+        }
         if (cleanUsername.length < 4 || /\s/.test(cleanUsername)) {
             setError('نام کاربری باید حداقل ۴ نویسه و بدون فاصله باشد.');
             return;
@@ -333,16 +337,16 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#111827] flex items-center justify-center p-6 relative overflow-hidden font-sans" dir="rtl">
+        <div className="min-h-screen bg-[#111827] flex items-start sm:items-center justify-center p-3 sm:p-6 pb-8 relative overflow-x-hidden overflow-y-auto overscroll-y-contain font-sans" dir="rtl">
             <div className="fixed top-4 left-4 z-50">
                 <SmartSectionGuide customPath="/login" />
             </div>
 
-            <div className="absolute -top-[20%] -right-[10%] w-[700px] h-[700px] bg-teal-900/20 rounded-full blur-[100px] opacity-40"></div>
-            <div className="w-full max-w-md bg-slate-900/60 border border-white/10 backdrop-blur-3xl p-8 sm:p-10 rounded-[2.5rem] shadow-2xl animate-fade-in relative z-10">
+            <div className="hidden sm:block absolute -top-[20%] -right-[10%] w-[700px] h-[700px] bg-teal-900/20 rounded-full blur-[100px] opacity-40"></div>
+            <div className="w-full max-w-md bg-slate-900 border border-white/20 p-5 sm:p-8 rounded-3xl shadow-2xl animate-fade-in relative z-10 mb-4">
                 <div className="flex flex-col items-center mb-8">
                     <AccountingLogo size="lg" className="mb-4" />
-                    <h1 className="text-3xl font-black text-white tracking-tight">اشک قلم کلود</h1>
+                    <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">اشک قلم کلود</h1>
                     <p className="text-teal-400 text-xs mt-2 font-bold uppercase tracking-widest flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
                         سامانه متمرکز چند دستگاهی و ابری
@@ -381,14 +385,15 @@ const LoginPage = () => {
                         <span>در حال بررسی حساب‌های ذخیره‌شده…</span>
                     </div>
                 ) : needsInitialSetup ? (
-                    <form onSubmit={handleCreateInitialAdmin} className="space-y-4">
-                        <p className="text-xs leading-relaxed text-slate-300 bg-slate-950/70 border border-teal-500/20 rounded-xl p-3">
-                            اولین اجرا: حساب مدیر را خودتان بسازید. هیچ نام کاربری یا رمز عبور پیش‌فرضی فعال نیست.
-                        </p>
+                    <form onSubmit={handleCreateInitialAdmin} className="space-y-3.5 sm:space-y-4">
+                        <div className="rounded-xl p-3.5 bg-slate-950 border border-teal-400/40 space-y-1">
+                            <p className="text-sm font-extrabold text-white">راه‌اندازی اولیه مدیر</p>
+                            <p className="text-sm leading-6 text-slate-200">این فرم فقط برای ساخت اولین حساب مدیر است. هیچ نام کاربری یا رمز عبور پیش‌فرضی وجود ندارد.</p>
+                        </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="setup-admin-fullname" className="block text-sm font-bold text-slate-200">نام کامل مدیر</label>
-                            <input id="setup-admin-fullname" type="text" autoComplete="name" className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500" placeholder="مثلاً: علی رضایی" value={setupFullName} onChange={e => setSetupFullName(e.target.value)} />
-                            <p className="text-xs leading-relaxed text-slate-400">نامی که در حساب کاربری و سوابق مدیریتی نمایش داده می‌شود.</p>
+                            <label htmlFor="setup-admin-fullname" className="block text-sm font-extrabold text-white">نام کامل مدیر</label>
+                            <input id="setup-admin-fullname" type="text" autoComplete="name" className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20" placeholder="مثلاً: علی رضایی" value={setupFullName} required onChange={e => setSetupFullName(e.target.value)} />
+                            <p className="text-sm leading-6 text-slate-300">نامی که در حساب کاربری و سوابق مدیریتی نمایش داده می‌شود.</p>
                         </div>
                         <div className="space-y-1.5">
                             <label htmlFor="setup-admin-username" className="block text-sm font-bold text-slate-200">نام کاربری</label>
