@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store';
 import { UserPermissions } from '../types';
-import { isDesktopApp, isAndroidApp } from '../utils';
+import { isDesktopApp, isAndroidApp, isMotherWebPortal } from '../utils';
 import { AccountingLogo } from './AccountingLogo';
 import { PlatformCopyService } from '../services/platformCopyService';
 import { AppDownloadCenterModal } from './AppDownloadCenterModal';
@@ -44,6 +44,7 @@ const Sidebar = () => {
   const { pathname } = useLocation();
   const isDesktop = isDesktopApp();
   const isNativeClient = isDesktop || isAndroidApp();
+  const isMotherPortal = isMotherWebPortal();
 
   const navRef = useRef<HTMLElement>(null);
   const [canScrollDown, setCanScrollDown] = useState(false);
@@ -120,14 +121,14 @@ const Sidebar = () => {
       icon: Sparkles,
       perm: 'settings',
       items: [
-        ...(!isNativeClient ? [{ to: '/license-manager', icon: KeyRound, label: 'صدور لایسنس و مدیریت کلاینت‌ها (پرتال مدیر)', perm: 'settings' }] : []),
+        ...(isMotherPortal ? [{ to: '/license-manager', icon: KeyRound, label: 'صدور لایسنس و مدیریت کلاینت‌ها (پرتال مدیر)', perm: 'settings' }] : []),
         { to: '/moadian', icon: Landmark, label: 'سامانه مؤدیان مالیاتی', perm: 'finance' },
         { to: '/pos-terminal', icon: CreditCard, label: 'کارتخوان بانکی (PC-POS)', perm: 'finance' },
         { to: '/cloud-vault', icon: Cloud, label: 'پشتیبان ابری (Cloud Vault)', perm: 'settings' },
         { to: '/sms-center', icon: MessageSquare, label: 'پنل پیامک هوشمند', perm: 'finance' },
         { to: '/multi-user-lan', icon: Network, label: 'شبکه محلی چندکاربره', perm: 'settings' },
         { to: '/client-broadcast', icon: Megaphone, label: isDesktop ? 'اطلاعیه‌ها و تخفیف‌ها' : 'انتشار اطلاعیه به کلاینت‌ها', perm: 'settings' },
-        { to: '/install-android', icon: Smartphone, label: isNativeClient ? 'اتصال سرور و فعال‌سازی لایسنس' : 'ساخت نسخه‌ها و مدیریت اتصال', badge: isNativeClient ? 'کلاینت' : 'پرتال' },
+        { to: '/install-android', icon: Smartphone, label: isMotherPortal ? 'ساخت نسخه‌ها و مدیریت اتصال' : 'اتصال سرور و فعال‌سازی لایسنس', badge: isMotherPortal ? 'پرتال' : 'کلاینت' },
         { to: '/mobile-catalog', icon: BookOpen, label: 'کاتالوگ ویزیتوری همراه + امضای لمسی', badge: 'ویزیتور' },
         { to: '/catalog', icon: BookOpen, label: 'کاتالوگ و معرفی محصول', badge: 'کاتالوگ' },
         { to: '/support-sla', icon: Headphones, label: 'پشتیبانی و تمدید سالانه', perm: 'settings' },
@@ -148,7 +149,7 @@ const Sidebar = () => {
   ];
 
   const bottomItems: SidebarNavItem[] = [
-    ...(!isNativeClient ? [{ to: '/debug-center', icon: FileCode2, label: 'مرکز دیباگ سیستم', perm: 'settings' }] : []),
+    ...(isMotherPortal ? [{ to: '/debug-center', icon: FileCode2, label: 'مرکز دیباگ سیستم', perm: 'settings' }] : []),
     { to: '/updates', icon: DownloadCloud, label: 'مرکز آپدیت (OTA)', badge: 'جدید' },
     { to: '/settings', icon: Settings, label: 'تنظیمات عمومی', perm: 'settings', shortcut: 'Alt+9', keyCombo: ['Alt', '9'] },
     { to: '/help', icon: HelpCircle, label: 'آموزش و راهنما' },
@@ -417,7 +418,7 @@ const Sidebar = () => {
           {bottomItems.map(item => renderLink(item))}
 
           {/* Download App Package Button: owner web portal only */}
-          {!isNativeClient && (
+          {isMotherPortal && (
             <button
               type="button"
               onClick={() => setIsDownloadModalOpen(true)}
