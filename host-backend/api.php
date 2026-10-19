@@ -1,8 +1,8 @@
 <?php
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, X-Workspace-ID, X-Workspace-Token, X-Device-HWID, X-Admin-Secret');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);
@@ -45,6 +45,76 @@ try {
         exit;
     }
 
+    // Every non-health endpoint requires a registered tenant credential + bound HWID,
+    // or the mother portal's server-held admin secret. Never allow global anonymous CRUD.
+    $requestHeaders = function_exists('getallheaders') ? getallheaders() : [];
+    $headerValue = static function (string $name) use ($requestHeaders): string {
+        foreach ($requestHeaders as $key => $value) {
+            if (strcasecmp((string)$key, $name) === 0) return (string)$value;
+        }
+        $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+        return isset($_SERVER[$serverKey]) ? (string)$_SERVER[$serverKey] : '';
+    };
+    $workspaceId = trim($headerValue('X-Workspace-ID') ?: (string)($input['workspace_id'] ?? ''));
+    $workspaceToken = trim($headerValue('X-Workspace-Token') ?: (string)($input['workspace_token'] ?? ''));
+    $deviceHwid = trim($headerValue('X-Device-HWID') ?: (string)($input['hwid'] ?? ''));
+    if ($workspaceId === '' || $workspaceToken === '') {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'AUTH_REQUIRED', 'message' => 'برای این عملیات، اعتبارنامهٔ معتبر فضای کاری لازم است.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    require_once __DIR__ . '/license_validator.php';
+    $isMotherWorkspace = in_array($workspaceId, ['default', 'main'], true);
+    $access = LicenseValidator::validateAccess($workspaceId, $workspaceToken, $isMotherWorkspace ? null : $deviceHwid);
+    if (empty($access['allowed'])) {
+        http_response_code(403);
+        echo json_encode([
+            'success' => false,
+            'error' => 'ACCESS_DENIED',
+            'status' => $access['status'] ?? 'FORBIDDEN',
+            'message' => $access['message'] ?? 'دسترسی به این API مجاز نیست.'
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $isMotherAdmin = $isMotherWorkspace && (($access['role'] ?? '') === 'SUPER_ADMIN');
+    $tenantActions = ['support_chat', 'send_invoice_sms'];
+    if (!$isMotherAdmin && !in_array($action, $tenantActions, true)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'MOTHER_PORTAL_ONLY', 'message' => 'این API قدیمی فقط برای مدیر احرازشدهٔ پرتال مادر در دسترس است.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    // Small file-backed rate limit. Fail closed if the limit store cannot be locked/written.
+    $consumeApiRateLimit = static function (string $key, int $limit, int $windowSeconds): bool {
+        $path = __DIR__ . '/data/api_rate_limits.json';
+        $lock = @fopen($path . '.lock', 'c');
+        if ($lock === false || !flock($lock, LOCK_EX)) {
+            if (is_resource($lock)) fclose($lock);
+            return false;
+        }
+        @chmod($path . '.lock', 0600);
+        $all = json_decode((string)@file_get_contents($path), true);
+        if (!is_array($all)) $all = [];
+        $now = time();
+        $events = array_values(array_filter($all[$key] ?? [], static fn($ts) => is_int($ts) && $ts > $now - $windowSeconds));
+        if (count($events) >= $limit) {
+            $all[$key] = $events;
+            flock($lock, LOCK_UN);
+            fclose($lock);
+            return false;
+        }
+        $events[] = $now;
+        $all[$key] = $events;
+        $encoded = json_encode($all, JSON_UNESCAPED_SLASHES);
+        $ok = $encoded !== false && @file_put_contents($path, $encoded, LOCK_EX) !== false;
+        if ($ok) @chmod($path, 0600);
+        flock($lock, LOCK_UN);
+        fclose($lock);
+        return $ok;
+    };
+    $rateIdentity = hash('sha256', $workspaceId . '|' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+
     // Support Chat & Mobile Notification API (ذخیره‌سازی پیام‌ها در هاست مادر، اعلان به موبایل و وضعیت آنلاین)
     if ($action === 'support_chat') {
         $chatFile = __DIR__ . '/data/support_chat.json';
@@ -56,6 +126,14 @@ try {
             if (empty($messages) && file_exists($chatFile)) {
                 $messages = json_decode(file_get_contents($chatFile), true) ?: [];
             }
+            if (!is_array($messages)) $messages = [];
+            // Customers can read only their own workspace's messages; legacy unscoped messages
+            // are intentionally hidden from client tenants to prevent historical cross-tenant leaks.
+            if (!$isMotherAdmin) {
+                $messages = array_values(array_filter($messages, static fn($m) =>
+                    is_array($m) && (string)($m['workspace_id'] ?? '') === $workspaceId
+                ));
+            }
             echo json_encode([
                 'success' => true,
                 'status' => 'online',
@@ -65,15 +143,38 @@ try {
             ]);
             exit;
         } else if ($method === 'POST') {
-            $messageText = trim($input['text'] ?? '');
-            $sender = $input['sender'] ?? 'user';
-            $senderName = $input['senderName'] ?? 'کاربر سیستم';
-            $phone = $input['phone'] ?? '';
-            
-            if (empty($messageText)) {
+            $messageText = trim((string)($input['text'] ?? ''));
+            $senderName = trim((string)($input['senderName'] ?? 'کاربر سیستم'));
+            $phone = trim((string)($input['phone'] ?? ''));
+            if ($messageText === '' || mb_strlen($messageText, 'UTF-8') > 5000 || mb_strlen($senderName, 'UTF-8') > 120 || strlen($phone) > 40) {
                 http_response_code(400);
-                echo json_encode(['error' => 'متن پیام الزامی است']);
+                echo json_encode(['success' => false, 'error' => 'INVALID_MESSAGE', 'message' => 'متن، نام فرستنده یا شماره تماس معتبر نیست.'], JSON_UNESCAPED_UNICODE);
                 exit;
+            }
+            if (!$consumeApiRateLimit('support_chat:' . $rateIdentity, 10, 300)) {
+                http_response_code(429);
+                echo json_encode(['success' => false, 'error' => 'RATE_LIMITED', 'message' => 'تعداد پیام‌ها بیش از حد مجاز است.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+
+            $messageWorkspaceId = $workspaceId;
+            $sender = 'user';
+            if ($isMotherAdmin) {
+                $targetWorkspaceId = trim((string)($input['target_workspace_id'] ?? ''));
+                $registry = json_decode((string)@file_get_contents(__DIR__ . '/data/workspaces_auth.json'), true);
+                if ($targetWorkspaceId === '' || in_array($targetWorkspaceId, ['default', 'main'], true) ||
+                    !is_array($registry) || !isset($registry['workspaces'][$targetWorkspaceId])) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'SUPPORT_TARGET_REQUIRED', 'message' => 'برای پاسخ‌گویی، فضای کاری مشتری را انتخاب کنید.'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
+                $messageWorkspaceId = $targetWorkspaceId;
+                $sender = 'support';
+                if (!empty($registry['workspaces'][$targetWorkspaceId]['status']) && $registry['workspaces'][$targetWorkspaceId]['status'] !== 'ACTIVE') {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'SUPPORT_TARGET_INACTIVE', 'message' => 'فضای کاری انتخاب‌شده فعال نیست.'], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
             }
 
             // Get existing messages
@@ -84,10 +185,11 @@ try {
 
             $newMsg = [
                 'id' => uniqid('msg_', true),
+                'workspace_id' => $messageWorkspaceId,
                 'text' => $messageText,
                 'sender' => $sender,
                 'senderName' => $senderName,
-                'phone' => $phone,
+                'phone' => $sender === 'user' ? $phone : '',
                 'timestamp' => date('Y-m-d H:i:s'),
                 'synced_to_mother' => true
             ];
@@ -132,8 +234,18 @@ try {
     // ارسال پیامک صورتحساب به مشتری همراه با لینک امضا و پرداخت
     if ($action === 'send_invoice_sms') {
         if ($method === 'POST') {
-            $phone = $input['phone'] ?? '';
-            $message = $input['message'] ?? '';
+            if (!$consumeApiRateLimit('invoice_sms:' . $rateIdentity, 20, 3600)) {
+                http_response_code(429);
+                echo json_encode(['success' => false, 'error' => 'RATE_LIMITED', 'message' => 'سقف ارسال پیامک این فضای کاری در بازهٔ زمانی فعلی تکمیل شده است.'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $phone = trim((string)($input['phone'] ?? ''));
+            $message = trim((string)($input['message'] ?? ''));
+            if (strlen($phone) > 40 || mb_strlen($message, 'UTF-8') > 1000) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'INVALID_SMS_PAYLOAD'], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
             
             if (empty($phone) || empty($message)) {
                 http_response_code(400);
