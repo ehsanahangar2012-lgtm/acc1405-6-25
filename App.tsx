@@ -846,7 +846,7 @@ const App = () => {
   const [activationPrefill, setActivationPrefill] = useState<{ licenseKey?: string; companyName?: string; workspaceId?: string }>({});
   const [showAndroidCommercialModal, setShowAndroidCommercialModal] = useState(false);
   const [showTrialLimitModal, setShowTrialLimitModal] = useState(false);
-  const [trialLimitReason, setTrialLimitReason] = useState<'CUSTOMERS_LIMIT' | 'DOCUMENTS_LIMIT' | 'MANUAL'>('MANUAL');
+  const [trialLimitReason, setTrialLimitReason] = useState<'CUSTOMERS_LIMIT' | 'DOCUMENTS_LIMIT' | 'USERS_LIMIT' | 'MANUAL'>('MANUAL');
   const [showSetupWizard, setShowSetupWizard] = useState(() => {
     if (typeof window === 'undefined') return false;
     if (!isDesktopApp()) {
