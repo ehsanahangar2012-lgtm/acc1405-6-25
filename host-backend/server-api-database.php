@@ -1,6 +1,5 @@
 <?php
-// Retired legacy endpoint. It accepted a public hard-coded token and exposed
-// caller-selected database tables. Use authenticated workspace storage APIs.
+// Retired legacy endpoint; use authenticated workspace storage APIs.
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
 header('X-Content-Type-Options: nosniff');
