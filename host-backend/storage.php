@@ -23,24 +23,31 @@ foreach ($headers as $k => $v) {
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $workspace = trim($workspaceHeader ?: ($input['workspace_id'] ?? $_GET['workspace_id'] ?? ''));
 $workspace = preg_replace('/[^a-zA-Z0-9_-]/', '', $workspace);
-$token = trim($tokenHeader ?: ($input['workspace_token'] ?? $_GET['workspace_token'] ?? ''));
+// Do not accept workspace tokens in query strings: URLs can be captured in access logs and referrers.
+$token = trim($tokenHeader ?: ($input['workspace_token'] ?? ''));
 
 // بررسی لایسنس و توکن در صورت وجود فایل license_validator.php
-if (file_exists(__DIR__ . '/license_validator.php')) {
-    require_once __DIR__ . '/license_validator.php';
-    $access = LicenseValidator::validateAccess($workspace, $token);
-    if (!$access['allowed']) {
-        http_response_code(403);
-        echo json_encode([
-            'success' => false,
-            'error' => 'ACCESS_DENIED',
-            'status' => $access['status'] ?? 'FORBIDDEN',
-            'message' => $access['message'] ?? 'دسترسی به این فضای کاری مجاز نمی‌باشد.'
-        ], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
+if (!is_file(__DIR__ . '/license_validator.php')) {
+    http_response_code(503);
+    echo json_encode([
+        'success' => false,
+        'error' => 'AUTHORITY_UNAVAILABLE',
+        'message' => 'اعتبارسنج مرکزی لایسنس روی سرور نصب نیست.'
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
 }
-
+require_once __DIR__ . '/license_validator.php';
+$access = LicenseValidator::validateAccess($workspace, $token);
+if (!$access['allowed']) {
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'error' => 'ACCESS_DENIED',
+        'status' => $access['status'] ?? 'FORBIDDEN',
+        'message' => $access['message'] ?? 'دسترسی به این فضای کاری مجاز نمی‌باشد.'
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 // تفکیک مسیر ذخیره‌سازی بر پایه فضای کاری (ایزوله‌سازی داده‌های مشتریان و نسخه پرتابل)
 if (!empty($workspace) && $workspace !== 'default' && $workspace !== 'main') {
     $DATA_DIR = __DIR__ . '/data/tenants/' . $workspace;
