@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -92,6 +92,41 @@ if($raw===false||$sig===false||openssl_verify($raw,$sig,$pub,OPENSSL_ALGO_SHA256
 $p=json_decode($raw,true);if(($p["hwid"]??"")!=="HWID-A"||($p["plan"]??"")!=="BRONZE"||($p["max_customers"]??null)!==50||($p["max_documents"]??null)!==500){fwrite(STDERR,"Wrong receipt entitlements\n");exit(1);}
 ' "$TEST_DIR/valid.json" "$TEST_REGISTRY_PATH"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["workspaces"]["ws_test"]["hwid"]??"")!=="HWID-A"){fwrite(STDERR,"HWID not persisted\n");exit(1);}' "$TEST_REGISTRY_PATH"
+
+# Every data API must require both the registered workspace token and the pinned device.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-no-hwid.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001"}' "$BASE_URL/storage.php")"
+[[ "$code" == "403" ]]; assert_status "$TEST_DIR/storage-no-hwid.json" "INVALID_HWID"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-wrong-hwid.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-B"}' "$BASE_URL/storage.php")"
+[[ "$code" == "403" ]]; assert_status "$TEST_DIR/storage-wrong-hwid.json" "HWID_MISMATCH"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-valid.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A"}' "$BASE_URL/storage.php")"
+[[ "$code" == "200" ]]
+php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||($r["workspace"]??"")!=="ws_test"){fwrite(STDERR,"Device-bound storage access failed\\n");exit(1);}' "$TEST_DIR/storage-valid.json"
+
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-valid.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A"}' "$BASE_URL/host-storage-api.php")"
+[[ "$code" == "200" ]]
+php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||($r["workspace"]??"")!=="ws_test"){fwrite(STDERR,"Device-bound host storage access failed\\n");exit(1);}' "$TEST_DIR/host-storage-valid.json"
+
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-api-no-auth.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"list"}' "$BASE_URL/server-api-backup.php")"
+[[ "$code" == "400" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-api-valid.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"list","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A"}' "$BASE_URL/server-api-backup.php")"
+[[ "$code" == "200" ]]
+php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||!is_array($r["backups"]??null)){fwrite(STDERR,"Device-bound host backup access failed\\n");exit(1);}' "$TEST_DIR/backup-api-valid.json"
+
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-system-no-auth.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'Content-Type: application/json' -d '{"action":"backup_data","type":"ci_test","payload":{"probe":"should-deny"}}' "$BASE_URL/backup-system.php")"
+[[ "$code" == "403" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-system-valid.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' -d '{"action":"backup_data","type":"ci_test","payload":{"probe":"ok"}}' "$BASE_URL/backup-system.php")"
+[[ "$code" == "200" ]]
+php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||empty($r["file"])){fwrite(STDERR,"Device-bound backup write failed\\n");exit(1);}' "$TEST_DIR/backup-system-valid.json"
+
 code="$(post_json '{"action":"verify_license","workspace_id":"ws_test","token":"ASHK-CI-TEST-0001","hwid":"HWID-B"}' "$TEST_DIR/mismatch.json")"
 [[ "$code" == "403" ]]; assert_status "$TEST_DIR/mismatch.json" "HWID_MISMATCH"
 code="$(post_json '{"action":"verify_license","workspace_id":"ws_expired","token":"ASHK-CI-EXPIRED-0001","hwid":"HWID-EXPIRED"}' "$TEST_DIR/expired.json")"
