@@ -2,10 +2,63 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, X-Workspace-ID, X-Workspace-Token, X-Device-HWID');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
     exit(0);
+}
+
+$headers = function_exists('getallheaders') ? getallheaders() : [];
+$workspace = '';
+$token = '';
+$hwid = '';
+foreach ($headers as $name => $value) {
+    if (strcasecmp($name, 'X-Workspace-ID') === 0) $workspace = (string)$value;
+    elseif (strcasecmp($name, 'X-Workspace-Token') === 0) $token = (string)$value;
+    elseif (strcasecmp($name, 'X-Device-HWID') === 0) $hwid = (string)$value;
+}
+$workspace = trim($workspace);
+$token = trim($token);
+$hwid = trim($hwid);
+if ($workspace === '' || !preg_match('/^[a-zA-Z0-9_-]{1,128}$/', $workspace)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'INVALID_WORKSPACE']);
+    exit();
+}
+$validatorFile = __DIR__ . '/license_validator.php';
+if (!is_file($validatorFile)) {
+    http_response_code(503);
+    echo json_encode(['success' => false, 'error' => 'AUTHORITY_UNAVAILABLE']);
+    exit();
+}
+require_once $validatorFile;
+$access = LicenseValidator::validateAccess($workspace, $token, $hwid);
+if (!($access['allowed'] ?? false)) {
+    http_response_code(($access['status'] ?? '') === 'REGISTRY_UNAVAILABLE' ? 503 : 403);
+    echo json_encode(['success' => false, 'error' => 'ACCESS_DENIED', 'status' => $access['status'] ?? 'FORBIDDEN']);
+    exit();
+}
+
+// Customer backups and uploads are isolated by workspace; never use a shared client directory.
+if ($workspace === 'default' || $workspace === 'main') {
+    $BACKUP_ROOT = __DIR__ . '/backup';
+    $DAILY_BACKUP_ROOT = __DIR__ . '/daily-backups';
+    $IMAGES_ROOT = __DIR__ . '/uploads';
+} else {
+    $BACKUP_ROOT = __DIR__ . '/backup/tenants/' . $workspace;
+    $DAILY_BACKUP_ROOT = __DIR__ . '/daily-backups/tenants/' . $workspace;
+    $IMAGES_ROOT = __DIR__ . '/uploads/tenants/' . $workspace;
+}
+foreach ([$BACKUP_ROOT, $DAILY_BACKUP_ROOT, $IMAGES_ROOT] as $protectedDir) {
+    if (!is_dir($protectedDir) && !mkdir($protectedDir, 0700, true) && !is_dir($protectedDir)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'STORAGE_UNAVAILABLE']);
+        exit();
+    }
+    @chmod($protectedDir, 0700);
+    $denyFile = $protectedDir . '/.htaccess';
+    if (!is_file($denyFile)) @file_put_contents($denyFile, "Options -Indexes\nDeny from all\n", LOCK_EX);
 }
 
 // تنظیمات
