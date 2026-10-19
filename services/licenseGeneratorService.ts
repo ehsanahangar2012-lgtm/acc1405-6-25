@@ -90,14 +90,16 @@ class LicenseGeneratorService {
      */
     generateLicenseKey(): string {
         const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        const seg = (len: number) => {
-            let res = '';
-            for (let i = 0; i < len; i++) {
-                res += chars.charAt(Math.floor(Math.random() * chars.length));
+        const secureSegment = (length: number) => {
+            const bytes = new Uint8Array(length);
+            const secureCrypto = globalThis.crypto;
+            if (!secureCrypto?.getRandomValues) {
+                throw new Error('این مرورگر مولد اعداد تصادفی امن را پشتیبانی نمی‌کند.');
             }
-            return res;
+            secureCrypto.getRandomValues(bytes);
+            return Array.from(bytes, byte => chars[byte % chars.length]).join('');
         };
-        return `ASHK-${seg(4)}-${seg(4)}-${seg(4)}`;
+        return `ASHK-${secureSegment(4)}-${secureSegment(4)}-${secureSegment(4)}`;
     }
 
     /**
