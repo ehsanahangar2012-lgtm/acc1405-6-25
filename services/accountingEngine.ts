@@ -209,6 +209,9 @@ export class AccountingEngine {
       try { previousLedgerCache = localStorage.getItem(`ledger-${personId}`); } catch {}
     }
 
+    let embeddedCashAmount = Number(invoice.cashAmount || 0);
+    let embeddedCheckAmount = Number(invoice.checkAmount || 0);
+
     try {
     // Reject malformed invoice totals before removing any previously posted journal.
     if (invoice.type === InvoiceType.SALE || invoice.type === InvoiceType.PURCHASE) {
@@ -219,14 +222,27 @@ export class AccountingEngine {
       const checkAmount = Number(invoice.checkAmount || 0);
       const finalTotal = Number(invoice.finalTotal);
       const netAmount = subtotal - discount;
+      const separatelyPostedPayments = (invoice.payments || []).filter(payment => payment.accountingPosted === true);
+      const separatelyPostedCash = separatelyPostedPayments
+        .filter(payment => payment.method !== 'CHECK')
+        .reduce((sum, payment) => sum + Number(payment.amount), 0);
+      const separatelyPostedChecks = separatelyPostedPayments
+        .filter(payment => payment.method === 'CHECK')
+        .reduce((sum, payment) => sum + Number(payment.amount), 0);
 
       if (!Number.isFinite(netAmount) || netAmount <= 0 ||
           !Number.isFinite(tax) || tax < 0 ||
           !Number.isFinite(cashAmount) || cashAmount < 0 ||
           !Number.isFinite(checkAmount) || checkAmount < 0 ||
-          !Number.isFinite(finalTotal) || finalTotal <= 0) {
+          !Number.isFinite(finalTotal) || finalTotal <= 0 ||
+          !Number.isFinite(separatelyPostedCash) || separatelyPostedCash < 0 ||
+          !Number.isFinite(separatelyPostedChecks) || separatelyPostedChecks < 0 ||
+          separatelyPostedCash > cashAmount || separatelyPostedChecks > checkAmount) {
         throw new Error('مبالغ فاکتور نامعتبر است؛ مبلغ خالص، مالیات، پرداخت و جمع نهایی را بررسی کنید.');
       }
+
+      embeddedCashAmount = cashAmount - separatelyPostedCash;
+      embeddedCheckAmount = checkAmount - separatelyPostedChecks;
     }
 
     // Keep the accounting audit trail: reverse any currently active postings first,
@@ -267,27 +283,27 @@ export class AccountingEngine {
       }
 
       // Cash payments
-      if (invoice.cashAmount > 0) {
-        // Debit: Cash (1110) / Credit: Accounts Receivable (1130)
+      if (embeddedCashAmount > 0) {
+        // Initial/legacy payment amounts are embedded in the invoice date journal.
         this.postDoubleEntry(
           invoice.date,
           `دریافت نقدی بابت ${docDescription}`,
           '1110',
           '1130',
-          invoice.cashAmount,
+          embeddedCashAmount,
           invoice.id,
           'INVOICE'
         );
       }
 
       // Check receipts reduce customer receivables and increase checks held.
-      if (invoice.checkAmount > 0) {
+      if (embeddedCheckAmount > 0) {
         this.postDoubleEntry(
           invoice.date,
           `دریافت چک بابت ${docDescription}`,
           '1140',
           '1130',
-          invoice.checkAmount,
+          embeddedCheckAmount,
           invoice.id,
           'INVOICE'
         );
@@ -358,27 +374,27 @@ export class AccountingEngine {
       }
 
       // Cash payments
-      if (invoice.cashAmount > 0) {
-        // Debit: Accounts Payable (2110) / Credit: Cash (1110)
+      if (embeddedCashAmount > 0) {
+        // Initial/legacy payment amounts are embedded in the invoice date journal.
         this.postDoubleEntry(
           invoice.date,
           `پرداخت نقدی بابت ${docDescription}`,
           '2110',
           '1110',
-          invoice.cashAmount,
+          embeddedCashAmount,
           invoice.id,
           'INVOICE'
         );
       }
 
       // Issued checks reduce accounts payable and increase check liabilities.
-      if (invoice.checkAmount > 0) {
+      if (embeddedCheckAmount > 0) {
         this.postDoubleEntry(
           invoice.date,
           `پرداخت چک بابت ${docDescription}`,
           '2110',
           '2130',
-          invoice.checkAmount,
+          embeddedCheckAmount,
           invoice.id,
           'INVOICE'
         );
@@ -652,6 +668,69 @@ export class AccountingEngine {
   }
 
   /**
+   * Post a later invoice settlement on the actual payment date instead of rewriting
+   * the original invoice-date journal. Its reference is the payment transaction ID.
+   */
+  static postInvoicePayment(
+    invoice: Invoice,
+    payment: Pick<Transaction, 'id' | 'date' | 'amount' | 'description'>,
+    method: 'CASH' | 'POS' | 'CARD' | 'CHECK'
+  ) {
+    return this.withPostingRollback([invoice.personId], () => {
+      if (invoice.type !== InvoiceType.SALE && invoice.type !== InvoiceType.PURCHASE) {
+        throw new Error('برای پیش‌فاکتور یا سند غیرمالی نمی‌توان پرداخت ثبت کرد.');
+      }
+      if (!Number.isFinite(payment.amount) || payment.amount <= 0) {
+        throw new Error('مبلغ پرداخت باید عددی معتبر و بزرگ‌تر از صفر باشد.');
+      }
+      if (typeof payment.date !== 'string' || !payment.date.trim()) {
+        throw new Error('تاریخ پرداخت الزامی است.');
+      }
+
+      this.postStornoReversal(payment.id, 'INVOICE_PAYMENT');
+
+      const isSale = invoice.type === InvoiceType.SALE;
+      const debitAccount = isSale
+        ? (method === 'CHECK' ? '1140' : '1110')
+        : '2110';
+      const creditAccount = isSale
+        ? '1130'
+        : (method === 'CHECK' ? '2130' : '1110');
+      const methodLabel = method === 'CHECK' ? 'چک' :
+        method === 'POS' ? 'کارتخوان' :
+        method === 'CARD' ? 'کارت‌به‌کارت' : 'نقدی';
+
+      this.postDoubleEntry(
+        payment.date,
+        `${isSale ? 'دریافت' : 'پرداخت'} ${methodLabel} بابت فاکتور ${invoice.number}: ${payment.description || ''}`.trim(),
+        debitAccount,
+        creditAccount,
+        payment.amount,
+        payment.id,
+        'INVOICE_PAYMENT'
+      );
+    });
+  }
+
+  /**
+   * Reverse an invoice and its separately posted payment journals in one transaction.
+   */
+  static reverseInvoiceAndPayments(invoice: Invoice, relatedTransactions: Transaction[]) {
+    return this.withPostingRollback(
+      [invoice.personId, ...relatedTransactions.map(transaction => transaction.personId)],
+      () => {
+        this.postStornoReversal(invoice.id, 'INVOICE');
+        relatedTransactions.forEach(transaction => {
+          this.postStornoReversal(transaction.id, 'INVOICE_PAYMENT');
+          // Reverse legacy linked-finance entries created before invoice payments
+          // received their own INVOICE_PAYMENT reference type.
+          this.postStornoReversal(transaction.id, 'TRANSACTION');
+        });
+      }
+    );
+  }
+
+  /**
    * Reverse a check-transfer document and its affected check-status postings atomically.
    */
   static reverseCheckTransfer(transfer: CheckTransfer) {
@@ -671,6 +750,7 @@ export class AccountingEngine {
    */
   static reverseGeneralTransaction(trans: Transaction) {
     return this.withPostingRollback([trans.personId], () => {
+      this.postStornoReversal(trans.id, 'INVOICE_PAYMENT');
       this.postStornoReversal(trans.id, 'TRANSACTION');
       if (trans.personId) {
         PersonLedgerService.removeByReference(trans.personId, trans.id);
