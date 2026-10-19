@@ -81,7 +81,7 @@ class LicenseQuotaService {
                 data?.workspaceToken === licenseKey &&
                 data?.syncToken === licenseKey &&
                 typeof data?.hostUrl === 'string' &&
-                /^https?:\\/\\//i.test(data.hostUrl) &&
+                /^https?:\/\//i.test(data.hostUrl) &&
                 data?.workspaceId &&
                 data.workspaceId !== 'default' &&
                 data.workspaceId !== 'main'
@@ -103,7 +103,6 @@ class LicenseQuotaService {
         hostUrl?: string;
         syncToken?: string;
         workspaceId?: string;
-        plan?: string;
         maxCustomers?: number;
         maxDocuments?: number;
         isUnlimited?: boolean;
@@ -191,7 +190,7 @@ class LicenseQuotaService {
             companyName: serverData.companyName || localStorage.getItem('ashk_company_name') || 'سامانه مرکزی اشک قلم',
             planTitle: serverData.planTitle || 'نسخه تجاری متصل به سرور اصلی (نامحدود)',
             expireDate: serverData.expireDate || 'دائمی (معتبر در سرور اصلی)',
-            isUnlimited: true,
+            isUnlimited: serverData.isUnlimited === true,
             hostUrl: serverData.hostUrl || localStorage.getItem('ashk_host_url') || ''
         };
     }
@@ -244,21 +243,22 @@ class LicenseQuotaService {
             localStorage.getItem('ashk_active_license_key') ||
             ''
         ).trim();
-        const activationCode = (localStorage.getItem('ashk_activation_code') || '').trim();
         let serverVerified = false;
         try {
             const data = JSON.parse(localStorage.getItem('ashk_server_license_data') || 'null');
             serverVerified = Boolean(
                 data?.serverVerified === true &&
                 data?.licenseKey === licenseKey &&
+                data?.workspaceToken === licenseKey &&
+                data?.syncToken === licenseKey &&
+                typeof data?.hostUrl === 'string' &&
+                /^https?:\/\//i.test(data.hostUrl) &&
                 data?.workspaceId &&
                 data.workspaceId !== 'default' &&
                 data.workspaceId !== 'main'
             );
         } catch {}
-        // Legacy local ACT codes used a client-embedded secret and are not commercial proof.
-        const offlineLicenseConfirmed = false;
-        if (localStatus === 'ACTIVATED' && (serverVerified || offlineLicenseConfirmed)) {
+        if (localStatus === 'ACTIVATED' && serverVerified) {
             return true;
         }
 
@@ -354,8 +354,7 @@ class LicenseQuotaService {
             try {
                 serverLicense = JSON.parse(localStorage.getItem('ashk_server_license_data') || 'null') || {};
             } catch {}
-            const unlimitedPlan = serverLicense.isUnlimited === true ||
-                ['GOLD', 'ENTERPRISE', 'UNLIMITED', 'COMMERCIAL_ANDROID_LINKED', 'COMMERCIAL_ANDROID'].includes(currentPlan);
+            const unlimitedPlan = serverLicense.isUnlimited === true;
             if (!unlimitedPlan) {
                 const defaults: Record<string, [number, number]> = {
                     HEMAYAT: [MAX_HEMAYAT_CUSTOMERS, MAX_HEMAYAT_DOCUMENTS],
