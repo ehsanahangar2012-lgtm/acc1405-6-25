@@ -3,7 +3,7 @@
 import { encryptedStorageService, AppManifest } from './encryptedStorageService';
 import { hardwareIdService } from './hardwareIdService';
 import { isAndroidApp } from '../utils';
-import { refreshServerLicense, VerifiedLicensePayload } from './serverLicenseReceiptService';
+import { refreshServerLicense, type VerifiedLicensePayload } from './serverLicenseReceiptService';
 
 export const MAX_TRIAL_CUSTOMERS = 30;
 export const MAX_TRIAL_DOCUMENTS = 100;
@@ -53,6 +53,9 @@ class LicenseQuotaService {
             };
             window.addEventListener('ashk-license-updated', refresh);
             window.addEventListener('online', () => void this.refreshCachedServerLicense());
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) void this.refreshCachedServerLicense();
+            });
             void this.refreshCachedServerLicense();
         }
     }
@@ -61,7 +64,7 @@ class LicenseQuotaService {
         if (typeof window === 'undefined') return false;
         if (this.refreshPromise) return this.refreshPromise;
 
-        this.refreshPromise = (async () => {
+        const pending = (async () => {
             const raw = localStorage.getItem('ashk_server_license_data');
             if (!raw) {
                 this.serverReceiptVerifiedInSession = false;
@@ -71,6 +74,7 @@ class LicenseQuotaService {
             let stored: any;
             try { stored = JSON.parse(raw); } catch {
                 this.serverReceiptVerifiedInSession = false;
+                this.serverEntitlements = null;
                 return false;
             }
             const licenseKey = String(stored?.licenseKey || '').trim();
@@ -78,6 +82,7 @@ class LicenseQuotaService {
             const hostUrl = String(stored?.hostUrl || '').trim();
             if (!licenseKey || !workspaceId || !hostUrl || ['default', 'main'].includes(workspaceId)) {
                 this.serverReceiptVerifiedInSession = false;
+                this.serverEntitlements = null;
                 return false;
             }
 
@@ -86,6 +91,7 @@ class LicenseQuotaService {
                 const verified = await refreshServerLicense({ hostUrl, licenseKey, workspaceId, hwid });
                 if (!verified) {
                     this.serverReceiptVerifiedInSession = false;
+                    this.serverEntitlements = null;
                     localStorage.setItem('ashk_server_license_data', JSON.stringify({ ...stored, serverVerified: false }));
                     this.notifyListeners();
                     return false;
@@ -121,11 +127,12 @@ class LicenseQuotaService {
                 return false;
             }
         })();
+        this.refreshPromise = pending;
 
         try {
-            return await this.refreshPromise;
+            return await pending;
         } finally {
-            this.refreshPromise = null;
+            if (this.refreshPromise === pending) this.refreshPromise = null;
         }
     }
 
@@ -283,6 +290,10 @@ class LicenseQuotaService {
      */
     async isFullyLicensed(): Promise<boolean> {
         if (typeof window === 'undefined') return false;
+
+        if (!this.serverReceiptVerifiedInSession) {
+            await this.refreshCachedServerLicense();
+        }
 
         // پلتفرم اندروید: در حالت پیش‌فرض محدود به ۵۰ سند، با فعال‌سازی یا لینک به PWA فعال می‌شود
         if (isAndroidApp()) {
