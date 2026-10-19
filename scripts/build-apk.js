@@ -40,6 +40,9 @@ function run(command, args, cwd = rootDir) {
 if (!fs.existsSync(path.join(rootDir, 'dist', 'index.html'))) {
   throw new Error('dist/index.html not found. Run the web build first (npm run build:web).');
 }
+
+// Fail closed if the web assets still contain any server/admin/release tooling.
+run(process.execPath, ['scripts/sanitize-client-build.js', path.join(rootDir, 'dist'), '--verify-only']);
 if (!fs.existsSync(androidDir) || !fs.existsSync(gradleWrapper)) {
   throw new Error('The Android Gradle project or Gradle wrapper is missing.');
 }
@@ -52,6 +55,7 @@ run(npx, ['cap', 'sync', 'android']);
 
 // Fail early if the Android bundle regresses to Tailwind v4 syntax that older WebViews ignore.
 const androidPublicDir = path.join(androidDir, 'app', 'src', 'main', 'assets', 'public');
+run(process.execPath, ['scripts/sanitize-client-build.js', androidPublicDir]);
 const bundledHtmlPath = path.join(androidPublicDir, 'index.html');
 if (!fs.existsSync(bundledHtmlPath)) {
   throw new Error('Capacitor sync did not create android/app/src/main/assets/public/index.html.');
