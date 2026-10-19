@@ -4,6 +4,7 @@ import { Person, Product, Invoice, Check, Voucher, CompanyProfile, SystemConfig,
 import { generateId, getPersianDate, generateTrackingCode, toPersianDigits, downloadJSON } from './utils';
 import { ImportBatch, ImportMappingConfig } from './types-import';
 import { backupService } from './services/backupService';
+import { backupEncryptionService } from './services/backupEncryptionService';
 import { autoBackupService } from './services/autoBackupService';
 import { backupMigrationService } from './services/backupMigrationService';
 import { securityService } from './services/securityService';
@@ -2076,8 +2077,16 @@ export const useStore = create<AppState>()(
               signature: ''
           };
           backupData.signature = securityService.signBackup(backupData);
-          downloadJSON(backupData, `AshkeGhalam-Backup-${getPersianDate().replace(/\//g, '-')}`);
-          backupService.backupData('full-export', backupData).catch(() => {});
+          const passphrase = typeof window !== 'undefined'
+              ? window.prompt('برای خروجی قابل‌حمل رمز حداقل ۱۲ نویسه‌ای وارد کنید. رمز را جدا از فایل نگه دارید.')
+              : null;
+          if (!passphrase || passphrase.trim().length < 12) {
+              if (typeof window !== 'undefined') alert('خروجی لغو شد؛ برای محافظت از داده‌ها رمز حداقل ۱۲ نویسه‌ای لازم است.');
+              return;
+          }
+          const encryptedText = backupEncryptionService.encryptJson(backupData, passphrase);
+          downloadJSON(JSON.parse(encryptedText), `AshkeGhalam-Backup-Encrypted-${getPersianDate().replace(/\\//g, '-')}`);
+          // No plaintext full-export copy is uploaded by this action.
       }
     };
     },
