@@ -9,7 +9,7 @@
 import CryptoJS from 'crypto-js';
 import { idbService } from './indexedDBService';
 import { hostBackupService } from './hostBackupService';
-import { workspaceService } from './workspaceService';
+import { hasNativeBackupStorage, getNativeBackupValue, setNativeBackupValue } from './nativeBackupStorage';
 import { useFinancialStore } from '../store-financial';
 import { getPersianDate } from '../utils';
 
@@ -32,8 +32,8 @@ export interface TripleBackupReport {
     sha256: string;
 }
 
-const STORAGE_KEY_TRIPLE_REPORT = 'triple_backup_report';
-const STORAGE_KEY_LOCAL_BACKUP = 'ashk_triple_backup_local';
+const STORAGE_KEY_TRIPLE_REPORT = 'triple-backup:report';
+const STORAGE_KEY_LOCAL_BACKUP = 'triple-backup:latest';
 
 export class TripleBackupService {
     /**
@@ -49,22 +49,34 @@ export class TripleBackupService {
         const sizeBytes = new Blob([payloadString]).size;
         const nowPersian = getPersianDate() + ' ' + new Date().toLocaleTimeString('fa-IR');
 
-        // Tier 1 is a local IndexedDB snapshot on this device only.
+        // Tier 1 uses OS/Keystore-backed encryption on native apps. Only browser/PWA
+        // falls back to IndexedDB, which must never be described as hardware-backed encryption.
+        const nativeProtectedStore = hasNativeBackupStorage();
         let tier1Status: BackupTierStatus['status'] = 'SYNCED';
         try {
-            await idbService.save('backups', {
-                id: STORAGE_KEY_LOCAL_BACKUP,
-                data: payloadString,
-                hash,
-                date: nowPersian,
-                updatedAt: Date.now()
-            });
+            if (nativeProtectedStore) {
+                await setNativeBackupValue(STORAGE_KEY_LOCAL_BACKUP, JSON.stringify({
+                    data: payloadString,
+                    hash,
+                    date: nowPersian,
+                    updatedAt: Date.now()
+                }));
+            } else {
+                await idbService.save('backups', {
+                    id: STORAGE_KEY_LOCAL_BACKUP,
+                    data: payloadString,
+                    hash,
+                    date: nowPersian,
+                    updatedAt: Date.now()
+                });
+            }
         } catch {
             tier1Status = 'ERROR';
         }
 
-        // Only a confirmed native filesystem write counts as the independent device copy.
-        // Android filesystem export remains pending until its native adapter is implemented.
+        // This tier means an additional actual file, not merely an internal database copy.
+        // Android portable file export is user-initiated from the Commercial Hub, so this
+        // tier stays WAITING until a native file has actually been written by this flow.
         let tier2Status: BackupTierStatus['status'] = 'WAITING';
         let tier3Status: BackupTierStatus['status'] = 'WAITING';
         try {
@@ -88,8 +100,10 @@ export class TripleBackupService {
             tiers: [
                 {
                     tierId: 'windows_local',
-                    name: 'نسخه محلی برنامه (IndexedDB همین دستگاه)',
-                    description: 'نسخه محلی برای بازیابی سریع؛ با پاک‌سازی داده‌های برنامه یا مرورگر ممکن است از دست برود و به‌تنهایی کافی نیست',
+                    name: nativeProtectedStore ? 'نسخه محلی رمزگذاری‌شده روی دستگاه' : 'نسخه محلی مرورگر (IndexedDB)',
+                    description: nativeProtectedStore
+                        ? 'در نسخه نصب‌شدهٔ ویندوز/اندروید با قابلیت رمزگذاری سیستم‌عامل یا Android Keystore نگهداری می‌شود؛ بازگردانی فایل به دستگاه دیگر از مسیر رمز عبور فایل قابل‌حمل انجام می‌شود.'
+                        : 'در مخزن محلی مرورگر نگهداری می‌شود؛ ممکن است با پاک‌سازی داده‌های مرورگر یا پروفایل از دست برود و رمزگذاری سخت‌افزاری ندارد.',
                     lastBackupDate: tier1Status === 'SYNCED' ? nowPersian : undefined,
                     status: tier1Status,
                     itemCount: tier1Status === 'SYNCED' ? count : 0,
@@ -99,11 +113,11 @@ export class TripleBackupService {
                 {
                     tierId: 'device_file',
                     name: 'نسخه مستقل روی دیسک ویندوز',
-                    description: 'پس از انتخاب پوشه با پنجره ویندوز، فایل واقعی در آن ذخیره می‌شود؛ خروجی مستقل فایل‌سیستم اندروید هنوز پیاده‌سازی نشده است',
+                    description: 'تنها پس از نوشتن یک فایل واقعی و مستقل ثبت می‌شود. در ویندوز مسیر انتخابی سیستم‌عامل استفاده می‌شود؛ در اندروید از مرکز تجاری همراه، ذخیرهٔ رمزگذاری‌شده با انتخاب مسیر انجام می‌شود و این مورد تا تأیید فایل همچنان در انتظار می‌ماند.',
                     lastBackupDate: tier2Status === 'SYNCED' ? nowPersian : undefined,
                     status: tier2Status,
                     itemCount: tier2Status === 'SYNCED' ? count : 0,
-                    sha256Hash: tier2Status === 'SYNCED' ? hash.substring(0, 16) + '...' : undefined,
+                    sha256Hash: tier2Status === 'SYNCED' ? undefined : undefined,
                     sizeBytes: tier2Status === 'SYNCED' ? sizeBytes : 0
                 },
                 {
@@ -120,7 +134,11 @@ export class TripleBackupService {
         };
 
         try {
-            await idbService.save('backups', { id: STORAGE_KEY_TRIPLE_REPORT, report });
+            if (nativeProtectedStore) {
+                await setNativeBackupValue(STORAGE_KEY_TRIPLE_REPORT, JSON.stringify(report));
+            } else {
+                await idbService.save('backups', { id: STORAGE_KEY_TRIPLE_REPORT, report });
+            }
         } catch (error) {
             console.warn('Unable to save backup status report locally:', error);
         }
@@ -132,11 +150,15 @@ export class TripleBackupService {
      */
     static async getLastReport(): Promise<TripleBackupReport | null> {
         try {
+            if (hasNativeBackupStorage()) {
+                const raw = await getNativeBackupValue(STORAGE_KEY_TRIPLE_REPORT);
+                if (raw === null) return null;
+                const report = JSON.parse(raw);
+                return report && Array.isArray(report.tiers) ? report as TripleBackupReport : null;
+            }
             const saved = await idbService.get('backups', STORAGE_KEY_TRIPLE_REPORT);
             const report = saved?.report;
-            if (report && Array.isArray(report.tiers)) {
-                return report as TripleBackupReport;
-            }
+            if (report && Array.isArray(report.tiers)) return report as TripleBackupReport;
         } catch {}
         return null;
     }
