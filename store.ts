@@ -406,6 +406,16 @@ export const useStore = create<AppState>()(
       },
       
       addUser: (user) => set(s => {
+          const alreadyExists = s.users.some(existing =>
+              existing.id === user.id ||
+              String(existing.username || '').trim().toLowerCase() === String(user.username || '').trim().toLowerCase()
+          );
+          if (!alreadyExists) {
+              const quotaCheck = licenseQuotaService.canAddUser(s.users.length);
+              if (!quotaCheck.allowed) {
+                  return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف کاربران نسخه فعلی تکمیل شده است.' }] };
+              }
+          }
           const { password, ...rest } = user;
           const hashedPassword = password
               ? securityService.hashPasswordV2(password)
