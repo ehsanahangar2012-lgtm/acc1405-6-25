@@ -16,6 +16,7 @@ import { workspaceService } from './workspaceService';
 import { idbService } from './indexedDBService';
 import { useFinancialStore } from '../store-financial';
 import CryptoJS from 'crypto-js';
+import { hasNativeBackupStorage, getNativeBackupValue, setNativeBackupValue, removeNativeBackupValue } from './nativeBackupStorage';
 
 // ─── انواع ───────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,8 @@ const LAST_BACKUP_KEY     = 'host_last_backup_time';
 const BACKUP_INTERVAL_MS  = 24 * 60 * 60 * 1000; // ۲۴ ساعت
 const MAX_HOST_BACKUPS    = 10; // نگهداری حداکثر ۱۰ فایل در هاست
 const FETCH_TIMEOUT_MS    = 30_000; // ۳۰ ثانیه - بکاپ داده بزرگ است
+const NATIVE_HOST_BACKUP_INDEX_KEY = 'host-backups:index';
+const nativeHostBackupRecordKey = (id: string) => `host-backups:record:${id}`;
 // Read the release version from the shared application configuration.
 
 // جداول اصلی که باید بکاپ شوند
@@ -362,12 +365,64 @@ class HostBackupService {
      * دریافت لیست بکاپ‌های لوکال از IndexedDB
      */
     async listLocalBackups(): Promise<HostBackupEntry[]> {
+        if (hasNativeBackupStorage()) {
+            const entries = await this.readNativeHostBackupIndex(true);
+            return entries;
+        }
         try {
             const stored = await idbService.get(LOCAL_BACKUP_STORE, 'index');
             return Array.isArray(stored?.entries) ? stored.entries : [];
         } catch {
             return [];
         }
+    }
+
+    private async readNativeHostBackupIndex(migrateLegacy: boolean): Promise<HostBackupEntry[]> {
+        const storedText = await getNativeBackupValue(NATIVE_HOST_BACKUP_INDEX_KEY);
+        if (storedText !== null) {
+            let entries: unknown;
+            try { entries = JSON.parse(storedText); } catch {
+                throw new Error('فهرست بکاپ محلی رمزگذاری‌شده معتبر نیست.');
+            }
+            if (!Array.isArray(entries) || entries.some(entry =>
+                !entry || typeof entry.id !== 'string' || !/^backup_[A-Za-z0-9_-]{1,160}$/.test(entry.id)
+            )) {
+                throw new Error('ساختار فهرست بکاپ محلی معتبر نیست.');
+            }
+            return entries as HostBackupEntry[];
+        }
+
+        if (!migrateLegacy) {
+            await setNativeBackupValue(NATIVE_HOST_BACKUP_INDEX_KEY, '[]');
+            return [];
+        }
+
+        // One-time migration from old IndexedDB snapshots. Keep legacy data until each
+        // snapshot and the new encrypted index have been written successfully.
+        let legacyEntries: HostBackupEntry[] = [];
+        try {
+            const index = await idbService.get(LOCAL_BACKUP_STORE, 'index');
+            if (Array.isArray(index?.entries)) legacyEntries = index.entries;
+        } catch {}
+        const migrated: HostBackupEntry[] = [];
+        for (const entry of legacyEntries) {
+            if (!entry || typeof entry.id !== 'string' || !/^backup_[A-Za-z0-9_-]{1,160}$/.test(entry.id)) continue;
+            const record = await idbService.get(LOCAL_BACKUP_STORE, entry.id).catch(() => null);
+            if (!record || typeof record !== 'object' || !record.data || typeof record.data !== 'object') continue;
+            await setNativeBackupValue(nativeHostBackupRecordKey(entry.id), JSON.stringify(record));
+            migrated.push(entry);
+        }
+        migrated.sort((a, b) => b.timestamp - a.timestamp);
+        const retained = migrated.slice(0, MAX_HOST_BACKUPS);
+        await setNativeBackupValue(NATIVE_HOST_BACKUP_INDEX_KEY, JSON.stringify(retained));
+        for (const old of migrated.slice(MAX_HOST_BACKUPS)) {
+            await removeNativeBackupValue(nativeHostBackupRecordKey(old.id)).catch(() => {});
+        }
+        for (const entry of migrated) {
+            await idbService.delete(LOCAL_BACKUP_STORE, entry.id).catch(() => {});
+        }
+        await idbService.delete(LOCAL_BACKUP_STORE, 'index').catch(() => {});
+        return retained;
     }
 
     // ─── بازیابی ────────────────────────────────────────────────────────────
@@ -424,11 +479,52 @@ class HostBackupService {
      */
     async restoreFromLocal(backupId: string): Promise<RestoreResult> {
         try {
-            const item = await idbService.get(LOCAL_BACKUP_STORE, backupId);
-            if (!item) return { success: false, error: 'بکاپ یافت نشد' };
-            return { success: true, data: item };
+            if (typeof backupId !== 'string' || !/^backup_[A-Za-z0-9_-]{1,160}$/.test(backupId)) {
+                return { success: false, error: 'شناسه نسخه پشتیبان محلی معتبر نیست.' };
+            }
+            let item: any;
+            if (hasNativeBackupStorage()) {
+                const raw = await getNativeBackupValue(nativeHostBackupRecordKey(backupId));
+                if (raw === null) return { success: false, error: 'بکاپ رمزگذاری‌شده در حافظه محلی پیدا نشد.' };
+                item = JSON.parse(raw);
+            } else {
+                item = await idbService.get(LOCAL_BACKUP_STORE, backupId);
+            }
+            if (!item || typeof item !== 'object') return { success: false, error: 'بکاپ یافت نشد' };
+
+            let integrityVerified = false;
+            if (item.checksumAlgorithm === 'sha256') {
+                if (!item.data || typeof item.data !== 'object' || typeof item.checksum !== 'string') {
+                    return { success: false, error: 'ساختار کنترل صحت بکاپ محلی معتبر نیست.' };
+                }
+                const actual = this.checksum({ data: item.data, assets: item.assets ?? {} });
+                if (!/^[a-f0-9]{64}$/i.test(item.checksum) || actual !== item.checksum.toLowerCase()) {
+                    return { success: false, error: 'کنترل صحت بکاپ محلی ناموفق است؛ بازیابی لغو شد.' };
+                }
+                integrityVerified = true;
+            }
+            return { success: true, data: item, integrityVerified };
         } catch (error: any) {
-            return { success: false, error: error?.message };
+            return { success: false, error: error?.message || 'خواندن بکاپ محلی ناموفق بود.' };
+        }
+    }
+
+    async deleteLocalBackup(backupId: string): Promise<boolean> {
+        if (typeof backupId !== 'string' || !/^backup_[A-Za-z0-9_-]{1,160}$/.test(backupId)) return false;
+        try {
+            if (hasNativeBackupStorage()) {
+                const entries = await this.readNativeHostBackupIndex(false);
+                await removeNativeBackupValue(nativeHostBackupRecordKey(backupId));
+                await setNativeBackupValue(NATIVE_HOST_BACKUP_INDEX_KEY, JSON.stringify(entries.filter(entry => entry.id !== backupId)));
+            } else {
+                await idbService.delete(LOCAL_BACKUP_STORE, backupId);
+                const stored = await idbService.get(LOCAL_BACKUP_STORE, 'index');
+                const entries = Array.isArray(stored?.entries) ? stored.entries.filter((entry: HostBackupEntry) => entry.id !== backupId) : [];
+                await idbService.save(LOCAL_BACKUP_STORE, { id: 'index', entries });
+            }
+            return true;
+        } catch {
+            return false;
         }
     }
 
@@ -574,38 +670,51 @@ class HostBackupService {
     }
 
     private async saveLocally(payload: any): Promise<void> {
+        const indexEntry: HostBackupEntry = {
+            id: payload.id,
+            timestamp: payload.timestamp,
+            label: payload.label,
+            size: JSON.stringify(payload).length,
+            type: payload.type,
+            checksum: payload.checksum,
+            version: payload.version,
+            hasAssets: payload.hasAssets,
+        };
+
         try {
-            // ذخیره کل بکاپ با ID
-            await idbService.save(LOCAL_BACKUP_STORE, { id: payload.id, ...payload });
-
-            // به‌روزرسانی ایندکس
-            const indexEntry: HostBackupEntry = {
-                id: payload.id,
-                timestamp: payload.timestamp,
-                label: payload.label,
-                size: JSON.stringify(payload).length,
-                type: payload.type,
-                checksum: payload.checksum,
-                version: payload.version,
-                hasAssets: payload.hasAssets,
-            };
-
-            const existing = await idbService.get(LOCAL_BACKUP_STORE, 'index');
-            const entries: HostBackupEntry[] = Array.isArray(existing?.entries) ? existing.entries : [];
-            entries.push(indexEntry);
-
-            // نگهداری آخرین MAX_HOST_BACKUPS بکاپ (۱۰ فایل)
-            entries.sort((a, b) => b.timestamp - a.timestamp);
-            if (entries.length > MAX_HOST_BACKUPS) {
-                const toRemove = entries.splice(MAX_HOST_BACKUPS);
-                for (const old of toRemove) {
-                    await idbService.delete(LOCAL_BACKUP_STORE, old.id).catch(() => {});
+            if (hasNativeBackupStorage()) {
+                const entries = await this.readNativeHostBackupIndex(true);
+                // Full accounting payload remains encrypted at rest on native devices.
+                await setNativeBackupValue(nativeHostBackupRecordKey(payload.id), JSON.stringify(payload));
+                const next = [indexEntry, ...entries.filter(entry => entry.id !== payload.id)]
+                    .sort((a, b) => b.timestamp - a.timestamp);
+                const retained = next.slice(0, MAX_HOST_BACKUPS);
+                await setNativeBackupValue(NATIVE_HOST_BACKUP_INDEX_KEY, JSON.stringify(retained));
+                for (const old of next.slice(MAX_HOST_BACKUPS)) {
+                    await removeNativeBackupValue(nativeHostBackupRecordKey(old.id)).catch(() => {});
                 }
+                // Remove the old IDB shadow only after encrypted records and index are committed.
+                for (const entry of next) {
+                    if (retained.some(kept => kept.id === entry.id)) continue;
+                    await idbService.delete(LOCAL_BACKUP_STORE, entry.id).catch(() => {});
+                }
+                return;
             }
 
-            await idbService.save(LOCAL_BACKUP_STORE, { id: 'index', entries });
+            // Browser/PWA fallback. IndexedDB is explicitly not represented as OS-encrypted storage.
+            await idbService.save(LOCAL_BACKUP_STORE, { id: payload.id, ...payload });
+            const existing = await idbService.get(LOCAL_BACKUP_STORE, 'index');
+            const entries: HostBackupEntry[] = Array.isArray(existing?.entries) ? existing.entries : [];
+            const next = [indexEntry, ...entries.filter(entry => entry.id !== payload.id)]
+                .sort((a, b) => b.timestamp - a.timestamp);
+            const retained = next.slice(0, MAX_HOST_BACKUPS);
+            for (const old of next.slice(MAX_HOST_BACKUPS)) {
+                await idbService.delete(LOCAL_BACKUP_STORE, old.id).catch(() => {});
+            }
+            await idbService.save(LOCAL_BACKUP_STORE, { id: 'index', entries: retained });
         } catch (error) {
-            console.warn('خطا در ذخیره لوکال بکاپ:', error);
+            console.warn('خطا در ذخیره بکاپ محلی:', error);
+            // Never downgrade failed native encryption to plaintext IndexedDB/localStorage.
         }
     }
 
