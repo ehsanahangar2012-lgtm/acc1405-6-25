@@ -25,7 +25,7 @@ class DigitalSignatureConfig {
     private function __construct() {
         $this->config = [
             'baseUrl' => $this->getBaseUrl(),
-            'apiKey' => self::getEnvVar('VITE_API_TOKEN', 'default-api-key-change-in-production'),
+            'apiKey' => self::getEnvVar('ASHK_DIGITAL_SIGNATURE_API_TOKEN'),
             'maxDocumentSize' => 10 * 1024 * 1024, // 10MB
             'linkExpirationHours' => 48,
             'otpExpirationMinutes' => 10,
@@ -67,7 +67,9 @@ class DigitalSignatureConfig {
     }
 
     public function validateToken($token) {
-        return $token === $this->config['apiKey'];
+        $expected = (string)($this->config['apiKey'] ?? '');
+        $provided = is_string($token) ? $token : '';
+        return $expected !== '' && $provided !== '' && hash_equals($expected, $provided);
     }
 
     private function getBaseUrl() {
