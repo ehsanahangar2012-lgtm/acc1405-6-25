@@ -113,71 +113,33 @@ function getServerBackupKey(): string {
         }
     }
 
-    $dataDir = __DIR__ . '/data';
-    if (!is_dir($dataDir) && !@mkdir($dataDir, 0700, true) && !is_dir($dataDir)) {
-        throw new RuntimeException('BACKUP_KEY_STORAGE_UNAVAILABLE');
-    }
-    @chmod($dataDir, 0700);
-    $denyPath = $dataDir . '/.htaccess';
-    if (!is_file($denyPath)) {
-        @file_put_contents($denyPath, "<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nOrder Deny,Allow\nDeny from all\n</IfModule>\nOptions -Indexes\n", LOCK_EX);
-        @chmod($denyPath, 0600);
-    }
-
-    $keyPath = $dataDir . '/.backup-encryption-key';
-    $lock = @fopen($keyPath . '.lock', 'c');
-    if ($lock === false || !flock($lock, LOCK_EX)) {
-        if (is_resource($lock)) fclose($lock);
-        throw new RuntimeException('BACKUP_KEY_LOCK_FAILED');
-    }
-
-    try {
-        $storedKey = null;
-        if (is_file($keyPath)) {
-            $encoded = trim((string)@file_get_contents($keyPath));
-            $storedKey = base64_decode($encoded, true);
-            if (!is_string($storedKey) || strlen($storedKey) !== 32) {
-                throw new RuntimeException('BACKUP_ENCRYPTION_KEY_FILE_INVALID');
-            }
+    // The key must be provided from outside the public web deployment tree.
+    // No automatic key file is created under this directory because Nginx may ignore .htaccess.
+    $keyFilePath = trim((string)(getenv('ASHK_BACKUP_ENCRYPTION_KEY_FILE') ?: ''));
+    if ($keyFilePath !== '') {
+        $realKeyPath = realpath($keyFilePath);
+        $documentRoot = realpath((string)($_SERVER['DOCUMENT_ROOT'] ?? ''));
+        $codeRoot = realpath(__DIR__);
+        if (!is_string($realKeyPath) || !is_file($realKeyPath)) {
+            throw new RuntimeException('BACKUP_ENCRYPTION_KEY_FILE_INVALID');
         }
-
-        // Never allow a new environment variable to silently replace a key already
-        // protecting backups: that would make the old encrypted snapshots unreadable.
-        if (is_string($environmentCandidate)) {
-            if (is_string($storedKey) && !hash_equals($storedKey, $environmentCandidate)) {
-                throw new RuntimeException('BACKUP_ENCRYPTION_KEY_MISMATCH');
-            }
-            $cachedKey = is_string($storedKey) ? $storedKey : $environmentCandidate;
-            return $cachedKey;
+        if (($documentRoot !== false && ($realKeyPath === $documentRoot || str_starts_with($realKeyPath, rtrim($documentRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR))) ||
+            ($codeRoot !== false && ($realKeyPath === $codeRoot || str_starts_with($realKeyPath, rtrim($codeRoot, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR)))) {
+            throw new RuntimeException('BACKUP_KEY_FILE_MUST_BE_OUTSIDE_WEB_ROOT');
         }
-
-        if (is_string($storedKey)) {
-            $cachedKey = $storedKey;
-            return $cachedKey;
+        $keyText = trim((string)@file_get_contents($realKeyPath));
+        if (preg_match('/^[a-f0-9]{64}$/i', $keyText)) $key = hex2bin($keyText);
+        else $key = base64_decode($keyText, true);
+        if (!is_string($key) || strlen($key) !== 32) {
+            throw new RuntimeException('BACKUP_ENCRYPTION_KEY_FILE_INVALID');
         }
-
-        $existingFiles = array_merge(
-            glob(__DIR__ . '/backup/backup_*.json') ?: [],
-            glob(__DIR__ . '/backups/tenants/*/backup_*.json') ?: []
-        );
-        foreach ($existingFiles as $existingFile) {
-            $stored = json_decode((string)@file_get_contents($existingFile), true);
-            if (is_array($stored) && ($stored['format'] ?? '') === SERVER_BACKUP_FORMAT) {
-                throw new RuntimeException('BACKUP_ENCRYPTION_KEY_MISSING');
-            }
-        }
-
-        $key = random_bytes(32);
-        if (!backupAtomicWrite($keyPath, base64_encode($key))) {
-            throw new RuntimeException('BACKUP_KEY_WRITE_FAILED');
-        }
-        @chmod($keyPath, 0600);
         $cachedKey = $key;
         return $cachedKey;
-    } finally {
-        flock($lock, LOCK_UN);
-        fclose($lock);
     }
+
+    // Fail closed when neither key source is configured; never write financial backups in plaintext.
+    throw new RuntimeException('BACKUP_ENCRYPTION_KEY_MISSING');
+
 }
 
 function encryptServerBackupPayload(string $plainJson, string $workspace, string $id, string $key): string {
