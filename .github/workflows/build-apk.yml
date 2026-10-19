@@ -186,6 +186,8 @@ jobs:
         uses: actions/deploy-pages@v4
 
   build-apk:
+    environment:
+      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'commercial-release' || 'ci' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -259,6 +261,26 @@ jobs:
       - name: Build real Android APK
         run: bun run build:apk
 
+      - name: Verify APK signature and enforce release build type
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")"
+            APK_PATH="downloads/AshkeGhalam-v${VERSION}.apk"
+            test -f "$APK_PATH" || { echo "::error::A commercial tag must produce the signed release APK, not a debug APK."; exit 1; }
+            if compgen -G 'downloads/*-debug.apk' >/dev/null; then
+              echo "::error::Debug APKs cannot be used for a commercial release."
+              exit 1
+            fi
+          else
+            APK_PATH="$(find downloads -maxdepth 1 -type f -name 'AshkeGhalam-v*.apk' -print -quit)"
+            test -n "$APK_PATH" || { echo "::error::No APK was produced."; exit 1; }
+          fi
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER" || { echo "::error::Android apksigner tool is missing."; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK_PATH"
+
       - name: Verify Android package excludes server and admin tooling
         run: node scripts/sanitize-client-build.js android/app/src/main/assets/public --verify-only
 
@@ -269,6 +291,8 @@ jobs:
           path: downloads/AshkeGhalam-v*.apk
           if-no-files-found: error
   build-windows:
+    environment:
+      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'commercial-release' || 'ci' }}
     runs-on: windows-latest
 
     steps:
@@ -311,6 +335,27 @@ jobs:
       - name: Build real Windows EXE files
         run: bun run build:windows
 
+      - name: Verify Windows Authenticode signatures for commercial release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $version = node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)"
+          $files = @(
+            "dist_electron/AshkeGhalam-Setup-v$version.exe",
+            "dist_electron/AshkeGhalam-Portable-v$version.exe"
+          )
+          foreach ($file in $files) {
+            if (-not (Test-Path $file)) {
+              throw "Required commercial EXE is missing: $file"
+            }
+            $signature = Get-AuthenticodeSignature -FilePath $file
+            if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate) {
+              throw "Commercial EXE is not signed by a currently trusted publisher: $file (status: $($signature.Status))"
+            }
+            Write-Host "$file signature verified. Publisher: $($signature.SignerCertificate.Subject)"
+            Write-Host "Publisher certificate SHA-256: $([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($signature.SignerCertificate.RawData)))"
+          }
+
       - name: Verify Windows renderer excludes server and admin tooling
         run: node scripts/sanitize-client-build.js dist --verify-only
 
@@ -326,6 +371,8 @@ jobs:
   publish-native-release:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-windows, build-apk]
+    environment:
+      name: commercial-release
     runs-on: ubuntu-latest
     permissions:
       contents: write
