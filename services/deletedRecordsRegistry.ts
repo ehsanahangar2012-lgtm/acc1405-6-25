@@ -108,7 +108,10 @@ class DeletedRecordsRegistry {
         if (response.ok) {
           const text = await response.text();
           if (!text.trim().startsWith('<?php') && !text.trim().startsWith('<')) {
-            serverDeleted = JSON.parse(text);
+            const parsed = JSON.parse(text);
+            serverDeleted = Array.isArray(parsed)
+              ? parsed
+              : (parsed?.success && Array.isArray(parsed?.records) ? parsed.records : []);
           }
         }
       } catch (err) {
