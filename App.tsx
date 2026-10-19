@@ -146,13 +146,19 @@ const ConnectionStatus = () => {
 };
 
 const LoginPage = () => {
-    const { login } = useStore();
+    const { login, users, addUser, updateUser } = useStore();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
     const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+    const [setupFullName, setSetupFullName] = useState('');
+    const [setupUsername, setSetupUsername] = useState('');
+    const [setupEmail, setSetupEmail] = useState('');
+    const [setupPassword, setSetupPassword] = useState('');
+    const [setupPasswordConfirm, setSetupPasswordConfirm] = useState('');
+    const [setupMessage, setSetupMessage] = useState('');
 
     // همگام‌سازی خودکار حساب‌های کاربری با سرور مرکزی ابری هنگام بارگذاری (صرفاً در صورت اتصال و پیکربندی صریح سرور)
     useEffect(() => {
@@ -175,6 +181,65 @@ const LoginPage = () => {
         fetchRemoteUsers();
         return () => { isMounted = false; };
     }, []);
+
+    const needsInitialSetup = users.length === 0 && !workspaceService.isRemoteCloudConfigured();
+
+    const handleCreateInitialAdmin = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setSetupMessage('');
+
+        const cleanUsername = setupUsername.trim();
+        const cleanName = setupFullName.trim();
+        const cleanEmail = setupEmail.trim();
+
+        if (cleanUsername.length < 4 || /\\s/.test(cleanUsername)) {
+            setError('نام کاربری باید حداقل ۴ نویسه و بدون فاصله باشد.');
+            return;
+        }
+        if (setupPassword.length < 12) {
+            setError('برای حساب مدیر، رمز عبور باید حداقل ۱۲ نویسه داشته باشد.');
+            return;
+        }
+        if (setupPassword !== setupPasswordConfirm) {
+            setError('رمز عبور و تکرار آن یکسان نیستند.');
+            return;
+        }
+        if (cleanEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(cleanEmail)) {
+            setError('قالب ایمیل معتبر نیست.');
+            return;
+        }
+        if ((useStore.getState().users || []).length > 0) {
+            setError('حساب کاربری از قبل ایجاد شده است؛ صفحه را تازه‌سازی کنید و وارد شوید.');
+            return;
+        }
+
+        const adminRole = useStore.getState().roles.find((role: any) => role.id === 'admin');
+        if (!adminRole) {
+            setError('نقش مدیر سیستم یافت نشد. تنظیمات اولیه را بررسی کنید.');
+            return;
+        }
+
+        try {
+            const createdUser = AuthService.createUser({
+                username: cleanUsername,
+                fullName: cleanName || 'مدیر سیستم',
+                roleId: 'admin',
+                permissions: adminRole.permissions,
+                is_active: true,
+                email: cleanEmail || undefined,
+                password: setupPassword
+            });
+            addUser(createdUser);
+            setUsername(cleanUsername);
+            setPassword('');
+            setSetupPassword('');
+            setSetupPasswordConfirm('');
+            setSetupMessage('حساب مدیر ساخته شد. اکنون با رمز انتخاب‌شده وارد شوید. اگر ایمیل بازیابی ثبت نکرده‌اید، آن را از تنظیمات کاربر تکمیل کنید.');
+        } catch {
+            setError('ساخت حساب مدیر انجام نشد؛ لطفاً دوباره تلاش کنید.');
+        }
+    };
 
     const handleManualSync = async () => {
         if (!workspaceService.isRemoteCloudConfigured()) {
@@ -216,6 +281,15 @@ const LoginPage = () => {
             }
 
             if (user) {
+                const existingUser = useStore.getState().users.find(u => u.id === user!.id);
+                if (existingUser && (!securityService.isPasswordHashV2(existingUser.hashedPassword) || existingUser.password)) {
+                    updateUser(existingUser.id, { password });
+                    user = useStore.getState().users.find(u => u.id === existingUser.id) || user;
+                }
+                if (user.password) {
+                    const { password: _legacyPassword, ...safeUser } = user;
+                    user = safeUser as typeof user;
+                }
                 login(user);
                 // بارگذاری تمام فاکتورها، حساب‌ها و اسناد تنها در صورت پیکربندی و اتصال صریح به سرور
                 if (workspaceService.isRemoteCloudConfigured()) {
@@ -268,7 +342,30 @@ const LoginPage = () => {
                     </button>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-5">
+                {setupMessage && (
+                    <div className="mb-4 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-bold">
+                        {setupMessage}
+                    </div>
+                )}
+
+                {needsInitialSetup ? (
+                    <form onSubmit={handleCreateInitialAdmin} className="space-y-4">
+                        <p className="text-xs leading-relaxed text-slate-300 bg-slate-950/70 border border-teal-500/20 rounded-xl p-3">
+                            اولین اجرا: حساب مدیر را خودتان بسازید. هیچ نام کاربری یا رمز عبور پیش‌فرضی فعال نیست.
+                        </p>
+                        <input type="text" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500" placeholder="نام کامل مدیر" value={setupFullName} onChange={e => setSetupFullName(e.target.value)} />
+                        <input type="text" autoComplete="username" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500 font-mono" placeholder="نام کاربری (حداقل ۴ نویسه)" value={setupUsername} onChange={e => setSetupUsername(e.target.value)} required />
+                        <input type="email" autoComplete="email" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500" placeholder="ایمیل بازیابی (اختیاری)" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} />
+                        <input type="password" autoComplete="new-password" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500 font-mono" placeholder="رمز عبور مدیر (حداقل ۱۲ نویسه)" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} required />
+                        <input type="password" autoComplete="new-password" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500 font-mono" placeholder="تکرار رمز عبور" value={setupPasswordConfirm} onChange={e => setSetupPasswordConfirm(e.target.value)} required />
+                        {error && <div className="text-rose-400 text-xs text-center font-bold bg-rose-500/10 py-3 px-4 rounded-xl border border-rose-500/20">{error}</div>}
+                        <button type="submit" className="w-full bg-teal-600 hover:bg-teal-500 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-teal-900/30 transition-all flex items-center justify-center gap-2">
+                            <ShieldCheck size={20} />
+                            <span>ایجاد حساب امن مدیر</span>
+                        </button>
+                    </form>
+                ) : (
+                    <form onSubmit={handleLogin} className="space-y-5">
                     <div className="space-y-2">
                         <label className="text-xs text-slate-400 pr-2 font-bold flex items-center gap-1.5">
                             <UserIcon size={14} className="text-teal-400" />
@@ -321,7 +418,8 @@ const LoginPage = () => {
                             </>
                         )}
                     </button>
-                </form>
+                    </form>
+                )}
 
                 {/* پیوند بازیابی هوشمند رمز عبور */}
                 <div className="mt-5 text-center">

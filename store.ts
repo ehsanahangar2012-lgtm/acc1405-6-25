@@ -243,32 +243,8 @@ export const useStore = create<AppState>()(
       
       return {
       currentUser: null,
-      users: [
-        { 
-          id: 'admin-1', 
-          username: 'admin', 
-          hashedPassword: securityService.hashPassword('123'), 
-          fullName: 'مدیر کل', 
-          roleId: 'admin', 
-          permissions: fullPermissions(), 
-          is_active: true,
-          email: 'ehsanahangar2010@gmail.com',
-          recoveryKey: 'ASHK-REC-9988-7711',
-          securityQuestion: 'نام اولین کسب‌وکار یا شرکت شما چیست؟',
-          securityAnswerHash: securityService.hashPassword('اشک قلم'.toLowerCase())
-        },
-        { 
-          id: 'user-1', 
-          username: 'user', 
-          hashedPassword: securityService.hashPassword('123'), 
-          fullName: 'کاربر عادی', 
-          roleId: 'user', 
-          permissions: {...fullPermissions(), settings: emptyPerm(false), users: emptyPerm(false)}, 
-          is_active: true,
-          email: 'user@ashkeghalam.ir',
-          recoveryKey: 'ASHK-REC-4433-2211'
-        }
-      ],
+      // Fresh installations require the owner to create an administrator account.
+      users: [],
       roles: PREDEFINED_ROLES as any,
       companies: [{ 
           id: 'default', 
@@ -430,8 +406,11 @@ export const useStore = create<AppState>()(
       
       addUser: (user) => set(s => {
           const { password, ...rest } = user;
-          const hashedPassword = password ? securityService.hashPassword(password) : securityService.hashPassword('123');
+          const hashedPassword = password
+              ? securityService.hashPasswordV2(password)
+              : (user.hashedPassword || '');
           const stampedUser = { ...rest, hashedPassword, updatedAt: new Date().toISOString() };
+          delete (stampedUser as any).password;
           const newUsers = [...s.users.filter(u => u.id !== user.id && u.username !== user.username), stampedUser];
           persistentStorage.saveData('users', newUsers).catch(() => {});
           return { users: newUsers };
@@ -439,11 +418,14 @@ export const useStore = create<AppState>()(
       updateUser: (id, up) => set(s => {
           const { password, ...rest } = up;
           const updateObj = { ...rest } as any;
-          if (password) {
-              updateObj.hashedPassword = securityService.hashPassword(password);
-          }
+          if (password) updateObj.hashedPassword = securityService.hashPasswordV2(password);
           updateObj.updatedAt = new Date().toISOString();
-          const updatedUsers = s.users.map(u => u.id === id ? {...u, ...updateObj} : u);
+          const updatedUsers = s.users.map(u => {
+              if (u.id !== id) return u;
+              const updated = { ...u, ...updateObj } as any;
+              delete updated.password;
+              return updated;
+          });
           persistentStorage.saveData('users', updatedUsers).catch(() => {});
           return { users: updatedUsers };
       }),
@@ -2061,6 +2043,40 @@ export const useStore = create<AppState>()(
     },
     {
       name: 'ashke-ghalam-rbac-v15-accounting',
+      version: 1,
+      migrate: (persistedState: any) => {
+          if (!persistedState || typeof persistedState !== 'object') return persistedState;
+          const migrated: any = { ...persistedState };
+          const legacyWeakHash = securityService.hashPassword('123');
+          const knownRecoveryKeys = new Set([
+              'ASHK-REC-9988-7711',
+              'ASHK-REC-4433-2211',
+              'ASHK-SUPER-MASTER-EMERGENCY-2026'
+          ]);
+          if (Array.isArray(migrated.users)) {
+              migrated.users = migrated.users
+                  .filter((user: any) => {
+                      if (!user || typeof user !== 'object') return false;
+                      const username = String(user.username || '').trim().toLowerCase();
+                      const defaultCredential = user.password === '123' || user.hashedPassword === legacyWeakHash;
+                      return !(['admin', 'user'].includes(username) && defaultCredential);
+                  })
+                  .map((user: any) => {
+                      const next = { ...user };
+                      if (typeof next.password === 'string' && next.password && !next.hashedPassword) {
+                          next.hashedPassword = securityService.hashPassword(next.password);
+                      }
+                      delete next.password;
+                      if (knownRecoveryKeys.has(String(next.recoveryKey || '').trim().toUpperCase())) {
+                          delete next.recoveryKey;
+                      }
+                      return next;
+                  });
+          }
+          // Do not restore an authenticated session from persisted application state.
+          migrated.currentUser = null;
+          return migrated;
+      },
       storage: createJSONStorage(() => ({
         getItem: async (name) => {
             // ۱. اولویت نخست در محیط ویندوز: بارگذاری مستقیم از فایل پایگاه داده دیسک (.db)
@@ -2171,7 +2187,7 @@ export const useStore = create<AppState>()(
       })),
       partialize: (state) => Object.fromEntries(
         Object.entries(state).filter(([key, val]) => 
-          typeof val !== 'function' && !['notifications', 'isOnline'].includes(key)
+          typeof val !== 'function' && !['notifications', 'isOnline', 'currentUser'].includes(key)
         )
       ),
     }
