@@ -2,6 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useStore } from '../store';
+import { useMobile } from '../useMobile';
 import { Person, Product, Invoice, InvoiceItem, InvoiceType, Check, IRANIAN_BANKS, PrintTheme, CompanyBranch } from '../types';
 import { formatCurrency, generateId, toPersianDigits, generateTrackingCode, getPersianDate, getPersianTime, generateLocalQrSvg, getNextCustomerCode, getNextProductCode, copyToClipboard, generatePdfBlob, downloadPdfBlob, sendInvoicePdf } from '../utils';
 import { Plus, Trash2, Printer, X, Save, CreditCard, UserPlus, PackagePlus, ShoppingBag, PlusCircle, Edit, ArrowLeft, Eye, Wallet, Landmark, CheckCircle2, ShieldCheck, Workflow, BookmarkPlus, Calculator, Banknote, BookMarked, Info, Barcode as BarcodeIcon, QrCode, ScrollText, Share2, UserCheck, Smartphone, Truck, PenTool, TextQuote, Link as LinkIcon, Calendar, Send, FileText, Download, Camera, MessageSquare, HelpCircle, Building2, Store, ShieldAlert, ArrowUpDown, Shuffle, RotateCcw, Sparkles, Copy, ExternalLink, ArrowDown, ArrowUp, Scan, Barcode, Layers } from 'lucide-react';
@@ -46,6 +47,7 @@ export const getInvoiceTypeDefaults = (targetType: InvoiceType, allInvoices: Inv
 
 const Invoices = () => {
   const { invoices, products, people, checks, addInvoice, updateInvoice, deleteInvoice, addPerson, addProduct, setInvoiceSignature, companies, defaultInvoiceFooter, savedDescriptions, addSavedDescription, removeSavedDescription, addBranch, addNotification } = useStore();
+  const { isMobile } = useMobile();
   
   const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
   const activeCompany = useMemo(() => companies.find(c => c.isActive) || companies[0], [companies]);
@@ -120,6 +122,8 @@ const Invoices = () => {
   const [invoiceNumber, setInvoiceNumber] = useState<number>(1001);
   const [showPosModal, setShowPosModal] = useState(false);
   const [filterType, setFilterType] = useState<'ALL' | InvoiceType>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const INVOICE_PAGE_SIZE = 50;
 
   // سورت لیست فاکتورها (پیش‌فرض: تاریخ صدور)
   const [sortBy, setSortBy] = useState<'date' | 'number' | 'finalTotal' | 'personName' | 'dueDate'>('date');
@@ -237,6 +241,21 @@ const Invoices = () => {
         return sortOrder === 'desc' ? -comparison : comparison;
       });
   }, [invoices, filterType, sortBy, sortOrder]);
+
+  // Render at most one page of invoices to avoid creating thousands of DOM nodes.
+  const pageCount = Math.max(1, Math.ceil(displayedInvoices.length / INVOICE_PAGE_SIZE));
+  const pageInvoices = useMemo(() => {
+    const start = (currentPage - 1) * INVOICE_PAGE_SIZE;
+    return displayedInvoices.slice(start, start + INVOICE_PAGE_SIZE);
+  }, [displayedInvoices, currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterType, sortBy, sortOrder]);
+
+  useEffect(() => {
+    if (currentPage > pageCount) setCurrentPage(pageCount);
+  }, [currentPage, pageCount]);
 
   const handleToggleSort = (field: 'date' | 'number' | 'finalTotal' | 'personName' | 'dueDate') => {
     if (sortBy === field) {
@@ -1175,8 +1194,8 @@ ${url}
 
           <div className="bg-transparent md:bg-slate-900/60 border-none md:border border-white/5 rounded-[2.5rem] overflow-hidden shadow-none md:shadow-2xl">
             {/* Mobile Card View */}
-            <div className="md:hidden space-y-4">
-              {displayedInvoices.map(inv => (
+            {isMobile && (<div className="space-y-4">
+              {pageInvoices.map(inv => (
                 <div key={inv.id} className="bg-slate-900/80 border border-white/10 p-5 rounded-4xl shadow-lg flex flex-col gap-4 active:scale-[0.98] transition-transform">
                     <div className="flex justify-between items-start">
                         <div>
@@ -1219,10 +1238,10 @@ ${url}
                     </div>
                 </div>
               ))}
-            </div>
+            </div>)}
 
           {/* Desktop Table View */}
-          <div className="hidden md:block overflow-x-auto">
+          {!isMobile && (<div className="overflow-x-auto">
             <table className="w-full text-right" dir="rtl">
               <thead className="bg-white/5 text-slate-400 text-[11px] font-black">
                 <tr>
@@ -1255,7 +1274,7 @@ ${url}
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-slate-200 text-sm">
-                {displayedInvoices.map(inv => (
+                {pageInvoices.map(inv => (
                   <tr key={inv.id} className="hover:bg-white/5 transition-colors group">
                     <td className="p-5 font-mono text-slate-400 font-black">{(inv.prefix || '') + toPersianDigits(inv.number)}</td>
                     <td className="p-5 text-xs text-slate-300 font-mono">{toPersianDigits(inv.date)}</td>
@@ -1299,6 +1318,26 @@ ${url}
                 ))}
               </tbody>
             </table>
+          </div>)}
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-4 text-xs text-slate-400" aria-live="polite">
+            <span>
+              نمایش {toPersianDigits(displayedInvoices.length === 0 ? '۰' : (currentPage - 1) * INVOICE_PAGE_SIZE + 1)} تا {toPersianDigits(Math.min(currentPage * INVOICE_PAGE_SIZE, displayedInvoices.length))} از {toPersianDigits(displayedInvoices.length)} فاکتور
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+                className="min-h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              >قبلی</button>
+              <span className="font-mono text-slate-300">{toPersianDigits(currentPage)} / {toPersianDigits(pageCount)}</span>
+              <button
+                type="button"
+                disabled={currentPage >= pageCount}
+                onClick={() => setCurrentPage(page => Math.min(pageCount, page + 1))}
+                className="min-h-9 px-3 rounded-lg border border-white/10 bg-white/5 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed"
+              >بعدی</button>
+            </div>
           </div>
         </div>
       </div>
