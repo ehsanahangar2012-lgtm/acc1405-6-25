@@ -337,7 +337,7 @@ const LoginPage = () => {
 
                 <div className="mt-6 pt-4 border-t border-white/5 text-center flex flex-col items-center gap-1">
                     <p className="text-[11px] text-slate-400">امکان اتصال همزمان چندین سیستم • پشتیبان‌گیری ابری و آفلاین</p>
-                    <p className="text-[10px] text-teal-400 font-black tracking-wide">دپارتمان IT اشک قلم | www.ashkghalam.ir</p>
+                    <p className="text-[10px] text-teal-400 font-semibold tracking-wide"><a href="https://ashkghalam.ir" target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">ashkghalam.ir</a></p>
                 </div>
             </div>
 
