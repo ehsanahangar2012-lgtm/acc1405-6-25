@@ -25,6 +25,7 @@ export interface VerifiedServerLicense {
 
 const publicKeys = new Map<string, CryptoKey>();
 const ALGORITHM = 'RSASSA-PKCS1-v1_5-SHA256';
+const LICENSE_AUTHORITY_URL = 'https://acc.ashkghalam.ir';
 
 function baseUrl(value: string): string {
   const url = String(value || '').trim().replace(/\/+$/, '');
@@ -78,12 +79,13 @@ export async function verifyServerLicenseReceipt(args: {
   receipt: ServerLicenseReceipt | null | undefined;
 }): Promise<VerifiedServerLicense | null> {
   try {
-    const { hostUrl, licenseKey, workspaceId, hwid, receipt } = args;
+    const { licenseKey, workspaceId, hwid, receipt } = args;
+    const trustedHostUrl = LICENSE_AUTHORITY_URL;
     if (!licenseKey?.trim() || !workspaceId?.trim() || !hwid?.trim() || !receipt) return null;
     if (receipt.algorithm !== ALGORITHM || !receipt.signed_payload || !receipt.signature) return null;
     const bytes = fromB64(receipt.signed_payload);
     const sig = fromB64(receipt.signature);
-    const key = await publicKey(hostUrl);
+    const key = await publicKey(trustedHostUrl);
     if (!await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, sig, bytes)) return null;
     const payload = JSON.parse(new TextDecoder().decode(bytes)) as VerifiedLicensePayload;
     const now = Math.floor(Date.now() / 1000);
@@ -108,7 +110,7 @@ export async function verifyServerLicenseReceipt(args: {
 export async function refreshServerLicense(args: {
   hostUrl: string; licenseKey: string; workspaceId: string; hwid: string;
 }): Promise<VerifiedServerLicense | null> {
-  const base = baseUrl(args.hostUrl);
+  const base = baseUrl(LICENSE_AUTHORITY_URL);
   const body = JSON.stringify({ action: 'verify_license', workspace_id: args.workspaceId, token: args.licenseKey, hwid: args.hwid });
   for (const endpoint of [base + '/tenant-manager.php', base + '/host-backend/tenant-manager.php']) {
     try {
@@ -120,7 +122,7 @@ export async function refreshServerLicense(args: {
       const data = await response.json().catch(() => null);
       if (!response.ok || data?.allowed !== true || data?.status !== 'ACTIVE') return null;
       return await verifyServerLicenseReceipt({
-        hostUrl: base, licenseKey: args.licenseKey, workspaceId: args.workspaceId,
+        hostUrl: LICENSE_AUTHORITY_URL, licenseKey: args.licenseKey, workspaceId: args.workspaceId,
         hwid: args.hwid, receipt: data.license_receipt
       });
     } catch { /* Try the alternate deployed endpoint, then fail closed. */ }
