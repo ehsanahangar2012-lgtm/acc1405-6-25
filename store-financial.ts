@@ -289,17 +289,28 @@ export const useFinancialStore = create<FinancialState>()(
 
       // بستن سال مالی (Year-Closing Procedure)
       closeFiscalYear: (year) => {
+        const originalEntries = [...get().accountingEntries];
+        const originalPeriods = [...get().fiscalPeriods];
+        const yearPeriods = originalPeriods.filter(period => period.startDate.startsWith(year));
+        if (yearPeriods.length === 0) {
+          throw new Error(`برای سال مالی ${year} هیچ دورهٔ مالی تعریف نشده است.`);
+        }
+        if (yearPeriods.every(period => period.status === 'LOCKED')) {
+          throw new Error(`سال مالی ${year} قبلاً بسته شده است.`);
+        }
+
+        try {
         const trial = get().getTrialBalance();
         const accounts = get().chartOfAccounts;
-        const currentLocalDate = getPersianDate();
 
         // 1. یافتن کلیه حساب‌های موقت (درآمدها و هزینه‌ها)
         const temporaryBalances = trial.filter(t => {
           const acc = accounts.find(a => a.id === t.accountId);
-          return acc && (acc.type === 'REVENUE' || acc.type === 'EXPENSE');
+          return acc &&
+            (acc.type === 'REVENUE' || acc.type === 'EXPENSE') &&
+            Number.isFinite(t.balance) &&
+            Math.abs(t.balance) > 0.000001;
         });
-
-        if (temporaryBalances.length === 0) return;
 
         // 2. صدور سند بستن حساب‌های موقت و انتقال سود/زیان به سود انباشته (3200)
         let totalRev = 0;
@@ -358,10 +369,24 @@ export const useFinancialStore = create<FinancialState>()(
             p.startDate.startsWith(year) ? { ...p, status: 'LOCKED' } : p
           )
         }));
+        } catch (error) {
+          set({ accountingEntries: originalEntries, fiscalPeriods: originalPeriods });
+          throw error;
+        }
       },
 
       // افتتاح سال مالی جدید (Year-Opening Procedure)
       openFiscalYear: (year, prevYear) => {
+        const originalEntries = [...get().accountingEntries];
+        const originalPeriods = [...get().fiscalPeriods];
+        if (!/^\\d{4}$/.test(year) || !/^\\d{4}$/.test(prevYear) || year === prevYear) {
+          throw new Error('سال مالی و سال مبنا باید سال‌های معتبر و متفاوت باشند.');
+        }
+        if (originalPeriods.some(period => period.startDate.startsWith(year))) {
+          throw new Error(`سال مالی ${year} قبلاً افتتاح شده است و دوره‌های آن وجود دارند.`);
+        }
+
+        try {
         const trial = get().getTrialBalance();
         const accounts = get().chartOfAccounts;
 
@@ -419,6 +444,10 @@ export const useFinancialStore = create<FinancialState>()(
             { id: `${year}-12`, name: `اسفند ${year}`, startDate: `${year}/12/01`, endDate: `${year}/12/29`, status: 'OPEN' }
           ];
           set(s => ({ fiscalPeriods: [...s.fiscalPeriods, ...newPeriods] }));
+        }
+        } catch (error) {
+          set({ accountingEntries: originalEntries, fiscalPeriods: originalPeriods });
+          throw error;
         }
       },
 
