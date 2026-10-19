@@ -20,6 +20,7 @@ import { persistentStorage } from './services/persistentStorage';
 import { deletedRecordsRegistry } from './services/deletedRecordsRegistry';
 import { licenseQuotaService } from './services/licenseQuotaService';
 import { desktopDatabaseService } from './services/desktopDatabaseService';
+import { APP_VERSION } from './config';
 
 const emptyPerm = (val: boolean = false): ModulePermission => ({ view: val, create: val, edit: val, delete: val });
 
@@ -2014,7 +2015,8 @@ export const useStore = create<AppState>()(
           const allBranches = (state.companies || []).flatMap(c => (c.branches || []).map(b => ({ ...b, companyId: c.id })));
           const backupData: any = {
               timestamp: new Date().toISOString(),
-              version: '16.22.0',
+              version: APP_VERSION,
+              backupFormatVersion: 2,
               companies: state.companies,
               branches: allBranches,
               products: state.products,

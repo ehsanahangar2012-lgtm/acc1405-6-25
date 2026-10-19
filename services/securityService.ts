@@ -69,48 +69,51 @@ class SecurityService {
         return CryptoJS.lib.WordArray.random(32).toString();
     }
 
+    private stableBackupSerialize(value: any): string {
+        if (value === null || value === undefined || typeof value === 'function') return 'null';
+        if (value instanceof Date) return JSON.stringify(value.toISOString());
+        if (typeof value !== 'object') {
+            const encoded = JSON.stringify(value);
+            return encoded === undefined ? 'null' : encoded;
+        }
+        if (Array.isArray(value)) {
+            return '[' + value.map(item => this.stableBackupSerialize(item)).join(',') + ']';
+        }
+        const keys = Object.keys(value)
+            .filter(key => value[key] !== undefined && typeof value[key] !== 'function')
+            .sort();
+        return '{' + keys.map(key =>
+            JSON.stringify(key) + ':' + this.stableBackupSerialize(value[key])
+        ).join(',') + '}';
+    }
+
+    // Version 2 is an integrity digest across the complete backup payload, excluding
+    // only the digest field itself. It detects file corruption but is not a server-issued
+    // digital signature and cannot authenticate a hostile client.
     signBackup(data: any): string {
         try {
-            const dataStr = JSON.stringify({
-                companies: data.companies || [],
-                products: data.products || [],
-                people: data.people || [],
-                invoices: data.invoices || [],
-                vouchers: data.vouchers || [],
-                checks: data.checks || [],
-                transactions: data.transactions || [],
-                checkTransfers: data.checkTransfers || [],
-                salaries: data.salaries || [],
-                config: data.config || {}
-            });
-            return CryptoJS.SHA256(dataStr + this.salt).toString();
+            const payload = { ...data };
+            delete payload.signature;
+            const canonicalPayload = this.stableBackupSerialize(payload);
+            return 'v2-sha256:' + CryptoJS.SHA256('AshkeGhalamBackupV2:' + canonicalPayload).toString();
         } catch {
             return '';
         }
     }
 
     verifyBackup(data: any): boolean {
-        if (!data) return false;
-        
-        // Check if the payload structurally looks like a valid system backup
-        const hasBackupTables = !!(
-            data.companies || data.products || data.people || 
-            data.invoices || data.vouchers || data.checks || 
-            data.transactions || data.salaries || data.contracts
-        );
-        
-        if (!data.signature) {
-            // Allow legacy files that don't have a signature, but must have valid system tables
-            return hasBackupTables;
+        if (!data || Number(data.backupFormatVersion) !== 2 ||
+            typeof data.signature !== 'string' || !data.signature.startsWith('v2-sha256:')) {
+            return false;
         }
-        
-        const computed = this.signBackup(data);
-        if (data.signature === computed) {
-            return true;
+
+        const expected = this.signBackup(data);
+        if (!expected || expected.length !== data.signature.length) return false;
+        let diff = 0;
+        for (let i = 0; i < expected.length; i++) {
+            diff |= expected.charCodeAt(i) ^ data.signature.charCodeAt(i);
         }
-        
-        // If signature fails but contains valid system tables, allow as legacy/converted import
-        return hasBackupTables;
+        return diff === 0;
     }
 
     generateRecordChecksum(recordId: string, payload: any): string {

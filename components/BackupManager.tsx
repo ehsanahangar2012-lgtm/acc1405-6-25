@@ -14,6 +14,8 @@ import { autoBackupService } from '../services/autoBackupService';
 import { backupMigrationService } from '../services/backupMigrationService';
 import { smartStorage } from '../services/smartStorageService';
 import { TripleBackupService, TripleBackupReport } from '../services/tripleBackupService';
+import { useFinancialStore } from '../store-financial';
+import { APP_VERSION } from '../config';
 
 type ActiveTab = 'triple' | 'stats' | 'cloud' | 'local_snap' | 'desktop' | 'file' | 'sync' | 'diagnostics' | 'reset';
 
@@ -476,7 +478,8 @@ const BackupManager = () => {
             const currentRoles = useStore.getState().roles || [];
             const backupData: any = {
                 timestamp: new Date().toISOString(),
-                version: '16.22.0',
+                version: APP_VERSION,
+                backupFormatVersion: 2,
                 companies,
                 branches: allBranches,
                 products,
@@ -492,6 +495,7 @@ const BackupManager = () => {
                 users,
                 roles: currentRoles,
                 importConfigs,
+                financialData: useFinancialStore.getState(),
                 signature: ''
             };
             
@@ -503,9 +507,9 @@ const BackupManager = () => {
             backupService.backupData('full-export', backupData).catch(() => {});
             
             if (addNotification) {
-                addNotification('success', 'فایل پشتیبان کامل و امضا شده (شامل شعب، کاربران و نقش‌ها) با موفقیت صادر و دانلود شد.');
+                addNotification('success', 'فایل پشتیبان کامل با کنترل یکپارچگی و شامل دفتر مالی با موفقیت صادر شد.');
             } else {
-                alert('فایل پشتیبان کامل و امضا شده با موفقیت صادر و دانلود شد.');
+                alert('فایل پشتیبان کامل با کنترل یکپارچگی صادر و دانلود شد.');
             }
         } catch (error) {
             console.error(error);
@@ -534,10 +538,16 @@ const BackupManager = () => {
                 return;
             }
 
-            // Cryptographic Verification
+            // Version 2 backups must pass integrity verification. Legacy formats are
+            // imported only through a separate, explicit compatibility confirmation.
+            const formatVersion = Number(rawData.backupFormatVersion || 0);
             const isValid = securityService.verifyBackup(rawData);
-            if (!isValid) {
-                const proceed = confirm('⚠️ هشدار امنیتی: اصالت فایل پشتیبان تایید نشد (امضای دیجیتال معتبر نیست یا فایل دستکاری شده است).\n\nآیا با این وجود می‌خواهید با ریسک خود اقدام به وارد کردن و مهاجرت داده‌ها نمایید؟');
+            if (formatVersion >= 2 && !isValid) {
+                alert('فایل پشتیبان نسخه جدید فاقد برچسب یکپارچگی معتبر است یا پس از ایجاد تغییر کرده است. بازیابی متوقف شد.');
+                return;
+            }
+            if (formatVersion < 2 && !isValid) {
+                const proceed = confirm('این فایل پشتیبان قدیمی است و کنترل یکپارچگی نسخه جدید را ندارد. فقط در صورتی ادامه دهید که منبع فایل را می‌شناسید. آیا می‌خواهید مسیر مهاجرت فایل قدیمی را ادامه دهید؟');
                 if (!proceed) return;
             }
 
