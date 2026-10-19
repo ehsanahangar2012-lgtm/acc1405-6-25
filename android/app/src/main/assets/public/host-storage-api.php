@@ -456,6 +456,35 @@ function uploadImage($base64, $folder, $filename) {
     return ['success' => true, 'url' => str_replace(DIRECTORY_SEPARATOR, '/', substr($path, strlen(__DIR__)))];
 }
 
+function createBackup() {
+    $timestamp = date('Y-m-d_H-i-s');
+    $manualDir = BACKUP_ROOT . '/manual';
+    if (!is_dir($manualDir) && !@mkdir($manualDir, 0700, true) && !is_dir($manualDir)) {
+        return ['success' => false, 'error' => 'BACKUP_STORAGE_UNAVAILABLE'];
+    }
+    @chmod($manualDir, 0700);
+    $backup = [
+        'timestamp' => date(DATE_ATOM),
+        'workspace' => $GLOBALS['workspace'] ?? '',
+        'version' => '3.0',
+        'data' => []
+    ];
+    foreach ($GLOBALS['ALLOWED_TABLES'] ?? [] as $table) {
+        $records = getData($table);
+        if (!is_array($records)) {
+            return ['success' => false, 'error' => 'BACKUP_READ_FAILED', 'table' => $table];
+        }
+        $backup['data'][$table] = $records;
+    }
+    $encoded = json_encode($backup, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if (!is_string($encoded)) return ['success' => false, 'error' => 'BACKUP_ENCODE_FAILED'];
+    $path = $manualDir . '/backup_' . $timestamp . '_' . bin2hex(random_bytes(3)) . '.json';
+    if (!storageAtomicWrite($path, $encoded)) {
+        return ['success' => false, 'error' => 'BACKUP_WRITE_FAILED'];
+    }
+    return ['success' => true, 'file' => basename($path), 'size' => filesize($path)];
+}
+
 // Keep the legacy API router separate from the secure storage helpers.
 
 // Handle authenticated, workspace-bound storage actions.
