@@ -86,11 +86,8 @@ class LicenseQuotaService {
             );
         } catch {}
 
-        const offlineLicenseConfirmed = Boolean(
-            licenseKey &&
-            activationCode &&
-            !licenseKey.startsWith('PWA-HOST-LIC-')
-        );
+        // Legacy local ACT codes used a client-embedded secret and are not commercial proof.
+        const offlineLicenseConfirmed = false;
         return serverVerified || offlineLicenseConfirmed;
     }
 
@@ -246,9 +243,8 @@ class LicenseQuotaService {
                 data.workspaceId !== 'main'
             );
         } catch {}
-        const offlineLicenseConfirmed = Boolean(
-            licenseKey && activationCode && !licenseKey.startsWith('PWA-HOST-LIC-')
-        );
+        // Legacy local ACT codes used a client-embedded secret and are not commercial proof.
+        const offlineLicenseConfirmed = false;
         if (localStatus === 'ACTIVATED' && (serverVerified || offlineLicenseConfirmed)) {
             return true;
         }
