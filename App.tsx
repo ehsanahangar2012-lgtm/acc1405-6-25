@@ -843,6 +843,7 @@ const App = () => {
   }, [currentUser]);
 
   const [showActivationModal, setShowActivationModal] = useState(false);
+  const [activationPrefill, setActivationPrefill] = useState<{ licenseKey?: string; companyName?: string; workspaceId?: string }>({});
   const [showAndroidCommercialModal, setShowAndroidCommercialModal] = useState(false);
   const [showTrialLimitModal, setShowTrialLimitModal] = useState(false);
   const [trialLimitReason, setTrialLimitReason] = useState<'CUSTOMERS_LIMIT' | 'DOCUMENTS_LIMIT' | 'MANUAL'>('MANUAL');
@@ -882,7 +883,11 @@ const App = () => {
   // should spend its bandwidth and CPU on the active screen only.
 
   useEffect(() => {
-    const handleOpenActivation = () => setShowActivationModal(true);
+    const handleOpenActivation = (event: Event) => {
+      const detail = (event as CustomEvent<{ licenseKey?: string; companyName?: string; workspaceId?: string }>).detail;
+      setActivationPrefill(detail && typeof detail === 'object' ? detail : {});
+      setShowActivationModal(true);
+    };
     const handleOpenAndroidCommercial = () => setShowAndroidCommercialModal(true);
     const handleOpenTrialLimit = (e: any) => {
       if (e.detail?.reason) setTrialLimitReason(e.detail.reason);
@@ -928,6 +933,9 @@ const App = () => {
                 <ActivationDashboard 
                   isOpen={showActivationModal} 
                   onClose={() => setShowActivationModal(false)}
+                  initialLicenseKey={activationPrefill.licenseKey}
+                  initialCompanyName={activationPrefill.companyName}
+                  initialWorkspaceId={activationPrefill.workspaceId}
                 />
               )}
               {showAndroidCommercialModal && (
