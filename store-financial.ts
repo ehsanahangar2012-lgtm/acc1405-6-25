@@ -379,7 +379,7 @@ export const useFinancialStore = create<FinancialState>()(
       openFiscalYear: (year, prevYear) => {
         const originalEntries = [...get().accountingEntries];
         const originalPeriods = [...get().fiscalPeriods];
-        if (!/^\\d{4}$/.test(year) || !/^\\d{4}$/.test(prevYear) || year === prevYear) {
+        if (!/^\d{4}$/.test(year) || !/^\d{4}$/.test(prevYear) || year === prevYear) {
           throw new Error('سال مالی و سال مبنا باید سال‌های معتبر و متفاوت باشند.');
         }
         if (originalPeriods.some(period => period.startDate.startsWith(year))) {
