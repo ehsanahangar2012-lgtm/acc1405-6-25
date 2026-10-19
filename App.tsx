@@ -731,6 +731,14 @@ const App = () => {
   });
   const [showSplash, setShowSplash] = useState(() => {
     if (typeof window === 'undefined') return false;
+
+    // Mobile users should enter the app immediately instead of waiting through
+    // the 2–3 second animated welcome screen on a smaller/less powerful device.
+    if (isAndroidApp() || window.matchMedia('(max-width: 768px)').matches) {
+      sessionStorage.setItem('ashk_splash_seen', 'true');
+      return false;
+    }
+
     const sessionSeen = sessionStorage.getItem('ashk_splash_seen');
     if (!sessionSeen) {
       sessionStorage.setItem('ashk_splash_seen', 'true');
@@ -739,21 +747,9 @@ const App = () => {
     return false;
   });
 
-  // پیش‌بارگذاری بهینه کامپوننت‌های اصلی برای حذف کامل لگ در تعویض صفحات
-  useEffect(() => {
-    const preloadTimer = setTimeout(() => {
-      import('./pages/Dashboard').catch(() => {});
-      import('./pages/Invoices').catch(() => {});
-      import('./pages/Inventory').catch(() => {});
-      import('./pages/Checks').catch(() => {});
-      import('./pages/Finance').catch(() => {});
-      import('./pages/Customers').catch(() => {});
-      import('./pages/Help').catch(() => {});
-      import('./pages/MoadianTaxHub').catch(() => {});
-      import('./pages/PosTerminalManagement').catch(() => {});
-    }, 1500);
-    return () => clearTimeout(preloadTimer);
-  }, []);
+  // Route-aware preloading is handled by useSmartRoutePreloader on desktop.
+  // Avoid importing nine large financial modules during initial startup; mobile WebView
+  // should spend its bandwidth and CPU on the active screen only.
 
   useEffect(() => {
     const handleOpenActivation = () => setShowActivationModal(true);
