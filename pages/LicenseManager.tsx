@@ -154,7 +154,7 @@ const LicenseManager: React.FC = () => {
     const handlePlanChange = (plan: LicensePlan) => {
         setSelectedPlan(plan);
         setPricePaid(PLAN_CONFIGS[plan].defaultPrice);
-        if (PLAN_CONFIGS[plan].isUnlimited) {
+        if (plan === 'GOLD') {
             setExpireDate('9999-12-31');
         } else {
             const d = new Date();
