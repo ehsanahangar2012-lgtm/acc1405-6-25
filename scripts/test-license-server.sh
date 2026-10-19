@@ -366,6 +366,21 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-valid
 [[ "$code" == "200" ]]
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||!is_array($r["stats"]??null)){fwrite(STDERR,"Device-bound host storage access failed\n");exit(1);}' "$TEST_DIR/host-storage-valid.json"
 
+# The legacy record-oriented storage API rejects arbitrary table paths and invalid IDs.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-invalid-table.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"save","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A","table":"../../data","data":{"id":"x"}}' "$BASE_URL/host-storage-api.php")"
+[[ "$code" == "400" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="INVALID_TABLE"){fwrite(STDERR,"Host storage accepted a caller-chosen path");exit(1);}' "$TEST_DIR/host-storage-invalid-table.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-invalid-id.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"save","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A","table":"people","data":{"id":"../../workspaces_auth"}}' "$BASE_URL/host-storage-api.php")"
+[[ "$code" == "400" ]]
+
+# Record-oriented writes cannot exceed the same server-side customer limit enforced by storage.php.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-quota-denied.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"action":"save","workspace_id":"ws_quota","workspace_token":"ASHK-CI-QUOTA-0001","hwid":"HWID-Q","table":"people","data":{"id":"p3","name":"Third"}}' "$BASE_URL/host-storage-api.php")"
+[[ "$code" == "409" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="CUSTOMER_QUOTA_EXCEEDED"||($j["max"]??null)!==2){fwrite(STDERR,"Legacy host storage bypassed customer quota enforcement");exit(1);}' "$TEST_DIR/host-storage-quota-denied.json"
+
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-api-no-auth.json" -w '%{http_code}' \
   -H 'Content-Type: application/json' -d '{"action":"list"}' "$BASE_URL/server-api-backup.php")"
 [[ "$code" == "400" ]]
