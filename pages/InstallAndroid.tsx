@@ -34,6 +34,7 @@ const InstallAndroid: React.FC = () => {
         if (typeof window === 'undefined') return '';
         return localStorage.getItem('ashk_host_sync_token') || localStorage.getItem('ashk_cloud_token') || '';
     });
+    const [workspaceId, setWorkspaceId] = useState(() => workspaceService.getWorkspaceId());
 
     useEffect(() => {
         if (typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches) {
@@ -71,20 +72,26 @@ const InstallAndroid: React.FC = () => {
     const handleSaveAndroidSync = async () => {
         const trimmedUrl = hostUrl.trim();
         const trimmedToken = syncToken.trim();
-        if (trimmedUrl) {
-            localStorage.setItem('ashk_host_url', trimmedUrl);
-            localStorage.setItem('ashk_custom_server_url', trimmedUrl);
+        const trimmedWorkspaceId = workspaceId.trim();
+
+        if (!trimmedUrl || !trimmedToken || !trimmedWorkspaceId) {
+            addNotification('error', 'آدرس سرور، شناسه فضای کاری و توکن اختصاصی را کامل وارد کنید.');
+            return;
         }
-        if (trimmedToken) {
-            localStorage.setItem('ashk_host_sync_token', trimmedToken);
-            localStorage.setItem('ashk_cloud_token', trimmedToken);
+
+        const result = await androidCommercialService.connectToServer(
+            trimmedUrl,
+            trimmedToken,
+            trimmedWorkspaceId
+        );
+        if (result.success) {
+            setHostUrl(trimmedUrl);
+            setSyncToken(trimmedToken);
+            setWorkspaceId(trimmedWorkspaceId);
+            addNotification('success', result.message);
+        } else {
+            addNotification('error', result.message);
         }
-        await workspaceService.updateConfig({
-            customServerUrl: trimmedUrl,
-            workspaceToken: trimmedToken,
-            standaloneOfflineMode: false
-        }).catch(() => {});
-        addNotification('success', 'تنظیمات ارتباط با سرور با موفقیت ذخیره شد.');
     };
 
     const currentLiveUrl = typeof window !== 'undefined' ? window.location.origin : 'https://acc.ashkghalam.ir';
@@ -674,23 +681,23 @@ pause`;
                         <span className="text-[10px] text-teal-400 font-black uppercase tracking-wider bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
                             🔄 همگام‌سازی ابری و محلی ۳ سویه
                         </span>
-                        <h2 className="text-xl font-black text-white">ارتباط دائمی موبایل با ویندوز و هاست</h2>
+                        <h2 className="text-xl font-black text-white">اتصال کلاینت به سرور و سایر دستگاه‌ها</h2>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                            اطلاعات ثبت‌شده روی موبایل هنگام دسترسی به اینترنت یا شبکه محلی با دیتابیس مرکزی و نرم‌افزار ویندوز تبادل می‌شود.
+                            ابتدا لایسنس معتبر دستگاه را فعال کنید. سپس شناسه فضای کاری ثبت‌شده، آدرس سرور و توکن اختصاصی آن را وارد کنید. اتصال فقط پس از تأیید سرور ذخیره می‌شود؛ اتصال به‌تنهایی لایسنس را فعال یا سهمیه را افزایش نمی‌دهد.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                                 <Globe size={14} className="text-teal-400" />
-                                <span>آدرس هاست مرکزی یا سرور محلی (Host URL):</span>
+                                <span>آدرس سرور (Host URL):</span>
                             </label>
                             <input
-                                type="text"
+                                type="url"
                                 value={hostUrl}
                                 onChange={(e) => setHostUrl(e.target.value)}
-                                placeholder="https://acc.ashkghalam.ir"
+                                placeholder="https://acc.yourdomain.ir"
                                 className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-teal-500"
                             />
                         </div>
@@ -698,14 +705,29 @@ pause`;
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                                 <Key size={14} className="text-amber-400" />
-                                <span>توکن امنیتی همگام‌سازی (Sync Token):</span>
+                                <span>شناسه فضای کاری (Workspace ID):</span>
                             </label>
                             <input
                                 type="text"
+                                value={workspaceId}
+                                onChange={(e) => setWorkspaceId(e.target.value)}
+                                placeholder="client_rahimi"
+                                className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-amber-500"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                                <Key size={14} className="text-violet-400" />
+                                <span>توکن اختصاصی سرور:</span>
+                            </label>
+                            <input
+                                type="password"
+                                autoComplete="off"
                                 value={syncToken}
                                 onChange={(e) => setSyncToken(e.target.value)}
-                                placeholder="AG-HOST-VAULT-9821-SYNC-X72A"
-                                className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-amber-500"
+                                placeholder="توکن اختصاصی این مشتری"
+                                className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-violet-500"
                             />
                         </div>
                     </div>
@@ -716,7 +738,7 @@ pause`;
                             className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-lg shadow-teal-900/30"
                         >
                             <RefreshCw size={16} />
-                            <span>ذخیره تنظیمات و برقراری پیوند همگام‌سازی ۳ سویه</span>
+                            <span>تأیید لایسنس و آزمون اتصال</span>
                         </button>
 
                         <div className="text-[11px] text-slate-400 flex items-center gap-2">
