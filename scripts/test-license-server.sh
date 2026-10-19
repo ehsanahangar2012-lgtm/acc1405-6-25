@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -51,6 +51,31 @@ for attempt in $(seq 1 40); do
   if curl --silent --fail "$BASE_URL/tenant-manager.php?action=public_key" >/dev/null; then break; fi
   sleep 0.25
 done
+
+# A legacy digital-signature API must never accept the historical public fallback or VITE token.
+if grep -Eq "default-api-key-change-in-production|VITE_API_TOKEN" \
+  "$ROOT_DIR/host-backend/digital-signature-config.php" \
+  "$ROOT_DIR/android/app/src/main/assets/public/digital-signature-config.php"; then
+  echo "Public/fallback digital-signature API credentials must not be used" >&2
+  exit 1
+fi
+unset ASHK_DIGITAL_SIGNATURE_API_TOKEN || true
+VITE_API_TOKEN=default-api-key-change-in-production php -r '
+require $argv[1];
+$config = DigitalSignatureConfig::getInstance();
+if ($config->validateToken("default-api-key-change-in-production") || $config->validateToken("")) {
+  fwrite(STDERR, "Digital-signature API accepted a missing/server-unconfigured secret\\n"); exit(1);
+}
+' "$TEST_DIR/digital-signature-config.php"
+ASHK_DIGITAL_SIGNATURE_API_TOKEN=ci-digital-signature-secret php -r '
+require $argv[1];
+$config = DigitalSignatureConfig::getInstance();
+if (!$config->validateToken("ci-digital-signature-secret") ||
+    $config->validateToken("wrong-secret") ||
+    $config->validateToken("default-api-key-change-in-production")) {
+  fwrite(STDERR, "Digital-signature server-only token validation failed\\n"); exit(1);
+}
+' "$TEST_DIR/digital-signature-config.php"
 
 # Retired legacy endpoints must fail closed.
 for endpoint in server-api-database.php server-api-upload.php audit-trail-api.php; do
