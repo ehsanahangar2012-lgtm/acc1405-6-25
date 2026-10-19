@@ -1444,14 +1444,13 @@ const BackupManager = () => {
                                 </p>
                             </div>
 
-                            <div 
                             <div className="space-y-1.5 mb-4">
                                 <label htmlFor="backup-import-password" className="block text-sm font-bold text-slate-200">رمز بازیابی فایل رمزگذاری‌شده</label>
                                 <input id="backup-import-password" type="password" autoComplete="current-password" value={backupImportPassword} onChange={e => setBackupImportPassword(e.target.value)} placeholder="رمز هنگام ایجاد فایل" className="w-full min-h-12 rounded-xl bg-slate-950 border border-white/20 px-3 py-3 text-base text-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
                                 <p className="text-sm text-slate-300 leading-6">اگر فایل قدیمی و بدون رمز است، برنامه پیش از بازیابی هشدار می‌دهد.</p>
                             </div>
 
-                                className={`h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                            <div className={`h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
                                     dragOver ? 'border-teal-500 bg-teal-500/10 text-teal-400' : 'border-white/10 hover:border-teal-500 text-slate-400 hover:text-white'
                                 }`}
                                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
