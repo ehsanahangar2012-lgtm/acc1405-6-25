@@ -65,7 +65,7 @@ class AndroidCommercialService {
             return { success: false, message: 'این عملیات فقط در نسخه نصب‌شده پشتیبانی می‌شود.' };
         }
 
-        const hostUrl = (customHostUrl || localStorage.getItem(this.STORAGE_KEYS.HOST_URL) || localStorage.getItem('ashk_custom_server_url') || '').trim().replace(/\\/+$/, '');
+        const hostUrl = (customHostUrl || localStorage.getItem(this.STORAGE_KEYS.HOST_URL) || localStorage.getItem('ashk_custom_server_url') || '').trim().replace(/\/+$/, '');
         const syncToken = (customSyncToken || localStorage.getItem(this.STORAGE_KEYS.SYNC_TOKEN) || localStorage.getItem('ashk_cloud_token') || '').trim();
 
         if (!hostUrl) return { success: false, message: 'آدرس سرور را وارد کنید.' };
