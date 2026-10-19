@@ -48,8 +48,16 @@ jobs:
           set -euo pipefail
           php -l host-backend/license_validator.php
           php -l host-backend/tenant-manager.php
+          php -l host-backend/storage.php
+          php -l host-backend/host-storage-api.php
+          php -l host-backend/server-api-backup.php
+          php -l host-backend/backup-system.php
           php -l android/app/src/main/assets/public/license_validator.php
           php -l android/app/src/main/assets/public/tenant-manager.php
+          php -l android/app/src/main/assets/public/storage.php
+          php -l android/app/src/main/assets/public/host-storage-api.php
+          php -l android/app/src/main/assets/public/server-api-backup.php
+          php -l android/app/src/main/assets/public/backup-system.php
 
       - name: Test server license registration and lifecycle
         shell: bash

@@ -7,7 +7,7 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Workspace-ID, X-Workspace-Token');
+header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Workspace-ID, X-Workspace-Token, X-Device-HWID');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit(0);

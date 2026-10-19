@@ -2,69 +2,64 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, X-Workspace-ID, X-Workspace-Token, X-Device-HWID');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
 
-function getEnvVar($key, $default = '') {
-    $envFile = __DIR__ . '/.env.local';
-    if (file_exists($envFile)) {
-        $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ($lines as $line) {
-            if (strpos(trim($line), '#') === 0) continue;
-            $parts = explode('=', $line, 2);
-            if (count($parts) === 2 && trim($parts[0]) === $key) {
-                return trim($parts[1]);
-            }
-        }
-    }
-    return getenv($key) ?: $default;
+$headers = function_exists('getallheaders') ? getallheaders() : [];
+$workspaceHeader = '';
+$tokenHeader = '';
+$hwidHeader = '';
+foreach ($headers as $name => $value) {
+    if (strcasecmp($name, 'X-Workspace-ID') === 0) $workspaceHeader = $value;
+    elseif (strcasecmp($name, 'X-Workspace-Token') === 0) $tokenHeader = $value;
+    elseif (strcasecmp($name, 'X-Device-HWID') === 0) $hwidHeader = $value;
 }
-
-$expectedToken = getEnvVar('VITE_API_TOKEN');
-
-$authHeader = '';
-$headers = getallheaders();
-if (is_array($headers)) {
-    foreach ($headers as $name => $value) {
-        if (strcasecmp($name, 'Authorization') === 0) {
-            $authHeader = $value;
-            break;
-        }
-    }
+$input = json_decode(file_get_contents('php://input'), true);
+if (!is_array($input)) $input = [];
+$workspace = trim((string)($workspaceHeader ?: ($input['workspace_id'] ?? '')));
+$token = trim((string)($tokenHeader ?: ($input['workspace_token'] ?? '')));
+$hwid = trim((string)($hwidHeader ?: ($input['hwid'] ?? '')));
+if ($workspace === '' || !preg_match('/^[a-zA-Z0-9_-]{1,128}$/', $workspace)) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'INVALID_WORKSPACE']);
+    exit();
 }
-if (empty($authHeader) && isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
+$validatorFile = __DIR__ . '/license_validator.php';
+if (!is_file($validatorFile)) {
+    http_response_code(503);
+    echo json_encode(['success' => false, 'error' => 'AUTHORITY_UNAVAILABLE']);
+    exit();
 }
-if (empty($authHeader) && isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-    $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-}
-
-$providedToken = '';
-if (!empty($authHeader)) {
-    if (preg_match('/Bearer\s(\S+)/i', $authHeader, $matches)) {
-        $providedToken = $matches[1];
-    } else {
-        $providedToken = str_replace('Bearer ', '', $authHeader);
-    }
-}
-
-if (empty($expectedToken) || $providedToken !== $expectedToken) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+require_once $validatorFile;
+$access = LicenseValidator::validateAccess($workspace, $token, $hwid);
+if (!($access['allowed'] ?? false)) {
+    http_response_code(($access['status'] ?? '') === 'REGISTRY_UNAVAILABLE' ? 503 : 403);
+    echo json_encode(['success' => false, 'error' => 'ACCESS_DENIED', 'status' => $access['status'] ?? 'FORBIDDEN']);
     exit();
 }
 
-$backupDir = __DIR__ . '/backup';
-if (!is_dir($backupDir)) {
-    mkdir($backupDir, 0755, true);
+// Backups are separated by workspace. The mother portal retains the legacy master location.
+$backupDir = ($workspace === 'default' || $workspace === 'main')
+    ? __DIR__ . '/backup'
+    : __DIR__ . '/backups/tenants/' . $workspace;
+if (!is_dir($backupDir) && !mkdir($backupDir, 0700, true) && !is_dir($backupDir)) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'BACKUP_STORAGE_UNAVAILABLE']);
+    exit();
 }
-$legacyDir = __DIR__ . '/backups';
-if (is_dir($legacyDir) && !file_exists($backupDir . '/backups_index.json') && file_exists($legacyDir . '/backups_index.json')) {
-    @copy($legacyDir . '/backups_index.json', $backupDir . '/backups_index.json');
+@chmod($backupDir, 0700);
+$denyRule = "Options -Indexes\nDeny from all\n";
+if (!is_file($backupDir . '/.htaccess')) @file_put_contents($backupDir . '/.htaccess', $denyRule, LOCK_EX);
+if (($workspace === 'default' || $workspace === 'main')) {
+    // Migrate the old index only for the mother portal, never into a customer tenant.
+    $legacyDir = __DIR__ . '/backups';
+    if (is_dir($legacyDir) && !file_exists($backupDir . '/backups_index.json') && file_exists($legacyDir . '/backups_index.json')) {
+        @copy($legacyDir . '/backups_index.json', $backupDir . '/backups_index.json');
+    }
 }
 
 $indexPath = $backupDir . '/backups_index.json';
@@ -96,6 +91,7 @@ function rebuildIndex($backupDir, $indexPath, $maxFiles = 10) {
         return $b['timestamp'] - $a['timestamp'];
     });
 
+    // Enforce 10 files limit
     if (count($entries) > $maxFiles) {
         $toRemove = array_slice($entries, $maxFiles);
         $entries = array_slice($entries, 0, $maxFiles);
@@ -111,7 +107,6 @@ function rebuildIndex($backupDir, $indexPath, $maxFiles = 10) {
     return $entries;
 }
 
-$input = json_decode(file_get_contents('php://input'), true);
 $action = $input['action'] ?? $_GET['action'] ?? '';
 
 switch ($action) {
@@ -178,6 +173,7 @@ switch ($action) {
             }
         }
         
+        // Also cleanup any orphan backup files exceeding 10 files
         $existingFiles = glob($backupDir . '/backup_*.json');
         if (count($existingFiles) > $MAX_BACKUP_FILES) {
             $indexedIds = array_column($entries, 'id');

@@ -51,6 +51,10 @@ GitHub Actions artifacts are QA downloads; they are not the same as an official 
 
 Never commit certificate/keystore bytes or paste secret values into chat. Without signing secrets, Windows EXE files are unsigned and the APK workflow emits a debug/test build.
 
-## Remaining production security gate
+## Remaining production security gates
 
-The legacy mother workspace storage API still treats the reserved `default`/`main` workspace as a super-admin bypass in `LicenseValidator::validateAccess()`. This was retained to avoid silently breaking the existing mother portal's storage flow. Before a public commercial deployment, migrate mother-portal storage requests to server-authenticated sessions or per-user server-issued credentials, then remove that bypass and verify every storage/upload/backup endpoint. Do not assume front-end role checks alone protect server-side financial data.
+The reserved \`default\`/\`main\` workspace no longer has an anonymous super-admin bypass: current storage endpoints require the server-only admin secret for mother-portal requests. Customer workspace storage and the updated backup endpoints require the server-issued workspace token plus the registered device HWID. Keep the admin secret only in the mother portal's session storage; rotate it if it may have been exposed.
+
+**Do not treat this branch as a production security sign-off yet.** The older global \`api.php\`, \`host-api.php\`, \`server-api-database.php\` and \`server-api-upload.php\` implementations require a separate migration/audit for authentication and tenant isolation. In particular, verify that support-chat reads do not return other customers' messages and that legacy backup, SMS, vault and generic CRUD actions cannot be called anonymously. Disable unused legacy endpoints or make them fail closed before public rollout.
+
+Also verify all directory-deny rules against the actual hosting stack (Apache \`.htaccess\` versus Nginx rules), validate backups/uploads from a separate browser, and run the portal → issue → activate → sync → revoke flow against the real deployed host. CI uses a disposable test registry and does not prove production hosting configuration.

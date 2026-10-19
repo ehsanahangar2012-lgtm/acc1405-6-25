@@ -13,24 +13,48 @@ class LicenseValidator {
      * @param string $token
      * @return array [allowed => bool, message => string, details => array]
      */
-    public static function validateAccess($workspaceId, $token = '') {
-        // فضای پیش‌فرض و مدیر اصلی همیشه مجاز است
-        if (empty($workspaceId) || $workspaceId === 'default' || $workspaceId === 'main') {
-            return [
-                'allowed' => true,
-                'status' => 'ACTIVE',
-                'role' => 'SUPER_ADMIN',
-                'message' => 'فضای کاری اصلی سیستم'
-            ];
-        }
-
-        // اگر فایل تنظیمات وجود نداشت، پوشه و فایل ایجاد می‌شود
+    public static function validateAccess($workspaceId, $token = '', $hwid = null) {
+        // Fail closed: empty workspace identifiers are never an implicit super-admin grant.
         if (!file_exists(self::$configFile)) {
             self::initDefaultConfig();
         }
 
-        $configData = json_decode(file_get_contents(self::$configFile), true) ?: [];
+        $configData = json_decode((string)@file_get_contents(self::$configFile), true);
+        if (!is_array($configData)) {
+            return [
+                'allowed' => false,
+                'status' => 'REGISTRY_UNAVAILABLE',
+                'message' => 'دفتر ثبت امن لایسنس در دسترس نیست.'
+            ];
+        }
         $workspaces = $configData['workspaces'] ?? [];
+
+        if (trim((string)$workspaceId) === '') {
+            return [
+                'allowed' => false,
+                'status' => 'INVALID_WORKSPACE',
+                'message' => 'شناسه فضای کاری الزامی است.'
+            ];
+        }
+
+        // The mother workspace is privileged only when the server-held admin secret is supplied.
+        // Customer clients must never receive implicit access to the shared master data directory.
+        if ($workspaceId === 'default' || $workspaceId === 'main') {
+            $adminSecret = (string)($configData['admin_secret_key'] ?? '');
+            if ($adminSecret !== '' && (string)$token !== '' && hash_equals($adminSecret, (string)$token)) {
+                return [
+                    'allowed' => true,
+                    'status' => 'ACTIVE',
+                    'role' => 'SUPER_ADMIN',
+                    'message' => 'مجوز مدیریت سرور تأیید شد.'
+                ];
+            }
+            return [
+                'allowed' => false,
+                'status' => 'ADMIN_AUTH_REQUIRED',
+                'message' => 'دسترسی به فضای کاری مادر به احراز هویت مدیر سرور نیاز دارد.'
+            ];
+        }
 
         // اگر سیستم روی حالت ثبت خودکار باشد و فضای کاری هنوز ثبت نشده باشد
         if (!isset($workspaces[$workspaceId])) {
@@ -103,6 +127,35 @@ class LicenseValidator {
                     'status' => 'EXPIRED',
                     'expire_date' => $expireDate,
                     'message' => 'اشتراک و اعتبار این فضای کاری در تاریخ ' . $expireDate . ' به پایان رسیده است.'
+                ];
+            }
+        }
+
+        // Data/storage APIs pass a third argument and must bind every request to the
+        // server-registered device. Activation itself intentionally calls this with two
+        // arguments, then tenant-manager.php persists the first valid HWID atomically.
+        if ($hwid !== null) {
+            $providedHwid = strtoupper(trim((string)$hwid));
+            if ($providedHwid === '' || strlen($providedHwid) > 256 || preg_match('/[\x00-\x1F\x7F]/', $providedHwid)) {
+                return [
+                    'allowed' => false,
+                    'status' => 'INVALID_HWID',
+                    'message' => 'شناسه معتبر دستگاه برای دسترسی به داده‌های سرور الزامی است.'
+                ];
+            }
+            $registeredHwid = strtoupper(trim((string)($ws['hwid'] ?? '')));
+            if ($registeredHwid === '') {
+                return [
+                    'allowed' => false,
+                    'status' => 'HWID_NOT_BOUND',
+                    'message' => 'این لایسنس هنوز به دستگاهی متصل نشده است؛ ابتدا فعال‌سازی آنلاین را کامل کنید.'
+                ];
+            }
+            if (!hash_equals($registeredHwid, $providedHwid)) {
+                return [
+                    'allowed' => false,
+                    'status' => 'HWID_MISMATCH',
+                    'message' => 'دسترسی به داده‌های سرور فقط از دستگاه ثبت‌شده مجاز است.'
                 ];
             }
         }

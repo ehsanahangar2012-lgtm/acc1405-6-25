@@ -70,9 +70,9 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-storage-que
 
 # A verified mother-portal admin secret may access the reserved master workspace.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-storage-allowed.json" -w '%{http_code}' \
-  -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"default","workspace_token":"ci-test-admin-secret"}' "$BASE_URL/host-storage-api.php")"
+  -H 'Content-Type: application/json' -d '{"action":"stats","workspace_id":"default","workspace_token":"ci-test-admin-secret"}' "$BASE_URL/host-storage-api.php")"
 [[ "$code" == "200" ]]
-php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["success"]??false)!==true||($j["workspace"]??"")!=="default"){fwrite(STDERR,"Master storage did not accept verified admin\n");exit(1);}' "$TEST_DIR/master-storage-allowed.json"
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["success"]??false)!==true||!is_array($j["stats"]??null)){fwrite(STDERR,"Master storage did not accept verified admin\n");exit(1);}' "$TEST_DIR/master-storage-allowed.json"
 
 # Verification must use POST; do not expose license keys through query-string logs.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/get-verify.json" -w '%{http_code}' "$BASE_URL/tenant-manager.php?action=verify_license&workspace_id=ws_test&token=ASHK-CI-TEST-0001&hwid=HWID-GET")"
@@ -106,9 +106,9 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-valid.json
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||($r["workspace"]??"")!=="ws_test"){fwrite(STDERR,"Device-bound storage access failed\\n");exit(1);}' "$TEST_DIR/storage-valid.json"
 
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/host-storage-valid.json" -w '%{http_code}' \
-  -H 'Content-Type: application/json' -d '{"action":"test","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A"}' "$BASE_URL/host-storage-api.php")"
+  -H 'Content-Type: application/json' -d '{"action":"stats","workspace_id":"ws_test","workspace_token":"ASHK-CI-TEST-0001","hwid":"HWID-A"}' "$BASE_URL/host-storage-api.php")"
 [[ "$code" == "200" ]]
-php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||($r["workspace"]??"")!=="ws_test"){fwrite(STDERR,"Device-bound host storage access failed\\n");exit(1);}' "$TEST_DIR/host-storage-valid.json"
+php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||!is_array($r["stats"]??null)){fwrite(STDERR,"Device-bound host storage access failed\n");exit(1);}' "$TEST_DIR/host-storage-valid.json"
 
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/backup-api-no-auth.json" -w '%{http_code}' \
   -H 'Content-Type: application/json' -d '{"action":"list"}' "$BASE_URL/server-api-backup.php")"
