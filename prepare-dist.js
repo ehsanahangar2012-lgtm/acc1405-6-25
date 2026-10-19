@@ -1,5 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { sanitizeClientBuild } from './scripts/sanitize-client-build.js';
+
+const isClientBuild = process.argv.includes('--client-build');
 
 const appPackage = JSON.parse(fs.readFileSync(path.resolve('package.json'), 'utf8'));
 const APP_VERSION = String(appPackage.version || '0.0.0');
@@ -39,6 +42,13 @@ if (!fs.existsSync(path.join('dist', 'index.html')) && fs.existsSync('dist-build
 
 if (!fs.existsSync(path.join('dist', 'index.html'))) {
     throw new Error('dist/index.html یافت نشد؛ ابتدا npm run build:web را اجرا کنید.');
+}
+
+// Native/client artifacts must never receive PHP endpoints, license-admin code, or server data directories.
+if (isClientBuild) {
+    sanitizeClientBuild(path.resolve('dist'));
+    console.log('Client build mode: skipped host-backend PHP and server data packaging.');
+    process.exit(0);
 }
 
 // ۴. کپی فایل‌های PHP از host-backend و روت
