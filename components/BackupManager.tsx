@@ -154,10 +154,14 @@ const BackupManager = () => {
             const state = useStore.getState();
             const report = await TripleBackupService.executeTripleBackup(state);
             setTripleReport(report);
-            if (addNotification) {
-                addNotification('success', 'پشتیبان‌گیری ۳ گانه همزمان (ویندوز + اندروید + هاست) با موفقیت کامل شد.');
+            if (report.overallSuccess) {
+                if (addNotification) addNotification('success', 'همه مسیرهای پشتیبان‌گیری گزارش‌شده موفق بودند.');
+                else alert('همه مسیرهای پشتیبان‌گیری گزارش‌شده موفق بودند.');
             } else {
-                alert('پشتیبان‌گیری ۳ گانه همزمان با موفقیت انجام شد.');
+                const cloudStatus = report.tiers[2]?.status || 'WAITING';
+                const message = `پشتیبان‌گیری کامل نیست. نسخه محلی: ${report.tiers[0]?.status || 'نامشخص'}؛ نسخه مستقل فایل‌سیستم: نیازمند پیاده‌سازی؛ سرور: ${cloudStatus}.`;
+                if (addNotification) addNotification('error', message);
+                else alert(message);
             }
         } catch (error: any) {
             alert(`خطا در پشتیبان‌گیری ۳ گانه: ${error?.message || error}`);
@@ -913,10 +917,10 @@ const BackupManager = () => {
                             <div>
                                 <h3 className="text-white font-black text-lg flex items-center gap-2">
                                     <ShieldCheck size={22} className="text-teal-400" />
-                                    <span>پشتیبان‌گیری ۳ گانه هوشمند و ایزوله (Triple Redundancy)</span>
+                                    <span>پشتیبان‌گیری چندمسیره و وضعیت واقعی ذخیره‌سازی</span>
                                 </h3>
                                 <p className="text-xs text-slate-300 mt-1">
-                                    حفاظت پایدار در ۳ لایه مستقل: هارد ویندوز/کش مرورگر، حافظه امن اپلیکیشن موبایل، و مخزن ابری هاست متمرکز
+                                    وضعیت‌ها فقط پس از تأیید ذخیره نمایش داده می‌شوند؛ نسخه مستقل روی فایل‌سیستم و رمزگذاری بکاپ سرور هنوز کامل نشده‌اند.
                                 </p>
                             </div>
 
@@ -928,12 +932,12 @@ const BackupManager = () => {
                                 {tripleLoading ? (
                                     <>
                                         <Loader2 size={16} className="animate-spin" />
-                                        <span>در حال ذخیره در ۳ لایه...</span>
+                                        <span>در حال ذخیره و بررسی...</span>
                                     </>
                                 ) : (
                                     <>
                                         <Sparkles size={16} />
-                                        <span>اجرای پشتیبان‌گیری ۳ گانه همزمان</span>
+                                        <span>اجرای پشتیبان‌گیری و بررسی وضعیت</span>
                                     </>
                                 )}
                             </button>
@@ -949,13 +953,13 @@ const BackupManager = () => {
                                         ۱
                                     </div>
                                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                                        {tripleReport?.tiers[0]?.status === 'SYNCED' ? 'همگام و ایمن ✓' : 'فعال و محلی'}
+                                        {tripleReport?.tiers[0]?.status === 'SYNCED' ? 'ثبت محلی تأیید شد ✓' : tripleReport?.tiers[0]?.status === 'ERROR' ? 'خطای ذخیره محلی' : 'وضعیت نامشخص'}
                                     </span>
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-black text-white">هارد دیسک و دیتابیس محلی</h4>
+                                    <h4 className="text-sm font-black text-white">نسخه محلی برنامه (IndexedDB)</h4>
                                     <p className="text-[11px] text-slate-400 mt-1">
-                                        ذخیره‌سازی با پاسخگویی آنی 0ms در ویندوز و مرورگر
+                                        ذخیره در همین دستگاه؛ پاک‌سازی داده‌های برنامه یا مرورگر می‌تواند این نسخه را حذف کند
                                     </p>
                                 </div>
                                 <div className="pt-2 border-t border-white/5 text-[10px] text-slate-500 space-y-1 font-mono">
@@ -972,13 +976,13 @@ const BackupManager = () => {
                                         ۲
                                     </div>
                                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                                        {tripleReport?.tiers[1]?.status === 'SYNCED' ? 'همگام و ایمن ✓' : 'آماده ذخیره'}
+                                        {tripleReport?.tiers[1]?.status === 'SYNCED' ? 'ثبت مستقل تأیید شد ✓' : tripleReport?.tiers[1]?.status === 'ERROR' ? 'خطای ذخیره' : 'پیاده‌سازی لازم است'}
                                     </span>
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-black text-white">حافظه ایزوله اپلیکیشن اندروید</h4>
+                                    <h4 className="text-sm font-black text-white">نسخه مستقل روی فایل‌سیستم</h4>
                                     <p className="text-[11px] text-slate-400 mt-1">
-                                        نگهداری بک‌آپ مستقل در حافظه امن گوشی برای شرایط اضطراری
+                                        نسخه جداگانه روی دیسک ویندوز یا پوشه خصوصی اندروید هنوز پیاده‌سازی نشده و موفق گزارش نمی‌شود
                                     </p>
                                 </div>
                                 <div className="pt-2 border-t border-white/5 text-[10px] text-slate-500 space-y-1 font-mono">
@@ -995,17 +999,17 @@ const BackupManager = () => {
                                         ۳
                                     </div>
                                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                                        {tripleReport?.tiers[2]?.status === 'SYNCED' ? 'همگام و ایمن ✓' : 'مخزن ابری'}
+                                        {tripleReport?.tiers[2]?.status === 'SYNCED' ? 'ذخیره سرور تأیید شد ✓' : tripleReport?.tiers[2]?.status === 'ERROR' ? 'ذخیره سرور ناموفق' : 'اتصال سرور فعال نیست'}
                                     </span>
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-black text-white">مخزن ابری و هاست متمرکز</h4>
+                                    <h4 className="text-sm font-black text-white">نسخه پشتیبان سرور</h4>
                                     <p className="text-[11px] text-slate-400 mt-1">
-                                        پشتیبان‌گیری در سرور امن ابری جهت جلوگیری از مفقودی در خرابی سخت‌افزار
+                                        فقط پس از تأیید موفق API ثبت می‌شود؛ رمزگذاری بکاپ در حالت سکون هنوز فعال نشده است
                                     </p>
                                 </div>
                                 <div className="pt-2 border-t border-white/5 text-[10px] text-slate-500 space-y-1 font-mono">
-                                    <div>امنیت انتقال: <span className="text-purple-400 font-bold">SHA-256 + TLS</span></div>
+                                    <div>یکپارچگی: <span className="text-purple-400 font-bold">SHA-256؛ انتقال امن با HTTPS</span></div>
                                     <div>آخرین همگامی: <span className="text-slate-300 font-sans">{tripleReport?.persianDate || 'به‌روز'}</span></div>
                                 </div>
                             </div>
