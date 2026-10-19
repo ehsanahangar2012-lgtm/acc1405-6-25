@@ -45,6 +45,10 @@ if (!fs.existsSync(path.join(rootDir, 'dist', 'index.html'))) {
 }
 
 fs.mkdirSync(outputDir, { recursive: true });
+
+// Harden the packaged renderer bundle before electron-builder archives it.
+run(process.execPath, ['scripts/obfuscate-release.js']);
+
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 // Disable electron-builder's implicit CI publishing. This workflow only builds artifacts;
 // publishing GitHub releases is a separate, explicit operation requiring a release token.
