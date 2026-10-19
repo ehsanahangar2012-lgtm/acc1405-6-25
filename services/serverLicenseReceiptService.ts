@@ -25,7 +25,8 @@ export interface VerifiedServerLicense {
 
 const publicKeys = new Map<string, CryptoKey>();
 const ALGORITHM = 'RSASSA-PKCS1-v1_5-SHA256';
-const LICENSE_AUTHORITY_URL = 'https://acc.ashkghalam.ir';
+import { HOST_BASE_URL } from '../config';
+const LICENSE_AUTHORITY_URL = HOST_BASE_URL;
 
 function baseUrl(value: string): string {
   const url = String(value || '').trim().replace(/\/+$/, '');
