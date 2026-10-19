@@ -107,6 +107,11 @@ function storageQuotaSnapshot(string $dataDir, ?string $overrideKey = null, ?str
     }
     return $corrupt ? null : ['customers' => $customers, 'documents' => $documents, 'users' => $users];
 }
+function storageIsReservedSystemKey(string $key): bool {
+    // Never expose server-side licence registry or rate-limit state through generic tenant storage.
+    return in_array(strtolower($key), ['workspaces_auth', 'api_rate_limits'], true);
+}
+
 function storageAtomicWrite(string $file, string $value): bool {
     $directory = dirname($file);
     $temp = $file . '.tmp.' . bin2hex(random_bytes(6));
@@ -240,6 +245,10 @@ if (!is_file($IMAGES_DIR . '/.htaccess')) {
 
 $action = trim((string)($input['action'] ?? ''));
 $key = trim((string)($input['key'] ?? ''));
+
+if (in_array($action, ['load', 'save'], true) && storageIsReservedSystemKey($key)) {
+    storageRespond(403, ['success' => false, 'error' => 'RESERVED_STORAGE_KEY']);
+}
 
 switch ($action) {
     case 'test':
