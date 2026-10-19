@@ -649,8 +649,8 @@ const MainAppLayout: React.FC = () => {
                             <Route path="/marketing" element={<MarketingHub />} />
                             <Route path="/catalog" element={<CatalogPage />} />
                             <Route path="/import-center" element={<ImportCenter />} />
-                            <Route path="/debug-center" element={isDesktopApp() ? <Navigate to="/" replace /> : <DebugCenter />} />
-                            <Route path="/license-manager" element={isDesktopApp() ? <Navigate to="/" replace /> : <LicenseManager />} />
+                            <Route path="/debug-center" element={(isDesktopApp() || isAndroidApp()) ? <Navigate to="/" replace /> : <DebugCenter />} />
+                            <Route path="/license-manager" element={(isDesktopApp() || isAndroidApp()) ? <Navigate to="/" replace /> : <LicenseManager />} />
                             <Route path="/client-broadcast" element={<ClientBroadcastHub />} />
                             
                             {/* ماژول‌های تجاری و ابری */}

@@ -97,7 +97,11 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "AshkeGhalam",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "AshkeGhalam-Setup-v${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "AshkeGhalam-Portable-v${version}.${ext}"
     }
   }
 }

@@ -10,12 +10,14 @@ import { hardwareIdService } from '../services/hardwareIdService';
 import { androidCommercialService } from '../services/androidCommercialService';
 import { workspaceService } from '../services/workspaceService';
 import { APP_VERSION, APP_RELEASE_DATE } from '../config';
+import { isAndroidApp, isDesktopApp } from '../utils';
 
 const InstallAndroid: React.FC = () => {
     const { addNotification } = useStore();
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstalled, setIsInstalled] = useState(false);
-    const [activeTab, setActiveTab] = useState<'windows' | 'apk' | 'pwa' | 'sync' | 'license'>('windows');
+    const isNativeClient = isDesktopApp() || isAndroidApp();
+    const [activeTab, setActiveTab] = useState<'windows' | 'apk' | 'pwa' | 'sync' | 'license'>(() => isNativeClient ? 'sync' : 'windows');
     const [copiedAppUrl, setCopiedAppUrl] = useState(false);
     const [copiedBatContent, setCopiedBatContent] = useState(false);
     const [copiedWinBatContent, setCopiedWinBatContent] = useState(false);
@@ -101,7 +103,7 @@ title AshkeGhalam Accounting - Windows Standalone Launcher v${APP_VERSION}
 cls
 echo ================================================================
 echo   نرم افزار حسابداری و مدیریت مالی اشک قلم - نگارش ${APP_VERSION}
-echo   معماری بومی بدون نیاز به الکترون (Native C++ / WebView2)
+echo   نسخه فعلی Electron؛ مهاجرت ‎.NET/SQLite در نقشه‌راه آینده
 echo ================================================================
 echo.
 
@@ -211,71 +213,33 @@ pause`;
                 </div>
             </div>
 
-            {/* Navigation Tabs */}
+            {/* Build tools are owner-portal-only; installed clients only need connection and activation. */}
             <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto custom-scrollbar">
-                <button
-                    onClick={() => setActiveTab('windows')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'windows'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <Monitor className="w-4 h-4" />
-                    <span>مرحله ۱: تولید بسته مستقل ویندوز (EXE / Portable)</span>
+                {!isNativeClient && (
+                    <button onClick={() => setActiveTab('windows')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'windows' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                        <Monitor className="w-4 h-4" /><span>ساخت نسخه ویندوز</span>
+                    </button>
+                )}
+                {!isNativeClient && (
+                    <button onClick={() => setActiveTab('apk')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'apk' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                        <Smartphone className="w-4 h-4" /><span>ساخت APK اندروید</span>
+                    </button>
+                )}
+                {!isNativeClient && (
+                    <button onClick={() => setActiveTab('pwa')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'pwa' ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                        <Download className="w-4 h-4" /><span>نصب PWA</span>
+                    </button>
+                )}
+                <button onClick={() => setActiveTab('sync')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'sync' ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                    <ArrowLeftRight className="w-4 h-4" /><span>اتصال سرور و همگام‌سازی</span>
                 </button>
-
-                <button
-                    onClick={() => setActiveTab('apk')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'apk'
-                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <Smartphone className="w-4 h-4" />
-                    <span>مرحله ۲: تولید فایل نصبی اندروید (APK) و ابزارهای ابری</span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('pwa')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'pwa'
-                            ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <Download className="w-4 h-4" />
-                    <span>مرحله ۳: نصب مستقل فوری (PWA Standalone)</span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('sync')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'sync'
-                            ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <ArrowLeftRight className="w-4 h-4" />
-                    <span>مرحله ۴: پیوند همگام‌سازی ۳ سویه (ویندوز 🔄 اندروید 🔄 هاست)</span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('license')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'license'
-                            ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <Key className="w-4 h-4" />
-                    <span>مرحله ۵: قفل سخت‌افزاری و صدور لایسنس مستقل</span>
+                <button onClick={() => setActiveTab('license')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'license' ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                    <Key className="w-4 h-4" /><span>فعال‌سازی لایسنس</span>
                 </button>
             </div>
 
             {/* TAB 1: WINDOWS STANDALONE PIPELINE */}
-            {activeTab === 'windows' && (
+            {!isNativeClient && activeTab === 'windows' && (
                 <div className="space-y-6 animate-fade-in">
                     {/* Step-by-Step Interactive Workflow */}
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
@@ -369,7 +333,7 @@ pause`;
                                         </p>
                                     </div>
                                     <a
-                                        href={`/downloads/AshkeGhalam-Setup-v${APP_VERSION}.exe`}
+                                        href={`https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download/AshkeGhalam-Setup-v${APP_VERSION}.exe`}
                                         download={`AshkeGhalam-Setup-v${APP_VERSION}.exe`}
                                         className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md"
                                     >
@@ -390,7 +354,7 @@ pause`;
                                         </p>
                                     </div>
                                     <a
-                                        href={`/downloads/AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`}
+                                        href={`https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download/AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`}
                                         download={`AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`}
                                         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md"
                                     >
@@ -411,7 +375,7 @@ pause`;
                                         </p>
                                     </div>
                                     <a
-                                        href={`/downloads/AshkeGhalam-Portable-v${APP_VERSION}.exe`}
+                                        href={`https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download/AshkeGhalam-Portable-v${APP_VERSION}.exe`}
                                         download={`AshkeGhalam-Portable-v${APP_VERSION}.exe`}
                                         className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md"
                                     >
@@ -460,7 +424,7 @@ pause`;
             )}
 
             {/* TAB 2: ANDROID STANDALONE PIPELINE (APK) */}
-            {activeTab === 'apk' && (
+            {!isNativeClient && activeTab === 'apk' && (
                 <div className="space-y-6 animate-fade-in">
                     {/* SECTION 1: Online Instant APK Builders */}
                     <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-indigo-500/20 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
@@ -575,7 +539,7 @@ pause`;
                                     </p>
                                 </div>
                                 <a
-                                    href={`/downloads/AshkeGhalam-v${APP_VERSION}.apk`}
+                                    href={`https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download/AshkeGhalam-v${APP_VERSION}.apk`}
                                     download={`AshkeGhalam-v${APP_VERSION}.apk`}
                                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow"
                                 >
@@ -645,7 +609,7 @@ pause`;
             )}
 
             {/* TAB 3: PWA STANDALONE */}
-            {activeTab === 'pwa' && (
+            {!isNativeClient && activeTab === 'pwa' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
                     <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
                         <div className="space-y-2">
@@ -799,29 +763,22 @@ pause`;
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-white flex items-center gap-2">
                                 <Globe size={18} className="text-teal-400" />
-                                <span>پیوند مستقیم با سیستم PWA و فعال‌سازی با لایسنس سرور اصلی</span>
+                                <span>ورود کد لایسنس دستگاه</span>
                             </span>
                             <span className="text-[10px] bg-teal-500/20 text-teal-300 px-3 py-1 rounded-full font-bold border border-teal-500/30">
-                                نسخه ۵۰ سندی ➔ نامحدود
+                                فقط پس از اعتبارسنجی کد مجاز است
                             </span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                            با برقراری پیوند، مشخصات لایسنس فعال در سرور اصلی روی این دستگاه اعمال شده و محدودیت سند و مشتری به طور کامل حذف می‌گردد.
+                            آدرس سرور و توکن را در تب «اتصال سرور و همگام‌سازی» وارد کنید. اتصال به سرور به‌تنهایی لایسنس تجاری را فعال نمی‌کند؛ کد فعال‌سازی دستگاه را از مسیر تأیید لایسنس وارد کنید.
                         </p>
                         <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
                             <button
-                                onClick={async () => {
-                                    const res = await androidCommercialService.linkToPwaAndActivate(hostUrl, syncToken);
-                                    if (res.success) {
-                                        addNotification('success', res.message);
-                                    } else {
-                                        addNotification('error', res.message);
-                                    }
-                                }}
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-activation-dashboard'))}
                                 className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/30 w-full sm:w-auto"
                             >
                                 <RefreshCw size={16} />
-                                <span>پیوند به سیستم PWA و فعال‌سازی با لایسنس سرور</span>
+                                <span>ورود و اعتبارسنجی کد لایسنس</span>
                             </button>
 
                             <button

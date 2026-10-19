@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useMobile } from '../useMobile';
 import { 
   Maximize2, Minimize2, Sliders, HelpCircle, X, ChevronUp, 
-  Table, Layers, Sparkles, Check, ArrowDownUp, Compass, FileSpreadsheet,
+  Table, Layers, Sparkles, Check, ArrowDownUp, Compass, FileSpreadsheet, BarChart3, RefreshCw, KeyRound,
   ScrollText, Landmark, Banknote, Package, FileText, LayoutDashboard, ShieldCheck, DownloadCloud, Settings
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
@@ -205,6 +205,7 @@ export const ResponsiveLayoutProvider: React.FC<ResponsiveLayoutProviderProps> =
                 <div className="space-y-1.5">
                   <span className="text-[10px] font-bold text-slate-400 px-1">بخش‌های پرکاربرد</span>
                   <div className="grid grid-cols-2 gap-2">
+                    <DrawerNavLink to="/" icon={LayoutDashboard} label="پیشخوان" onClick={() => setOpenDrawer(false)} />
                     <DrawerNavLink to="/invoices" icon={FileText} label="فاکتورها" onClick={() => setOpenDrawer(false)} />
                     <DrawerNavLink to="/inventory" icon={Package} label="انبار و حواله‌ها" onClick={() => setOpenDrawer(false)} />
                     <DrawerNavLink to="/contracts" icon={ScrollText} label="قراردادها" onClick={() => setOpenDrawer(false)} />
@@ -220,6 +221,7 @@ export const ResponsiveLayoutProvider: React.FC<ResponsiveLayoutProviderProps> =
                     <DrawerNavLink to="/cashflow" icon={Layers} label="جریان وجوه نقد" onClick={() => setOpenDrawer(false)} />
                     <DrawerNavLink to="/budget" icon={ArrowDownUp} label="بودجه‌بندی" onClick={() => setOpenDrawer(false)} />
                     <DrawerNavLink to="/customers" icon={ShieldCheck} label="طرف‌های حساب" onClick={() => setOpenDrawer(false)} />
+                    <DrawerNavLink to="/reports" icon={BarChart3} label="گزارش‌های مالی" onClick={() => setOpenDrawer(false)} />
                     <DrawerNavLink to="/import-center" icon={FileSpreadsheet} label="مرکز واردات اسناد" onClick={() => setOpenDrawer(false)} />
                   </div>
                 </div>
@@ -227,6 +229,8 @@ export const ResponsiveLayoutProvider: React.FC<ResponsiveLayoutProviderProps> =
                 <div className="space-y-1.5 pt-2 border-t border-white/5">
                   <span className="text-[10px] font-bold text-slate-400 px-1">عمومی</span>
                   <div className="grid grid-cols-2 gap-2">
+                    <DrawerNavLink to="/data-sync" icon={RefreshCw} label="همگام‌سازی" onClick={() => setOpenDrawer(false)} />
+                    <DrawerNavLink to="/install-android" icon={KeyRound} label="فعال‌سازی لایسنس و اتصال سرور" onClick={() => setOpenDrawer(false)} />
                     <DrawerNavLink to="/updates" icon={DownloadCloud} label="مرکز آپدیت (OTA)" onClick={() => setOpenDrawer(false)} />
                     <DrawerNavLink to="/settings" icon={Settings} label="تنظیمات" onClick={() => setOpenDrawer(false)} />
                   </div>
