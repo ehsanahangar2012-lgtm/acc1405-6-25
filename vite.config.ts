@@ -219,7 +219,7 @@ function excludeMotherPortalAdminToolsPlugin(enabled: boolean): any {
           ? transformed.indexOf("\n          )}", downloadButtonStart)
           : -1;
         if (downloadButtonStart >= 0 && downloadButtonEnd >= 0) {
-          transformed = transformed.slice(0, downloadButtonStart) + transformed.slice(downloadButtonEnd + 12);
+          transformed = transformed.slice(0, downloadButtonStart) + transformed.slice(downloadButtonEnd + 13);
         }
         return transformed === code ? null : { code: transformed, map: null };
       }
