@@ -268,7 +268,7 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-o
 [[ "$code" == "403" ]]
 
 # Seed a test OTP challenge rather than send a real SMS, then verify and consume a one-time session.
-php -r '$p=$argv[1];$r=json_decode(file_get_contents($p),true)?:[];$r[$argv[2]]=["requestId"=>$argv[2],"workspace_id"=>"ws_test","codeHash"=>password_hash("123456",PASSWORD_DEFAULT),"attempts"=>0,"expiresAt"=>time()+600];file_put_contents($argv[1],json_encode($r));' "$TEST_DIR/signatures/otp_codes.json" "$SIG_ID"
+php -r '$p=$argv[1];$raw=is_file($p)?file_get_contents($p):"[]";$r=json_decode($raw,true)?:[];$r[$argv[2]]=["requestId"=>$argv[2],"workspace_id"=>"ws_test","codeHash"=>password_hash("123456",PASSWORD_DEFAULT),"attempts"=>0,"expiresAt"=>time()+600];file_put_contents($p,json_encode($r));' "$TEST_DIR/signatures/otp_codes.json" "$SIG_ID"
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/remote-signature-verified.json" -w '%{http_code}' \
   -H 'Content-Type: application/json' \
   -d "{\"action\":\"verify_otp\",\"requestId\":\"$SIG_ID\",\"signatureToken\":\"$(php -r '$j=json_decode(file_get_contents($argv[1]),true);echo $j["data"]["signatureToken"];' "$TEST_DIR/remote-signature-created.json")\",\"otpCode\":\"123456\"}" \
