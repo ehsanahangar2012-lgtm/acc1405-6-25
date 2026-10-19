@@ -259,6 +259,10 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Build real Android APK
+        env:
+          # Produce an installable, non-commercially-signed distribution APK on branch builds.
+          # Android still requires an APK signature; this uses Gradle's debug signing identity.
+          ANDROID_NONCOMMERCIAL_DISTRIBUTION: ${{ startsWith(github.ref, 'refs/tags/v') && '0' || '1' }}
         run: bun run build:apk
 
       - name: Verify APK signature and enforce release build type
