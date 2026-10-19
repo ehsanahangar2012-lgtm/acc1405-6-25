@@ -135,10 +135,10 @@ if (!is_dir($root) && !@mkdir($root, 0700, true) && !is_dir($root)) {
     simpleSignatureRespond(503, ['success' => false, 'error' => 'SIGNATURE_STORAGE_UNAVAILABLE']);
 }
 @chmod($root, 0700);
-$action = trim((string)($_GET['action'] ?? $_POST['action'] ?? ''));
 $rawBody = file_get_contents('php://input');
 $input = is_string($rawBody) ? json_decode($rawBody, true) : null;
 if (!is_array($input)) $input = [];
+$action = trim((string)($_GET['action'] ?? $_POST['action'] ?? $input['action'] ?? ''));
 if ($action === '' && isset($_GET['token'])) $action = 'getRequest';
 if ($action === '' && isset($input['request'])) $action = 'createRequest';
 
