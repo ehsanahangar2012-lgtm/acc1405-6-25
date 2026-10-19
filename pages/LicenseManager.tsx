@@ -38,6 +38,7 @@ import {
     PLAN_CONFIGS 
 } from '../services/licenseGeneratorService';
 import { hardwareIdService } from '../services/hardwareIdService';
+import { HOST_BASE_URL } from '../config';
 
 const LicenseManager: React.FC = () => {
     const [licenses, setLicenses] = useState<LicenseRecord[]>([]);
@@ -59,7 +60,7 @@ const LicenseManager: React.FC = () => {
     const [copiedKey, setCopiedKey] = useState(false);
     const [copiedCode, setCopiedCode] = useState(false);
     const [currentHwid, setCurrentHwid] = useState('');
-    const [licenseServerUrl, setLicenseServerUrl] = useState(() => typeof window !== 'undefined' ? window.location.origin : '');
+    const [licenseServerUrl, setLicenseServerUrl] = useState(HOST_BASE_URL);
     const [adminSecret, setAdminSecret] = useState('');
     const [isIssuing, setIsIssuing] = useState(false);
     const [issueError, setIssueError] = useState('');
@@ -73,11 +74,11 @@ const LicenseManager: React.FC = () => {
         setLicenses(licenseGeneratorService.getAllLicenses());
     };
 
-    const getSecureServerBaseUrl = (value: string) => {
-        const base = (value.trim() || window.location.origin).replace(/\/+$/, '');
+    const getSecureServerBaseUrl = (_value: string) => {
+        const base = HOST_BASE_URL.replace(/\/+$/, '');
         const parsed = new URL(base);
-        if (parsed.protocol !== 'https:' && !['localhost', '127.0.0.1', '::1'].includes(parsed.hostname)) {
-            throw new Error('برای عملیات مدیریتی لایسنس، اتصال HTTPS الزامی است.');
+        if (parsed.protocol !== 'https:') {
+            throw new Error('برای عملیات مدیریتی لایسنس، نشانی سرور مرکزی باید HTTPS باشد.');
         }
         return base;
     };
@@ -377,12 +378,12 @@ const LicenseManager: React.FC = () => {
             {/* Server-only licensing controls: these settings exist only in the mother web portal. */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-900 border border-amber-500/30 rounded-2xl p-5">
                 <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-200">آدرس ریشه سرور مادر (بدون /host-backend)</label>
+                    <label className="text-xs font-bold text-slate-200">سرور مرکزی لایسنس (ثابت در تنظیمات پروژه)</label>
                     <input
                         type="url"
                         value={licenseServerUrl}
-                        onChange={e => setLicenseServerUrl(e.target.value)}
-                        placeholder="https://ashkghalam.ir"
+                        readOnly
+                        placeholder="https://acc.ashkghalam.ir"
                         required
                         className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono text-left"
                         dir="ltr"
@@ -401,7 +402,7 @@ const LicenseManager: React.FC = () => {
                     />
                 </div>
                 <p className="md:col-span-2 text-[11px] text-slate-400 leading-relaxed">
-                    کلید مدیریت فقط برای ارسال درخواست‌های احراز هویت‌شده استفاده می‌شود و در رکورد لایسنس ذخیره نمی‌شود. بدون تأیید سرور، صدور لایسنس متوقف خواهد شد.
+                    کلید مدیریت فقط در درخواست‌های احراز هویت‌شده به سرور مرکزی ارسال می‌شود و در رکورد لایسنس ذخیره نمی‌شود. نشانی سرور ثابت است تا کلید به میزبان دیگری ارسال نشود. بدون تأیید سرور، صدور لایسنس متوقف خواهد شد.
                 </p>
                 {issueError && <p className="md:col-span-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">{issueError}</p>}
             </div>
