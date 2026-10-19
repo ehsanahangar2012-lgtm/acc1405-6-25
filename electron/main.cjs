@@ -672,21 +672,18 @@ function generateRelationalSqlDump(state) {
 ipcMain.handle('sql-db-save', async (event, stateData) => {
     try {
         const dbFile = getDatabaseFilePath();
-        const sqlFile = getSqlDumpFilePath();
-
         const serialized = typeof stateData === 'string' ? stateData : JSON.stringify(stateData);
-        // ذخیره فایل باینری دیتابیس
-        fs.writeFileSync(dbFile, serialized, 'utf-8');
 
-        // ساخت و ذخیره همزمان فایل SQL
-        const sqlDump = generateRelationalSqlDump(stateData);
-        fs.writeFileSync(sqlFile, sqlDump, 'utf-8');
+        // Keep autosave cheap: the renderer sends a full state snapshot, so write only
+        // that snapshot here. Generating a full relational SQL dump for every state
+        // change is expensive for large invoice ledgers; SQL is generated on explicit export.
+        await fs.promises.writeFile(dbFile, serialized, 'utf-8');
 
-        return { 
-            success: true, 
-            dbPath: dbFile, 
-            sqlPath: sqlFile,
-            size: Buffer.byteLength(serialized, 'utf-8') 
+        return {
+            success: true,
+            dbPath: dbFile,
+            sqlPath: getSqlDumpFilePath(),
+            size: Buffer.byteLength(serialized, 'utf-8')
         };
     } catch (e) {
         console.error('خطا در ذخیره دیتابیس SQL:', e);
@@ -709,16 +706,17 @@ ipcMain.handle('sql-db-load', async () => {
 
 ipcMain.handle('sql-db-export', async (event, defaultName = 'ashke_ghalam_backup.sql') => {
     try {
-        const sqlFile = getSqlDumpFilePath();
-        if (!fs.existsSync(sqlFile)) {
-            return { success: false, error: 'SQL dump file not generated yet' };
+        const dbFile = getDatabaseFilePath();
+        if (!fs.existsSync(dbFile)) {
+            return { success: false, error: 'فایل داده محلی هنوز ایجاد نشده است.' };
         }
+
         const result = await dialog.showSaveDialog(mainWindow, {
-            title: 'خروجی پایگاه داده SQL استاندارد (سازگار با سی‌پنل و SQLite)',
+            title: 'خروجی داده‌های اشک قلم',
             defaultPath: defaultName,
             filters: [
                 { name: 'SQL Script (*.sql)', extensions: ['sql'] },
-                { name: 'Database File (*.db)', extensions: ['db', 'sqlite'] }
+                { name: 'JSON State Backup (*.json)', extensions: ['json'] }
             ]
         });
 
@@ -726,17 +724,23 @@ ipcMain.handle('sql-db-export', async (event, defaultName = 'ashke_ghalam_backup
             return { canceled: true };
         }
 
-        if (result.filePath.endsWith('.db') || result.filePath.endsWith('.sqlite')) {
-            const dbFile = getDatabaseFilePath();
-            if (fs.existsSync(dbFile)) {
-                fs.copyFileSync(dbFile, result.filePath);
-            }
+        if (path.extname(result.filePath).toLowerCase() === '.json') {
+            // This is a JSON state snapshot, not a real SQLite database file.
+            await fs.promises.copyFile(dbFile, result.filePath);
         } else {
-            fs.copyFileSync(sqlFile, result.filePath);
+            // Zustand persistence stores { state, version }; unwrap it before SQL generation.
+            const serialized = await fs.promises.readFile(dbFile, 'utf-8');
+            const persisted = JSON.parse(serialized);
+            const applicationState = persisted && typeof persisted === 'object' && persisted.state
+                ? persisted.state
+                : persisted;
+            const sqlDump = generateRelationalSqlDump(applicationState);
+            await fs.promises.writeFile(result.filePath, sqlDump, 'utf-8');
         }
 
         return { success: true, filePath: result.filePath };
     } catch (e) {
+        console.error('خطا در خروجی داده‌ها:', e);
         return { success: false, error: e.message };
     }
 });
