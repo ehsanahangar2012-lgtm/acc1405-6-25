@@ -192,10 +192,30 @@ class WorkspaceService {
     }
 
     public getHeaders(): Record<string, string> {
+        const workspaceId = this.getWorkspaceId();
         const headers: Record<string, string> = {
-            'X-Workspace-ID': this.getWorkspaceId()
+            'X-Workspace-ID': workspaceId
         };
-        const token = this.config.workspaceToken || (typeof window !== 'undefined' ? localStorage.getItem('ashk_cloud_token') || localStorage.getItem('ashk_host_sync_token') : '');
+
+        // Reserved master workspaces never fall back to the public client token.
+        // Their admin credential is kept only for this browser tab/session after server validation.
+        let token = '';
+        if (workspaceId === 'default' || workspaceId === 'main') {
+            try {
+                token = typeof window !== 'undefined'
+                    ? (window.sessionStorage.getItem('ashk_mother_admin_secret') || '')
+                    : '';
+            } catch {
+                token = '';
+            }
+        } else {
+            token = this.config.workspaceToken || (
+                typeof window !== 'undefined'
+                    ? localStorage.getItem('ashk_cloud_token') || localStorage.getItem('ashk_host_sync_token') || ''
+                    : ''
+            );
+        }
+
         if (token) {
             headers['X-Workspace-Token'] = token;
         }
