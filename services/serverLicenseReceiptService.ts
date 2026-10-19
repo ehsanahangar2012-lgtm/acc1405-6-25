@@ -6,6 +6,7 @@ export interface ServerLicenseReceipt {
 export interface VerifiedLicensePayload {
   issuer: string;
   workspace_id: string;
+  company_name?: string;
   license_key_hash: string;
   hwid: string;
   plan: string;
@@ -95,12 +96,16 @@ export async function verifyServerLicenseReceipt(args: {
     if (String(payload.hwid || '').toUpperCase() !== hwid.trim().toUpperCase()) return null;
     if (!Number.isFinite(payload.issued_at) || payload.issued_at > now + 60) return null;
     if (!Number.isFinite(payload.expires_at) || payload.expires_at <= now) return null;
-    if (typeof payload.plan !== 'string' || !Array.isArray(payload.features)) return null;
-    if (!Number.isFinite(payload.max_customers) || !Number.isFinite(payload.max_documents)) return null;
+    if (!['TRIAL', 'HEMAYAT', 'BRONZE', 'SILVER', 'GOLD', 'ENTERPRISE'].includes(payload.plan)) return null;
+    if (!Array.isArray(payload.features) || !payload.features.every(feature => typeof feature === 'string')) return null;
+    if (!Number.isInteger(payload.max_customers) || payload.max_customers < -1) return null;
+    if (!Number.isInteger(payload.max_documents) || payload.max_documents < -1) return null;
+    if (!Number.isInteger(payload.max_users) || payload.max_users < 1) return null;
+    if (typeof payload.is_unlimited !== 'boolean') return null;
     if (!payload.is_unlimited) {
       if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.expire_date || '')) return null;
       const expires = new Date(payload.expire_date + 'T23:59:59Z');
-      if (Number.isNaN(expires.getTime()) || expires.getTime() < Date.now()) return null;
+      if (Number.isNaN(expires.getTime()) || expires.toISOString().slice(0, 10) !== payload.expire_date || expires.getTime() < Date.now()) return null;
     }
     return { payload, receipt };
   } catch {
