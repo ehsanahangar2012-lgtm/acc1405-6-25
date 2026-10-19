@@ -51,18 +51,72 @@ if (isClientBuild) {
     process.exit(0);
 }
 
-// ۴. کپی فایل‌های PHP از host-backend و روت
-console.log('کپی کلیه APIها و اسکریپت‌های PHP...');
-if (fs.existsSync('host-backend')) {
-    fs.readdirSync('host-backend').forEach(f => {
-        const srcPath = path.join('host-backend', f);
-        const destPath = path.join('dist', f);
-        if (fs.statSync(srcPath).isFile()) {
-            fs.copyFileSync(srcPath, destPath);
-        } else if (fs.statSync(srcPath).isDirectory()) {
-            copyDir(srcPath, destPath);
+// Never carry generated databases, customer files or private keys into a distributable host ZIP.
+const RUNTIME_OUTPUT_DIRS = [
+    'data', 'db', 'host-data', 'signatures', 'uploads', 'invoices',
+    'vouchers', 'contracts', 'backups', 'daily-backups', 'api'
+];
+for (const relativePath of RUNTIME_OUTPUT_DIRS) {
+    const generatedPath = path.join('dist', relativePath);
+    if (fs.existsSync(generatedPath)) {
+        fs.rmSync(generatedPath, { recursive: true, force: true });
+    }
+}
+
+function isPrivateFileName(fileName) {
+    const normalized = String(fileName).toLowerCase();
+    if (normalized === '.env.example') return false;
+    return /^\.env(?:$|\.)/i.test(fileName) ||
+        /(?:^|[_.-])(?:workspaces_auth|api_rate_limits)(?:[_.-]|$)/i.test(fileName) ||
+        /\.(?:sqlite(?:3)?|db|pem|key|p12|pfx|jks|log|bak)$/i.test(normalized);
+}
+
+// Purge private files left behind by an earlier package build in dist.
+function removePrivateFilesRecursively(directoryPath) {
+    if (!fs.existsSync(directoryPath)) return;
+    for (const entry of fs.readdirSync(directoryPath, { withFileTypes: true })) {
+        const fullPath = path.join(directoryPath, entry.name);
+        if (entry.isDirectory()) {
+            removePrivateFilesRecursively(fullPath);
+        } else if (entry.isFile() && isPrivateFileName(entry.name)) {
+            fs.rmSync(fullPath, { force: true });
         }
-    });
+    }
+}
+removePrivateFilesRecursively('dist');
+
+// ۴. کپی APIهای PHP از host-backend با حذف داده‌های اجرایی و محرمانه
+console.log('کپی APIهای PHP بدون رجیستری یا داده‌های اجرایی...');
+const PRIVATE_BACKEND_DIRS = new Set([
+    'data', 'host-data', 'uploads', 'invoices', 'vouchers', 'contracts',
+    'signatures', 'backups', 'daily-backups', 'db', 'api', 'logs', 'tmp',
+    'cache', 'downloads', 'node_modules'
+]);
+
+function copyBackendSafely(sourceDir, destinationDir, relativePath = '') {
+    fs.mkdirSync(destinationDir, { recursive: true });
+    for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+        const sourcePath = path.join(sourceDir, entry.name);
+        const destinationPath = path.join(destinationDir, entry.name);
+
+        // Keep only the deny-rules file from the runtime registry directory.
+        if (!relativePath && entry.isDirectory() && entry.name.toLowerCase() === 'data') {
+            const guardPath = path.join(sourcePath, '.htaccess');
+            if (fs.existsSync(guardPath) && fs.statSync(guardPath).isFile()) {
+                fs.mkdirSync(destinationPath, { recursive: true });
+                fs.copyFileSync(guardPath, path.join(destinationPath, '.htaccess'));
+            }
+            continue;
+        }
+
+        if (entry.isDirectory()) {
+            if (PRIVATE_BACKEND_DIRS.has(entry.name.toLowerCase())) continue;
+            copyBackendSafely(sourcePath, destinationPath, relativePath ? `${relativePath}/${entry.name}` : entry.name);
+        } else if (entry.isFile()) {
+            if (isPrivateFileName(entry.name)) continue;
+            fs.copyFileSync(sourcePath, destinationPath);
+        }
+    }
 }
 
 // ۵. کپی فایل‌های PHP موجود در روت
@@ -93,6 +147,25 @@ if (fs.existsSync('host-backend')) {
         fs.copyFileSync(path.join('host-backend', f), path.join('dist', f));
     });
 }
+
+// Validate that no private key/registry file survives package preparation.
+const privatePayloadFindings = [];
+function inspectDistribution(directoryPath, relativePath = '') {
+    for (const entry of fs.readdirSync(directoryPath, { withFileTypes: true })) {
+        const fullPath = path.join(directoryPath, entry.name);
+        const rel = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+        if (entry.isDirectory()) {
+            inspectDistribution(fullPath, rel);
+        } else if (entry.isFile() && isPrivateFileName(entry.name)) {
+            privatePayloadFindings.push(rel);
+        }
+    }
+}
+inspectDistribution(path.resolve('dist'));
+if (privatePayloadFindings.length > 0) {
+    throw new Error(`Refusing to package private server material: ${privatePayloadFindings.join(', ')}`);
+}
+console.log('✅ Private registries, local environment files and database files are excluded.');
 
 // ۹. ایجاد کلیه پوشه‌های داده، پشتیبان‌گیری، ذخیره فاکتورها، رسیدها و امضاها
 console.log('ایجاد و پیکربندی ساختار فولدرهای ذخیره‌سازی، پشتیبان‌گیری و اسناد...');
