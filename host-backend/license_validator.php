@@ -13,7 +13,7 @@ class LicenseValidator {
      * @param string $token
      * @return array [allowed => bool, message => string, details => array]
      */
-    public static function validateAccess($workspaceId, $token = '') {
+    public static function validateAccess($workspaceId, $token = '', $hwid = null) {
         // Fail closed: empty workspace identifiers are never an implicit super-admin grant.
         if (!file_exists(self::$configFile)) {
             self::initDefaultConfig();
@@ -127,6 +127,35 @@ class LicenseValidator {
                     'status' => 'EXPIRED',
                     'expire_date' => $expireDate,
                     'message' => 'اشتراک و اعتبار این فضای کاری در تاریخ ' . $expireDate . ' به پایان رسیده است.'
+                ];
+            }
+        }
+
+        // Data/storage APIs pass a third argument and must bind every request to the
+        // server-registered device. Activation itself intentionally calls this with two
+        // arguments, then tenant-manager.php persists the first valid HWID atomically.
+        if ($hwid !== null) {
+            $providedHwid = strtoupper(trim((string)$hwid));
+            if ($providedHwid === '' || strlen($providedHwid) > 256 || preg_match('/[\x00-\x1F\x7F]/', $providedHwid)) {
+                return [
+                    'allowed' => false,
+                    'status' => 'INVALID_HWID',
+                    'message' => 'شناسه معتبر دستگاه برای دسترسی به داده‌های سرور الزامی است.'
+                ];
+            }
+            $registeredHwid = strtoupper(trim((string)($ws['hwid'] ?? '')));
+            if ($registeredHwid === '') {
+                return [
+                    'allowed' => false,
+                    'status' => 'HWID_NOT_BOUND',
+                    'message' => 'این لایسنس هنوز به دستگاهی متصل نشده است؛ ابتدا فعال‌سازی آنلاین را کامل کنید.'
+                ];
+            }
+            if (!hash_equals($registeredHwid, $providedHwid)) {
+                return [
+                    'allowed' => false,
+                    'status' => 'HWID_MISMATCH',
+                    'message' => 'دسترسی به داده‌های سرور فقط از دستگاه ثبت‌شده مجاز است.'
                 ];
             }
         }
