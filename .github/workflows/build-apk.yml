@@ -78,6 +78,8 @@ jobs:
           php -l host-backend/backup-system.php
           php -l host-backend/api.php
           php -l host-backend/audit-trail-api.php
+          php -l host-backend/digital-signature-api.php
+          php -l host-backend/digital-signature-config.php
           php -l host-backend/host-api.php
           php -l host-backend/server-api-database.php
           php -l host-backend/server-api-upload.php
@@ -87,6 +89,8 @@ jobs:
           php -l android/app/src/main/assets/public/host-storage-api.php
           php -l android/app/src/main/assets/public/server-api-backup.php
           php -l android/app/src/main/assets/public/backup-system.php
+          php -l android/app/src/main/assets/public/digital-signature-api.php
+          php -l android/app/src/main/assets/public/digital-signature-config.php
 
       - name: Test server license registration and lifecycle
         shell: bash
