@@ -159,6 +159,33 @@ const LoginPage = () => {
     const [setupPassword, setSetupPassword] = useState('');
     const [setupPasswordConfirm, setSetupPasswordConfirm] = useState('');
     const [setupMessage, setSetupMessage] = useState('');
+    const [usersHydrated, setUsersHydrated] = useState(() => useStore.persist.hasHydrated());
+
+    // Do not offer first-run setup until the asynchronous persisted store has loaded.
+    useEffect(() => {
+        if (useStore.persist.hasHydrated()) {
+            setUsersHydrated(true);
+            return;
+        }
+        return useStore.persist.onFinishHydration(() => setUsersHydrated(true));
+    }, []);
+
+    // Remove only the exact legacy demo accounts created with the known default password.
+    // User-created administrator accounts with a different password are preserved.
+    useEffect(() => {
+        if (!usersHydrated || workspaceService.isRemoteCloudConfigured()) return;
+        const storedUsers = useStore.getState().users || [];
+        const legacyDefaultHash = securityService.hashPassword('123');
+        const safeUsers = storedUsers.filter(user => {
+            const cleanUsername = (user.username || '').trim().toLowerCase();
+            const seededName = cleanUsername === 'admin' || cleanUsername === 'user';
+            const seededPassword = user.password === '123' || user.hashedPassword === legacyDefaultHash;
+            return !(seededName && seededPassword);
+        });
+        if (safeUsers.length !== storedUsers.length) {
+            useStore.setState({ users: safeUsers });
+        }
+    }, [usersHydrated]);
 
     // همگام‌سازی خودکار حساب‌های کاربری با سرور مرکزی ابری هنگام بارگذاری (صرفاً در صورت اتصال و پیکربندی صریح سرور)
     useEffect(() => {
@@ -182,7 +209,7 @@ const LoginPage = () => {
         return () => { isMounted = false; };
     }, []);
 
-    const needsInitialSetup = users.length === 0 && !workspaceService.isRemoteCloudConfigured();
+    const needsInitialSetup = usersHydrated && users.length === 0 && !workspaceService.isRemoteCloudConfigured();
 
     const handleCreateInitialAdmin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -193,7 +220,7 @@ const LoginPage = () => {
         const cleanName = setupFullName.trim();
         const cleanEmail = setupEmail.trim();
 
-        if (cleanUsername.length < 4 || /\\s/.test(cleanUsername)) {
+        if (cleanUsername.length < 4 || /\s/.test(cleanUsername)) {
             setError('نام کاربری باید حداقل ۴ نویسه و بدون فاصله باشد.');
             return;
         }
@@ -205,7 +232,7 @@ const LoginPage = () => {
             setError('رمز عبور و تکرار آن یکسان نیستند.');
             return;
         }
-        if (cleanEmail && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(cleanEmail)) {
+        if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
             setError('قالب ایمیل معتبر نیست.');
             return;
         }
@@ -348,7 +375,12 @@ const LoginPage = () => {
                     </div>
                 )}
 
-                {needsInitialSetup ? (
+                {!usersHydrated && !workspaceService.isRemoteCloudConfigured() ? (
+                    <div className="flex items-center justify-center gap-3 py-10 text-slate-300 text-sm">
+                        <Loader2 size={20} className="animate-spin text-teal-400" />
+                        <span>در حال بررسی حساب‌های ذخیره‌شده…</span>
+                    </div>
+                ) : needsInitialSetup ? (
                     <form onSubmit={handleCreateInitialAdmin} className="space-y-4">
                         <p className="text-xs leading-relaxed text-slate-300 bg-slate-950/70 border border-teal-500/20 rounded-xl p-3">
                             اولین اجرا: حساب مدیر را خودتان بسازید. هیچ نام کاربری یا رمز عبور پیش‌فرضی فعال نیست.
