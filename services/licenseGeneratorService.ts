@@ -123,6 +123,13 @@ class LicenseGeneratorService {
         }
     }
 
+    /** Cache a reconciled snapshot from the authoritative server registry. */
+    replaceAllLicenses(records: LicenseRecord[]): void {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(LICENSES_STORAGE_KEY, JSON.stringify(records));
+        }
+    }
+
     /**
      * دریافت تمام لایسنس‌های صادر شده
      */
