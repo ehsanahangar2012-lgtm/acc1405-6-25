@@ -22,6 +22,7 @@ import { licenseQuotaService } from './services/licenseQuotaService';
 import { desktopDatabaseService } from './services/desktopDatabaseService';
 import { APP_VERSION } from './config';
 import { isNativeAndroidSecureStorage, getAndroidEncryptedItem, setAndroidEncryptedItem, removeAndroidEncryptedItem } from './services/androidSecureStorage';
+import { hasNativeBackupStorage } from './services/nativeBackupStorage';
 async function localStorageRemoveLegacy(name: string): Promise<void> {
     try {
         localStorage.removeItem(name);
@@ -2025,11 +2026,14 @@ export const useStore = create<AppState>()(
                           }
                       });
 
-                      // ۳. ذخیره در IndexedDB به عنوان نسخه پشتیبان پایدار
-                      idbService.save('backups', {
-                          id: 'ashke-ghalam-rbac-v15-accounting',
-                          data: JSON.stringify(migrated)
-                      }).catch(() => {});
+                      // Native apps already persist through Android Keystore or Electron safeStorage.
+                      // Avoid creating a second full-state copy in browser IndexedDB on those builds.
+                      if (!hasNativeBackupStorage()) {
+                          idbService.save('backups', {
+                              id: 'ashke-ghalam-rbac-v15-accounting',
+                              data: JSON.stringify(migrated)
+                          }).catch(() => {});
+                      }
 
                       restoreFinancialData(data);
                       set(s => ({ ...s, ...migrated }));
