@@ -104,11 +104,15 @@ function loadCompressedData($filename) {
 createBackupStructure($BACKUP_ROOT);
 createBackupStructure($DAILY_BACKUP_ROOT);
 
-$action = $_POST['action'] ?? $_GET['action'] ?? '';
+$jsonInput = [];
+if (stripos((string)($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json') !== false) {
+    $jsonInput = json_decode(file_get_contents('php://input'), true) ?: [];
+}
+$action = $_POST['action'] ?? $_GET['action'] ?? ($jsonInput['action'] ?? '');
 
 switch ($action) {
     case 'backup_data':
-        $rawBody = file_get_contents('php://input');
+        $rawBody = json_encode($jsonInput, JSON_UNESCAPED_UNICODE);
         if (strlen((string)$rawBody) > 50 * 1024 * 1024) {
             http_response_code(413);
             echo json_encode(['success' => false, 'error' => 'BACKUP_TOO_LARGE']);
