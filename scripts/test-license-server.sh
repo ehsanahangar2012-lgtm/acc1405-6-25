@@ -320,6 +320,26 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/storage-valid.json
 [[ "$code" == "200" ]]
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||($r["workspace"]??"")!=="ws_test"){fwrite(STDERR,"Device-bound storage access failed\\n");exit(1);}' "$TEST_DIR/storage-valid.json"
 
+# Generic master storage must never disclose or overwrite the server-side licence-signing registry.
+for action in load save; do
+  if [[ "$action" == "load" ]]; then
+    body='{"action":"load","key":"workspaces_auth"}'
+  else
+    body='{"action":"save","key":"workspaces_auth","value":"{}"}'
+  fi
+  code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/master-registry-$action.json" -w '%{http_code}' \\
+    -H 'Content-Type: application/json' -d "$body" \\
+    -H 'X-Workspace-ID: default' -H 'X-Workspace-Token: ci-test-admin-secret' "$BASE_URL/storage.php")"
+  [[ "$code" == "403" ]]
+  php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="RESERVED_STORAGE_KEY"){fwrite(STDERR,"Generic storage exposed a reserved server file");exit(1);}' "$TEST_DIR/master-registry-$action.json"
+done
+
+# The Android package must carry the same protected storage endpoint as the mother-web host package.
+cmp -s "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/android/app/src/main/assets/public/storage.php" || {
+  echo "Host and Android storage.php copies have diverged" >&2
+  exit 1
+}
+
 # Legacy signature/share keys must never read from or write to another tenant's namespace.
 mkdir -p "$TEST_DIR/data/tenants/ws_other"
 php -r '$record=["secret"=>"other-tenant-only"];file_put_contents($argv[1],json_encode($record));' "$TEST_DIR/data/tenants/ws_other/share_probe.json"
