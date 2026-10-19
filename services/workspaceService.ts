@@ -2,6 +2,7 @@
 // مدیریت فضاهای کاری مجزا، استقلال نسخه دسکتاپ و پیکربندی بدون تداخل با سایر مشتریان
 import { HOST_BASE_URL, IS_BROWSER_PREVIEW } from '../config';
 import { isAndroidApp, isDesktopApp } from '../utils';
+import { hardwareIdService } from './hardwareIdService';
 
 export interface WorkspaceConfig {
     workspaceId: string;           // شناسه یکتای فضای کاری (مثلاً client_rahimi یا default)
@@ -222,6 +223,18 @@ class WorkspaceService {
         return headers;
     }
 
+    /** Add a device-bound credential to tenant API requests; the central portal uses its session admin secret. */
+    public async getSecureHeaders(): Promise<Record<string, string>> {
+        const headers = this.getHeaders();
+        const workspaceId = this.getWorkspaceId();
+        if (workspaceId === 'default' || workspaceId === 'main') return headers;
+
+        const hwid = String(await hardwareIdService.getHardwareId() || '').trim();
+        if (!hwid) throw new Error('شناسه دستگاه برای اتصال امن به فضای کاری در دسترس نیست.');
+        headers['X-Device-HWID'] = hwid;
+        return headers;
+    }
+
     public async updateConfig(partial: Partial<WorkspaceConfig>): Promise<void> {
         this.config = {
             ...this.config,
@@ -288,7 +301,7 @@ class WorkspaceService {
                 cache: 'no-store',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...this.getHeaders()
+                    ...await this.getSecureHeaders()
                 },
                 body: JSON.stringify({ action: 'ping' })
             }).catch(() => null);
