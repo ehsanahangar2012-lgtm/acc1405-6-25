@@ -111,56 +111,76 @@ class PersonLedgerService {
             });
         });
 
-        // ۳. بررسی فاکتورهایی که مبلغ نقدی یا چک درون خود فاکتور دارند ولی در آرایه تراکنش‌ها ثبت جداگانه ندارند
+        // ۳. Reconcile embedded invoice settlements against dated transactions.
+        // An existing transaction for one payment must not suppress any unpaid legacy
+        // amount still embedded in cashAmount/checkAmount.
         personInvoices.forEach((inv: any) => {
             const isSale = inv.type === InvoiceType.SALE;
             const timestamp = inv.createdAt ? new Date(inv.createdAt).getTime() : 1;
+            const invoiceTransactions = personTransactions.filter((t: any) => t.relatedInvoiceId === inv.id);
 
-            if (inv.cashAmount && inv.cashAmount > 0) {
-                const hasExistingTrans = personTransactions.some((t: any) => 
-                    t.relatedInvoiceId === inv.id && (t.type === 'CASH_PAYMENT' || t.type === 'INVOICE_RECEIPT')
-                );
-                if (!hasExistingTrans) {
-                    entries.push({
-                        id: `cash-${inv.id}`,
-                        date: inv.date,
-                        type: 'PAYMENT',
-                        referenceId: inv.id,
-                        referenceNumber: `CSH-${inv.number}`,
-                        description: isSale ? `دریافت نقدی بابت فاکتور فروش ${inv.number}` : `پرداخت نقدی بابت فاکتور خرید ${inv.number}`,
-                        debit: !isSale ? inv.cashAmount : 0, // خرید نقدی = بدهکار، فروش نقدی = بستانکار
-                        credit: isSale ? inv.cashAmount : 0,
-                        balance: 0,
-                        timestamp: timestamp + 1,
-                        relatedInvoiceId: inv.id,
-                        isChild: true
-                    });
-                }
+            const checkTransactions = invoiceTransactions.filter((t: any) =>
+                t.type === 'CHECK_INFO' ||
+                t.type === 'CHECK' ||
+                t.metadata?.paymentMethod === 'CHECK'
+            );
+            const checkTransactionTotal = checkTransactions.reduce((sum: number, t: any) =>
+                sum + Math.max(0, Number(t.amount) || 0), 0);
+            const missingCheckAmount = Math.max(0, Number(inv.checkAmount || 0) - checkTransactionTotal);
+
+            const cashTransactions = invoiceTransactions.filter((t: any) =>
+                (t.type === 'CASH_PAYMENT' ||
+                 t.type === 'INVOICE_RECEIPT' ||
+                 t.type === 'GENERAL_INCOME' ||
+                 t.type === 'EXPENSE' ||
+                 ['CASH', 'POS', 'CARD'].includes(t.metadata?.paymentMethod)) &&
+                t.type !== 'CHECK_INFO' &&
+                t.type !== 'CHECK' &&
+                t.metadata?.paymentMethod !== 'CHECK'
+            );
+            const cashTransactionTotal = cashTransactions.reduce((sum: number, t: any) =>
+                sum + Math.max(0, Number(t.amount) || 0), 0);
+            const missingCashAmount = Math.max(0, Number(inv.cashAmount || 0) - cashTransactionTotal);
+
+            if (missingCashAmount > 0) {
+                entries.push({
+                    id: `cash-${inv.id}`,
+                    date: inv.date,
+                    type: 'PAYMENT',
+                    referenceId: inv.id,
+                    referenceNumber: `CSH-${inv.number}`,
+                    description: isSale
+                        ? `دریافت نقدی بابت فاکتور فروش ${inv.number}`
+                        : `پرداخت نقدی بابت فاکتور خرید ${inv.number}`,
+                    debit: !isSale ? missingCashAmount : 0,
+                    credit: isSale ? missingCashAmount : 0,
+                    balance: 0,
+                    timestamp: timestamp + 1,
+                    relatedInvoiceId: inv.id,
+                    isChild: true
+                });
             }
 
-            if (inv.checkAmount && inv.checkAmount > 0) {
-                const hasExistingTrans = personTransactions.some((t: any) => 
-                    t.relatedInvoiceId === inv.id && (t.type === 'CHECK_INFO' || t.type === 'CHECK')
-                );
-                if (!hasExistingTrans) {
-                    const checkNos = inv.checks?.map((c: any) => c.checkNumber || c.sayadId || 'چک').join('، ') || 'چک';
-                    const firstCheckImg = inv.checks?.find((c: any) => c.imageUrl)?.imageUrl;
-                    entries.push({
-                        id: `chk-inv-${inv.id}`,
-                        date: inv.date,
-                        type: 'CHECK',
-                        referenceId: inv.id,
-                        referenceNumber: `CHK-${inv.number}`,
-                        description: isSale ? `چک دریافتی (${checkNos}) بابت فاکتور ${inv.number}` : `چک پرداختی (${checkNos}) بابت فاکتور ${inv.number}`,
-                        debit: !isSale ? inv.checkAmount : 0,
-                        credit: isSale ? inv.checkAmount : 0,
-                        balance: 0,
-                        timestamp: timestamp + 2,
-                        relatedInvoiceId: inv.id,
-                        isChild: true,
-                        imageUrl: firstCheckImg
-                    });
-                }
+            if (missingCheckAmount > 0) {
+                const checkNos = inv.checks?.map((c: any) => c.checkNumber || c.sayadId || 'چک').join('، ') || 'چک';
+                const firstCheckImg = inv.checks?.find((c: any) => c.imageUrl)?.imageUrl;
+                entries.push({
+                    id: `chk-inv-${inv.id}`,
+                    date: inv.date,
+                    type: 'CHECK',
+                    referenceId: inv.id,
+                    referenceNumber: `CHK-${inv.number}`,
+                    description: isSale
+                        ? `چک دریافتی (${checkNos}) بابت فاکتور ${inv.number}`
+                        : `چک پرداختی (${checkNos}) بابت فاکتور ${inv.number}`,
+                    debit: !isSale ? missingCheckAmount : 0,
+                    credit: isSale ? missingCheckAmount : 0,
+                    balance: 0,
+                    timestamp: timestamp + 2,
+                    relatedInvoiceId: inv.id,
+                    isChild: true,
+                    imageUrl: firstCheckImg
+                });
             }
         });
 
