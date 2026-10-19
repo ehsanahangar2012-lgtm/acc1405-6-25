@@ -12,10 +12,11 @@ const rootDir = process.cwd();
 const outputDir = path.join(rootDir, 'dist_electron');
 const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'));
 const appVersion = String(packageJson.version || '0.0.0');
+const isClientBuild = process.argv.includes('--client-build');
 const destinations = [
   path.join(rootDir, 'downloads'),
   path.join(rootDir, 'public', 'downloads'),
-  path.join(rootDir, 'dist', 'downloads')
+  ...(isClientBuild ? [] : [path.join(rootDir, 'dist', 'downloads')])
 ];
 
 function run(command, args) {
@@ -47,6 +48,9 @@ if (!targets) {
 if (!fs.existsSync(path.join(rootDir, 'dist', 'index.html'))) {
   throw new Error('dist/index.html not found. Run the web build first (npm run build:web).');
 }
+
+// Fail closed before packaging if the Electron renderer still contains server/admin/release tools.
+run(process.execPath, ['scripts/sanitize-client-build.js', path.join(rootDir, 'dist'), '--verify-only']);
 
 fs.mkdirSync(outputDir, { recursive: true });
 // Remove only old top-level deliverables; keep electron-builder's unpacked cache.
