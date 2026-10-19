@@ -77,6 +77,7 @@ jobs:
           php -l host-backend/server-api-backup.php
           php -l host-backend/backup-system.php
           php -l host-backend/api.php
+          php -l host-backend/audit-trail-api.php
           php -l host-backend/host-api.php
           php -l host-backend/server-api-database.php
           php -l host-backend/server-api-upload.php
