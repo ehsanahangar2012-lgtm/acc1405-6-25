@@ -61,6 +61,7 @@ function storageQuotaSnapshot(string $dataDir, ?string $overrideKey = null, ?str
     // Aliases are grouped using max, not sum, because old clients synced the
     // same check-transfer collection to both checkTransfers and check_transfers.
     $customers = storageAliasGroupCount($dataDir, ['people', 'customers', 'clients'], $overrideKey, $overrideValue, $corrupt);
+    $users = storageAliasGroupCount($dataDir, ['users'], $overrideKey, $overrideValue, $corrupt);
     $documents = 0;
     foreach ([
         ['invoices'], ['vouchers'], ['checks'], ['transactions'], ['contracts'],
@@ -68,7 +69,7 @@ function storageQuotaSnapshot(string $dataDir, ?string $overrideKey = null, ?str
     ] as $group) {
         $documents += storageAliasGroupCount($dataDir, $group, $overrideKey, $overrideValue, $corrupt);
     }
-    return $corrupt ? null : ['customers' => $customers, 'documents' => $documents];
+    return $corrupt ? null : ['customers' => $customers, 'documents' => $documents, 'users' => $users];
 }
 function storageAtomicWrite(string $file, string $value): bool {
     $directory = dirname($file);
@@ -93,7 +94,8 @@ function storageSaveValue(string $dataDir, string $key, string $value, array $ac
         'salaries', 'salary', 'checkTransfers', 'check_transfers'
     ];
     $category = in_array($key, $customerKeys, true) ? 'customers' :
-        (in_array($key, $documentKeys, true) ? 'documents' : '');
+        (in_array($key, $documentKeys, true) ? 'documents' :
+        ($key === 'users' ? 'users' : ''));
     if ($category === '') {
         return storageAtomicWrite($file, $value)
             ? ['success' => true, 'workspace' => true]
@@ -117,7 +119,9 @@ function storageSaveValue(string $dataDir, string $key, string $value, array $ac
     $unlimited = !empty($access['is_unlimited']) || (($access['role'] ?? '') === 'SUPER_ADMIN');
     $limit = $category === 'customers'
         ? (int)($access['max_customers'] ?? 30)
-        : (int)($access['max_documents'] ?? 100);
+        : ($category === 'documents'
+            ? (int)($access['max_documents'] ?? 100)
+            : (int)($access['max_users'] ?? 1));
     $before = (int)$current[$category];
     $after = (int)$proposed[$category];
 
@@ -128,7 +132,8 @@ function storageSaveValue(string $dataDir, string $key, string $value, array $ac
         fclose($lock);
         return [
             'success' => false,
-            'error' => $category === 'customers' ? 'CUSTOMER_QUOTA_EXCEEDED' : 'DOCUMENT_QUOTA_EXCEEDED',
+            'error' => $category === 'customers' ? 'CUSTOMER_QUOTA_EXCEEDED' :
+                ($category === 'documents' ? 'DOCUMENT_QUOTA_EXCEEDED' : 'USER_QUOTA_EXCEEDED'),
             'category' => $category,
             'current' => $before,
             'requested' => $after,
@@ -223,7 +228,7 @@ switch ($action) {
         $result = storageSaveValue($DATA_DIR, $key, $value, $access);
         if (!empty($result['success'])) $result['workspace'] = $workspace;
         if (empty($result['success'])) {
-            $status = in_array($result['error'] ?? '', ['CUSTOMER_QUOTA_EXCEEDED', 'DOCUMENT_QUOTA_EXCEEDED'], true) ? 409 :
+            $status = in_array($result['error'] ?? '', ['CUSTOMER_QUOTA_EXCEEDED', 'DOCUMENT_QUOTA_EXCEEDED', 'USER_QUOTA_EXCEEDED'], true) ? 409 :
                 (($result['error'] ?? '') === 'QUOTA_LOCK_UNAVAILABLE' ? 503 : 400);
             storageRespond($status, $result);
         }
