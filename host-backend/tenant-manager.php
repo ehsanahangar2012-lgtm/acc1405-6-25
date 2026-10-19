@@ -17,6 +17,35 @@ require_once __DIR__ . '/license_validator.php';
 
 $authFile = __DIR__ . '/data/workspaces_auth.json';
 
+// Serialize registry reads and writes so concurrent first activations/admin actions cannot overwrite each other.
+$registryDir = dirname($authFile);
+if (!is_dir($registryDir) && !@mkdir($registryDir, 0750, true) && !is_dir($registryDir)) {
+    http_response_code(503);
+    echo json_encode(['success' => false, 'message' => 'پوشه امن رجیستری لایسنس قابل ایجاد نیست.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+$registryLock = @fopen($registryDir . '/workspaces_auth.lock', 'c');
+if ($registryLock === false || !flock($registryLock, LOCK_EX)) {
+    http_response_code(503);
+    echo json_encode(['success' => false, 'message' => 'قفل امن رجیستری لایسنس در دسترس نیست.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+@chmod($registryDir . '/workspaces_auth.lock', 0600);
+
+function saveAuthRegistry(string $path, array $data): bool {
+    $encoded = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($encoded === false) return false;
+    $temporaryPath = $path . '.tmp';
+    if (file_put_contents($temporaryPath, $encoded, LOCK_EX) === false) return false;
+    @chmod($temporaryPath, 0600);
+    if (!@rename($temporaryPath, $path)) {
+        @unlink($temporaryPath);
+        return false;
+    }
+    @chmod($path, 0600);
+    return true;
+}
+
 if (!file_exists($authFile)) {
     // Create a closed-by-default registry. Admin must read/configure this random key on the server.
     LicenseValidator::validateAccess('__initialize_registry__');
@@ -46,7 +75,7 @@ if (!$signingReady && function_exists('openssl_pkey_new') && function_exists('op
             $config['license_signing_private_key'] = $privatePem;
             $config['license_signing_public_key'] = $keyDetails['key'];
             $savedConfig = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-            if ($savedConfig !== false && file_put_contents($authFile, $savedConfig, LOCK_EX) !== false) {
+            if ($savedConfig !== false && saveAuthRegistry($authFile, $config)) {
                 @chmod($authFile, 0600);
                 $signingReady = true;
             }
@@ -114,7 +143,7 @@ if ($action === 'verify_license') {
     if ($registeredHwid === '') {
         $config['workspaces'][$wsId]['hwid'] = $submittedHwid;
         $savedRegistry = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        if ($savedRegistry === false || file_put_contents($authFile, $savedRegistry, LOCK_EX) === false) {
+        if ($savedRegistry === false || !saveAuthRegistry($authFile, $config)) {
             http_response_code(503);
             echo json_encode([
                 'allowed' => false,
@@ -267,7 +296,11 @@ switch ($action) {
             'notes' => trim($input['notes'] ?? ($existing['notes'] ?? ''))
         ];
 
-        file_put_contents($authFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+        if (!saveAuthRegistry($authFile, $config)) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'ذخیره امن رجیستری لایسنس روی سرور انجام نشد.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
 
         echo json_encode([
             'success' => true,
@@ -285,7 +318,11 @@ switch ($action) {
         }
         $config['workspaces'][$wsId]['status'] = 'SUSPENDED';
         $config['workspaces'][$wsId]['revoked_at'] = date('Y-m-d H:i:s');
-        file_put_contents($authFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+        if (!saveAuthRegistry($authFile, $config)) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'ذخیره امن رجیستری لایسنس روی سرور انجام نشد.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         echo json_encode(['success' => true, 'message' => 'لایسنس در سرور ابطال شد.'], JSON_UNESCAPED_UNICODE);
         break;
 
@@ -293,7 +330,11 @@ switch ($action) {
         $wsId = trim($input['workspace_id'] ?? '');
         if (isset($config['workspaces'][$wsId])) {
             unset($config['workspaces'][$wsId]);
-            file_put_contents($authFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+            if (!saveAuthRegistry($authFile, $config)) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'ذخیره امن رجیستری لایسنس روی سرور انجام نشد.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
             echo json_encode(['success' => true, 'message' => 'فضای کاری با موفقیت حذف شد.'], JSON_UNESCAPED_UNICODE);
         } else {
             echo json_encode(['success' => false, 'message' => 'فضای کاری یافت نشد.'], JSON_UNESCAPED_UNICODE);
@@ -305,7 +346,11 @@ switch ($action) {
         if (isset($config['workspaces'][$wsId])) {
             $curr = $config['workspaces'][$wsId]['status'] ?? 'ACTIVE';
             $config['workspaces'][$wsId]['status'] = ($curr === 'ACTIVE') ? 'SUSPENDED' : 'ACTIVE';
-            file_put_contents($authFile, json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+            if (!saveAuthRegistry($authFile, $config)) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'ذخیره امن رجیستری لایسنس روی سرور انجام نشد.'], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
             echo json_encode([
                 'success' => true, 
                 'new_status' => $config['workspaces'][$wsId]['status'],
