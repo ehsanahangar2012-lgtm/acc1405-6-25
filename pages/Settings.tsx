@@ -699,14 +699,14 @@ const Settings = () => {
                                         <Server size={20} className="text-cyan-400" />
                                         مرکز اتصال، ثبت لایسنس و هاست
                                     </h2>
-                                    <p className="text-xs text-slate-300 font-bold mt-1">وضعیت لایسنس آفلاین، کلید فعال‌سازی و ارتباط با هاست مادر</p>
+                                    <p className="text-xs text-slate-300 font-bold mt-1">وضعیت نسخه آزمایشی، کلید لایسنس و ارتباط با هاست مادر</p>
                                 </div>
 
                                 {((isDesktopApp() || isAndroidApp()) && !licenseQuotaService.isFullyLicensedSync()) ? (
                                     <div className="p-6 bg-amber-500/10 border-2 border-amber-400 rounded-2xl space-y-4">
                                         <div className="flex items-center gap-2 text-amber-300 text-sm font-black">
                                             <ShieldCheck size={20} />
-                                            <span>حالت آفلاین فعال است (ثبت کلید لایسنس نرم‌افزار)</span>
+                                            <span>نیاز به فعال‌سازی آنلاین لایسنس</span>
                                         </div>
                                         <p className="text-xs text-amber-200 font-bold leading-relaxed">
                                             در این حالت، تا سقف ۵۰ سند می‌توانید به رایگان ثبت کنید. برای دسترسی نامحدود و حذف محدودیت‌ها، کلید لایسنس معتبر خود را وارد نمایید.
@@ -722,16 +722,19 @@ const Settings = () => {
                                             <button 
                                                 type="button"
                                                 onClick={() => {
-                                                    if (!licenseInputKey.trim()) return;
-                                                    licenseQuotaService.activateWithServerLicense({ 
-                                                        licenseKey: licenseInputKey.trim(), 
-                                                        companyName: activeCompany?.name || 'مجموعه تجاری' 
-                                                    });
-                                                    addNotification('success', 'لایسنس با موفقیت فعال شد و تمام محدودیت‌ها برداشته شد.');
+                                                    const cleanKey = licenseInputKey.trim().toUpperCase();
+                                                    if (!cleanKey) return;
+                                                    window.dispatchEvent(new CustomEvent('open-activation-dashboard', {
+                                                        detail: {
+                                                            licenseKey: cleanKey,
+                                                            companyName: activeCompany?.name || 'مجموعه تجاری',
+                                                            workspaceId: `ws_${cleanKey.replace(/[^A-Z0-9]/gi, '').toLowerCase()}`
+                                                        }
+                                                    }));
                                                 }}
                                                 className="bg-teal-500 hover:bg-teal-400 text-slate-950 px-5 py-3 rounded-xl font-black text-xs cursor-pointer border border-teal-300"
                                             >
-                                                ثبت و فعال‌سازی
+                                                تأیید آنلاین
                                             </button>
                                         </div>
                                     </div>
