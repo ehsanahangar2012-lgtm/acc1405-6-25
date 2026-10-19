@@ -201,16 +201,30 @@ folders.forEach(f => {
     }
 });
 
-// ۱۰. اعمال محافظت htaccess برای پوشه‌های حساس پشتیبان
-const backupHtaccess = `Order Deny,Allow
-Deny from all
-<FilesMatch "\\.(php|php5|phtml)$">
-    Deny from all
-</FilesMatch>`;
-
-fs.writeFileSync('dist/backups/.htaccess', backupHtaccess, 'utf8');
-fs.writeFileSync('dist/daily-backups/.htaccess', backupHtaccess, 'utf8');
-fs.writeFileSync('dist/db/.htaccess', backupHtaccess, 'utf8');
+// ۱۰. Apply Apache 2.4 and legacy-compatible deny rules to all runtime data directories.
+// Nginx deployments must configure equivalent location-level denies (see deployment guide).
+const runtimeDenyRules = `<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order Deny,Allow
+  Deny from all
+</IfModule>
+Options -Indexes
+`;
+const guardedRuntimeDirs = [
+    'data', 'db', 'host-data', 'signatures', 'uploads', 'invoices',
+    'vouchers', 'contracts', 'backups', 'daily-backups', 'api'
+];
+for (const relativeDir of guardedRuntimeDirs) {
+    const dir = path.join('dist', relativeDir);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, '.htaccess'), runtimeDenyRules, 'utf8');
+    const guardFile = path.join(dir, 'index.html');
+    if (!fs.existsSync(guardFile)) {
+        fs.writeFileSync(guardFile, '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Access Restricted</title></head><body>Access restricted.</body></html>', 'utf8');
+    }
+}
 
 // ۱۱. ایجاد راهنمای جامع استقرار در dist/README.txt
 const readme = `# سامانه یکپارچه ابری و آفلاین اشک قلم - نسخه ${APP_VERSION}
