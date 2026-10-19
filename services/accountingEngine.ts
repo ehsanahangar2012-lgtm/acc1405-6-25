@@ -105,17 +105,6 @@ export class AccountingEngine {
     if (matchedPeriod && (matchedPeriod.status === 'CLOSED' || matchedPeriod.status === 'LOCKED')) {
       throw new Error(`خطای انطباق: دوره مالی مربوط به تاریخ ${date} بسته یا قفل شده است.`);
     }
-    const fiscalStartKey = globalConfig.fiscalStartDate ? dateComparisonKey(globalConfig.fiscalStartDate) : null;
-    const fiscalEndKey = globalConfig.fiscalEndDate ? dateComparisonKey(globalConfig.fiscalEndDate) : null;
-    if (globalConfig.fiscalStartDate && !fiscalStartKey) {
-      throw new Error('تاریخ شروع سال مالی در تنظیمات نامعتبر است.');
-    }
-    if (globalConfig.fiscalEndDate && !fiscalEndKey) {
-      throw new Error('تاریخ پایان سال مالی در تنظیمات نامعتبر است.');
-    }
-    if (fiscalStartKey && fiscalEndKey && (dateKey < fiscalStartKey || dateKey > fiscalEndKey)) {
-      throw new Error(`تاریخ ${date} خارج از بازه سال مالی پیکربندی‌شده است.`);
-    }
 
     return true;
   }
