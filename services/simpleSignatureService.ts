@@ -1,7 +1,6 @@
 import { idbService } from './indexedDBService';
 import { API_CONFIG } from '../config';
 import { generateUUID, packPayloadToToken, unpackPayloadFromToken } from '../utils';
-import { persistentStorage } from './persistentStorage';
 import { workspaceService } from './workspaceService';
 
 export interface SignatureRequest {
@@ -61,14 +60,6 @@ class SimpleSignatureService {
 
     const serverRequest = result.request as SignatureRequest;
     await idbService.save('signature_requests', serverRequest);
-    try {
-      await persistentStorage.saveData('sig_' + rawToken, serverRequest);
-      await persistentStorage.saveData('sig_' + fullToken, serverRequest);
-      await persistentStorage.saveData('public_sig_' + rawToken, serverRequest);
-      await persistentStorage.saveData('public_sig_' + fullToken, serverRequest);
-    } catch (e) {
-      console.warn('ذخیره نسخهٔ ابری کمکی ناموفق بود؛ نسخهٔ سرور مرجع است:', e);
-    }
     return fullToken;
   }
 
@@ -97,27 +88,6 @@ class SimpleSignatureService {
           }
         } catch (e) {
           console.warn('دریافت از signature API ناموفق بود، بررسی کانال ابری ثانویه...', e);
-        }
-      }
-
-      // ۳. بررسی کانال تضمین‌شده ابری persistentStorage جهت استفاده کاربران غیرلاگین و عمومی
-      if (!request || !request.documentPreview) {
-        try {
-          let cloudReq = await persistentStorage.loadData('sig_' + token);
-          if (!cloudReq) {
-            cloudReq = await persistentStorage.loadData('sig_' + rawUuid);
-          }
-          if (!cloudReq) {
-            cloudReq = await persistentStorage.loadData('public_sig_' + token);
-          }
-          if (!cloudReq) {
-            cloudReq = await persistentStorage.loadData('public_sig_' + rawUuid);
-          }
-          if (cloudReq && (cloudReq.documentPreview || cloudReq.token)) {
-            request = cloudReq;
-          }
-        } catch (e) {
-          console.warn('خطا در دریافت ابری امضا:', e);
         }
       }
 
@@ -186,12 +156,6 @@ class SimpleSignatureService {
       };
       await idbService.save('signature_requests', request);
 
-      try {
-        await persistentStorage.saveData('sig_' + token, request);
-        await persistentStorage.saveData('public_sig_' + token, request);
-      } catch (e) {
-        console.warn('به‌روزرسانی نسخهٔ ابری کمکی ناموفق بود؛ وضعیت سرور ثبت شده است:', e);
-      }
       return true;
     } catch (error) {
       console.error('خطا در ثبت امضا روی سرور:', error);
@@ -226,16 +190,6 @@ class SimpleSignatureService {
             }
           }
         } catch {}
-
-        // کانال دوم: persistentStorage
-        if (!signedData) {
-          try {
-            const cloudReq = await persistentStorage.loadData('sig_' + req.token);
-            if (cloudReq && cloudReq.status === 'SIGNED') {
-              signedData = cloudReq;
-            }
-          } catch {}
-        }
 
         if (signedData && signedData.status === 'SIGNED') {
           // بروزرسانی درخواست امضا در IndexedDB محلی
