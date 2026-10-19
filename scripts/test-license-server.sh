@@ -37,6 +37,10 @@ post_json() {
 assert_status() {
   php -r '$j=json_decode(file_get_contents($argv[1]),true); if (($j["status"]??"") !== $argv[2]) {fwrite(STDERR,"Expected ".$argv[2].", got ".($j["status"]??"missing")."\n"); exit(1);}' "$1" "$2"
 }
+# Verification must use POST; do not expose license keys through query-string logs.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/get-verify.json" -w '%{http_code}' "$BASE_URL/tenant-manager.php?action=verify_license&workspace_id=ws_test&token=ASHK-CI-TEST-0001&hwid=HWID-GET")"
+[[ "$code" == "405" ]]
+
 code="$(post_json '{"action":"verify_license","workspace_id":"ws_test","token":"WRONG-KEY","hwid":"HWID-ATTACKER"}' "$TEST_DIR/invalid.json")"
 [[ "$code" == "403" ]]; assert_status "$TEST_DIR/invalid.json" "INVALID_TOKEN"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["workspaces"]["ws_test"]["hwid"]??"")!==""){fwrite(STDERR,"Bad key bound HWID\n");exit(1);}' "$TEST_REGISTRY_PATH"
