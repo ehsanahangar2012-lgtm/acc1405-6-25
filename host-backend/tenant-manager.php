@@ -120,6 +120,7 @@ if ($action === 'verify_license') {
         $receiptPayload = [
             'issuer' => 'ashkghalam-license-v1',
             'workspace_id' => $wsId,
+            'company_name' => (string)($workspaceEntry['title'] ?? ''),
             'license_key_hash' => hash('sha256', strtoupper($tkn)),
             'hwid' => strtoupper($registeredHwid !== '' ? $registeredHwid : $submittedHwid),
             'plan' => $plan,
