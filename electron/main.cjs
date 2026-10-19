@@ -568,7 +568,14 @@ ipcMain.handle('get-app-config', async () => {
 ipcMain.handle('save-app-config', async (event, config) => {
     try {
         const configPath = getAppConfigPath();
-        fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+        const safeConfig = config && typeof config === 'object' ? {
+            ...config,
+            workspace_token: '',
+            workspaceToken: '',
+            license_key: '',
+            licenseKey: ''
+        } : {};
+        fs.writeFileSync(configPath, JSON.stringify(safeConfig, null, 2), 'utf-8');
         if (mainWindow && config.app_title) {
             mainWindow.setTitle(config.app_title);
         }
@@ -589,7 +596,14 @@ ipcMain.handle('export-app-config', async (event, config) => {
         if (result.canceled || !result.filePath) {
             return { canceled: true };
         }
-        fs.writeFileSync(result.filePath, JSON.stringify(config, null, 2), 'utf-8');
+        const safeConfig = config && typeof config === 'object' ? {
+            ...config,
+            workspace_token: '',
+            workspaceToken: '',
+            license_key: '',
+            licenseKey: ''
+        } : {};
+        fs.writeFileSync(result.filePath, JSON.stringify(safeConfig, null, 2), 'utf-8');
         return { success: true, filePath: result.filePath };
     } catch (error) {
         return { success: false, error: error.message };

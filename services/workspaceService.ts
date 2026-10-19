@@ -3,6 +3,7 @@
 import { HOST_BASE_URL, IS_BROWSER_PREVIEW } from '../config';
 import { isAndroidApp, isDesktopApp } from '../utils';
 import { hardwareIdService } from './hardwareIdService';
+import { hasNativeBackupStorage, getNativeBackupValue, setNativeBackupValue } from './nativeBackupStorage';
 
 export interface WorkspaceConfig {
     workspaceId: string;           // شناسه یکتای فضای کاری (مثلاً client_rahimi یا default)
@@ -27,24 +28,42 @@ const DEFAULT_WORKSPACE_CONFIG: WorkspaceConfig = {
 };
 
 const STORAGE_KEY = 'ashk_workspace_config_v1';
+const NATIVE_WORKSPACE_CONFIG_KEY = 'workspace:config:v1';
+const LEGACY_WORKSPACE_TOKEN_KEYS = ['ashk_cloud_token', 'ashk_host_sync_token'];
 
 class WorkspaceService {
     private config: WorkspaceConfig = DEFAULT_WORKSPACE_CONFIG;
     private initialized = false;
+    private legacyNativeConfig: Partial<WorkspaceConfig> | null = null;
+    private nativeCredentialStorageHealthy = true;
+    private nativeConfigLoadedSecurely = false;
 
     constructor() {
         this.loadLocalConfig();
-        this.initDesktopIntegration();
+        void this.initDesktopIntegration();
     }
 
     private loadLocalConfig(): void {
         try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-                const saved = localStorage.getItem(STORAGE_KEY);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    this.config = { ...DEFAULT_WORKSPACE_CONFIG, ...parsed };
-                }
+            if (typeof window === 'undefined' || !window.localStorage) return;
+            const nativeClient = hasNativeBackupStorage();
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (!saved) return;
+
+            const parsed = JSON.parse(saved);
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return;
+            if (nativeClient) {
+                // Preserve legacy credentials only in memory until successfully migrated
+                // to OS/Keystore-backed storage. Never continue using plaintext tokens.
+                this.legacyNativeConfig = parsed as Partial<WorkspaceConfig>;
+                this.config = {
+                    ...DEFAULT_WORKSPACE_CONFIG,
+                    ...parsed,
+                    workspaceToken: '',
+                    licenseKey: ''
+                };
+            } else {
+                this.config = { ...DEFAULT_WORKSPACE_CONFIG, ...parsed };
             }
         } catch (e) {
             console.warn('Failed to load local workspace config:', e);
@@ -54,38 +73,131 @@ class WorkspaceService {
     // بررسی و خواندن خودکار پیکربندی از فایل app-config.json در دسکتاپ
     private async initDesktopIntegration(): Promise<void> {
         if (typeof window === 'undefined') return;
-
+        const nativeClient = hasNativeBackupStorage();
         const desktopApi = (window as any).electronDesktopAPI;
+        let externalConfig: any = null;
+
+        if (nativeClient) {
+            try {
+                const encrypted = await getNativeBackupValue(NATIVE_WORKSPACE_CONFIG_KEY);
+                if (encrypted !== null) {
+                    const parsed = JSON.parse(encrypted);
+                    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+                        throw new Error('NATIVE_WORKSPACE_CONFIG_INVALID');
+                    }
+                    this.config = { ...this.config, ...parsed };
+                    this.nativeConfigLoadedSecurely = true;
+                }
+            } catch (error) {
+                // Fail closed: do not re-use credentials from localStorage/app-config
+                // when the secure store cannot be read or authenticated.
+                this.nativeCredentialStorageHealthy = false;
+                this.config = { ...this.config, workspaceToken: '', licenseKey: '' };
+                this.initialized = true;
+                console.warn('Secure workspace credentials are unavailable; cloud features remain disabled:', error);
+                return;
+            }
+        }
+
         if (desktopApi && typeof desktopApi.invoke === 'function') {
             try {
-                const desktopConfig = await desktopApi.invoke('get-app-config');
-                if (desktopConfig && typeof desktopConfig === 'object') {
+                externalConfig = await desktopApi.invoke('get-app-config');
+                if (externalConfig && typeof externalConfig === 'object') {
+                    const canMigrateExternalCredentials = !nativeClient || !this.nativeConfigLoadedSecurely;
                     this.config = {
                         ...this.config,
-                        workspaceId: desktopConfig.workspace_id || desktopConfig.workspaceId || this.config.workspaceId,
-                        workspaceToken: desktopConfig.workspace_token || desktopConfig.workspaceToken || this.config.workspaceToken,
-                        customServerUrl: desktopConfig.api_base_url || desktopConfig.customServerUrl || this.config.customServerUrl,
-                        standaloneOfflineMode: Boolean(desktopConfig.standalone_offline_mode ?? desktopConfig.standaloneOfflineMode ?? this.config.standaloneOfflineMode),
-                        appTitle: desktopConfig.app_title || desktopConfig.appTitle || this.config.appTitle,
-                        companyName: desktopConfig.company_name || desktopConfig.companyName || this.config.companyName,
-                        licenseKey: desktopConfig.license_key || desktopConfig.licenseKey || this.config.licenseKey
+                        workspaceId: externalConfig.workspace_id || externalConfig.workspaceId || this.config.workspaceId,
+                        workspaceToken: canMigrateExternalCredentials
+                            ? (externalConfig.workspace_token || externalConfig.workspaceToken || this.config.workspaceToken)
+                            : this.config.workspaceToken,
+                        customServerUrl: externalConfig.api_base_url || externalConfig.customServerUrl || this.config.customServerUrl,
+                        standaloneOfflineMode: Boolean(externalConfig.standalone_offline_mode ?? externalConfig.standaloneOfflineMode ?? this.config.standaloneOfflineMode),
+                        appTitle: externalConfig.app_title || externalConfig.appTitle || this.config.appTitle,
+                        companyName: externalConfig.company_name || externalConfig.companyName || this.config.companyName,
+                        licenseKey: canMigrateExternalCredentials
+                            ? (externalConfig.license_key || externalConfig.licenseKey || this.config.licenseKey)
+                            : this.config.licenseKey
                     };
-                    this.saveLocalConfig();
                 }
             } catch (e) {
                 console.log('Desktop config check completed without external file');
             }
         }
+
+        if (nativeClient) {
+            // One-time migration of older plaintext credentials to native encrypted storage.
+            // A stored secure config wins over any older app-config/localStorage token.
+            if (!this.nativeConfigLoadedSecurely) {
+                const legacyToken = this.config.workspaceToken ||
+                    this.legacyNativeConfig?.workspaceToken ||
+                    localStorage.getItem('ashk_cloud_token') ||
+                    localStorage.getItem('ashk_host_sync_token') ||
+                    '';
+                if (legacyToken) this.config.workspaceToken = String(legacyToken);
+                const legacyLicense = this.config.licenseKey ||
+                    this.legacyNativeConfig?.licenseKey ||
+                    '';
+                if (legacyLicense) this.config.licenseKey = String(legacyLicense);
+            } else if (!this.config.workspaceToken) {
+                // The encrypted workspace object may predate the separate legacy token keys.
+                const legacyToken = localStorage.getItem('ashk_cloud_token') ||
+                    localStorage.getItem('ashk_host_sync_token') || '';
+                if (legacyToken) this.config.workspaceToken = legacyToken;
+            }
+
+            try {
+                await this.saveLocalConfig();
+                this.nativeCredentialStorageHealthy = true;
+
+                // Remove any old plaintext token/license from app-config.json once a
+                // secure copy has been committed successfully.
+                if (desktopApi && typeof desktopApi.invoke === 'function') {
+                    await desktopApi.invoke('save-app-config', {
+                        workspace_id: this.config.workspaceId,
+                        workspace_token: '',
+                        api_base_url: this.config.customServerUrl,
+                        standalone_offline_mode: this.config.standaloneOfflineMode,
+                        app_title: this.config.appTitle,
+                        company_name: this.config.companyName,
+                        license_key: ''
+                    });
+                }
+            } catch (error) {
+                this.nativeCredentialStorageHealthy = false;
+                this.config = { ...this.config, workspaceToken: '', licenseKey: '' };
+                console.warn('Secure workspace credentials could not be saved; cloud features remain disabled:', error);
+            }
+        } else {
+            this.saveLocalConfig();
+        }
+
         this.initialized = true;
     }
 
-    private saveLocalConfig(): void {
+    private async saveLocalConfig(): Promise<void> {
         try {
-            if (typeof window !== 'undefined' && window.localStorage) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(this.config));
+            if (typeof window === 'undefined' || !window.localStorage) return;
+            if (hasNativeBackupStorage()) {
+                // Save full credential-bearing config only inside encrypted native storage.
+                await setNativeBackupValue(NATIVE_WORKSPACE_CONFIG_KEY, JSON.stringify(this.config));
+
+                // Keep non-secret display/configuration fields for synchronous startup only.
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+                    ...this.config,
+                    workspaceToken: '',
+                    licenseKey: ''
+                }));
+                for (const key of LEGACY_WORKSPACE_TOKEN_KEYS) localStorage.removeItem(key);
+                localStorage.removeItem('ashk_license_key');
+                localStorage.removeItem('ashk_active_license_key');
+                this.legacyNativeConfig = null;
+                this.nativeConfigLoadedSecurely = true;
+                return;
             }
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(this.config));
         } catch (e) {
-            console.warn('Failed to save local workspace config:', e);
+            console.warn('Failed to save local workspace config securely:', e);
+            throw e;
         }
     }
 
@@ -134,8 +246,7 @@ class WorkspaceService {
         const token = (
             motherSessionToken ||
             this.config.workspaceToken ||
-            localStorage.getItem('ashk_cloud_token') ||
-            localStorage.getItem('ashk_host_sync_token') ||
+            ((!isAndroidApp() && !isDesktopApp()) ? (localStorage.getItem('ashk_cloud_token') || localStorage.getItem('ashk_host_sync_token') || '') : '') ||
             ''
         ).trim();
 
@@ -223,7 +334,7 @@ class WorkspaceService {
             }
         } else {
             token = this.config.workspaceToken || (
-                typeof window !== 'undefined'
+                typeof window !== 'undefined' && !isAndroidApp() && !isDesktopApp()
                     ? localStorage.getItem('ashk_cloud_token') || localStorage.getItem('ashk_host_sync_token') || ''
                     : ''
             );
@@ -253,15 +364,15 @@ class WorkspaceService {
             ...partial,
             updatedAt: new Date().toISOString()
         };
-        this.saveLocalConfig();
+        await this.saveLocalConfig();
 
-        // اگر در محیط دسکتاپ هستیم، فایل app-config.json کنار نرم‌افزار را هم به‌روز کنیم
+        // در نسخه مستقل، کلیدها در مخزن امن می‌مانند؛ فایل app-config فقط تنظیمات غیرحساس دارد.
         const desktopApi = (typeof window !== 'undefined') ? (window as any).electronDesktopAPI : null;
         if (desktopApi && typeof desktopApi.invoke === 'function') {
             try {
                 await desktopApi.invoke('save-app-config', {
                     workspace_id: this.config.workspaceId,
-                    workspace_token: this.config.workspaceToken,
+                    workspace_token: '',
                     api_base_url: this.config.customServerUrl,
                     standalone_offline_mode: this.config.standaloneOfflineMode,
                     app_title: this.config.appTitle,
@@ -343,7 +454,7 @@ class WorkspaceService {
     public generateConfigFileString(): string {
         const json = {
             workspace_id: this.config.workspaceId || 'client_standalone_1403',
-            workspace_token: this.config.workspaceToken || '',
+            workspace_token: '',
             api_base_url: this.config.customServerUrl || HOST_BASE_URL,
             standalone_offline_mode: this.config.standaloneOfflineMode || false,
             app_title: this.config.appTitle || 'سامانه مالی و انبارداری اختصاصی',
@@ -356,7 +467,7 @@ class WorkspaceService {
     // ریست به حالت استاندارد
     public async resetToDefault(): Promise<void> {
         this.config = { ...DEFAULT_WORKSPACE_CONFIG, updatedAt: new Date().toISOString() };
-        this.saveLocalConfig();
+        await this.saveLocalConfig();
     }
 }
 
