@@ -8,7 +8,9 @@ import {
   Upload, AlertTriangle, Cpu, HardDrive, Network, Sparkles, Sliders, Info, Clock, AlertCircle
 } from 'lucide-react';
 import { ConfirmModal } from '../components/Shared';
-import { API_CONFIG } from '../config';
+import { API_CONFIG, APP_VERSION } from '../config';
+import { useFinancialStore } from '../store-financial';
+import { securityService } from '../services/securityService';
 
 const AdvancedSettings: React.FC = () => {
   const { config, updateConfig, hydrateStore, companies, invoices, products, people, checks, contracts, addNotification } = useStore();
@@ -68,7 +70,10 @@ const AdvancedSettings: React.FC = () => {
 
   const handleExportBackup = () => {
     const state = useStore.getState();
-    const dataToExport = {
+    const dataToExport: any = {
+      timestamp: new Date().toISOString(),
+      version: APP_VERSION,
+      backupFormatVersion: 2,
       companies: state.companies,
       config: state.config,
       products: state.products,
@@ -80,11 +85,18 @@ const AdvancedSettings: React.FC = () => {
       checkTransfers: state.checkTransfers,
       savedDescriptions: state.savedDescriptions,
       contracts: state.contracts,
-      salaries: state.salaries
+      salaries: state.salaries,
+      users: state.users,
+      roles: state.roles,
+      importConfigs: state.importConfigs,
+      importBatches: state.importBatches,
+      financialData: useFinancialStore.getState(),
+      signature: ''
     };
-    
-    downloadJSON(dataToExport, `erp-backup-${new Date().toISOString().slice(0, 10)}`);
-    addNotification('success', 'پشتیبان دیتابیس به صورت فایل JSON دانلود شد.');
+    dataToExport.signature = securityService.signBackup(dataToExport);
+
+    downloadJSON(dataToExport, `AshkeGhalam-Backup-${new Date().toISOString().slice(0, 10)}`);
+    addNotification('success', 'پشتیبان کامل همراه با دفتر مالی و کنترل یکپارچگی صادر شد.');
   };
 
   const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,11 +107,32 @@ const AdvancedSettings: React.FC = () => {
     reader.onload = async (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
-        
-        // Hydrate store tables
+        const hasBackupTables = Boolean(
+          json && typeof json === 'object' &&
+          (json.companies || json.products || json.people || json.invoices ||
+           json.vouchers || json.checks || json.transactions || json.state)
+        );
+        if (!hasBackupTables) {
+          addNotification('error', 'ساختار فایل پشتیبان معتبر نیست.');
+          return;
+        }
+
+        const formatVersion = Number(json.backupFormatVersion || 0);
+        const isValid = securityService.verifyBackup(json);
+        if (formatVersion >= 2 && !isValid) {
+          addNotification('error', 'کنترل یکپارچگی پشتیبان ناموفق بود؛ بازیابی متوقف شد.');
+          return;
+        }
+        if (formatVersion < 2 && !isValid &&
+            !confirm('این فایل قدیمی است و کنترل یکپارچگی نسخه جدید را ندارد. فقط اگر منبع فایل را می‌شناسید ادامه دهید. آیا می‌خواهید آن را مهاجرت دهید؟')) {
+          return;
+        }
+        if (!confirm('بازیابی، اطلاعات فعلی را با داده‌های فایل جایگزین می‌کند. آیا ادامه می‌دهید؟')) {
+          return;
+        }
+
         hydrateStore(json);
-        
-        addNotification('success', 'اطلاعات دیتابیس با موفقیت بازنشانی و جایگزین گردید.');
+        addNotification('success', 'اطلاعات پشتیبان با موفقیت بازیابی شد.');
         window.location.reload();
       } catch (err) {
         addNotification('error', 'فایل فایل پشتیبان نامعتبر است.');
