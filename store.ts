@@ -979,21 +979,18 @@ export const useStore = create<AppState>()(
           const transfer = s.checkTransfers.find(t => t.id === id);
           if (!transfer) return {};
 
+          // Reverse all related accounting entries as one operation before deleting the source record.
+          try {
+              AccountingEngine.reverseCheckTransfer(transfer);
+          } catch (err) {
+              console.error('AccountingEngine error in deleteCheckTransfer:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `ابطال واگذاری انجام نشد؛ سند حفظ شد: ${reason}` }] };
+          }
+
           deletedRecordsRegistry.registerDeletion(id, 'checkTransfer');
           hostDB.deleteFromHost('check_transfers', id).catch(() => {});
           persistentStorage.saveData('check_transfers', s.checkTransfers.filter(t => t.id !== id)).catch(() => {});
-
-          try {
-              AccountingEngine.postStornoReversal(id, 'CHECK_TRANSFER');
-              transfer.checkIds.forEach(cid => {
-                  AccountingEngine.postStornoReversal(cid, 'CHECK_STATUS');
-              });
-              if (transfer.personId) {
-                  PersonLedgerService.removeByReference(transfer.personId, id);
-              }
-          } catch (err) {
-              console.error('AccountingEngine error in deleteCheckTransfer:', err);
-          }
 
           const updatedChecks = s.checks.map(c => transfer.checkIds.includes(c.id) ? { ...c, status: 'PENDING' as const } : c);
           const exactBalance = transfer.personId ? PersonLedgerService.getBalance(transfer.personId) : 0;
@@ -1599,23 +1596,20 @@ export const useStore = create<AppState>()(
           const trans = s.transactions.find(t => t.id === id);
           if (!trans) return {};
           
+          // Reverse journal entries successfully before removing the source transaction.
+          try {
+              AccountingEngine.reverseGeneralTransaction(trans);
+          } catch (err) {
+              console.error('AccountingEngine error in deleteTransaction:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `حذف تراکنش انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}` }] };
+          }
+
           deletedRecordsRegistry.registerDeletion(id, 'transaction');
           hostDB.deleteFromHost('transactions', id).catch(() => {});
           
           const filteredTransactions = s.transactions.filter(t => t.id !== id);
           persistentStorage.saveData('transactions', filteredTransactions).catch(() => {});
-
-          try {
-              AccountingEngine.postStornoReversal(id, 'TRANSACTION');
-              if (trans.personId) {
-                  PersonLedgerService.removeByReference(trans.personId, id);
-                  try {
-                      localStorage.removeItem(`ledger-${trans.personId}`);
-                  } catch {}
-              }
-          } catch (err) {
-              console.error('AccountingEngine error in deleteTransaction:', err);
-          }
 
           const exactBalance = trans.personId ? PersonLedgerService.getBalance(trans.personId, s.invoices, filteredTransactions, s.checks) : 0;
           const updatedPeople = s.people.map(p => p.id === trans.personId ? { ...p, balance: exactBalance } : p);
