@@ -338,7 +338,7 @@ const LoginPage = () => {
 
     return (
         <div className="min-h-screen bg-[#111827] flex items-start sm:items-center justify-center p-3 sm:p-6 pb-8 relative overflow-x-hidden overflow-y-auto overscroll-y-contain font-sans" dir="rtl">
-            <div className="fixed top-4 left-4 z-50">
+            <div className="hidden sm:block fixed top-4 left-4 z-50">
                 <SmartSectionGuide customPath="/login" />
             </div>
 
