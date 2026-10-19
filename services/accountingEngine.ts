@@ -442,6 +442,10 @@ export class AccountingEngine {
    * Post check operations.
    */
   static postCheck(check: Check, personId?: string) {
+    return this.withPostingRollback([personId || check.personId], () => {
+    if (!Number.isFinite(check.amount) || check.amount <= 0) {
+      throw new Error('مبلغ چک باید عددی معتبر و بزرگ‌تر از صفر باشد.');
+    }
     const targetPersonId = personId || check.personId;
     this.postStornoReversal(check.id, 'CHECK');
     
@@ -500,12 +504,17 @@ export class AccountingEngine {
     }
 
     this.refreshPersonBalance(targetPersonId);
+    });
   }
 
   /**
    * Post check status transitions.
    */
   static postCheckStatusChange(check: Check, status: Check['status']) {
+    return this.withPostingRollback([check.personId], () => {
+    if (!Number.isFinite(check.amount) || check.amount <= 0) {
+      throw new Error('مبلغ چک باید عددی معتبر و بزرگ‌تر از صفر باشد.');
+    }
     // Reverse previous check status changes
     this.postStornoReversal(check.id, 'CHECK_STATUS');
 
@@ -606,16 +615,20 @@ export class AccountingEngine {
         );
       }
     }
+    });
   }
 
   /**
    * Post Check Transfers (خرج چک).
    */
   static postCheckTransfer(transfer: CheckTransfer) {
+    return this.withPostingRollback([transfer.personId], () => {
     this.postStornoReversal(transfer.id, 'CHECK_TRANSFER');
 
     const totalAmount = transfer.items?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-    if (totalAmount <= 0) return;
+    if (!Number.isFinite(totalAmount) || totalAmount <= 0) {
+      throw new Error('مبلغ واگذاری چک باید عددی معتبر و بزرگ‌تر از صفر باشد.');
+    }
 
     // Debit: Accounts Payable (2110) / Credit: Checks in Hand (1140)
     this.postDoubleEntry(
@@ -635,12 +648,17 @@ export class AccountingEngine {
     });
 
     this.refreshPersonBalance(transfer.personId);
+    });
   }
 
   /**
    * Post General Income/Expense Transactions.
    */
   static postGeneralTransaction(trans: Transaction) {
+    return this.withPostingRollback([trans.personId], () => {
+    if (!Number.isFinite(trans.amount) || trans.amount <= 0) {
+      throw new Error('مبلغ تراکنش مالی باید عددی معتبر و بزرگ‌تر از صفر باشد.');
+    }
     this.postStornoReversal(trans.id, 'TRANSACTION');
 
     if (trans.personId) {
@@ -680,6 +698,45 @@ export class AccountingEngine {
     }
 
     this.refreshPersonBalance(trans.personId);
+    });
+  }
+
+  /**
+   * Run a compound journal/ledger operation atomically from the UI's perspective.
+   * If any journal validation fails, restore every mutated journal entry, affected
+   * person-ledger cache, and person balance before propagating the error.
+   */
+  private static withPostingRollback<T>(personIds: Array<string | undefined>, operation: () => T): T {
+    const previousEntries = [...(useFinancialStore.getState().accountingEntries || [])];
+    const previousPeople = [...(useStore.getState().people || [])];
+    const ledgerSnapshots = new Map<string, string | null>();
+    const ids = [...new Set(personIds.filter((id): id is string => Boolean(id)))];
+
+    if (typeof window !== 'undefined') {
+      for (const id of ids) {
+        try {
+          ledgerSnapshots.set(id, localStorage.getItem(`ledger-${id}`));
+        } catch {}
+      }
+    }
+
+    try {
+      return operation();
+    } catch (error) {
+      useFinancialStore.setState({ accountingEntries: previousEntries });
+      if (typeof window !== 'undefined') {
+        for (const [id, raw] of ledgerSnapshots) {
+          try {
+            if (raw === null) localStorage.removeItem(`ledger-${id}`);
+            else localStorage.setItem(`ledger-${id}`, raw);
+          } catch {}
+        }
+      }
+      try {
+        useStore.setState({ people: previousPeople });
+      } catch {}
+      throw error;
+    }
   }
 
   /**
