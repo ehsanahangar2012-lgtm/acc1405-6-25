@@ -487,6 +487,21 @@ export type AppPlatform = 'windows' | 'android' | 'web' | 'pwa';
 /**
  * Get the current operating platform
  */
+/**
+ * Owner-only tools are enabled only on the mother web portal hostname.
+ * Configure VITE_MOTHER_PORTAL_HOSTS as a comma-separated host allowlist for alternate deployments.
+ */
+export const isMotherWebPortal = (): boolean => {
+  if (typeof window === 'undefined' || isDesktopApp() || isAndroidApp()) return false;
+  const hostname = window.location.hostname.toLowerCase();
+  const env = (import.meta as any).env || {};
+  const configured = typeof env.VITE_MOTHER_PORTAL_HOSTS === 'string'
+    ? env.VITE_MOTHER_PORTAL_HOSTS
+    : 'acc.ashkghalam.ir,ashkghalam.ir,www.ashkghalam.ir';
+  const allowedHosts = configured.split(',').map((host: string) => host.trim().toLowerCase()).filter(Boolean);
+  if (allowedHosts.includes(hostname)) return true;
+  return env.DEV === true && ['localhost', '127.0.0.1', '::1'].includes(hostname);
+};
 export const getAppPlatform = (): AppPlatform => {
   if (isDesktopApp()) return 'windows';
   if (isAndroidApp()) return 'android';
