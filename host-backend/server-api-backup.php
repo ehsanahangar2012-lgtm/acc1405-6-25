@@ -88,36 +88,166 @@ function backupAtomicWrite(string $path, string $content): bool {
     return true;
 }
 
-// Rebuild the index from the actual filenames. A client-supplied ID must never
-// change the path used to restore or prune a backup.
-function rebuildIndex($backupDir, $indexPath, $maxFiles = 10) {
+const SERVER_BACKUP_FORMAT = 'ASHKEGHALAM_SERVER_BACKUP_V1';
+
+/**
+ * Server at-rest encryption. The key is stored outside the backup directories and
+ * excluded from deployment packages. If the key disappears while encrypted files
+ * remain, fail closed rather than silently replacing it and losing old backups.
+ */
+function getServerBackupKey(): string {
+    static $cachedKey = null;
+    if (is_string($cachedKey) && strlen($cachedKey) === 32) return $cachedKey;
+    if (!function_exists('openssl_encrypt') || !function_exists('openssl_decrypt')) {
+        throw new RuntimeException('BACKUP_OPENSSL_UNAVAILABLE');
+    }
+
+    $environmentKey = getenv('ASHK_BACKUP_ENCRYPTION_KEY');
+    if ($environmentKey !== false && trim((string)$environmentKey) !== '') {
+        $candidate = trim((string)$environmentKey);
+        if (preg_match('/^[a-f0-9]{64}$/i', $candidate)) $key = hex2bin($candidate);
+        else $key = base64_decode($candidate, true);
+        if (!is_string($key) || strlen($key) !== 32) {
+            throw new RuntimeException('BACKUP_ENCRYPTION_KEY_INVALID');
+        }
+        $cachedKey = $key;
+        return $cachedKey;
+    }
+
+    $dataDir = __DIR__ . '/data';
+    if (!is_dir($dataDir) && !@mkdir($dataDir, 0700, true) && !is_dir($dataDir)) {
+        throw new RuntimeException('BACKUP_KEY_STORAGE_UNAVAILABLE');
+    }
+    @chmod($dataDir, 0700);
+    $denyPath = $dataDir . '/.htaccess';
+    if (!is_file($denyPath)) {
+        @file_put_contents($denyPath, "<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nOrder Deny,Allow\nDeny from all\n</IfModule>\nOptions -Indexes\n", LOCK_EX);
+        @chmod($denyPath, 0600);
+    }
+
+    $keyPath = $dataDir . '/.backup-encryption-key';
+    $lock = @fopen($keyPath . '.lock', 'c');
+    if ($lock === false || !flock($lock, LOCK_EX)) {
+        if (is_resource($lock)) fclose($lock);
+        throw new RuntimeException('BACKUP_KEY_LOCK_FAILED');
+    }
+
+    try {
+        if (is_file($keyPath)) {
+            $encoded = trim((string)@file_get_contents($keyPath));
+            $key = base64_decode($encoded, true);
+            if (!is_string($key) || strlen($key) !== 32) {
+                throw new RuntimeException('BACKUP_ENCRYPTION_KEY_FILE_INVALID');
+            }
+            $cachedKey = $key;
+            return $cachedKey;
+        }
+
+        $existingFiles = array_merge(
+            glob(__DIR__ . '/backup/backup_*.json') ?: [],
+            glob(__DIR__ . '/backups/tenants/*/backup_*.json') ?: []
+        );
+        foreach ($existingFiles as $existingFile) {
+            $stored = json_decode((string)@file_get_contents($existingFile), true);
+            if (is_array($stored) && ($stored['format'] ?? '') === SERVER_BACKUP_FORMAT) {
+                throw new RuntimeException('BACKUP_ENCRYPTION_KEY_MISSING');
+            }
+        }
+
+        $key = random_bytes(32);
+        if (!backupAtomicWrite($keyPath, base64_encode($key))) {
+            throw new RuntimeException('BACKUP_KEY_WRITE_FAILED');
+        }
+        @chmod($keyPath, 0600);
+        $cachedKey = $key;
+        return $cachedKey;
+    } finally {
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
+function encryptServerBackupPayload(string $plainJson, string $workspace, string $id, string $key): string {
+    $nonce = random_bytes(12);
+    $tag = '';
+    $aad = SERVER_BACKUP_FORMAT . '|' . $workspace . '|' . $id;
+    $ciphertext = openssl_encrypt($plainJson, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $nonce, $tag, $aad, 16);
+    if (!is_string($ciphertext) || strlen($tag) !== 16) {
+        throw new RuntimeException('BACKUP_ENCRYPTION_FAILED');
+    }
+    $envelope = [
+        'format' => SERVER_BACKUP_FORMAT,
+        'version' => 1,
+        'cipher' => 'AES-256-GCM',
+        'workspace' => $workspace,
+        'id' => $id,
+        'nonce' => base64_encode($nonce),
+        'tag' => base64_encode($tag),
+        'ciphertext' => base64_encode($ciphertext)
+    ];
+    $encoded = json_encode($envelope, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if (!is_string($encoded)) throw new RuntimeException('BACKUP_ENVELOPE_ENCODING_FAILED');
+    return $encoded;
+}
+
+/** Return decrypted JSON; null means the stored envelope is invalid or cannot be authenticated. */
+function decryptServerBackupPayload(string $raw, string $workspace, string $expectedId, string $key): ?string {
+    $envelope = json_decode($raw, true);
+    if (!is_array($envelope) || ($envelope['format'] ?? '') !== SERVER_BACKUP_FORMAT) {
+        // Prior releases stored ordinary JSON. It is migrated on the first request
+        // authenticated to this workspace; all newly created files are encrypted.
+        return $raw;
+    }
+    if (($envelope['version'] ?? null) !== 1 || ($envelope['cipher'] ?? '') !== 'AES-256-GCM' ||
+        ($envelope['workspace'] ?? '') !== $workspace || ($envelope['id'] ?? '') !== $expectedId) {
+        return null;
+    }
+    $nonce = base64_decode((string)($envelope['nonce'] ?? ''), true);
+    $tag = base64_decode((string)($envelope['tag'] ?? ''), true);
+    $ciphertext = base64_decode((string)($envelope['ciphertext'] ?? ''), true);
+    if (!is_string($nonce) || strlen($nonce) !== 12 || !is_string($tag) || strlen($tag) !== 16 ||
+        !is_string($ciphertext) || strlen($ciphertext) === 0 || strlen($ciphertext) > 50 * 1024 * 1024) {
+        return null;
+    }
+    $aad = SERVER_BACKUP_FORMAT . '|' . $workspace . '|' . $expectedId;
+    $plain = openssl_decrypt($ciphertext, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $nonce, $tag, $aad);
+    return is_string($plain) ? $plain : null;
+}
+
+/**
+ * Rebuild an index using metadata from the decrypted payload, but hash the stored
+ * ciphertext for disk-integrity checks. Financial content itself never goes in the index.
+ */
+function rebuildIndex($backupDir, $indexPath, $maxFiles = 10, $workspace = '', $key = null) {
+    if (!is_string($key) || strlen($key) !== 32) $key = getServerBackupKey();
+    if ($workspace === '') throw new RuntimeException('BACKUP_WORKSPACE_MISSING');
     $files = glob($backupDir . '/backup_*.json') ?: [];
     $entries = [];
     foreach ($files as $file) {
-        $content = @file_get_contents($file);
-        if (!is_string($content)) continue;
-        $data = json_decode($content, true);
-        if (!is_array($data)) continue;
-
+        $storedContent = @file_get_contents($file);
+        if (!is_string($storedContent)) continue;
         $fileBase = basename($file, '.json');
         $id = str_starts_with($fileBase, 'backup_') ? substr($fileBase, 7) : $fileBase;
         if (!preg_match('/^[a-zA-Z0-9_-]{1,160}$/', $id)) continue;
-
+        $plainContent = decryptServerBackupPayload($storedContent, $workspace, $id, $key);
+        if (!is_string($plainContent)) throw new RuntimeException('BACKUP_DECRYPT_OR_AUTHENTICATION_FAILED');
+        $data = json_decode($plainContent, true);
+        if (!is_array($data)) continue;
         $entries[] = [
             'id' => $id,
             'timestamp' => $data['timestamp'] ?? (filemtime($file) * 1000),
             'label' => $data['label'] ?? 'Manual Backup',
-            'size' => strlen($content),
+            'size' => strlen($storedContent),
             'type' => $data['type'] ?? 'auto',
             'checksum' => $data['checksum'] ?? '',
-            'fileSha256' => hash('sha256', $content),
+            'fileSha256' => hash('sha256', $storedContent),
             'version' => $data['version'] ?? '2.0.0',
-            'hasAssets' => $data['hasAssets'] ?? false
+            'hasAssets' => $data['hasAssets'] ?? false,
+            'encryptedAtRest' => true,
+            'encryption' => 'AES-256-GCM'
         ];
     }
-    usort($entries, function($a, $b) {
-        return $b['timestamp'] <=> $a['timestamp'];
-    });
+    usort($entries, function($a, $b) { return $b['timestamp'] <=> $a['timestamp']; });
 
     if (count($entries) > $maxFiles) {
         $toRemove = array_slice($entries, $maxFiles);
@@ -127,15 +257,65 @@ function rebuildIndex($backupDir, $indexPath, $maxFiles = 10) {
             if (is_file($remFile)) @unlink($remFile);
         }
     }
-
     $encoded = json_encode($entries, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    if (is_string($encoded)) backupAtomicWrite($indexPath, $encoded);
+    if (is_string($encoded) && !backupAtomicWrite($indexPath, $encoded)) {
+        throw new RuntimeException('BACKUP_INDEX_WRITE_FAILED');
+    }
     return $entries;
+}
+
+function migrateLegacyBackupFiles($backupDir, $workspace, $key): bool {
+    $changed = false;
+    $files = glob($backupDir . '/backup_*.json') ?: [];
+    foreach ($files as $file) {
+        $fileBase = basename($file, '.json');
+        $id = str_starts_with($fileBase, 'backup_') ? substr($fileBase, 7) : $fileBase;
+        if (!preg_match('/^[a-zA-Z0-9_-]{1,160}$/', $id)) continue;
+        $raw = @file_get_contents($file);
+        if (!is_string($raw)) throw new RuntimeException('BACKUP_READ_FAILED');
+        $stored = json_decode($raw, true);
+        if (is_array($stored) && ($stored['format'] ?? '') === SERVER_BACKUP_FORMAT) {
+            $decrypted = decryptServerBackupPayload($raw, $workspace, $id, $key);
+            if (!is_string($decrypted) || !is_array(json_decode($decrypted, true))) {
+                throw new RuntimeException('BACKUP_DECRYPT_OR_AUTHENTICATION_FAILED');
+            }
+            continue;
+        }
+        if (!is_array($stored)) continue;
+        $encrypted = encryptServerBackupPayload($raw, $workspace, $id, $key);
+        if (!backupAtomicWrite($file, $encrypted)) throw new RuntimeException('BACKUP_MIGRATION_WRITE_FAILED');
+        $changed = true;
+    }
+    return $changed;
+}
+
+// Existing files from prior app versions are migrated before any response or new write.
+// When encryption is not available or the key is lost, fail closed rather than accepting
+// another plaintext backup write or silently re-keying the stored ciphertext.
+try {
+    $backupKey = getServerBackupKey();
+    if (migrateLegacyBackupFiles($backupDir, $workspace, $backupKey)) {
+        rebuildIndex($backupDir, $indexPath, $MAX_BACKUP_FILES, $workspace, $backupKey);
+    }
+} catch (Throwable $error) {
+    error_log('Server backup encryption unavailable: ' . ($error->getMessage() ?: 'unknown'));
+    http_response_code(503);
+    echo json_encode(['success' => false, 'error' => 'BACKUP_ENCRYPTION_UNAVAILABLE']);
+    exit();
 }
 
 $action = $input['action'] ?? $_GET['action'] ?? '';
 
 switch ($action) {
+    case 'capabilities':
+        echo json_encode([
+            'success' => true,
+            'backupEncryption' => 'AES-256-GCM',
+            'encryptedAtRest' => true,
+            'version' => 1
+        ]);
+        break;
+
     case 'create':
         $requestedId = is_string($input['id'] ?? null) ? $input['id'] : '';
         $id = substr((string)preg_replace('/[^a-zA-Z0-9_\-]/', '', $requestedId), 0, 160);
@@ -156,7 +336,13 @@ switch ($action) {
             echo json_encode(['success' => false, 'error' => 'BACKUP_TOO_LARGE']);
             break;
         }
-        if (!backupAtomicWrite($filePath, $jsonData)) {
+        $storedJson = encryptServerBackupPayload($jsonData, $workspace, $id, $backupKey);
+        if (strlen($storedJson) > 50 * 1024 * 1024) {
+            http_response_code(413);
+            echo json_encode(['success' => false, 'error' => 'BACKUP_TOO_LARGE']);
+            break;
+        }
+        if (!backupAtomicWrite($filePath, $storedJson)) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'BACKUP_WRITE_FAILED']);
             break;
@@ -173,12 +359,14 @@ switch ($action) {
             'id' => $id,
             'timestamp' => $input['timestamp'] ?? (time() * 1000),
             'label' => $input['label'] ?? 'Manual Backup',
-            'size' => strlen($jsonData),
+            'size' => strlen($storedJson),
             'type' => $input['type'] ?? 'auto',
             'checksum' => $input['checksum'] ?? '',
-            'fileSha256' => hash('sha256', $jsonData),
+            'fileSha256' => hash('sha256', $storedJson),
             'version' => $input['version'] ?? '2.0.0',
-            'hasAssets' => $input['hasAssets'] ?? false
+            'hasAssets' => $input['hasAssets'] ?? false,
+            'encryptedAtRest' => true,
+            'encryption' => 'AES-256-GCM'
         ];
         
         $found = false;
@@ -229,7 +417,7 @@ switch ($action) {
             echo json_encode(['success' => false, 'error' => 'BACKUP_INDEX_WRITE_FAILED']);
             break;
         }
-        echo json_encode(['success' => true, 'id' => $id, 'retained' => count($entries)]);
+        echo json_encode(['success' => true, 'id' => $id, 'retained' => count($entries), 'encryptedAtRest' => true, 'encryption' => 'AES-256-GCM']);
         break;
         
     case 'list':
@@ -237,10 +425,10 @@ switch ($action) {
         if (file_exists($indexPath)) {
             $entries = json_decode(file_get_contents($indexPath), true);
             if (!is_array($entries)) {
-                $entries = rebuildIndex($backupDir, $indexPath);
+                $entries = rebuildIndex($backupDir, $indexPath, $MAX_BACKUP_FILES, $workspace, $backupKey);
             }
         } else {
-            $entries = rebuildIndex($backupDir, $indexPath);
+            $entries = rebuildIndex($backupDir, $indexPath, $MAX_BACKUP_FILES, $workspace, $backupKey);
         }
         echo json_encode(['success' => true, 'backups' => $entries]);
         break;
@@ -264,7 +452,7 @@ switch ($action) {
         }
 
         $entries = is_file($indexPath) ? json_decode((string)@file_get_contents($indexPath), true) : null;
-        if (!is_array($entries)) $entries = rebuildIndex($backupDir, $indexPath, $MAX_BACKUP_FILES);
+        if (!is_array($entries)) $entries = rebuildIndex($backupDir, $indexPath, $MAX_BACKUP_FILES, $workspace, $backupKey);
         $expectedHash = null;
         foreach ($entries as $entry) {
             if (is_array($entry) && ($entry['id'] ?? null) === $id && is_string($entry['fileSha256'] ?? null)) {
@@ -279,7 +467,13 @@ switch ($action) {
             break;
         }
 
-        $content = json_decode($rawBackup, true);
+        $plainBackup = decryptServerBackupPayload($rawBackup, $workspace, $id, $backupKey);
+        if (!is_string($plainBackup)) {
+            http_response_code(409);
+            echo json_encode(['success' => false, 'error' => 'BACKUP_DECRYPT_OR_AUTHENTICATION_FAILED']);
+            break;
+        }
+        $content = json_decode($plainBackup, true);
         if (!is_array($content)) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'BACKUP_INVALID_JSON']);
@@ -288,6 +482,8 @@ switch ($action) {
         echo json_encode([
             'success' => true,
             'data' => $content,
+            'encryptedAtRest' => true,
+            'encryption' => 'AES-256-GCM',
             'integrity' => [
                 'algorithm' => 'sha256',
                 'verified' => is_string($expectedHash) && $expectedHash !== ''
