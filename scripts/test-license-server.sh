@@ -45,6 +45,9 @@ echo "PASS: master workspaces require the server admin secret; blank workspace i
 ' "$TEST_DIR/license_validator.php"
 
 unset GEMINI_API_KEY || true
+# The backup API now requires a server-held AES-256-GCM key outside the web root.
+# Use a random ephemeral key for this isolated integration-test server only.
+export ASHK_BACKUP_ENCRYPTION_KEY="$(php -r 'echo bin2hex(random_bytes(32));')"
 PORT="$(node -e "const s=require('node:net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
 php -S "127.0.0.1:$PORT" -t "$TEST_DIR" >"$TEST_DIR/php-server.log" 2>&1 &
 SERVER_PID=$!
