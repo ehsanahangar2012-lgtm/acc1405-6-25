@@ -261,7 +261,7 @@ const Invoices = () => {
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [activeSignRole, setActiveSignRole] = useState<'warehouse' | 'sales' | 'customer' | 'driver'>('customer');
   const [printTheme, setPrintTheme] = useState<PrintTheme>('smart');
-  const [autoSendSms, setAutoSendSms] = useState<boolean>(true);
+  const [autoSendSms, setAutoSendSms] = useState<boolean>(false);
   const [isSendingSms, setIsSendingSms] = useState<boolean>(false);
   const [showHelpModal, setShowHelpModal] = useState<boolean>(false);
   const [showPreviousBalance, setShowPreviousBalance] = useState<boolean>(true);
@@ -458,7 +458,7 @@ const Invoices = () => {
     }
 
     const person = people.find(p => p.id === selectedPerson);
-    console.log('Person found:', person);
+    const invoiceId = editingId || generateId();
     
     const processedChecks = checkPayment.map(c => {
         const checkId = c.id || generateId();
@@ -473,14 +473,10 @@ const Invoices = () => {
             bankName: c.bankName || '',
             sayadId: c.sayadId || '',
             dueDate: c.dueDate || getPersianDate(),
-            relatedInvoiceId: editingId || generateId()
+            relatedInvoiceId: invoiceId
         } as Check;
         
-        // ثبت چک در سیستم مدیریت چک در صورتی که قبلا ثبت نشده باشد
-        const existingCheck = checks.find(ck => ck.id === checkId);
-        if (!existingCheck) {
-            addCheck(checkData, selectedPerson);
-        }
+        // Check records are saved together with the invoice only after its journal posts.
         return checkData;
     });
 
@@ -490,7 +486,7 @@ const Invoices = () => {
     const targetBranch = targetCompany?.branches?.find(b => b.id === selectedBranchId) || targetCompany?.branches?.[0];
 
     const invoice: Invoice = {
-      id: editingId || generateId(),
+      id: invoiceId,
       companyId: targetCompany?.id || 'default',
       branchId: targetBranch?.id || undefined,
       companyName: targetCompany?.name || 'مجموعه تجاری',
@@ -535,9 +531,14 @@ const Invoices = () => {
       showPreviousBalance
     };
     invoice.trackingCode = generateTrackingCode(invoice.prefix || 'INV', invoice.number, invoiceDate);
-    if (editingId) updateInvoice(editingId, invoice); else addInvoice(invoice);
+    // Do not send SMS or clear the form unless the invoice + journal actually save.
+    const saved = editingId ? updateInvoice(editingId, invoice) : addInvoice(invoice);
+    if (!saved) {
+      alert('فاکتور ثبت نشد؛ اطلاعات فرم حفظ شده است. پیام خطای حسابداری یا مجوز ثبت را بررسی کنید.');
+      return;
+    }
 
-    // ارسال خودکار پیامک صورتحساب حاوی لینک امضا و پرداخت در صورت تمایل کاربر
+    // SMS is strictly opt-in. It never participates in the invoice save transaction.
     if (autoSendSms && person?.phone && type === InvoiceType.SALE) {
       SmsInvoiceService.sendInvoiceNotification(invoice, person, targetCompany).then(res => {
         if (res.success) {
@@ -1932,11 +1933,11 @@ ${url}
                   />
                   <span className="text-xs font-bold text-white flex items-center gap-1.5">
                     <MessageSquare size={14} className="text-emerald-400" />
-                    ارسال خودکار پیامک صورتحساب
+                    پس از ثبت موفق فاکتور، پیامک ارسال شود
                   </span>
                 </label>
                 <p className="text-[10px] text-slate-400 leading-relaxed pr-6">
-                  بلافاصله پس از ثبت فاکتور، پیامک شامل شماره فاکتور، مبلغ و لینک اختصاصی امضا و پرداخت به شماره موبایل خریدار ارسال می‌شود.
+                  فقط در صورت فعال‌کردن این گزینه، پیامک شماره فاکتور، مبلغ و لینک اختصاصی امضا و پرداخت برای خریدار ارسال می‌شود. در حالت خاموش هیچ پیامکی ارسال نخواهد شد.
                 </p>
               </div>
 
