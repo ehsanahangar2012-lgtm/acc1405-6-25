@@ -197,6 +197,7 @@ const LicenseManager: React.FC = () => {
             const payload = {
                 action: 'add',
                 workspace_id: workspaceId,
+                license_key: newLicenseKey,
                 title: clientName.trim(),
                 token: newLicenseKey,
                 expire_date: effectiveExpireDate,
