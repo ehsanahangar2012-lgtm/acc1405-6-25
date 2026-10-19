@@ -8,6 +8,10 @@ def appVersionParts = appVersionName.tokenize('.').collect { part ->
 }
 while (appVersionParts.size() < 3) appVersionParts << 0
 def appVersionCode = appVersionParts[0] * 1000000 + appVersionParts[1] * 1000 + appVersionParts[2]
+def releaseKeyPath = System.getenv('ANDROID_KEYSTORE_PATH')
+def releaseSigningReady = [releaseKeyPath, System.getenv('ANDROID_KEYSTORE_PASSWORD'), System.getenv('ANDROID_KEY_ALIAS'), System.getenv('ANDROID_KEY_PASSWORD')].every { value ->
+    value != null && !value.trim().isEmpty()
+}
 
 android {
     namespace = "ir.ashkghalam.acc"
@@ -25,10 +29,25 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    if (releaseSigningReady) {
+        signingConfigs {
+            release {
+                storeFile file(releaseKeyPath)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
