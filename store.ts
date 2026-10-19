@@ -1030,7 +1030,15 @@ export const useStore = create<AppState>()(
 
       addCheckTransfer: (t) => set(s => {
           const updatedChecks = s.checks.map(c => t.checkIds.includes(c.id) ? { ...c, status: 'TRANSFERRED' as const } : c);
-          
+          const totalAmount = t.items?.reduce((sum: number, item: any) => sum + (item.amount || 0), 0) || 0;
+          if (totalAmount > 0) {
+              const totalDocs = s.invoices.length + s.vouchers.length + s.transactions.length + s.checks.length;
+              const quotaCheck = licenseQuotaService.canAddDocument(totalDocs);
+              if (!quotaCheck.allowed) {
+                  return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف اسناد نسخه فعلی تکمیل شده است؛ واگذاری چک ثبت نشد.' }] };
+              }
+          }
+
           try {
               AccountingEngine.postCheckTransfer(t);
           } catch (err) {
@@ -1042,7 +1050,6 @@ export const useStore = create<AppState>()(
           const exactBalance = t.personId ? PersonLedgerService.getBalance(t.personId) : 0;
           const updatedPeople = s.people.map(p => p.id === t.personId ? { ...p, balance: exactBalance } : p);
 
-          let totalAmount = t.items?.reduce((sum: number, item: any) => sum + (item.amount || 0), 0) || 0;
           let newTransactions = [...s.transactions];
 
           if (totalAmount > 0) {
@@ -1137,7 +1144,8 @@ export const useStore = create<AppState>()(
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ثبت حواله انبار را ندارید.' }] };
           }
           const totalDocs = s.invoices.length + s.vouchers.length + s.transactions.length + s.checks.length;
-          const quotaCheck = licenseQuotaService.canAddDocument(totalDocs);
+          const createsLedgerInfo = Boolean(v.personId && s.people.some(person => person.id === v.personId));
+          const quotaCheck = licenseQuotaService.canAddDocument(totalDocs + (createsLedgerInfo ? 1 : 0));
           if (!quotaCheck.allowed) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.' }] };
           }
@@ -1647,6 +1655,13 @@ export const useStore = create<AppState>()(
           }
           if (isCheck && payment.checkDetails?.sayadId && payment.checkDetails.sayadId.replace(/\D/g, '').length !== 16) {
               return notifyError('شناسه صیادی چک باید دقیقاً ۱۶ رقم باشد.');
+          }
+
+          const totalDocs = s.invoices.length + s.vouchers.length + s.transactions.length + s.checks.length;
+          const createsTwoDocuments = payment.method === 'CHECK';
+          const quotaCheck = licenseQuotaService.canAddDocument(totalDocs + (createsTwoDocuments ? 1 : 0));
+          if (!quotaCheck.allowed) {
+              return notifyError(quotaCheck.reason || 'سقف اسناد نسخه فعلی تکمیل شده است؛ پرداخت ثبت نشد.');
           }
 
           const transId = generateId();
