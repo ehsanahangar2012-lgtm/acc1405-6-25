@@ -856,8 +856,10 @@ const App = () => {
     });
 
     // پایش هوشمند پیام‌های چت پشتیبانی و نوتیفیکیشن زنده برای ادمین و سیستم
-    if (currentUser) {
-      adminChatNotificationService.startMonitoring(12000);
+    // Standalone desktop builds should not poll the hosted support API every 12 seconds.
+    // Live support notifications start only when the owner explicitly configured a remote workspace.
+    if (currentUser && workspaceService.isRemoteCloudConfigured()) {
+      adminChatNotificationService.startMonitoring(isAndroidApp() ? 12000 : 30000);
     }
 
     // شروع پردازش دوره‌ای صف سینک - هر ۲ دقیقه (صرفاً در صورت اتصال به سرور)
