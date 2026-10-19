@@ -61,15 +61,7 @@ foreach ([$BACKUP_ROOT, $DAILY_BACKUP_ROOT, $IMAGES_ROOT] as $protectedDir) {
     if (!is_file($denyFile)) @file_put_contents($denyFile, "Options -Indexes\nDeny from all\n", LOCK_EX);
 }
 
-// تنظیمات
-$BACKUP_ROOT = __DIR__ . '/backup';
-$DAILY_BACKUP_ROOT = __DIR__ . '/daily-backups';
-$IMAGES_ROOT = __DIR__ . '/uploads';
-
-// ایجاد پوشه‌ها
-if (!is_dir($BACKUP_ROOT)) mkdir($BACKUP_ROOT, 0755, true);
-if (!is_dir($DAILY_BACKUP_ROOT)) mkdir($DAILY_BACKUP_ROOT, 0755, true);
-if (!is_dir($IMAGES_ROOT)) mkdir($IMAGES_ROOT, 0755, true);
+// Keep all backup and upload paths scoped to the authenticated workspace.
 
 function createBackupStructure($root) {
     $folders = ['invoices', 'vouchers', 'checks', 'customers', 'products', 'transactions', 'images'];
