@@ -391,29 +391,29 @@ const LoginPage = () => {
                             <p className="text-sm leading-6 text-slate-200">این فرم فقط برای ساخت اولین حساب مدیر است. هیچ نام کاربری یا رمز عبور پیش‌فرضی وجود ندارد.</p>
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="setup-admin-fullname" className="block text-sm font-extrabold text-white">نام کامل مدیر</label>
+                            <label htmlFor="setup-admin-fullname" className="block text-sm font-extrabold text-white">نام کامل مدیر (الزامی)</label>
                             <input id="setup-admin-fullname" type="text" autoComplete="name" className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20" placeholder="مثلاً: علی رضایی" value={setupFullName} required onChange={e => setSetupFullName(e.target.value)} />
                             <p className="text-sm leading-6 text-slate-300">نامی که در حساب کاربری و سوابق مدیریتی نمایش داده می‌شود.</p>
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="setup-admin-username" className="block text-sm font-bold text-slate-200">نام کاربری</label>
-                            <input id="setup-admin-username" type="text" autoComplete="username" minLength={4} className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500 font-mono" placeholder="حداقل ۴ نویسه؛ برای ورود استفاده می‌شود" value={setupUsername} onChange={e => setSetupUsername(e.target.value)} required />
-                            <p className="text-xs leading-relaxed text-slate-400">شناسه ورود مدیر است؛ آن را به دیگران ندهید.</p>
+                            <label htmlFor="setup-admin-username" className="block text-sm font-extrabold text-white">نام کاربری (الزامی)</label>
+                            <input id="setup-admin-username" type="text" autoComplete="username" minLength={4} className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 font-mono" placeholder="حداقل ۴ نویسه؛ برای ورود استفاده می‌شود" value={setupUsername} onChange={e => setSetupUsername(e.target.value)} required />
+                            <p className="text-sm leading-6 text-slate-300">شناسه ورود مدیر است؛ آن را به دیگران ندهید.</p>
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="setup-admin-email" className="block text-sm font-bold text-slate-200">ایمیل بازیابی (اختیاری)</label>
-                            <input id="setup-admin-email" type="email" autoComplete="email" className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500" placeholder="name@example.com" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} />
-                            <p className="text-xs leading-relaxed text-slate-400">برای بازیابی دسترسی لازم است؛ اگر وارد نکنید، بعداً از تنظیمات تکمیلش کنید.</p>
+                            <label htmlFor="setup-admin-email" className="block text-sm font-extrabold text-white">ایمیل بازیابی (اختیاری)</label>
+                            <input id="setup-admin-email" type="email" autoComplete="email" className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20" placeholder="name@example.com" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} />
+                            <p className="text-sm leading-6 text-slate-300">برای بازیابی دسترسی لازم است؛ اگر وارد نکنید، بعداً از تنظیمات تکمیلش کنید.</p>
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="setup-admin-password" className="block text-sm font-bold text-slate-200">رمز عبور مدیر</label>
-                            <input id="setup-admin-password" type="password" autoComplete="new-password" minLength={12} className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500 font-mono" placeholder="حداقل ۱۲ نویسه" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} required />
-                            <p className="text-xs leading-relaxed text-slate-400">حداقل ۱۲ نویسه و ترجیحاً عبارت عبور طولانی و منحصربه‌فرد انتخاب کنید.</p>
+                            <label htmlFor="setup-admin-password" className="block text-sm font-extrabold text-white">رمز عبور مدیر (الزامی)</label>
+                            <input id="setup-admin-password" type="password" autoComplete="new-password" minLength={12} className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 font-mono" placeholder="حداقل ۱۲ نویسه" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} required />
+                            <p className="text-sm leading-6 text-slate-300">حداقل ۱۲ نویسه و ترجیحاً عبارت عبور طولانی و منحصربه‌فرد انتخاب کنید.</p>
                         </div>
                         <div className="space-y-1.5">
-                            <label htmlFor="setup-admin-password-confirm" className="block text-sm font-bold text-slate-200">تکرار رمز عبور</label>
-                            <input id="setup-admin-password-confirm" type="password" autoComplete="new-password" minLength={12} className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500 font-mono" placeholder="رمز انتخاب‌شده را دوباره وارد کنید" value={setupPasswordConfirm} onChange={e => setSetupPasswordConfirm(e.target.value)} required />
-                            <p className="text-xs leading-relaxed text-slate-400">باید دقیقاً با رمز عبور بالا یکسان باشد.</p>
+                            <label htmlFor="setup-admin-password-confirm" className="block text-sm font-extrabold text-white">تکرار رمز عبور (الزامی)</label>
+                            <input id="setup-admin-password-confirm" type="password" autoComplete="new-password" minLength={12} className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 font-mono" placeholder="رمز انتخاب‌شده را دوباره وارد کنید" value={setupPasswordConfirm} onChange={e => setSetupPasswordConfirm(e.target.value)} required />
+                            <p className="text-sm leading-6 text-slate-300">باید دقیقاً با رمز عبور بالا یکسان باشد.</p>
                         </div>
                         {error && <div className="text-rose-400 text-xs text-center font-bold bg-rose-500/10 py-3 px-4 rounded-xl border border-rose-500/20">{error}</div>}
                         <button type="submit" className="w-full bg-teal-600 hover:bg-teal-500 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-teal-900/30 transition-all flex items-center justify-center gap-2">
