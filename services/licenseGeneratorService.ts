@@ -1,6 +1,5 @@
 // License Generator & Validation Service (سرویس صدور و اعتبارسنجی لایسنس‌های نرم‌افزار)
 // سازگار با الگوریتم رمزنگاری HMAC-SHA256 و HWID دستگاه
-import CryptoJS from 'crypto-js';
 import { hardwareIdService } from './hardwareIdService';
 import { encryptedStorageService, AppManifest } from './encryptedStorageService';
 import { workspaceService } from './workspaceService';
@@ -10,7 +9,9 @@ export type LicensePlan = 'TRIAL' | 'HEMAYAT' | 'BRONZE' | 'SILVER' | 'GOLD' | '
 export interface LicenseRecord {
     id: string;
     licenseKey: string;
-    activationCode: string;
+    activationCode: string; // Empty for server-verified online licensing; legacy offline codes are disabled.
+    workspaceId?: string;
+    serverUrl?: string;
     clientName: string;
     clientPhone: string;
     hwid: string;
@@ -25,7 +26,6 @@ export interface LicenseRecord {
     status: 'ACTIVE' | 'REVOKED' | 'EXPIRED';
 }
 
-const MASTER_SIGNING_SALT = 'ASHK_MASTER_HWID_CRYPT_SALT_2026_IR';
 const LICENSES_STORAGE_KEY = 'ashk_issued_licenses_registry_v1';
 
 export const PLAN_CONFIGS: Record<LicensePlan, { title: string; maxCustomers: number; maxDocuments: number; isUnlimited: boolean; validityDays: number; defaultPrice: number; badgeColor: string }> = {
@@ -106,40 +106,10 @@ class LicenseGeneratorService {
     /**
      * تولید کد فعال‌سازی آفلاین امضاشده بر اساس HWID دستگاه، شماره لایسنس و مشخصات پلن
      */
-    generateActivationCode(licenseKey: string, hwid: string, plan: LicensePlan, expireDate: string): string {
-        const cleanKey = licenseKey.trim().toUpperCase();
-        const cleanHwid = hwid.trim().toUpperCase();
-        const planConfig = PLAN_CONFIGS[plan];
-        const isUnlimited = planConfig.isUnlimited;
-
-        // ۱. ساخت پی‌لود معتبر
-        const payload = {
-            licenseKey: cleanKey,
-            hwid: cleanHwid,
-            workspaceId: 'default',
-            companyName: 'کاربر لایسنس‌شده اشک قلم',
-            expireDate: expireDate || (isUnlimited ? '1410-12-29' : '1405-12-29'),
-            isUnlimited,
-            maxUsers: isUnlimited ? 99 : 5,
-            maxCustomers: planConfig.maxCustomers,
-            maxDocuments: planConfig.maxDocuments,
-            features: isUnlimited ? ['ALL_MODULES', 'UNLIMITED_INVOICES', 'SCOPED_DB', 'OFFLINE_STORAGE'] : ['BASIC_MODULES'],
-            activatedAt: new Date().toISOString()
-        };
-
-        const signature = hardwareIdService.generateActivationSignature(payload);
-        const signedPayload = { ...payload, signature };
-
-        // تبدیل به رشته بیس۶۴ رمزشده
-        const jsonStr = JSON.stringify(signedPayload);
-        const base64Code = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(jsonStr));
-
-        // همچنین کد هش کوتاه عددی-حروفی استاندارد: ACT-XXXX-XXXX-XXXX
-        const checkStandard = CryptoJS.SHA256(`${cleanKey}-${cleanHwid}-${MASTER_SIGNING_SALT}`).toString().toUpperCase();
-        const fastCode = `ACT-${checkStandard.substring(0, 4)}-${checkStandard.substring(4, 8)}-${checkStandard.substring(8, 12)}`;
-
-        // برگرداندن کد کوتاه که برای کاربر بسیار آسان است، یا بیس۶۴ کامل در صورت نیاز
-        return fastCode;
+    generateActivationCode(_licenseKey: string, _hwid: string, _plan: LicensePlan, _expireDate: string): string {
+        // Never generate commercial activation tokens in a distributable client-side module.
+        // The admin portal must register licenses through the authenticated mother-server API.
+        return '';
     }
 
     /**
@@ -201,7 +171,7 @@ class LicenseGeneratorService {
                 expireDate: p.expireDate || '1410-12-29',
                 isUnlimited: p.isUnlimited ?? true,
                 standaloneOfflineMode: true,
-                features: ['ALL_MODULES', 'OFFLINE_STORAGE', 'UNLIMITED_CUSTOMERS', 'UNLIMITED_DOCUMENTS']
+                features: Array.isArray(p.features) ? p.features : ['BASIC_MODULES']
             });
 
             await encryptedStorageService.saveAppManifest(newManifest);
@@ -246,22 +216,22 @@ class LicenseGeneratorService {
     formatCustomerDeliveryMessage(record: LicenseRecord): string {
         const planTitle = PLAN_CONFIGS[record.plan].title;
         return `با سلام و احترام خدمت ${record.clientName} عزیز،
-سپاس از انتخاب نرم‌افزار جامع حسابداری و اتوماسیون مالی اشک قلم.
+سپاس از انتخاب نرم‌افزار حسابداری اشک قلم.
 
-اطلاعات لایسنس و فعال‌سازی نرم‌افزار شما:
+اطلاعات لایسنس ثبت‌شده روی سرور:
 🏷 نام کسب‌وکار: ${record.clientName}
-📦 نسخه فعال‌شده: ${planTitle}
+📦 پلن: ${planTitle}
+🌐 سرور فعال‌سازی: ${record.serverUrl || 'نشانی سرور را از پشتیبانی دریافت کنید'}
+🧭 شناسه فضای کاری: ${record.workspaceId || '—'}
 🔑 شماره لایسنس: ${record.licenseKey}
-🔐 کد فعال‌سازی دستگاه: ${record.activationCode}
-📅 تاریخ اعتبار: ${record.isUnlimited ? 'مادام‌العمر و دائمی' : record.expireDate}
+📅 اعتبار: ${record.isUnlimited ? 'بدون تاریخ انقضا' : record.expireDate}
 
 راهنمای فعال‌سازی:
-۱- در نرم‌افزار، روی دکمه «فعال‌سازی لایسنس» کلیک کنید.
-۲- شماره لایسنس و کد فعال‌سازی بالا را در فرم مربوطه وارد کنید.
-۳- روی دکمه «تأیید و فعال‌سازی» کلیک نمایید تا تمام محدودیت‌ها بازگشایی شوند.
+۱- در نسخه ویندوز/اندروید بخش «فعال‌سازی آنلاین» را باز کنید.
+۲- نشانی سرور، شناسه فضای کاری و شماره لایسنس را وارد کنید.
+۳- دستگاه فقط پس از تأیید سرور فعال می‌شود.
 
-📞 پشتیبانی فنی اشک قلم: ۰۹۱۲۰۰۰۰۰۰۰
-با تشکر از اعتماد شما`;
+با تشکر از اعتماد شما به اشک قلم`;
     }
 }
 
