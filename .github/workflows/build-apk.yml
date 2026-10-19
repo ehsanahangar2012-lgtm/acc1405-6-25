@@ -15,6 +15,30 @@ on:
 
 jobs:
 
+  verify-host-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build mother-web assets
+        run: bun run build:web
+
+      - name: Test host package excludes private data
+        run: node scripts/test-host-package-safety.mjs
+
   build-browser-preview:
     runs-on: ubuntu-latest
 
