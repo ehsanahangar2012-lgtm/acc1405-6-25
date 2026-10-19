@@ -3,6 +3,7 @@
 import CryptoJS from 'crypto-js';
 import { hardwareIdService } from './hardwareIdService';
 import { encryptedStorageService, AppManifest } from './encryptedStorageService';
+import { workspaceService } from './workspaceService';
 
 export type LicensePlan = 'TRIAL' | 'HEMAYAT' | 'BRONZE' | 'SILVER' | 'GOLD' | 'ENTERPRISE';
 
@@ -204,6 +205,15 @@ class LicenseGeneratorService {
             });
 
             await encryptedStorageService.saveAppManifest(newManifest);
+            // Keep the activation's tenant scope available to the later, explicit server-connection step.
+            // Offline activation itself must not enable cloud sync.
+            await workspaceService.updateConfig({
+                workspaceId: newManifest.workspaceId,
+                licenseKey: newManifest.licenseKey,
+                workspaceToken: '',
+                customServerUrl: '',
+                standaloneOfflineMode: true
+            });
 
             // ذخیره فلگ در حافظه محلی
             if (typeof window !== 'undefined') {
