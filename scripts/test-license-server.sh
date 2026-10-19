@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -53,7 +53,7 @@ for attempt in $(seq 1 40); do
 done
 
 # Retired legacy endpoints must fail closed.
-for endpoint in server-api-database.php server-api-upload.php; do
+for endpoint in server-api-database.php server-api-upload.php audit-trail-api.php; do
   code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/$endpoint.json" -w '%{http_code}' "$BASE_URL/$endpoint")"
   [[ "$code" == "410" ]]
   php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="ENDPOINT_RETIRED"){fwrite(STDERR,"Retired endpoint returned an unexpected result");exit(1);}' "$TEST_DIR/$endpoint.json"
