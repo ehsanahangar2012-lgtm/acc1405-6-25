@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$ROOT_DIR/host-backend/remote-signature-api.php" "$ROOT_DIR/host-backend/signature-api-simple.php" "$ROOT_DIR/host-backend/deleted-records-api.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$ROOT_DIR/host-backend/remote-signature-api.php" "$ROOT_DIR/host-backend/signature-api-simple.php" "$ROOT_DIR/host-backend/deleted-records-api.php" "$ROOT_DIR/host-backend/gemini-api.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -42,6 +42,7 @@ foreach ($checks as [$workspace, $token, $allowed, $status]) {
 echo "PASS: master workspaces require the server admin secret; blank workspace is denied.\n";
 ' "$TEST_DIR/license_validator.php"
 
+unset GEMINI_API_KEY || true
 PORT="$(node -e "const s=require('node:net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
 php -S "127.0.0.1:$PORT" -t "$TEST_DIR" >"$TEST_DIR/php-server.log" 2>&1 &
 SERVER_PID=$!
@@ -101,6 +102,17 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/api-no-auth.json" 
   -H 'Content-Type: application/json' -d '{"action":"get","table":"companies"}' "$BASE_URL/api.php")"
 [[ "$code" == "403" ]]
 
+# Gemini proxy must not accept a bundled/public token; an active workspace is required.
+if grep -Eq 'secure_api_token_change_this|VITE_API_TOKEN|gemini-2\.0-flash' \
+  "$ROOT_DIR/services/geminiService.ts" "$ROOT_DIR/host-backend/gemini-api.php" \
+  "$ROOT_DIR/android/app/src/main/assets/public/gemini-api.php"; then
+  echo "Gemini endpoint/client still contains a public token or retired model" >&2
+  exit 1
+fi
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/gemini-no-auth.json" -w '%{http_code}' \
+  -H 'Content-Type: application/json' -d '{"contents":[{"parts":[{"text":"CI"}]}]}' "$BASE_URL/gemini-api.php")"
+[[ "$code" == "403" ]]
+
 # Deleted-records data must not be accessible or mutable without workspace credentials.
 code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/deleted-records-no-auth.json" -w '%{http_code}' "$BASE_URL/deleted-records-api.php?action=list")"
 [[ "$code" == "403" ]]
@@ -147,6 +159,13 @@ if($raw===false||$sig===false||openssl_verify($raw,$sig,$pub,OPENSSL_ALGO_SHA256
 $p=json_decode($raw,true);if(($p["hwid"]??"")!=="HWID-A"||($p["plan"]??"")!=="BRONZE"||($p["max_customers"]??null)!==50||($p["max_documents"]??null)!==500){fwrite(STDERR,"Wrong receipt entitlements\n");exit(1);}
 ' "$TEST_DIR/valid.json" "$TEST_REGISTRY_PATH"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["workspaces"]["ws_test"]["hwid"]??"")!=="HWID-A"){fwrite(STDERR,"HWID not persisted\n");exit(1);}' "$TEST_REGISTRY_PATH"
+
+# A valid licensed workspace passes authentication but cannot bypass missing server AI configuration.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/gemini-valid-workspace.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' -d '{"contents":[{"parts":[{"text":"CI"}]}]}' "$BASE_URL/gemini-api.php")"
+[[ "$code" == "503" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["error"]??"")!=="AI_SERVICE_NOT_CONFIGURED"){fwrite(STDERR,"Gemini did not fail closed without server secret");exit(1);}' "$TEST_DIR/gemini-valid-workspace.json"
 
 # Tombstone writes and reads are authorized and scoped to the licensed workspace directory.
 mkdir -p "$TEST_DIR/db/tenants/ws_other"
