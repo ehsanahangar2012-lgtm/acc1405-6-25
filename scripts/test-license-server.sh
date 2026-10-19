@@ -5,7 +5,7 @@ TEST_DIR="$(mktemp -d)"
 SERVER_PID=""
 cleanup() { if [[ -n "$SERVER_PID" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi; rm -rf "$TEST_DIR"; }
 trap cleanup EXIT
-cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$ROOT_DIR/host-backend/remote-signature-api.php" "$ROOT_DIR/host-backend/signature-api-simple.php" "$TEST_DIR/"
+cp "$ROOT_DIR/host-backend/license_validator.php" "$ROOT_DIR/host-backend/tenant-manager.php" "$ROOT_DIR/host-backend/host-storage-api.php" "$ROOT_DIR/host-backend/storage.php" "$ROOT_DIR/host-backend/server-api-backup.php" "$ROOT_DIR/host-backend/backup-system.php" "$ROOT_DIR/host-backend/api.php" "$ROOT_DIR/host-backend/host-api.php" "$ROOT_DIR/host-backend/server-api-database.php" "$ROOT_DIR/host-backend/server-api-upload.php" "$ROOT_DIR/host-backend/audit-trail-api.php" "$ROOT_DIR/host-backend/digital-signature-config.php" "$ROOT_DIR/host-backend/remote-signature-api.php" "$ROOT_DIR/host-backend/signature-api-simple.php" "$ROOT_DIR/host-backend/deleted-records-api.php" "$TEST_DIR/"
 mkdir -p "$TEST_DIR/data"
 export TEST_REGISTRY_PATH="$TEST_DIR/data/workspaces_auth.json"
 php <<'PHP'
@@ -101,6 +101,10 @@ code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/api-no-auth.json" 
   -H 'Content-Type: application/json' -d '{"action":"get","table":"companies"}' "$BASE_URL/api.php")"
 [[ "$code" == "403" ]]
 
+# Deleted-records data must not be accessible or mutable without workspace credentials.
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/deleted-records-no-auth.json" -w '%{http_code}' "$BASE_URL/deleted-records-api.php?action=list")"
+[[ "$code" == "403" ]]
+
 post_json() {
   local body="$1" output="$2"; shift 2
   curl --silent --show-error --max-time 8 "$@" -H 'Content-Type: application/json' -d "$body" -o "$output" -w '%{http_code}' "$BASE_URL/tenant-manager.php"
@@ -143,6 +147,27 @@ if($raw===false||$sig===false||openssl_verify($raw,$sig,$pub,OPENSSL_ALGO_SHA256
 $p=json_decode($raw,true);if(($p["hwid"]??"")!=="HWID-A"||($p["plan"]??"")!=="BRONZE"||($p["max_customers"]??null)!==50||($p["max_documents"]??null)!==500){fwrite(STDERR,"Wrong receipt entitlements\n");exit(1);}
 ' "$TEST_DIR/valid.json" "$TEST_REGISTRY_PATH"
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["workspaces"]["ws_test"]["hwid"]??"")!=="HWID-A"){fwrite(STDERR,"HWID not persisted\n");exit(1);}' "$TEST_REGISTRY_PATH"
+
+# Tombstone writes and reads are authorized and scoped to the licensed workspace directory.
+mkdir -p "$TEST_DIR/db/tenants/ws_other"
+php -r '$data=["other-record"=>["id"=>"other-record","type"=>"invoice","serverReceivedAt"=>date(DATE_ATOM)]];file_put_contents($argv[1],json_encode($data));' "$TEST_DIR/db/tenants/ws_other/deleted_records.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/deleted-records-before.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  "$BASE_URL/deleted-records-api.php?action=list")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(($j["success"]??false)!==true||count($j["records"]??[])!==0){fwrite(STDERR,"Deleted-record list leaked other workspace tombstones");exit(1);}' "$TEST_DIR/deleted-records-before.json"
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/deleted-records-register.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  -H 'Content-Type: application/json' \
+  -d '{"action":"register","workspace_id":"ws_test","records":[{"id":"own-deleted-invoice","type":"invoice","deletedAt":123456,"deletedBy":"CI","deviceId":"HWID-A","reason":"CI test","privateField":"must-be-dropped"}]}' \
+  "$BASE_URL/deleted-records-api.php")"
+[[ "$code" == "200" ]]
+code="$(curl --silent --show-error --max-time 8 -o "$TEST_DIR/deleted-records-after.json" -w '%{http_code}' \
+  -H 'X-Workspace-ID: ws_test' -H 'X-Workspace-Token: ASHK-CI-TEST-0001' -H 'X-Device-HWID: HWID-A' \
+  "$BASE_URL/deleted-records-api.php?action=list")"
+[[ "$code" == "200" ]]
+php -r '$j=json_decode(file_get_contents($argv[1]),true);$r=$j["records"]??[];if(count($r)!==1||($r[0]["id"]??"")!=="own-deleted-invoice"||isset($r[0]["privateField"])){fwrite(STDERR,"Tombstone persistence/sanitization failed");exit(1);}' "$TEST_DIR/deleted-records-after.json"
+php -r '$j=json_decode(file_get_contents($argv[1]),true);if(count($j)!==1||!isset($j["other-record"])){fwrite(STDERR,"Tenant tombstone write touched another workspace");exit(1);}' "$TEST_DIR/db/tenants/ws_other/deleted_records.json"
 
 # Simple public-link signatures: tenant-authenticated creation, no overwrite, exact link proof on sign.
 cat > "$TEST_DIR/simple-signature-create.json" <<'JSON'
