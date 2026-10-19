@@ -7,8 +7,11 @@
  */
 
 import CryptoJS from 'crypto-js';
-import { persistentStorage } from './persistentStorage';
-import { getPersianDate, toPersianDigits } from '../utils';
+import { idbService } from './indexedDBService';
+import { hostBackupService } from './hostBackupService';
+import { workspaceService } from './workspaceService';
+import { useFinancialStore } from '../store-financial';
+import { getPersianDate } from '../utils';
 
 export interface BackupTierStatus {
     tierId: 'windows_local' | 'android_storage' | 'cloud_vault';
@@ -30,57 +33,56 @@ export interface TripleBackupReport {
 }
 
 const STORAGE_KEY_TRIPLE_REPORT = 'triple_backup_report';
-const STORAGE_KEY_ANDROID_TIER = 'ashk_triple_backup_android';
-const STORAGE_KEY_CLOUD_VAULT = 'ashk_triple_backup_cloud_vault';
+const STORAGE_KEY_LOCAL_BACKUP = 'ashk_triple_backup_local';
 
 export class TripleBackupService {
     /**
      * اجرای پشتیبان‌گیری ۳ گانه همزمان
      */
     static async executeTripleBackup(accountingData: any): Promise<TripleBackupReport> {
-        const payloadString = JSON.stringify(accountingData);
+        const completeData = {
+            ...accountingData,
+            financialData: useFinancialStore.getState()
+        };
+        const payloadString = JSON.stringify(completeData);
         const hash = CryptoJS.SHA256(payloadString).toString();
         const sizeBytes = new Blob([payloadString]).size;
         const nowPersian = getPersianDate() + ' ' + new Date().toLocaleTimeString('fa-IR');
 
-        // لایه ۱: ویندوز و ذخیره‌ساز محلی (IndexedDB / LocalStorage)
+        // Tier 1 is a local IndexedDB snapshot on this device only.
         let tier1Status: BackupTierStatus['status'] = 'SYNCED';
         try {
-            await persistentStorage.saveData('ashk_triple_backup_local', {
-                data: accountingData,
+            await idbService.save('backups', {
+                id: STORAGE_KEY_LOCAL_BACKUP,
+                data: payloadString,
                 hash,
-                date: nowPersian
+                date: nowPersian,
+                updatedAt: Date.now()
             });
         } catch {
             tier1Status = 'ERROR';
         }
 
-        // لایه ۲: حافظه ایزوله موبایل اندروید
-        let tier2Status: BackupTierStatus['status'] = 'SYNCED';
-        try {
-            await persistentStorage.saveData(STORAGE_KEY_ANDROID_TIER, {
-                data: accountingData,
-                hash,
-                date: nowPersian
-            });
-        } catch {
-            tier2Status = 'ERROR';
+        // A genuinely separate OS-file backup is not implemented yet. Never claim
+        // that another key in the same IndexedDB database is an independent copy.
+        const tier2Status: BackupTierStatus['status'] = 'WAITING';
+
+        // Tier 3 is successful only after a configured, authenticated host backup confirms success.
+        let tier3Status: BackupTierStatus['status'] = 'WAITING';
+        if (
+            workspaceService.isRemoteCloudConfigured() &&
+            (typeof navigator === 'undefined' || navigator.onLine)
+        ) {
+            try {
+                const result = await hostBackupService.createBackup(accountingData, 'manual', 'پشتیبان چندمسیره');
+                tier3Status = result.success ? 'SYNCED' : 'ERROR';
+            } catch {
+                tier3Status = 'ERROR';
+            }
         }
 
-        // لایه ۳: فضای ابری و مخزن متمرکز هاست
-        let tier3Status: BackupTierStatus['status'] = 'SYNCED';
-        try {
-            await persistentStorage.saveData(STORAGE_KEY_CLOUD_VAULT, {
-                data: accountingData,
-                hash,
-                date: nowPersian
-            });
-        } catch {
-            tier3Status = 'ERROR';
-        }
-
-        const count = Object.keys(accountingData || {}).reduce((acc, k) => {
-            return acc + (Array.isArray(accountingData[k]) ? accountingData[k].length : 1);
+        const count = Object.keys(completeData || {}).reduce((acc, key) => {
+            return acc + (Array.isArray(completeData[key]) ? completeData[key].length : 1);
         }, 0);
 
         const report: TripleBackupReport = {
@@ -91,38 +93,40 @@ export class TripleBackupService {
             tiers: [
                 {
                     tierId: 'windows_local',
-                    name: 'لایه ۱: هارد دیسک و دیتابیس محلی (ویندوز / مرورگر)',
-                    description: 'ذخیره روی دیسک سخت و حافظه دائم IndexedDB با دسترسی آفلاین 0ms',
-                    lastBackupDate: nowPersian,
+                    name: 'نسخه محلی برنامه (IndexedDB همین دستگاه)',
+                    description: 'نسخه محلی برای بازیابی سریع؛ با پاک‌سازی داده‌های برنامه یا مرورگر ممکن است از دست برود و به‌تنهایی کافی نیست',
+                    lastBackupDate: tier1Status === 'SYNCED' ? nowPersian : undefined,
                     status: tier1Status,
-                    itemCount: count,
-                    sha256Hash: hash.substring(0, 16) + '...',
-                    sizeBytes
+                    itemCount: tier1Status === 'SYNCED' ? count : 0,
+                    sha256Hash: tier1Status === 'SYNCED' ? hash.substring(0, 16) + '...' : undefined,
+                    sizeBytes: tier1Status === 'SYNCED' ? sizeBytes : 0
                 },
                 {
                     tierId: 'android_storage',
-                    name: 'لایه ۲: حافظه ایزوله اپلیکیشن همراه (موبایل اندروید)',
-                    description: 'نگهداری یک نسخه مستقل در حافظه امن گوشی و تبلت برای بازیابی اضطراری',
-                    lastBackupDate: nowPersian,
+                    name: 'نسخه مستقل روی فایل‌سیستم دستگاه',
+                    description: 'ذخیره‌سازی مستقل روی دیسک ویندوز یا پوشه خصوصی اندروید هنوز پیاده‌سازی نشده است؛ این لایه عمداً موفق گزارش نمی‌شود',
                     status: tier2Status,
-                    itemCount: count,
-                    sha256Hash: hash.substring(0, 16) + '...',
-                    sizeBytes
+                    itemCount: 0,
+                    sizeBytes: 0
                 },
                 {
                     tierId: 'cloud_vault',
-                    name: 'لایه ۳: مخزن رمزنگاری‌شده ابری (هاست متمرکز SaaS)',
-                    description: 'پشتیبان‌گیری در سرور ابری جهت جلوگیری از مفقودی داده‌ها در صورت آسیب فیزیکی سخت‌افزار',
-                    lastBackupDate: nowPersian,
+                    name: 'نسخه پشتیبان سرور مرکزی',
+                    description: 'فقط پس از تأیید موفق API پشتیبان‌گیری سرور ثبت می‌شود؛ رمزگذاری در حالت سکون هنوز نیازمند تنظیم و پیاده‌سازی است',
+                    lastBackupDate: tier3Status === 'SYNCED' ? nowPersian : undefined,
                     status: tier3Status,
-                    itemCount: count,
-                    sha256Hash: hash.substring(0, 16) + '...',
-                    sizeBytes
+                    itemCount: tier3Status === 'SYNCED' ? count : 0,
+                    sha256Hash: tier3Status === 'SYNCED' ? hash.substring(0, 16) + '...' : undefined,
+                    sizeBytes: tier3Status === 'SYNCED' ? sizeBytes : 0
                 }
             ]
         };
 
-        await persistentStorage.saveData(STORAGE_KEY_TRIPLE_REPORT, report);
+        try {
+            await idbService.save('backups', { id: STORAGE_KEY_TRIPLE_REPORT, report });
+        } catch (error) {
+            console.warn('Unable to save backup status report locally:', error);
+        }
         return report;
     }
 
@@ -131,8 +135,9 @@ export class TripleBackupService {
      */
     static async getLastReport(): Promise<TripleBackupReport | null> {
         try {
-            const report = await persistentStorage.loadData(STORAGE_KEY_TRIPLE_REPORT);
-            if (report && report.tiers) {
+            const saved = await idbService.get('backups', STORAGE_KEY_TRIPLE_REPORT);
+            const report = saved?.report;
+            if (report && Array.isArray(report.tiers)) {
                 return report as TripleBackupReport;
             }
         } catch {}
