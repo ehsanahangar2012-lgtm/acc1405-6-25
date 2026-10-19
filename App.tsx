@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MobileNav from './components/MobileNav';
 import QuickActionFAB from './components/QuickActionFAB';
@@ -45,7 +45,7 @@ import { UpdateCenter } from './pages/UpdateCenter';
 import { workspaceService } from './services/workspaceService';
 import { isDesktopApp, isAndroidApp, isMotherWebPortal } from './utils';
 import { FEATURES } from './config';
-import { Lock, User as UserIcon, LogIn, PenTool, Loader2, WifiOff, Cloud, RefreshCw, KeyRound, ShieldCheck } from 'lucide-react';
+import { Lock, User as UserIcon, LogIn, PenTool, Loader2, WifiOff, Cloud, RefreshCw, KeyRound, ShieldCheck, ArrowRight } from 'lucide-react';
 
 // Helper to retry lazy loaded components on dynamic import failure
 const lazyWithRetry = <T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) =>
@@ -385,11 +385,31 @@ const LoginPage = () => {
                         <p className="text-xs leading-relaxed text-slate-300 bg-slate-950/70 border border-teal-500/20 rounded-xl p-3">
                             اولین اجرا: حساب مدیر را خودتان بسازید. هیچ نام کاربری یا رمز عبور پیش‌فرضی فعال نیست.
                         </p>
-                        <input type="text" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500" placeholder="نام کامل مدیر" value={setupFullName} onChange={e => setSetupFullName(e.target.value)} />
-                        <input type="text" autoComplete="username" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500 font-mono" placeholder="نام کاربری (حداقل ۴ نویسه)" value={setupUsername} onChange={e => setSetupUsername(e.target.value)} required />
-                        <input type="email" autoComplete="email" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500" placeholder="ایمیل بازیابی (اختیاری)" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} />
-                        <input type="password" autoComplete="new-password" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500 font-mono" placeholder="رمز عبور مدیر (حداقل ۱۲ نویسه)" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} required />
-                        <input type="password" autoComplete="new-password" className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-3.5 text-white outline-none focus:border-teal-500 font-mono" placeholder="تکرار رمز عبور" value={setupPasswordConfirm} onChange={e => setSetupPasswordConfirm(e.target.value)} required />
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-fullname" className="block text-sm font-bold text-slate-200">نام کامل مدیر</label>
+                            <input id="setup-admin-fullname" type="text" autoComplete="name" className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500" placeholder="مثلاً: علی رضایی" value={setupFullName} onChange={e => setSetupFullName(e.target.value)} />
+                            <p className="text-xs leading-relaxed text-slate-400">نامی که در حساب کاربری و سوابق مدیریتی نمایش داده می‌شود.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-username" className="block text-sm font-bold text-slate-200">نام کاربری</label>
+                            <input id="setup-admin-username" type="text" autoComplete="username" minLength={4} className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500 font-mono" placeholder="حداقل ۴ نویسه؛ برای ورود استفاده می‌شود" value={setupUsername} onChange={e => setSetupUsername(e.target.value)} required />
+                            <p className="text-xs leading-relaxed text-slate-400">شناسه ورود مدیر است؛ آن را به دیگران ندهید.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-email" className="block text-sm font-bold text-slate-200">ایمیل بازیابی (اختیاری)</label>
+                            <input id="setup-admin-email" type="email" autoComplete="email" className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500" placeholder="name@example.com" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} />
+                            <p className="text-xs leading-relaxed text-slate-400">برای بازیابی دسترسی لازم است؛ اگر وارد نکنید، بعداً از تنظیمات تکمیلش کنید.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-password" className="block text-sm font-bold text-slate-200">رمز عبور مدیر</label>
+                            <input id="setup-admin-password" type="password" autoComplete="new-password" minLength={12} className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500 font-mono" placeholder="حداقل ۱۲ نویسه" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} required />
+                            <p className="text-xs leading-relaxed text-slate-400">حداقل ۱۲ نویسه و ترجیحاً عبارت عبور طولانی و منحصربه‌فرد انتخاب کنید.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-password-confirm" className="block text-sm font-bold text-slate-200">تکرار رمز عبور</label>
+                            <input id="setup-admin-password-confirm" type="password" autoComplete="new-password" minLength={12} className="w-full bg-slate-950/90 border border-white/20 rounded-2xl p-3.5 text-white placeholder:text-slate-400 outline-none focus:border-teal-500 font-mono" placeholder="رمز انتخاب‌شده را دوباره وارد کنید" value={setupPasswordConfirm} onChange={e => setSetupPasswordConfirm(e.target.value)} required />
+                            <p className="text-xs leading-relaxed text-slate-400">باید دقیقاً با رمز عبور بالا یکسان باشد.</p>
+                        </div>
                         {error && <div className="text-rose-400 text-xs text-center font-bold bg-rose-500/10 py-3 px-4 rounded-xl border border-rose-500/20">{error}</div>}
                         <button type="submit" className="w-full bg-teal-600 hover:bg-teal-500 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-teal-900/30 transition-all flex items-center justify-center gap-2">
                             <ShieldCheck size={20} />
@@ -594,7 +614,15 @@ const useSmartRoutePreloader = () => {
 const MainAppLayout: React.FC = () => {
     const { isMaxTableMode } = useResponsiveLayout();
     const { theme } = useTheme();
+    const location = useLocation();
+    const navigate = useNavigate();
     const isLight = theme.mode === 'light';
+
+    const handlePageBack = () => {
+        const historyIndex = Number((window.history.state as { idx?: number } | null)?.idx ?? 0);
+        if (historyIndex > 0) navigate(-1);
+        else navigate('/');
+    };
 
     // اجرای پیش‌بارگذاری هوشمند وابسته به مسیر فعلی
     useSmartRoutePreloader();
@@ -610,6 +638,19 @@ const MainAppLayout: React.FC = () => {
                     ? 'p-1.5 sm:p-2.5 pt-10 md:mr-64 md:p-6 md:pt-11' 
                     : 'p-3 sm:p-4 pt-10 md:p-10 md:pt-11 md:mr-64'
             }`}>
+                {location.pathname !== '/' && (
+                    <div className="mb-3 flex items-center justify-start no-print">
+                        <button
+                            type="button"
+                            onClick={handlePageBack}
+                            aria-label="بازگشت به صفحه قبلی"
+                            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-2 text-sm font-bold text-slate-200 shadow-sm transition hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                            <ArrowRight size={17} />
+                            <span>بازگشت</span>
+                        </button>
+                    </div>
+                )}
                 <TrialDataProtectionWarningBanner />
                 <ErrorBoundary>
                     <Suspense fallback={<LoadingFallback />}>
