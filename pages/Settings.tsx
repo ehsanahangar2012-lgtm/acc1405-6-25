@@ -958,7 +958,7 @@ const Settings = () => {
 
                     <footer className="mt-10 pt-4 border-t-2 border-slate-700 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-300 font-bold gap-2">
                         <span>نرم‌افزار جامع حسابداری و اتوماسیون اشک قلم</span>
-                        <span className="text-teal-300 font-black">طراحی و توسعه: دپارتمان IT | نسخه ۱۶.۳۵.۰</span>
+                        <span className="text-teal-300 font-black"><a href="https://ashkghalam.ir" target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">ashkghalam.ir</a> · نسخه {APP_VERSION}</span>
                     </footer>
                 </main>
             </div>
