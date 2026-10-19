@@ -508,7 +508,7 @@ ipcMain.handle('open-directory-path', async (event, targetPath) => {
     }
 });
 
-// --- پایگاه داده رابطه‌ای و ایزوله دسکتاپ ویندوز (SQL Database Engine) ---
+// --- Local desktop state snapshot and SQL migration export ---
 function getDatabaseDir() {
     const dbDir = path.join(getUserDataDir(), 'database');
     if (!fs.existsSync(dbDir)) {
@@ -517,8 +517,30 @@ function getDatabaseDir() {
     return dbDir;
 }
 
+// The application stores a serialized Zustand JSON snapshot, not a SQLite database.
 function getDatabaseFilePath() {
-    return path.join(getDatabaseDir(), 'ashke_ghalam.db');
+    return path.join(getDatabaseDir(), 'ashke_ghalam-state.json');
+}
+
+// Migrate the old .db-named JSON snapshot without deleting the original.
+// If its content is not JSON, return the legacy file so existing recovery logic can inspect it.
+async function getExistingDatabaseFilePath() {
+    const currentFile = getDatabaseFilePath();
+    if (fs.existsSync(currentFile)) return currentFile;
+
+    const legacyFile = path.join(getDatabaseDir(), 'ashke_ghalam.db');
+    if (!fs.existsSync(legacyFile)) return currentFile;
+
+    const raw = await fs.promises.readFile(legacyFile, 'utf-8');
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return legacyFile;
+    } catch {
+        return legacyFile;
+    }
+
+    await fs.promises.writeFile(currentFile, raw, 'utf-8');
+    return currentFile;
 }
 
 function getSqlDumpFilePath() {
@@ -728,12 +750,12 @@ ipcMain.handle('sql-db-save', async (event, stateData) => {
 
 ipcMain.handle('sql-db-load', async () => {
     try {
-        const dbFile = getDatabaseFilePath();
+        const dbFile = await getExistingDatabaseFilePath();
         if (fs.existsSync(dbFile)) {
-            const raw = fs.readFileSync(dbFile, 'utf-8');
+            const raw = await fs.promises.readFile(dbFile, 'utf-8');
             return { success: true, data: raw };
         }
-        return { success: false, error: 'Database file not found' };
+        return { success: false, error: 'Local state snapshot not found' };
     } catch (e) {
         return { success: false, error: e.message };
     }
@@ -741,7 +763,7 @@ ipcMain.handle('sql-db-load', async () => {
 
 ipcMain.handle('sql-db-export', async (event, defaultName = 'ashke_ghalam_backup.sql') => {
     try {
-        const dbFile = getDatabaseFilePath();
+        const dbFile = await getExistingDatabaseFilePath();
         if (!fs.existsSync(dbFile)) {
             return { success: false, error: 'فایل داده محلی هنوز ایجاد نشده است.' };
         }
@@ -782,7 +804,7 @@ ipcMain.handle('sql-db-export', async (event, defaultName = 'ashke_ghalam_backup
 
 ipcMain.handle('sql-db-info', async () => {
     try {
-        const dbFile = getDatabaseFilePath();
+        const dbFile = await getExistingDatabaseFilePath();
         const sqlFile = getSqlDumpFilePath();
         const exists = fs.existsSync(dbFile);
         let size = 0;

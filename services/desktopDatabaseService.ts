@@ -1,11 +1,11 @@
-// سرویس مدیریت پایگاه داده ایزوله ویندوز و خروجی اسکریپت‌های رابطه‌ای SQL
-// پشتیبانی کامل از ذخیره‌سازی فایل‌های پایگاه داده بر روی دیسک، بدون وابستگی به کش موقت مرورگر
+// سرویس ذخیره snapshot محلی JSON در ویندوز و تولید خروجی انتقال SQL
+// فایل محلی منبع داده JSON است؛ فایل SQL تنها خروجی انتقال به MariaDB/MySQL است.
 import { isDesktopApp } from '../utils';
 
 export interface DatabaseStatusInfo {
     isAvailable: boolean;
     isDesktop: boolean;
-    engineType: 'SQLITE_ISOLATED_FILE' | 'INDEXED_DB_LOCAL' | 'HOST_MYSQL';
+    engineType: 'JSON_STATE_FILE' | 'INDEXED_DB_LOCAL' | 'HOST_MYSQL';
     dbPath?: string;
     sqlPath?: string;
     directory?: string;
@@ -19,7 +19,7 @@ class DesktopDatabaseService {
     private readonly DEBOUNCE_MS = 400; // تاخیر بهینه جهت پیشگیری کامل از لگ و کندی در تایپ و محاسبات
 
     /**
-     * بررسی دسترسی به موتور پایگاه داده دسکتاپ ویندوز
+     * بررسی دسترسی به ذخیره‌ساز فایل snapshot محلی دسکتاپ
      */
     isDesktopDatabaseAvailable(): boolean {
         if (typeof window === 'undefined') return false;
@@ -28,7 +28,7 @@ class DesktopDatabaseService {
     }
 
     /**
-     * بارگذاری داده‌ها از فایل دیتابیس مستقل هارد دیسک
+     * بارگذاری داده‌ها از فایل JSON محلی دسکتاپ
      */
     async loadFromDatabase(): Promise<string | null> {
         if (this.isDesktopDatabaseAvailable()) {
@@ -47,7 +47,7 @@ class DesktopDatabaseService {
     }
 
     /**
-     * ذخیره‌سازی داده‌ها در فایل دیتابیس مستقل با اعمال Debounce بهینه جهت حذف لگ
+     * ذخیره snapshot JSON در دیسک با Debounce جهت کاهش کار ذخیره‌سازی
      */
     async saveToDatabase(stateData: any, immediate = false): Promise<boolean> {
         if (!this.isDesktopDatabaseAvailable()) return false;
@@ -81,7 +81,7 @@ class DesktopDatabaseService {
     }
 
     /**
-     * دریافت جزئیات و وضعیت فایل پایگاه داده دسکتاپ
+     * دریافت جزئیات فایل snapshot JSON دسکتاپ
      */
     async getDatabaseInfo(): Promise<DatabaseStatusInfo> {
         if (this.isDesktopDatabaseAvailable()) {
@@ -91,7 +91,7 @@ class DesktopDatabaseService {
                 return {
                     isAvailable: true,
                     isDesktop: true,
-                    engineType: 'SQLITE_ISOLATED_FILE',
+                    engineType: 'JSON_STATE_FILE',
                     ...info
                 };
             } catch {}
@@ -101,7 +101,7 @@ class DesktopDatabaseService {
             isAvailable: true,
             isDesktop: isDesktopApp(),
             engineType: 'INDEXED_DB_LOCAL',
-            sizeFormatted: 'مخزن داده رمزنگاری‌شده محلی'
+            sizeFormatted: 'مخزن داده محلی در IndexedDB'
         };
     }
 
@@ -134,7 +134,7 @@ class DesktopDatabaseService {
     }
 
     /**
-     * تولید اسکریپت کامل و استاندارد SQL (سازگار با MySQL 5.7+ / MariaDB سی‌پنل و SQLite)
+     * تولید اسکریپت SQL برای انتقال داده به MariaDB/MySQL در cPanel
      */
     generateSqlScript(state: any): string {
         try {
@@ -144,7 +144,7 @@ class DesktopDatabaseService {
             const lines: string[] = [
                 '-- ====================================================================',
                 '-- اسکریپت پایگاه داده رابطه‌ای نرم‌افزار حسابداری اشک قلم',
-                '-- سازگار با cPanel MariaDB / MySQL / SQLite',
+                '-- سازگار با cPanel MariaDB / MySQL',
                 `-- تاریخ استخراج: ${new Date().toLocaleDateString('fa-IR')} ${new Date().toLocaleTimeString('fa-IR')}`,
                 '-- ====================================================================',
                 '',
