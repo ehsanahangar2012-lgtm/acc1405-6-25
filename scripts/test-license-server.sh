@@ -22,6 +22,26 @@ $json=json_encode($registry,JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE|JSON_UNESCA
 if($json===false||file_put_contents(getenv('TEST_REGISTRY_PATH'),$json)===false){fwrite(STDERR,"Unable to write test registry\n");exit(1);}
 chmod(getenv('TEST_REGISTRY_PATH'),0600);
 PHP
+# Reserved mother workspaces must require the server-held admin secret; no anonymous super-admin bypass.
+php -r '
+require $argv[1];
+$checks = [
+  ["default", "", false, "ADMIN_AUTH_REQUIRED"],
+  ["main", "wrong", false, "ADMIN_AUTH_REQUIRED"],
+  ["default", "ci-test-admin-secret", true, "ACTIVE"],
+  ["main", "ci-test-admin-secret", true, "ACTIVE"],
+  ["", "ci-test-admin-secret", false, "INVALID_WORKSPACE"]
+];
+foreach ($checks as [$workspace, $token, $allowed, $status]) {
+  $result = LicenseValidator::validateAccess($workspace, $token);
+  if (($result["allowed"] ?? false) !== $allowed || ($result["status"] ?? "") !== $status) {
+    fwrite(STDERR, "Mother workspace auth failed for " . json_encode($workspace) . ": " . json_encode($result) . "\n");
+    exit(1);
+  }
+}
+echo "PASS: master workspaces require the server admin secret; blank workspace is denied.\n";
+' "$TEST_DIR/license_validator.php"
+
 PORT="$(node -e "const s=require('node:net').createServer();s.listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
 php -S "127.0.0.1:$PORT" -t "$TEST_DIR" >"$TEST_DIR/php-server.log" 2>&1 &
 SERVER_PID=$!
