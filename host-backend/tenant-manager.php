@@ -225,6 +225,7 @@ switch ($action) {
             'max_documents' => max(-1, intval($input['max_documents'] ?? ($existing['max_documents'] ?? 100))),
             'features' => is_array($input['features'] ?? null) ? array_values(array_filter($input['features'], 'is_string')) : ($existing['features'] ?? ['BASIC_MODULES']),
             'hwid' => trim($input['hwid'] ?? ($existing['hwid'] ?? '')),
+            'price_paid' => max(0, (int)($input['price_paid'] ?? ($existing['price_paid'] ?? 0))),
             'contact_person' => trim($input['contact_person'] ?? ($existing['contact_person'] ?? '')),
             'phone' => trim($input['phone'] ?? ($existing['phone'] ?? '')),
             'notes' => trim($input['notes'] ?? ($existing['notes'] ?? ''))
