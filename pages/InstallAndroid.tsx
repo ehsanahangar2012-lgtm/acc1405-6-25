@@ -10,14 +10,15 @@ import { hardwareIdService } from '../services/hardwareIdService';
 import { androidCommercialService } from '../services/androidCommercialService';
 import { workspaceService } from '../services/workspaceService';
 import { APP_VERSION, APP_RELEASE_DATE } from '../config';
-import { isAndroidApp, isDesktopApp } from '../utils';
+import { isAndroidApp, isDesktopApp, isMotherWebPortal } from '../utils';
 
 const InstallAndroid: React.FC = () => {
     const { addNotification } = useStore();
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstalled, setIsInstalled] = useState(false);
     const isNativeClient = isDesktopApp() || isAndroidApp();
-    const [activeTab, setActiveTab] = useState<'windows' | 'apk' | 'pwa' | 'sync' | 'license'>(() => isNativeClient ? 'sync' : 'windows');
+    const isMotherPortal = isMotherWebPortal();
+    const [activeTab, setActiveTab] = useState<'windows' | 'apk' | 'pwa' | 'sync' | 'license'>(() => isMotherPortal ? 'windows' : isNativeClient ? 'sync' : 'pwa');
     const [copiedAppUrl, setCopiedAppUrl] = useState(false);
     const [copiedBatContent, setCopiedBatContent] = useState(false);
     const [copiedWinBatContent, setCopiedWinBatContent] = useState(false);
@@ -233,12 +234,12 @@ pause`;
 
             {/* Build tools are owner-portal-only; installed clients only need connection and activation. */}
             <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto custom-scrollbar">
-                {!isNativeClient && (
+                {isMotherPortal && (
                     <button onClick={() => setActiveTab('windows')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'windows' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
                         <Monitor className="w-4 h-4" /><span>ساخت نسخه ویندوز</span>
                     </button>
                 )}
-                {!isNativeClient && (
+                {isMotherPortal && (
                     <button onClick={() => setActiveTab('apk')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'apk' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
                         <Smartphone className="w-4 h-4" /><span>ساخت APK اندروید</span>
                     </button>
@@ -257,7 +258,7 @@ pause`;
             </div>
 
             {/* TAB 1: WINDOWS STANDALONE PIPELINE */}
-            {!isNativeClient && activeTab === 'windows' && (
+            {isMotherPortal && activeTab === 'windows' && (
                 <div className="space-y-6 animate-fade-in">
                     {/* Step-by-Step Interactive Workflow */}
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
@@ -442,7 +443,7 @@ pause`;
             )}
 
             {/* TAB 2: ANDROID STANDALONE PIPELINE (APK) */}
-            {!isNativeClient && activeTab === 'apk' && (
+            {isMotherPortal && activeTab === 'apk' && (
                 <div className="space-y-6 animate-fade-in">
                     {/* SECTION 1: Online Instant APK Builders */}
                     <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-indigo-500/20 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
@@ -768,7 +769,7 @@ pause`;
                         </span>
                         <h2 className="text-xl font-black text-white">فعال‌سازی لایسنس تجاری روی کلاینت‌ها</h2>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                            شناسه دستگاه برای فعال‌سازی استفاده می‌شود. روش آفلاین فعلی مبتنی بر HMAC-SHA256 با راز تعبیه‌شده در برنامه است و برای انتشار تجاری امن کافی نیست؛ پیش از انتشار رسمی باید به امضای نامتقارن با کلید خصوصی خارج از کلاینت مهاجرت کند.
+                            فعال‌سازی تجاری فقط با پاسخ دارای امضای دیجیتال RSA از سرور مادر انجام می‌شود؛ کدهای آفلاین قدیمی به دلیل ضعف رمزنگاری پذیرفته نمی‌شوند. کلید خصوصی امضا فقط روی سرور نگهداری می‌شود.
                         </p>
                     </div>
 
