@@ -85,6 +85,13 @@ jobs:
           php -l host-backend/signature-api-simple.php
           php -l host-backend/deleted-records-api.php
           php -l host-backend/gemini-api.php
+          php -l host-backend/certificate-api.php
+          php -l host-backend/signature-api.php
+          php -l host-backend/install.php
+          php -l host-backend/setup-folders.php
+          php -l host-backend/setup-check.php
+          php -l host-backend/backup-signatures.php
+          php -l host-backend/daily-cron.php
           php -l host-backend/server-api-database.php
           php -l host-backend/server-api-upload.php
           php -l android/app/src/main/assets/public/license_validator.php
@@ -100,6 +107,13 @@ jobs:
           php -l android/app/src/main/assets/public/signature-api-simple.php
           php -l android/app/src/main/assets/public/deleted-records-api.php
           php -l android/app/src/main/assets/public/gemini-api.php
+          php -l android/app/src/main/assets/public/certificate-api.php
+          php -l android/app/src/main/assets/public/signature-api.php
+          php -l android/app/src/main/assets/public/install.php
+          php -l android/app/src/main/assets/public/setup-folders.php
+          php -l android/app/src/main/assets/public/setup-check.php
+          php -l android/app/src/main/assets/public/backup-signatures.php
+          php -l android/app/src/main/assets/public/daily-cron.php
 
       - name: Test server license registration and lifecycle
         shell: bash
