@@ -32,6 +32,27 @@ if (!is_array($config) || !is_array($config['workspaces'] ?? null) || empty($con
     exit;
 }
 
+// Generate a per-server RSA keypair at runtime; never commit a private signing key to Git.
+$signingReady = !empty($config['license_signing_private_key']) && !empty($config['license_signing_public_key']);
+if (!$signingReady && function_exists('openssl_pkey_new') && function_exists('openssl_sign')) {
+    $keyResource = openssl_pkey_new([
+        'private_key_type' => OPENSSL_KEYTYPE_RSA,
+        'private_key_bits' => 2048
+    ]);
+    $privatePem = '';
+    if ($keyResource !== false && openssl_pkey_export($keyResource, $privatePem)) {
+        $keyDetails = openssl_pkey_get_details($keyResource);
+        if (is_array($keyDetails) && !empty($keyDetails['key'])) {
+            $config['license_signing_private_key'] = $privatePem;
+            $config['license_signing_public_key'] = $keyDetails['key'];
+            $savedConfig = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            if ($savedConfig !== false && file_put_contents($authFile, $savedConfig, LOCK_EX) !== false) {
+                @chmod($authFile, 0600);
+                $signingReady = true;
+            }
+        }
+    }
+}
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $action = $input['action'] ?? $_GET['action'] ?? 'list';
@@ -74,12 +95,76 @@ if ($action === 'verify_license') {
 
     $validation = LicenseValidator::validateAccess($wsId, $tkn);
     if (!empty($validation['allowed'])) {
-        $validation['plan'] = $workspaceEntry['plan'] ?? 'TRIAL';
-        $validation['max_customers'] = isset($workspaceEntry['max_customers']) ? (int)$workspaceEntry['max_customers'] : 30;
-        $validation['max_documents'] = isset($workspaceEntry['max_documents']) ? (int)$workspaceEntry['max_documents'] : 100;
-        $validation['features'] = is_array($workspaceEntry['features'] ?? null) ? $workspaceEntry['features'] : ['BASIC_MODULES'];
+        $plan = (string)($workspaceEntry['plan'] ?? 'TRIAL');
+        $maxCustomers = isset($workspaceEntry['max_customers']) ? (int)$workspaceEntry['max_customers'] : 30;
+        $maxDocuments = isset($workspaceEntry['max_documents']) ? (int)$workspaceEntry['max_documents'] : 100;
+        $features = is_array($workspaceEntry['features'] ?? null) ? array_values(array_filter($workspaceEntry['features'], 'is_string')) : ['BASIC_MODULES'];
+        $isUnlimited = !empty($workspaceEntry['is_unlimited']);
+
+        $validation['plan'] = $plan;
+        $validation['max_customers'] = $maxCustomers;
+        $validation['max_documents'] = $maxDocuments;
+        $validation['features'] = $features;
+
+        if (!$signingReady || empty($config['license_signing_private_key']) || !function_exists('openssl_sign')) {
+            http_response_code(503);
+            echo json_encode([
+                'allowed' => false,
+                'status' => 'SIGNING_UNAVAILABLE',
+                'message' => 'امضای امن لایسنس روی سرور فعال نیست؛ افزونه OpenSSL و دسترسی نوشتن پوشه data را بررسی کنید.'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        // Signed payload is base64-encoded so the verifier signs and checks the exact same bytes.
+        $receiptPayload = [
+            'issuer' => 'ashkghalam-license-v1',
+            'workspace_id' => $wsId,
+            'license_key_hash' => hash('sha256', strtoupper($tkn)),
+            'hwid' => strtoupper($registeredHwid !== '' ? $registeredHwid : $submittedHwid),
+            'plan' => $plan,
+            'max_customers' => $maxCustomers,
+            'max_documents' => $maxDocuments,
+            'max_users' => isset($workspaceEntry['max_users']) ? (int)$workspaceEntry['max_users'] : 1,
+            'is_unlimited' => $isUnlimited,
+            'features' => $features,
+            'expire_date' => (string)($workspaceEntry['expire_date'] ?? ''),
+            'issued_at' => time(),
+            'expires_at' => time() + 600
+        ];
+        $receiptJson = json_encode($receiptPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $signatureBinary = '';
+        if ($receiptJson === false || !openssl_sign($receiptJson, $signatureBinary, $config['license_signing_private_key'], OPENSSL_ALGO_SHA256)) {
+            http_response_code(503);
+            echo json_encode([
+                'allowed' => false,
+                'status' => 'SIGNING_FAILED',
+                'message' => 'امضای دیجیتال لایسنس تولید نشد؛ تنظیمات OpenSSL سرور را بررسی کنید.'
+            ], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+        $validation['license_receipt'] = [
+            'signed_payload' => base64_encode($receiptJson),
+            'signature' => base64_encode($signatureBinary),
+            'algorithm' => 'RSASSA-PKCS1-v1_5-SHA256'
+        ];
     }
     echo json_encode($validation, JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// The public key is safe to expose; all registry-management operations below still require admin authentication.
+if ($action === 'public_key') {
+    if (!$signingReady || empty($config['license_signing_public_key'])) {
+        http_response_code(503);
+        echo json_encode(['success' => false, 'message' => 'کلید امضای امن در سرور ساخته نشده است.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    echo json_encode([
+        'success' => true,
+        'algorithm' => 'RSASSA-PKCS1-v1_5-SHA256',
+        'public_key' => $config['license_signing_public_key']
+    ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -91,6 +176,15 @@ if ($configuredAdminSecret === '' || $configuredAdminSecret === 'DISABLED' || $a
     echo json_encode([
         'success' => false,
         'message' => 'کلید امنیتی مدیریت سرور نامعتبر است؛ مقدار admin_secret_key را در فایل سمت سرور بررسی کنید.'
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+if (in_array($action, ['add', 'save_workspace', 'update'], true) && !$signingReady) {
+    http_response_code(503);
+    echo json_encode([
+        'success' => false,
+        'message' => 'صدور لایسنس متوقف شد؛ برای امضای امن باید OpenSSL روی سرور فعال و پوشه data قابل نوشتن باشد.'
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
