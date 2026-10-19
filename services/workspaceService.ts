@@ -120,10 +120,22 @@ class WorkspaceService {
             ''
         ).trim();
 
+        const workspaceId = this.getWorkspaceId();
+        let motherSessionToken = '';
+        if (workspaceId === 'default' || workspaceId === 'main') {
+            try {
+                motherSessionToken = typeof window !== 'undefined'
+                    ? (window.sessionStorage.getItem('ashk_mother_admin_secret') || '')
+                    : '';
+            } catch {
+                motherSessionToken = '';
+            }
+        }
         const token = (
-            this.config.workspaceToken || 
-            localStorage.getItem('ashk_cloud_token') || 
-            localStorage.getItem('ashk_host_sync_token') || 
+            motherSessionToken ||
+            this.config.workspaceToken ||
+            localStorage.getItem('ashk_cloud_token') ||
+            localStorage.getItem('ashk_host_sync_token') ||
             ''
         ).trim();
 
