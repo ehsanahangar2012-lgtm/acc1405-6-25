@@ -34,12 +34,18 @@ interface ActivationDashboardProps {
     isOpen?: boolean;
     onClose?: () => void;
     onActivationSuccess?: (manifest: AppManifest) => void;
+    initialLicenseKey?: string;
+    initialCompanyName?: string;
+    initialWorkspaceId?: string;
 }
 
 export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
     isOpen = true,
     onClose,
-    onActivationSuccess
+    onActivationSuccess,
+    initialLicenseKey,
+    initialCompanyName,
+    initialWorkspaceId
 }) => {
     const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
     const [manifest, setManifest] = useState<AppManifest | null>(null);
@@ -67,9 +73,13 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
             const activeManifest = await encryptedStorageService.getAppManifest();
             if (activeManifest) {
                 setManifest(activeManifest);
-                setLicenseKey(activeManifest.licenseKey || '');
-                setCompanyName(activeManifest.companyName || '');
-                setWorkspaceId(activeManifest.workspaceId || 'default');
+                setLicenseKey(initialLicenseKey?.trim() || activeManifest.licenseKey || '');
+                setCompanyName(initialCompanyName || activeManifest.companyName || '');
+                setWorkspaceId(initialWorkspaceId || (
+                    initialLicenseKey?.trim()
+                        ? `ws_${initialLicenseKey.replace(/[^A-Z0-9]/gi, '').toLowerCase()}`
+                        : activeManifest.workspaceId || 'default'
+                ));
             }
         } catch (e) {
             console.error('Error loading activation status:', e);
