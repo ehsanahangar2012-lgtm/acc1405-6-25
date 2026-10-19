@@ -2162,6 +2162,7 @@ export const useStore = create<AppState>()(
             }
 
             // Native Windows local state is read through OS-backed encryption in Electron.
+            const nativeDesktopStorage = desktopDatabaseService.isDesktopDatabaseAvailable();
             try {
                 const desktopData = await desktopDatabaseService.loadFromDatabase();
                 if (desktopData) {
@@ -2179,9 +2180,27 @@ export const useStore = create<AppState>()(
                 if (!record || !record.data) record = await idbService.get('backups', 'ashke-ghalam-rbac-v14-accounting');
                 if (record && record.data) {
                     const val = record.data;
-                    if (typeof val === 'string' && val.trim().startsWith('{')) return val;
-                    const decrypted = securityService.decrypt(val);
-                    return decrypted && decrypted.trim().startsWith('{') ? decrypted : val;
+                    const decrypted = typeof val === 'string' && val.trim().startsWith('{')
+                        ? val
+                        : securityService.decrypt(val);
+                    const portableState = typeof decrypted === 'string' && decrypted.trim().startsWith('{')
+                        ? decrypted
+                        : val;
+
+                    if (nativeDesktopStorage && typeof portableState === 'string' && portableState.trim().startsWith('{')) {
+                        // Migrate existing desktop IDB/localStorage state only after an
+                        // OS-encrypted write succeeds. Keep the old copy if migration fails.
+                        const saved = await desktopDatabaseService.saveToDatabase(portableState, true);
+                        if (saved) {
+                            await idbService.remove(name).catch(() => {});
+                            await idbService.remove('ashke-ghalam-rbac-v14-accounting').catch(() => {});
+                            localStorage.removeItem(name);
+                            localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
+                        } else {
+                            console.warn('[Store] Legacy desktop state could not be migrated to OS-encrypted storage yet.');
+                        }
+                    }
+                    return portableState;
                 }
             } catch (e) {
                 console.error('Error reading legacy state from IndexedDB:', e);
@@ -2190,6 +2209,20 @@ export const useStore = create<AppState>()(
             let val = localStorage.getItem(name);
             if (!val) val = localStorage.getItem('ashke-ghalam-rbac-v14-accounting');
             if (!val) return null;
+            if (nativeDesktopStorage) {
+                const portableState = val.trim().startsWith('{') ? val : securityService.decrypt(val);
+                if (typeof portableState === 'string' && portableState.trim().startsWith('{')) {
+                    const saved = await desktopDatabaseService.saveToDatabase(portableState, true);
+                    if (saved) {
+                        localStorage.removeItem(name);
+                        localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
+                        await idbService.remove(name).catch(() => {});
+                        await idbService.remove('ashke-ghalam-rbac-v14-accounting').catch(() => {});
+                        return portableState;
+                    }
+                    console.warn('[Store] Legacy localStorage state could not be migrated to OS-encrypted storage yet.');
+                }
+            }
             try {
                 await idbService.set(name, val);
                 localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
