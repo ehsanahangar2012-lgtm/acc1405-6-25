@@ -2239,7 +2239,7 @@ export const useStore = create<AppState>()(
             localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
             localStorage.removeItem('ashke-ghalam-currency');
         }
-      }))
+      })),
       partialize: (state) => Object.fromEntries(
         Object.entries(state).filter(([key, val]) => 
           typeof val !== 'function' && !['notifications', 'isOnline', 'currentUser'].includes(key)
