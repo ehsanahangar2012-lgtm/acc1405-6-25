@@ -3,6 +3,7 @@
 import { encryptedStorageService, AppManifest } from './encryptedStorageService';
 import { hardwareIdService } from './hardwareIdService';
 import { isAndroidApp } from '../utils';
+import { refreshServerLicense } from './serverLicenseReceiptService';
 
 export const MAX_TRIAL_CUSTOMERS = 30;
 export const MAX_TRIAL_DOCUMENTS = 100;
@@ -36,13 +37,90 @@ export interface QuotaStatus {
 class LicenseQuotaService {
     private cachedManifest: AppManifest | null = null;
     private listeners: Array<() => void> = [];
+    // Session-only proof: localStorage values cannot set this flag. It is set only after a fresh, signed server receipt is checked.
+    private serverReceiptVerifiedInSession = false;
+    private refreshPromise: Promise<boolean> | null = null;
 
     constructor() {
         if (typeof window !== 'undefined') {
-            window.addEventListener('ashk-license-updated', () => {
+            const refresh = () => {
                 this.cachedManifest = null;
+                this.serverReceiptVerifiedInSession = false;
                 this.notifyListeners();
-            });
+                void this.refreshCachedServerLicense();
+            };
+            window.addEventListener('ashk-license-updated', refresh);
+            window.addEventListener('online', () => void this.refreshCachedServerLicense());
+            void this.refreshCachedServerLicense();
+        }
+    }
+
+    private async refreshCachedServerLicense(): Promise<boolean> {
+        if (typeof window === 'undefined') return false;
+        if (this.refreshPromise) return this.refreshPromise;
+
+        this.refreshPromise = (async () => {
+            const raw = localStorage.getItem('ashk_server_license_data');
+            if (!raw) {
+                this.serverReceiptVerifiedInSession = false;
+                return false;
+            }
+            let stored: any;
+            try { stored = JSON.parse(raw); } catch {
+                this.serverReceiptVerifiedInSession = false;
+                return false;
+            }
+            const licenseKey = String(stored?.licenseKey || '').trim();
+            const workspaceId = String(stored?.workspaceId || '').trim();
+            const hostUrl = String(stored?.hostUrl || '').trim();
+            if (!licenseKey || !workspaceId || !hostUrl || ['default', 'main'].includes(workspaceId)) {
+                this.serverReceiptVerifiedInSession = false;
+                return false;
+            }
+
+            try {
+                const hwid = String(stored?.hwid || await hardwareIdService.getHardwareId()).trim();
+                const verified = await refreshServerLicense({ hostUrl, licenseKey, workspaceId, hwid });
+                if (!verified) {
+                    this.serverReceiptVerifiedInSession = false;
+                    localStorage.setItem('ashk_server_license_data', JSON.stringify({ ...stored, serverVerified: false }));
+                    this.notifyListeners();
+                    return false;
+                }
+
+                const p = verified.payload;
+                const updated = {
+                    ...stored,
+                    serverVerified: true,
+                    licenseReceipt: verified.receipt,
+                    workspaceId: p.workspace_id,
+                    licenseKey,
+                    hwid: p.hwid,
+                    plan: p.plan,
+                    maxCustomers: p.max_customers,
+                    maxDocuments: p.max_documents,
+                    maxUsers: p.max_users,
+                    isUnlimited: p.is_unlimited,
+                    features: p.features,
+                    expireDate: p.expire_date,
+                    verifiedAt: new Date().toISOString()
+                };
+                localStorage.setItem('ashk_server_license_data', JSON.stringify(updated));
+                localStorage.setItem('ashk_license_plan', p.plan);
+                localStorage.setItem('ashk_license_type', p.is_unlimited ? 'UNLIMITED' : 'LIMITED');
+                this.serverReceiptVerifiedInSession = true;
+                this.notifyListeners();
+                return true;
+            } catch {
+                this.serverReceiptVerifiedInSession = false;
+                return false;
+            }
+        })();
+
+        try {
+            return await this.refreshPromise;
+        } finally {
+            this.refreshPromise = null;
         }
     }
 
@@ -88,8 +166,8 @@ class LicenseQuotaService {
             );
         } catch {}
 
-        // Local activation codes and editable status flags alone must never grant commercial features.
-        return serverVerified;
+        // Local flags are only cache metadata. A fresh signed server receipt must have been verified in this session.
+        return serverVerified && this.serverReceiptVerifiedInSession;
     }
 
     /**
@@ -258,7 +336,7 @@ class LicenseQuotaService {
                 data.workspaceId !== 'main'
             );
         } catch {}
-        if (localStatus === 'ACTIVATED' && serverVerified) {
+        if (localStatus === 'ACTIVATED' && serverVerified && this.serverReceiptVerifiedInSession) {
             return true;
         }
 
