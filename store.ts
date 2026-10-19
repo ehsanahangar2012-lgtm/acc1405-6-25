@@ -1451,97 +1451,124 @@ export const useStore = create<AppState>()(
       }),
 
       addGeneralFinance: (type, amount, desc, personId, signature, relatedInvoiceId, receiptImage) => {
-          const { currentUser } = get();
-          if (currentUser && !currentUser.permissions.finance.create) {
-              set(s => ({ notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ثبت تراکنش مالی را ندارید.' }] }));
-              return {} as Transaction;
-          }
           const s = get();
+          const notifyError = (message: string) => {
+              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message }] }));
+              return {} as Transaction;
+          };
+          if (s.currentUser && !s.currentUser.permissions.finance.create) {
+              return notifyError('خطا: شما مجوز ثبت تراکنش مالی را ندارید.');
+          }
           const totalDocs = s.invoices.length + s.vouchers.length + s.transactions.length + s.checks.length;
           const quotaCheck = licenseQuotaService.canAddDocument(totalDocs);
           if (!quotaCheck.allowed) {
-              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.' }] }));
-              return {} as Transaction;
+              return notifyError(quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.');
           }
+          if (!Number.isFinite(amount) || amount <= 0) {
+              return notifyError('مبلغ تراکنش مالی باید عددی معتبر و بزرگ‌تر از صفر باشد.');
+          }
+
+          const relatedInvoice = relatedInvoiceId
+              ? s.invoices.find(invoice => invoice.id === relatedInvoiceId)
+              : undefined;
+          if (relatedInvoiceId && !relatedInvoice) {
+              return notifyError('فاکتور مرتبط یافت نشد؛ تراکنش ثبت نشد.');
+          }
+          if (relatedInvoice && (
+              (type === 'INCOME' && relatedInvoice.type !== InvoiceType.SALE) ||
+              (type === 'EXPENSE' && relatedInvoice.type !== InvoiceType.PURCHASE)
+          )) {
+              return notifyError('نوع دریافت/پرداخت با نوع فاکتور مرتبط سازگار نیست.');
+          }
+          if (relatedInvoice && personId && personId !== relatedInvoice.personId) {
+              return notifyError('طرف‌حساب تراکنش با طرف‌حساب فاکتور یکسان نیست.');
+          }
+
+          const effectivePersonId = relatedInvoice?.personId || personId || '';
+          const effectivePersonName = relatedInvoice?.personName ||
+              ((get().people || []).find(p => p && p.id === effectivePersonId)?.name || '');
           const transId = generateId();
-          const trackingCode = generateId().slice(0,8);
-          const newTrans: Transaction = { 
-              id: transId, 
-              date: getPersianDate(), 
-              type: type === 'INCOME' ? 'GENERAL_INCOME' : 'EXPENSE', 
-              amount, 
-              personId: personId || '', 
-              personName: personId ? ((get().people || []).find(p => p && p.id === personId)?.name || '') : '',
-              description: desc, 
+          const trackingCode = generateId().slice(0, 8);
+          const transactionDate = getPersianDate();
+          const newTrans: Transaction = {
+              id: transId,
+              date: transactionDate,
+              type: relatedInvoice
+                  ? (type === 'INCOME' ? 'INVOICE_RECEIPT' : 'CASH_PAYMENT')
+                  : (type === 'INCOME' ? 'GENERAL_INCOME' : 'EXPENSE'),
+              amount,
+              personId: effectivePersonId,
+              personName: effectivePersonName,
+              description: desc,
               balanceAfter: 0,
-              isDebit: type === 'EXPENSE', 
-              relatedInvoiceId: relatedInvoiceId,
-              referenceId: relatedInvoiceId,
-              signature, 
+              isDebit: type === 'EXPENSE',
+              relatedInvoiceId,
+              referenceId: relatedInvoice ? transId : undefined,
+              signature,
               receiptImage,
-              trackingCode 
+              trackingCode
           };
 
-          const nextTransactions = [...s.transactions, newTrans];
           let nextInvoices = s.invoices;
-
-          // اگر دریافتی یا هزینه به فاکتور مرتبط است، فاکتور را نیز به‌روزرسانی کن
-          if (relatedInvoiceId) {
-              nextInvoices = s.invoices.map(inv => {
-                  if (inv.id === relatedInvoiceId) {
-                      const updatedCash = (inv.cashAmount || 0) + amount;
-                      const paymentEntry = {
-                          id: transId,
-                          date: getPersianDate(),
-                          amount,
-                          method: 'CASH' as const,
-                          trackingCode,
-                          description: desc
-                      };
-                      return {
-                          ...inv,
-                          cashAmount: updatedCash,
-                          payments: [...(inv.payments || []), paymentEntry]
-                      };
-                  }
-                  return inv;
-              });
-              // Persist the invoice change only after the accounting entry is posted successfully.
+          let updatedInvoice: Invoice | undefined;
+          if (relatedInvoice) {
+              const paymentEntry = {
+                  id: transId,
+                  date: transactionDate,
+                  amount,
+                  method: 'CASH' as const,
+                  trackingCode,
+                  description: desc,
+                  accountingPosted: true
+              };
+              updatedInvoice = {
+                  ...relatedInvoice,
+                  cashAmount: (relatedInvoice.cashAmount || 0) + amount,
+                  payments: [...(relatedInvoice.payments || []), paymentEntry]
+              };
+              nextInvoices = s.invoices.map(invoice => invoice.id === relatedInvoice.id ? updatedInvoice! : invoice);
           }
 
+          // A linked invoice receipt/payment gets its own dated journal, not a second
+          // generic transaction journal. Standalone finance items retain the generic flow.
           try {
-              AccountingEngine.postGeneralTransaction(newTrans);
+              if (updatedInvoice) {
+                  AccountingEngine.postInvoicePayment(updatedInvoice, newTrans, 'CASH');
+              } else {
+                  AccountingEngine.postGeneralTransaction(newTrans);
+              }
           } catch (err) {
               console.error('AccountingEngine error in addGeneralFinance:', err);
               const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
-              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message: `ثبت تراکنش مالی انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}` }] }));
-              return {} as Transaction;
+              return notifyError(`ثبت تراکنش مالی انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}`);
           }
 
-          const targetInvoice = relatedInvoiceId ? nextInvoices.find(v => v.id === relatedInvoiceId) : undefined;
-          if (targetInvoice) {
-              hostDB.save('invoices', targetInvoice).catch(() => {});
-              persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
-          }
-
-          const exactBalance = personId ? PersonLedgerService.getBalance(personId, nextInvoices, nextTransactions, s.checks) : 0;
+          const nextTransactions = [...s.transactions, newTrans];
+          const exactBalance = effectivePersonId
+              ? PersonLedgerService.getBalance(effectivePersonId, nextInvoices, nextTransactions, s.checks)
+              : 0;
           newTrans.balanceAfter = exactBalance;
+          const updatedPeople = effectivePersonId
+              ? s.people.map(p => p.id === effectivePersonId ? { ...p, balance: exactBalance } : p)
+              : s.people;
 
-          const updatedPeople = personId 
-              ? get().people.map(p => p.id === personId ? { ...p, balance: exactBalance } : p)
-              : get().people;
-
+          if (updatedInvoice) hostDB.save('invoices', updatedInvoice).catch(() => {});
           hostDB.save('transactions', newTrans).catch(() => {});
+          if (updatedInvoice) persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
           persistentStorage.saveData('transactions', nextTransactions).catch(() => {});
-          if (personId) {
-              persistentStorage.saveData('people', updatedPeople).catch(() => {});
-          }
+          if (effectivePersonId) persistentStorage.saveData('people', updatedPeople).catch(() => {});
 
-          set(s => ({ 
+          set(state => ({
               invoices: nextInvoices,
-              transactions: nextTransactions, 
-              people: updatedPeople, 
-              notifications: [...s.notifications, { id: generateId(), type: 'success', message: type === 'INCOME' ? 'دریافتی از مشتری ثبت و در کاردکس طرف‌حساب و محاسبات اعمال شد.' : 'پرداختی مالی ثبت و در کاردکس شخص اعمال شد.' }] 
+              transactions: nextTransactions,
+              people: updatedPeople,
+              notifications: [...state.notifications, {
+                  id: generateId(),
+                  type: 'success',
+                  message: updatedInvoice
+                      ? (type === 'INCOME' ? 'دریافتی فاکتور ثبت شد و سند آن در تاریخ دریافت صادر گردید.' : 'پرداخت فاکتور ثبت شد و سند آن در تاریخ پرداخت صادر گردید.')
+                      : (type === 'INCOME' ? 'دریافتی مالی ثبت و در کاردکس طرف‌حساب اعمال شد.' : 'پرداختی مالی ثبت و در کاردکس شخص اعمال شد.')
+              }]
           }));
           triggerAutoBackup(type === 'INCOME' ? 'دریافتی مالی' : 'پرداختی مالی');
           return newTrans;
