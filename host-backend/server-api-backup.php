@@ -102,16 +102,15 @@ function getServerBackupKey(): string {
         throw new RuntimeException('BACKUP_OPENSSL_UNAVAILABLE');
     }
 
+    $environmentCandidate = null;
     $environmentKey = getenv('ASHK_BACKUP_ENCRYPTION_KEY');
     if ($environmentKey !== false && trim((string)$environmentKey) !== '') {
         $candidate = trim((string)$environmentKey);
-        if (preg_match('/^[a-f0-9]{64}$/i', $candidate)) $key = hex2bin($candidate);
-        else $key = base64_decode($candidate, true);
-        if (!is_string($key) || strlen($key) !== 32) {
+        if (preg_match('/^[a-f0-9]{64}$/i', $candidate)) $environmentCandidate = hex2bin($candidate);
+        else $environmentCandidate = base64_decode($candidate, true);
+        if (!is_string($environmentCandidate) || strlen($environmentCandidate) !== 32) {
             throw new RuntimeException('BACKUP_ENCRYPTION_KEY_INVALID');
         }
-        $cachedKey = $key;
-        return $cachedKey;
     }
 
     $dataDir = __DIR__ . '/data';
@@ -133,13 +132,27 @@ function getServerBackupKey(): string {
     }
 
     try {
+        $storedKey = null;
         if (is_file($keyPath)) {
             $encoded = trim((string)@file_get_contents($keyPath));
-            $key = base64_decode($encoded, true);
-            if (!is_string($key) || strlen($key) !== 32) {
+            $storedKey = base64_decode($encoded, true);
+            if (!is_string($storedKey) || strlen($storedKey) !== 32) {
                 throw new RuntimeException('BACKUP_ENCRYPTION_KEY_FILE_INVALID');
             }
-            $cachedKey = $key;
+        }
+
+        // Never allow a new environment variable to silently replace a key already
+        // protecting backups: that would make the old encrypted snapshots unreadable.
+        if (is_string($environmentCandidate)) {
+            if (is_string($storedKey) && !hash_equals($storedKey, $environmentCandidate)) {
+                throw new RuntimeException('BACKUP_ENCRYPTION_KEY_MISMATCH');
+            }
+            $cachedKey = is_string($storedKey) ? $storedKey : $environmentCandidate;
+            return $cachedKey;
+        }
+
+        if (is_string($storedKey)) {
+            $cachedKey = $storedKey;
             return $cachedKey;
         }
 
