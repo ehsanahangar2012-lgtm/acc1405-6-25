@@ -104,4 +104,32 @@ code="$(post_json '{"action":"revoke_license","workspace_id":"ws_test"}' "$TEST_
 php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true){fwrite(STDERR,"Revoke failed\n");exit(1);}' "$TEST_DIR/revoke.json"
 code="$(post_json '{"action":"verify_license","workspace_id":"ws_test","token":"ASHK-CI-TEST-0001","hwid":"HWID-A"}' "$TEST_DIR/revoked.json")"
 [[ "$code" == "403" ]]; assert_status "$TEST_DIR/revoked.json" "SUSPENDED"
-echo "PASS: license token safety, HWID, RSA signature, quotas, expiry, admin auth, revocation."
+
+# License issuance must be server-authorized and create a usable server-side license.
+code="$(post_json '{"action":"add","workspace_id":"ws_unauthorized","token":"ASHK-CI-UNAUTH-0001","title":"Unauthorized","expire_date":"2099-12-31","status":"ACTIVE","is_unlimited":false,"max_users":3,"plan":"BRONZE","max_customers":50,"max_documents":500,"features":["BASIC_MODULES"],"hwid":"HWID-UNAUTH"}' "$TEST_DIR/unauthorized-add.json")"
+[[ "$code" == "401" ]]
+php -r '$r=json_decode(file_get_contents($argv[1]),true);if(isset($r["workspaces"]["ws_unauthorized"])){fwrite(STDERR,"Unauthorized issuance modified registry\n");exit(1);}' "$TEST_REGISTRY_PATH"
+
+code="$(post_json '{"action":"add","workspace_id":"ws_issued","token":"ASHK-CI-ISSUED-0001","title":"Issued CI Customer","expire_date":"2099-12-31","status":"ACTIVE","is_unlimited":false,"max_users":3,"plan":"HEMAYAT","max_customers":70,"max_documents":450,"features":["BASIC_MODULES"],"hwid":"HWID-ISSUED-A"}' "$TEST_DIR/issued.json" -H 'X-Admin-Secret: ci-test-admin-secret')"
+[[ "$code" == "200" ]]
+php -r '$r=json_decode(file_get_contents($argv[1]),true);if(($r["success"]??false)!==true||($r["workspace"]["workspace_id"]??"")!=="ws_issued"){fwrite(STDERR,"Authorized license issuance failed\n");exit(1);}' "$TEST_DIR/issued.json"
+
+code="$(post_json '{"action":"verify_license","workspace_id":"ws_issued","token":"ASHK-CI-ISSUED-0001","hwid":"HWID-ISSUED-A"}' "$TEST_DIR/issued-verify.json")"
+[[ "$code" == "200" ]]
+php -r '
+$r=json_decode(file_get_contents($argv[1]),true);
+if(($r["allowed"]??false)!==true||($r["status"]??"")!=="ACTIVE"){fwrite(STDERR,"Issued license is not activatable\n");exit(1);}
+$q=$r["license_receipt"]??[];$raw=base64_decode($q["signed_payload"]??"",true);$sig=base64_decode($q["signature"]??"",true);
+$reg=json_decode(file_get_contents($argv[2]),true);$pub=openssl_pkey_get_public($reg["license_signing_public_key"]??"");
+if($raw===false||$sig===false||openssl_verify($raw,$sig,$pub,OPENSSL_ALGO_SHA256)!==1){fwrite(STDERR,"Issued license receipt signature invalid\n");exit(1);}
+$p=json_decode($raw,true);
+if(($p["workspace_id"]??"")!=="ws_issued"||($p["hwid"]??"")!=="HWID-ISSUED-A"||($p["plan"]??"")!=="HEMAYAT"||($p["max_users"]??null)!==3||($p["max_customers"]??null)!==70||($p["max_documents"]??null)!==450){fwrite(STDERR,"Issued license receipt entitlements wrong\n");exit(1);}
+' "$TEST_DIR/issued-verify.json" "$TEST_REGISTRY_PATH"
+
+code="$(post_json '{"action":"revoke_license","workspace_id":"ws_issued"}' "$TEST_DIR/issued-revoke.json" -H 'X-Admin-Secret: ci-test-admin-secret')"
+[[ "$code" == "200" ]]
+code="$(post_json '{"action":"verify_license","workspace_id":"ws_issued","token":"ASHK-CI-ISSUED-0001","hwid":"HWID-ISSUED-A"}' "$TEST_DIR/issued-after-revoke.json")"
+[[ "$code" == "403" ]]
+assert_status "$TEST_DIR/issued-after-revoke.json" "SUSPENDED"
+
+echo "PASS: secure issuance, token safety, HWID, RSA signature, quotas, expiry, admin auth, revocation."
