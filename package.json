@@ -11,7 +11,7 @@
     "dev": "vite",
     "lint": "tsc --noEmit",
     "build": "npm run build:web && node prepare-dist.js && node scripts/create-host-zip.js",
-    "build:native-secure": "vite build && node scripts/build-native-obfuscated.js",
+    "build:native-secure": "npm run build:web && node scripts/obfuscate-release.js",
     "build:zip": "node prepare-dist.js && node scripts/create-host-zip.js",
     "build:installer": "npm run build:web && node prepare-dist.js && node scripts/build-windows.js nsis",
     "build:exe": "npm run build:web && node prepare-dist.js && node scripts/build-windows.js portable",
@@ -74,6 +74,8 @@
   "build": {
     "appId": "ir.ashkghalam.acc",
     "productName": "AshkeGhalam",
+    "asar": true,
+    "compression": "maximum",
     "directories": {
       "output": "dist_electron"
     },
