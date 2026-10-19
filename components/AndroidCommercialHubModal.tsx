@@ -31,6 +31,7 @@ import {
 import { useStore } from '../store';
 import { androidCommercialService, BusinessProfile } from '../services/androidCommercialService';
 import { licenseQuotaService, MAX_ANDROID_DEFAULT_DOCUMENTS, MAX_ANDROID_DEFAULT_CUSTOMERS } from '../services/licenseQuotaService';
+import { workspaceService } from '../services/workspaceService';
 import { isAndroidApp, toPersianDigits, getPersianDate, formatCurrency } from '../utils';
 import { useAndroidBackButtonHandler } from '../useMobile';
 
@@ -63,6 +64,7 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
     const [linkSuccessMsg, setLinkSuccessMsg] = useState<string | null>(null);
     const [targetHostUrl, setTargetHostUrl] = useState(() => localStorage.getItem('ashk_host_url') || localStorage.getItem('ashk_custom_server_url') || '');
     const [targetSyncToken, setTargetSyncToken] = useState(() => localStorage.getItem('ashk_host_sync_token') || localStorage.getItem('ashk_cloud_token') || '');
+    const [targetWorkspaceId, setTargetWorkspaceId] = useState(() => workspaceService.getWorkspaceId());
 
     const isAndroid = isAndroidApp();
     const totalDocs = invoices.length + vouchers.length + transactions.length + checks.length;
@@ -83,7 +85,7 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
         setIsLinking(true);
         setLinkSuccessMsg(null);
         try {
-            const res = await androidCommercialService.connectToServer(targetHostUrl, targetSyncToken);
+            const res = await androidCommercialService.connectToServer(targetHostUrl, targetSyncToken, targetWorkspaceId);
             if (res.success) {
                 setIsLicensed(licenseQuotaService.isFullyLicensedSync());
                 setLinkSuccessMsg(res.message);
@@ -350,7 +352,7 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                             ابتدا لایسنس دستگاه را فعال کنید. سپس شناسه فضای کاری ثبت‌شده، آدرس سرور و توکن اختصاصی را وارد کنید. اتصال موفق، به‌تنهایی سقف اسناد را حذف یا لایسنس را فعال نمی‌کند:
                                         </p>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                                             <div className="space-y-1">
                                                 <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
                                                     <Globe size={12} className="text-teal-400" />
@@ -367,14 +369,28 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                             <div className="space-y-1">
                                                 <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
                                                     <Key size={12} className="text-amber-400" />
-                                                    <span>توکن ابری همگام‌سازی (Sync Token):</span>
+                                                    <span>شناسه فضای کاری (Workspace ID):</span>
                                                 </label>
                                                 <input
                                                     type="text"
+                                                    value={targetWorkspaceId}
+                                                    onChange={(e) => setTargetWorkspaceId(e.target.value)}
+                                                    placeholder="client_rahimi"
+                                                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-amber-500"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                                                    <Key size={12} className="text-violet-400" />
+                                                    <span>توکن اختصاصی سرور:</span>
+                                                </label>
+                                                <input
+                                                    type="password"
+                                                    autoComplete="off"
                                                     value={targetSyncToken}
                                                     onChange={(e) => setTargetSyncToken(e.target.value)}
-                                                    placeholder="AG-HOST-VAULT-9821-SYNC-X72A"
-                                                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-amber-500"
+                                                    placeholder="توکن اختصاصی این مشتری"
+                                                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-violet-500"
                                                 />
                                             </div>
                                         </div>
