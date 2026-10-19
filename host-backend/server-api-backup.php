@@ -116,6 +116,13 @@ function getServerBackupKey(): string {
     // The key must be provided from outside the public web deployment tree.
     // No automatic key file is created under this directory because Nginx may ignore .htaccess.
     $keyFilePath = trim((string)(getenv('ASHK_BACKUP_ENCRYPTION_KEY_FILE') ?: ''));
+    if (is_string($environmentCandidate)) {
+        if ($keyFilePath !== '') {
+            throw new RuntimeException('BACKUP_KEY_SOURCE_CONFLICT');
+        }
+        $cachedKey = $environmentCandidate;
+        return $cachedKey;
+    }
     if ($keyFilePath !== '') {
         $realKeyPath = realpath($keyFilePath);
         $documentRoot = realpath((string)($_SERVER['DOCUMENT_ROOT'] ?? ''));
