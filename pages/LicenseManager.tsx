@@ -60,7 +60,7 @@ const LicenseManager: React.FC = () => {
     const [copiedKey, setCopiedKey] = useState(false);
     const [copiedCode, setCopiedCode] = useState(false);
     const [currentHwid, setCurrentHwid] = useState('');
-    const [licenseServerUrl, setLicenseServerUrl] = useState(HOST_BASE_URL);
+    const [licenseServerUrl] = useState(HOST_BASE_URL);
     const [adminSecret, setAdminSecret] = useState('');
     const [isIssuing, setIsIssuing] = useState(false);
     const [issueError, setIssueError] = useState('');
