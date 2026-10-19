@@ -849,14 +849,15 @@ export const useStore = create<AppState>()(
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.' }] };
           }
           const targetPersonId = personId || c.personId;
-          hostDB.save('checks', {...c, personId: targetPersonId}).catch(() => {});
-          
           try {
               AccountingEngine.postCheck(c, targetPersonId);
           } catch (err) {
               console.error('AccountingEngine error in addCheck:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `ثبت چک انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}` }] };
           }
 
+          hostDB.save('checks', {...c, personId: targetPersonId}).catch(() => {});
           const exactBalance = targetPersonId ? PersonLedgerService.getBalance(targetPersonId) : 0;
           const updatedPeople = s.people.map(p => p.id === targetPersonId ? { ...p, balance: exactBalance } : p);
 
@@ -879,6 +880,8 @@ export const useStore = create<AppState>()(
               AccountingEngine.postCheckStatusChange(check, status);
           } catch (err) {
               console.error('AccountingEngine error in updateCheckStatus:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `تغییر وضعیت چک ثبت نشد؛ وضعیت قبلی حفظ شد: ${reason}` }] };
           }
 
           const targetPersonId = check.personId;
@@ -925,6 +928,8 @@ export const useStore = create<AppState>()(
               AccountingEngine.postCheckTransfer(t);
           } catch (err) {
               console.error('AccountingEngine error in addCheckTransfer:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `واگذاری چک ثبت نشد؛ اطلاعات قبلی حفظ شد: ${reason}` }] };
           }
 
           const exactBalance = t.personId ? PersonLedgerService.getBalance(t.personId) : 0;
@@ -1415,23 +1420,22 @@ export const useStore = create<AppState>()(
                   }
                   return inv;
               });
-              const targetInv = nextInvoices.find(v => v.id === relatedInvoiceId);
-              if (targetInv) {
-                  hostDB.save('invoices', targetInv).catch(() => {});
-                  persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
-              }
-          }
-
-          if (personId) {
-              try {
-                  localStorage.removeItem(`ledger-${personId}`);
-              } catch {}
+              // Persist the invoice change only after the accounting entry is posted successfully.
           }
 
           try {
               AccountingEngine.postGeneralTransaction(newTrans);
           } catch (err) {
               console.error('AccountingEngine error in addGeneralFinance:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message: `ثبت تراکنش مالی انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}` }] }));
+              return {} as Transaction;
+          }
+
+          const targetInvoice = relatedInvoiceId ? nextInvoices.find(v => v.id === relatedInvoiceId) : undefined;
+          if (targetInvoice) {
+              hostDB.save('invoices', targetInvoice).catch(() => {});
+              persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
           }
 
           const exactBalance = personId ? PersonLedgerService.getBalance(personId, nextInvoices, nextTransactions, s.checks) : 0;
