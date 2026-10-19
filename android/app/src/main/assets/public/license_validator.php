@@ -69,26 +69,40 @@ class LicenseValidator {
             ];
         }
 
-        // ۲. بررسی تطابق توکن امنیتی (در صورت فعال بودن بررسی توکن)
-        if (!empty($ws['token'])) {
-            if (empty($token) || $ws['token'] !== $token) {
-                return [
-                    'allowed' => false,
-                    'status' => 'INVALID_TOKEN',
-                    'message' => 'توکن امنیتی (Workspace Token) اشتباه است یا دسترسی نامعتبر می‌باشد.'
-                ];
-            }
+        // ۲. Every tenant must have a non-empty server-issued token.
+        $storedToken = (string)($ws['token'] ?? '');
+        if ($storedToken === '' || (string)$token === '' || !hash_equals($storedToken, (string)$token)) {
+            return [
+                'allowed' => false,
+                'status' => 'INVALID_TOKEN',
+                'message' => 'توکن امنیتی (Workspace Token) اشتباه است یا دسترسی نامعتبر می‌باشد.'
+            ];
         }
 
-        // ۳. بررسی تاریخ انقضا (Expiration Date)
-        if (empty($ws['is_unlimited']) && !empty($ws['expire_date'])) {
-            $today = date('Y-m-d');
-            if ($today > $ws['expire_date']) {
+        // ۳. Non-unlimited licenses must have a valid Gregorian ISO date and must not be expired.
+        if (empty($ws['is_unlimited'])) {
+            $expireDate = (string)($ws['expire_date'] ?? '');
+            if (!preg_match('/^\\d{4}-\\d{2}-\\d{2}$/', $expireDate)) {
+                return [
+                    'allowed' => false,
+                    'status' => 'INVALID_EXPIRY',
+                    'message' => 'تاریخ انقضای لایسنس در سرور معتبر نیست؛ تاریخ میلادی YYYY-MM-DD ثبت کنید.'
+                ];
+            }
+            $dateParts = array_map('intval', explode('-', $expireDate));
+            if (count($dateParts) !== 3 || !checkdate($dateParts[1], $dateParts[2], $dateParts[0])) {
+                return [
+                    'allowed' => false,
+                    'status' => 'INVALID_EXPIRY',
+                    'message' => 'تاریخ انقضای لایسنس در سرور نامعتبر است.'
+                ];
+            }
+            if (date('Y-m-d') > $expireDate) {
                 return [
                     'allowed' => false,
                     'status' => 'EXPIRED',
-                    'expire_date' => $ws['expire_date'],
-                    'message' => 'اشتراک و اعتبار این فضای کاری در تاریخ ' . $ws['expire_date'] . ' به پایان رسیده است.'
+                    'expire_date' => $expireDate,
+                    'message' => 'اشتراک و اعتبار این فضای کاری در تاریخ ' . $expireDate . ' به پایان رسیده است.'
                 ];
             }
         }
