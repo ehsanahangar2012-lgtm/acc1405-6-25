@@ -26,7 +26,9 @@ import {
     MAX_HEMAYAT_CUSTOMERS, 
     MAX_HEMAYAT_DOCUMENTS,
     MAX_ANDROID_DEFAULT_CUSTOMERS,
-    MAX_ANDROID_DEFAULT_DOCUMENTS
+    MAX_ANDROID_DEFAULT_DOCUMENTS,
+    MAX_TRIAL_USERS,
+    MAX_ANDROID_DEFAULT_USERS
 } from '../services/licenseQuotaService';
 import { isAndroidApp } from '../utils';
 import { useStore } from '../store';
@@ -34,7 +36,7 @@ import { useStore } from '../store';
 interface TrialLimitModalProps {
     isOpen?: boolean;
     onClose?: () => void;
-    reason?: 'CUSTOMERS_LIMIT' | 'DOCUMENTS_LIMIT' | 'MANUAL';
+    reason?: 'CUSTOMERS_LIMIT' | 'DOCUMENTS_LIMIT' | 'USERS_LIMIT' | 'MANUAL';
 }
 
 export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
@@ -42,7 +44,7 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
     onClose,
     reason = 'MANUAL'
 }) => {
-    const { people, invoices, vouchers, transactions, checks } = useStore();
+    const { people, invoices, vouchers, transactions, checks, users } = useStore();
     const [hwid, setHwid] = useState('');
     const [copiedHwid, setCopiedHwid] = useState(false);
     const [licenseKey, setLicenseKey] = useState('');
@@ -55,6 +57,7 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
     
     const maxCust = isAndroid ? MAX_ANDROID_DEFAULT_CUSTOMERS : (isHemayat ? MAX_HEMAYAT_CUSTOMERS : MAX_TRIAL_CUSTOMERS);
     const maxDoc = isAndroid ? MAX_ANDROID_DEFAULT_DOCUMENTS : (isHemayat ? MAX_HEMAYAT_DOCUMENTS : MAX_TRIAL_DOCUMENTS);
+    const maxUsers = licenseQuotaService.getMaxUsers();
 
     useEffect(() => {
         hardwareIdService.getHardwareId().then(setHwid);
@@ -99,15 +102,17 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
                         </div>
                         <div>
                             <h2 className="text-lg font-black text-white flex items-center gap-2">
-                                <span>{isAndroid ? 'سقف نسخه پیش‌فرض همراه' : 'سقف نسخه پایه مستقل'}</span>
+                                <span>{reason === 'USERS_LIMIT' ? 'سقف کاربران این دستگاه' : (isAndroid ? 'سقف نسخه پیش‌فرض همراه' : 'سقف نسخه پایه مستقل')}</span>
                                 <span className="text-[10px] bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full border border-amber-500/30">
-                                    {isAndroid ? 'پایان سقف ۵۰ سند' : 'پایان سهمیه آزمایشی'}
+                                    {reason === 'USERS_LIMIT' ? 'تکمیل سهمیه کاربر' : (isAndroid ? 'پایان سقف ۵۰ سند' : 'پایان سهمیه آزمایشی')}
                                 </span>
                             </h2>
                             <p className="text-xs text-slate-400 mt-0.5">
-                                {isAndroid 
-                                    ? 'برای ثبت اسناد بیشتر، کلید لایسنس را در سرور مادر به‌صورت آنلاین تأیید کنید'
-                                    : 'جهت ثبت نامحدود مشتریان و اسناد، لایسنس خود را فعال فرمایید'}
+                                {reason === 'USERS_LIMIT'
+                                    ? 'تعداد کاربران مجاز از روی لایسنس تأییدشده سرور کنترل می‌شود.'
+                                    : (isAndroid
+                                        ? 'برای ثبت اسناد بیشتر، کلید لایسنس را در سرور مادر به‌صورت آنلاین تأیید کنید'
+                                        : 'جهت ثبت نامحدود مشتریان و اسناد، لایسنس خود را فعال فرمایید')}
                             </p>
                         </div>
                     </div>
@@ -126,7 +131,7 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
                 <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-200">
                     
                     {/* Quota Progress Cards */}
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className={`p-4 rounded-2xl border ${customerCount >= maxCust ? 'bg-rose-950/20 border-rose-500/30' : 'bg-slate-950/60 border-slate-800'}`}>
                             <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
                                 <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5 text-teal-400" /> مشتریان:</span>
@@ -152,6 +157,21 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
                                 ></div>
                             </div>
                         </div>
+
+                        {reason === 'USERS_LIMIT' && (
+                            <div className={`p-4 rounded-2xl border ${users.length >= maxUsers ? 'bg-rose-950/20 border-rose-500/30' : 'bg-slate-950/60 border-slate-800'}`}>
+                                <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
+                                    <span className="flex items-center gap-1"><Users className="w-3.5 h-3.5 text-teal-400" /> کاربران دستگاه:</span>
+                                    <span className="font-mono font-bold">{users.length} / {maxUsers}</span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
+                                    <div
+                                        className={`h-full rounded-full ${users.length >= maxUsers ? 'bg-rose-500' : 'bg-teal-500'}`}
+                                        style={{ width: `${Math.min(100, (users.length / maxUsers) * 100)}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Explain the required license-first sequence; server reachability is not a license. */}
