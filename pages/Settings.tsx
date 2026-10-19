@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import { useFinancialStore } from '../store-financial';
 import { generateId, toPersianDigits, formatCurrency, isDesktopApp, isAndroidApp } from '../utils';
+import { APP_VERSION } from '../config';
 import { 
     Settings as SettingsIcon, Building2, Landmark, ShieldCheck, Palette, 
     Plus, Coins, Database, X, Save, 
@@ -76,7 +77,7 @@ const Settings = () => {
                         <div className="flex items-center gap-3 flex-wrap">
                             <h1 className="text-xl md:text-2xl font-black text-white">پلتفرم جامع تنظیمات و مدیریت سامانه</h1>
                             <span className="text-xs bg-teal-500/30 text-teal-200 font-extrabold px-3 py-1 rounded-full border border-teal-400">
-                                نسخه ۱۶.۳۵.۰
+                                نسخه {APP_VERSION}
                             </span>
                             <button
                                 type="button"
