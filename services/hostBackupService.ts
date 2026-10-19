@@ -182,7 +182,8 @@ class HostBackupService {
                 version: APP_VERSION,
                 data: backupData,
                 assets,
-                checksum: this.checksum(backupData),
+                checksumAlgorithm: 'sha256',
+                checksum: this.checksum({ data: backupData, assets }),
                 hasAssets: (assets.companies && assets.companies.some(c => c.logo || c.stamp || c.signature)) || 
                            (assets.checkImages && assets.checkImages.length > 0) || 
                            (assets.signatures && assets.signatures.length > 0),
@@ -475,12 +476,7 @@ class HostBackupService {
     }
 
     private checksum(data: any): string {
-        const str = JSON.stringify(data);
-        let h = 0;
-        for (let i = 0; i < str.length; i++) {
-            h = Math.imul(31, h) + str.charCodeAt(i) | 0;
-        }
-        return (h >>> 0).toString(16);
+        return CryptoJS.SHA256(JSON.stringify(data)).toString();
     }
 }
 
