@@ -342,15 +342,19 @@ jobs:
           "CSC_LINK=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "CSC_KEY_PASSWORD=$env:WINDOWS_SIGNING_PFX_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Build real Windows EXE files
-        run: bun run build:windows
+      - name: Build Windows installer for manual distribution
+        run: bun run build:installer
 
-      - name: Verify Windows Authenticode signatures for commercial release
+      - name: Verify Windows Authenticode signature when optional certificate is supplied
         if: startsWith(github.ref, 'refs/tags/v')
         shell: pwsh
         env:
           EXPECTED_WINDOWS_SIGNING_PUBLISHER: ${{ vars.WINDOWS_SIGNING_PUBLISHER }}
         run: |
+          if ([string]::IsNullOrWhiteSpace($env:CSC_LINK) -or -not (Test-Path $env:CSC_LINK)) {
+            Write-Host "No Windows code-signing certificate configured. The installer is intentionally unsigned for manual distribution; continuing."
+            exit 0
+          }
           $version = node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)"
           $files = @(
             "dist_electron/AshkeGhalam-Setup-v$version.exe",
@@ -379,13 +383,11 @@ jobs:
       - name: Verify Windows renderer excludes server and admin tooling
         run: node scripts/sanitize-client-build.js dist --verify-only
 
-      - name: Upload Windows artifacts
+      - name: Upload Windows installer for manual delivery
         uses: actions/upload-artifact@v4
         with:
-          name: AshkeGhalam-Windows-EXE
-          path: |
-            dist_electron/*.exe
-            dist_electron/*.zip
+          name: AshkeGhalam-Windows-Installer
+          path: dist_electron/AshkeGhalam-Setup-v*.exe
           if-no-files-found: error
 
   publish-native-release:
@@ -414,12 +416,6 @@ jobs:
       - name: Build host deployment package
         run: bun run build:web && bun run build:zip
 
-      - name: Download Windows artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: AshkeGhalam-Windows-EXE
-          path: release-assets/windows
-
       - name: Download Android artifact
         uses: actions/download-artifact@v4
         with:
@@ -432,9 +428,6 @@ jobs:
           set -euo pipefail
           VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")"
           test "${GITHUB_REF_NAME}" = "v${VERSION}" || { echo "::error::Tag must match package.json version: v${VERSION}"; exit 1; }
-          test -f "release-assets/windows/AshkeGhalam-Setup-v${VERSION}.exe"
-          test -f "release-assets/windows/AshkeGhalam-Portable-v${VERSION}.exe"
-          test -f "release-assets/windows/AshkeGhalam-Windows-Portable-v${VERSION}.zip"
           test -f "release-assets/android/AshkeGhalam-v${VERSION}.apk"
           if find release-assets/android -maxdepth 1 -name '*-debug.apk' -print -quit | grep -q .; then
             echo "::error::Debug APKs cannot be published as a production release."
@@ -451,8 +444,6 @@ jobs:
           generate_release_notes: true
           draft: true
           files: |
-            release-assets/windows/*.exe
-            release-assets/windows/*.zip
             release-assets/android/AshkeGhalam-v*.apk
             release-assets/host/*.zip
         env:
