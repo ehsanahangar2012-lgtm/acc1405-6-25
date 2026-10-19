@@ -131,7 +131,8 @@ switch ($action) {
         $filename = $targetFolder . '/' . $timestamp . '.gz';
         $savedImmediate = saveCompressedData($data['payload'], $filename, $targetFolder, 10);
         $daily_filename = $dailyFolder . '/' . date('Y-m-d') . '.gz';
-        $savedDaily = saveCompressedData($data['payload'], $daily_filename, $dailyFolder, 10);
+        // Keep enough dated snapshots for the 30-day cleanup policy; the instant backup folder has its own 10-file cap.
+        $savedDaily = saveCompressedData($data['payload'], $daily_filename, $dailyFolder, 40);
         if ($savedImmediate === false || $savedDaily === false) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'BACKUP_WRITE_FAILED']);
@@ -180,16 +181,16 @@ switch ($action) {
         // حذف فایل‌های قدیمی‌تر از 30 روز
         $cutoff = time() - (30 * 24 * 60 * 60);
         $folders = glob($DAILY_BACKUP_ROOT . '/*', GLOB_ONLYDIR);
-        
+        $deletedCount = 0;
+
         foreach ($folders as $folder) {
-            $files = glob($folder . '/*.gz');
-            foreach ($files as $file) {
-                if (filemtime($file) < $cutoff) {
-                    unlink($file);
+            foreach (glob($folder . '/*.gz') ?: [] as $file) {
+                if (filemtime($file) < $cutoff && @unlink($file)) {
+                    $deletedCount++;
                 }
             }
         }
-        echo json_encode(['success' => true, 'cleaned' => count($files ?? [])]);
+        echo json_encode(['success' => true, 'cleaned' => $deletedCount, 'retention_days' => 30]);
         break;
         
     case 'get_backup_list':
