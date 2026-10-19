@@ -81,6 +81,13 @@ if ($action === 'verify_license') {
     }
 
     $workspaceEntry = $config['workspaces'][$wsId];
+    // Validate the server-issued token, status, and expiry before binding HWID; invalid requests must not lock out the owner.
+    $preValidation = LicenseValidator::validateAccess($wsId, $tkn);
+    if (empty($preValidation['allowed'])) {
+        http_response_code(403);
+        echo json_encode($preValidation, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     $submittedHwid = strtoupper(trim((string)($input['hwid'] ?? '')));
     $registeredHwid = strtoupper(trim((string)($workspaceEntry['hwid'] ?? '')));
     if ($submittedHwid === '' || strlen($submittedHwid) > 256 || preg_match('/[\\x00-\\x1F\\x7F]/', $submittedHwid)) {
