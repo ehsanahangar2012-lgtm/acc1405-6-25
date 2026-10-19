@@ -157,7 +157,14 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [1/2] پاکسازی نسخه های قدیمی و پکیج بندی جدید...
+if not exist node_modules (
+echo [خطا] وابستگی‌های پروژه نصب نیستند.
+echo ابتدا در ریشه پروژه دستور bun install --frozen-lockfile را اجرا کنید.
+pause
+exit /b 1
+)
+
+echo [1/2] بازسازی رابط کاربری و ساخت APK...
 npm run build:apk
 if %errorlevel% neq 0 (
     echo.
@@ -167,7 +174,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/2] فایل نهایی AshkeGhalam-v${APP_VERSION}.apk در ریشه پروژه و پوشه downloads تولید شد.
+echo [2/2] خروجی APK در پوشه downloads تولید شد؛ برای انتشار رسمی، keystore امضای انتشار لازم است.
 echo.
 pause`;
 
