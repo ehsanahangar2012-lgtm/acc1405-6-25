@@ -101,7 +101,7 @@ switch ($action) {
         echo json_encode([
             'success' => true,
             'workspaces' => array_values($config['workspaces'] ?? []),
-            'auto_register' => !empty($config['auto_register_new_tenants']),
+            'auto_register' => (!empty($config['auto_register_new_tenants']) && getenv('ASHK_ALLOW_AUTO_REGISTER_TENANTS') === '1'),
             'server_time' => date('Y-m-d H:i:s')
         ], JSON_UNESCAPED_UNICODE);
         break;
