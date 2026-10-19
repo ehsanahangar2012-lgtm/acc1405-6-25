@@ -670,6 +670,9 @@ const BackupManager = () => {
         try {
             const res = await hostBackupService.restoreFromHost(backupId);
             if (res.success && res.data) {
+                if (!res.integrityVerified && !confirm('هش کامل نسخه پشتیبان تأیید نشد (ممکن است بکاپ قدیمی باشد). آیا با مسئولیت خودت ادامه می‌دهی؟')) {
+                    return;
+                }
                 const payload = res.data;
                 const restoredData = payload.data || {};
                 const restoredAssets = payload.assets;
@@ -694,7 +697,9 @@ const BackupManager = () => {
                 const migrated = backupMigrationService.migrateBackupData(restoredData);
                 hydrateStore(migrated);
 
-                alert('✅ بازیابی اطلاعات از روی سرور مرکزی با موفقیت کامل شد.');
+                alert(res.integrityVerified
+                    ? 'بازیابی موفق شد؛ یکپارچگی فایل و داده‌های پشتیبان تأیید شد.'
+                    : 'بازیابی انجام شد؛ نسخه پشتیبان قدیمی بود یا کنترل کامل یکپارچگی قابل تأیید نبود.');
                 window.location.reload();
             } else {
                 alert(`خطا در بازیابی اطلاعات: ${res.error || 'پاسخ نامعتبر از سرور'}`);
