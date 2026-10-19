@@ -43,7 +43,7 @@ import { AccountingLogo } from './components/AccountingLogo';
 import { dialogService } from './services/dialogService';
 import { UpdateCenter } from './pages/UpdateCenter';
 import { workspaceService } from './services/workspaceService';
-import { isDesktopApp, isAndroidApp } from './utils';
+import { isDesktopApp, isAndroidApp, isMotherWebPortal } from './utils';
 import { FEATURES } from './config';
 import { Lock, User as UserIcon, LogIn, PenTool, Loader2, WifiOff, Cloud, RefreshCw, KeyRound, ShieldCheck } from 'lucide-react';
 
@@ -649,8 +649,8 @@ const MainAppLayout: React.FC = () => {
                             <Route path="/marketing" element={<MarketingHub />} />
                             <Route path="/catalog" element={<CatalogPage />} />
                             <Route path="/import-center" element={<ImportCenter />} />
-                            <Route path="/debug-center" element={(isDesktopApp() || isAndroidApp()) ? <Navigate to="/" replace /> : <DebugCenter />} />
-                            <Route path="/license-manager" element={(isDesktopApp() || isAndroidApp()) ? <Navigate to="/" replace /> : <LicenseManager />} />
+                            <Route path="/debug-center" element={isMotherWebPortal() ? <DebugCenter /> : <Navigate to="/" replace />} />
+                            <Route path="/license-manager" element={isMotherWebPortal() ? <LicenseManager /> : <Navigate to="/" replace />} />
                             <Route path="/client-broadcast" element={<ClientBroadcastHub />} />
                             
                             {/* ماژول‌های تجاری و ابری */}
