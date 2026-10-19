@@ -1,11 +1,9 @@
+import { workspaceService } from './workspaceService';
+
 export class BackupService {
     private getBaseUrl(): string {
-        if (typeof window === 'undefined') return '';
-        
-        const isLocalhost = window.location.hostname === 'localhost' || 
-                           window.location.hostname === '127.0.0.1';
-        
-        return isLocalhost ? '' : window.location.origin;
+        if (typeof window === 'undefined' || !workspaceService.isRemoteCloudConfigured()) return '';
+        return workspaceService.getBaseUrl();
     }
     
     async backupData(type: string, data: any): Promise<boolean> {
@@ -15,7 +13,7 @@ export class BackupService {
         try {
             const response = await fetch(`${baseUrl}/backup-system.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                 body: JSON.stringify({
                     action: 'backup_data',
                     type,
@@ -41,6 +39,7 @@ export class BackupService {
             
             const response = await fetch(`${baseUrl}/backup-system.php`, {
                 method: 'POST',
+                headers: await workspaceService.getSecureHeaders(),
                 body: formData
             });
             const result = await response.json();
@@ -55,7 +54,10 @@ export class BackupService {
         if (!baseUrl) return [];
         
         try {
-            const response = await fetch(`${baseUrl}/backup-system.php?action=get_backup_list&type=${type}`);
+            const safeType = encodeURIComponent(type.replace(/[^a-zA-Z0-9_-]/g, '') || 'invoices');
+            const response = await fetch(`${baseUrl}/backup-system.php?action=get_backup_list&type=${safeType}`, {
+                headers: await workspaceService.getSecureHeaders()
+            });
             return await response.json();
         } catch (error) {
             return [];
