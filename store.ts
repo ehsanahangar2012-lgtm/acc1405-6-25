@@ -21,6 +21,15 @@ import { deletedRecordsRegistry } from './services/deletedRecordsRegistry';
 import { licenseQuotaService } from './services/licenseQuotaService';
 import { desktopDatabaseService } from './services/desktopDatabaseService';
 import { APP_VERSION } from './config';
+import { isNativeAndroidSecureStorage, getAndroidEncryptedItem, setAndroidEncryptedItem, removeAndroidEncryptedItem } from './services/androidSecureStorage';
+async function localStorageRemoveLegacy(name: string): Promise<void> {
+    try {
+        localStorage.removeItem(name);
+        localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
+        localStorage.removeItem('ashke-ghalam-currency');
+    } catch {}
+}
+
 
 const emptyPerm = (val: boolean = false): ModulePermission => ({ view: val, create: val, edit: val, delete: val });
 
@@ -2106,112 +2115,131 @@ export const useStore = create<AppState>()(
       },
       storage: createJSONStorage(() => ({
         getItem: async (name) => {
-            // ۱. اولویت نخست در محیط ویندوز: بارگذاری مستقیم از فایل پایگاه داده دیسک (.db)
+            // Native Android: main accounting state must live in Android Keystore-backed storage.
+            if (isNativeAndroidSecureStorage()) {
+                const protectedValue = await getAndroidEncryptedItem(name);
+                if (protectedValue !== null) return protectedValue;
+
+                // Migrate older copies once. If native encryption fails, do not fall back to plaintext.
+                let legacyValue: string | null = null;
+                try {
+                    let record = await idbService.get('backups', name);
+                    if (!record || !record.data) {
+                        record = await idbService.get('backups', 'ashke-ghalam-rbac-v14-accounting');
+                    }
+                    if (record && typeof record.data === 'string') legacyValue = record.data;
+                } catch (error) {
+                    console.warn('[Store] Legacy Android IndexedDB migration check failed:', error);
+                }
+                if (legacyValue === null) {
+                    legacyValue = localStorage.getItem(name) ?? localStorage.getItem('ashke-ghalam-rbac-v14-accounting');
+                }
+                if (legacyValue === null) return null;
+
+                let migratedValue = legacyValue;
+                if (!legacyValue.trim().startsWith('{')) {
+                    const decrypted = securityService.decrypt(legacyValue);
+                    if (decrypted && decrypted.trim().startsWith('{')) migratedValue = decrypted;
+                }
+                await setAndroidEncryptedItem(name, migratedValue);
+                await localStorageRemoveLegacy(name);
+                await idbService.remove(name).catch(() => {});
+                await idbService.remove('ashke-ghalam-rbac-v14-accounting').catch(() => {});
+                return migratedValue;
+            }
+
+            // Native Windows local state is read through OS-backed encryption in Electron.
             try {
                 const desktopData = await desktopDatabaseService.loadFromDatabase();
                 if (desktopData) {
                     if (desktopData.trim().startsWith('{')) return desktopData;
-                    try {
-                        return securityService.decrypt(desktopData);
-                    } catch {
-                        return desktopData;
-                    }
+                    const decrypted = securityService.decrypt(desktopData);
+                    return decrypted && decrypted.trim().startsWith('{') ? decrypted : desktopData;
                 }
             } catch (e) {
-                console.warn('[Store] Desktop database read fallback:', e);
+                console.warn('[Store] Desktop database read failed:', e);
             }
 
+            // Older web/PWA/desktop fallback migration.
             try {
-                // Try reading from IndexedDB first (v15 then v14 fallback)
                 let record = await idbService.get('backups', name);
-                if (!record || !record.data) {
-                    record = await idbService.get('backups', 'ashke-ghalam-rbac-v14-accounting');
-                }
+                if (!record || !record.data) record = await idbService.get('backups', 'ashke-ghalam-rbac-v14-accounting');
                 if (record && record.data) {
                     const val = record.data;
-                    try {
-                        if (val.trim().startsWith('{')) return val;
-                        return securityService.decrypt(val);
-                    } catch (e) {
-                        return val;
-                    }
+                    if (typeof val === 'string' && val.trim().startsWith('{')) return val;
+                    const decrypted = securityService.decrypt(val);
+                    return decrypted && decrypted.trim().startsWith('{') ? decrypted : val;
                 }
             } catch (e) {
-                console.error('Error reading from IndexedDB:', e);
+                console.error('Error reading legacy state from IndexedDB:', e);
             }
 
-            // Fallback to localStorage if not found in IndexedDB
             let val = localStorage.getItem(name);
-            if (!val) {
-                val = localStorage.getItem('ashke-ghalam-rbac-v14-accounting');
-            }
+            if (!val) val = localStorage.getItem('ashke-ghalam-rbac-v14-accounting');
             if (!val) return null;
-
-            // Migrate to IndexedDB asynchronously to free up localStorage space
             try {
                 await idbService.set(name, val);
                 localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
                 localStorage.removeItem(name);
-                console.log('[Store] Successfully migrated state to v15 in IndexedDB!');
             } catch (e) {
-                console.error('[Store] Error migrating state to IndexedDB:', e);
+                console.error('Error migrating legacy state to IndexedDB:', e);
             }
-
-            try {
-                if (val.trim().startsWith('{')) return val;
-                return securityService.decrypt(val);
-            } catch (e) {
-                return val;
-            }
+            if (val.trim().startsWith('{')) return val;
+            const decrypted = securityService.decrypt(val);
+            return decrypted && decrypted.trim().startsWith('{') ? decrypted : val;
         },
         setItem: async (name, value) => {
-            // ۱. ذخیره‌سازی ایزوله در فایل پایگاه داده SQL دسکتاپ و اسکریپت رابطه‌ای
-            desktopDatabaseService.saveToDatabase(value).catch(() => {});
+            // Android: persist the primary application state only using Android Keystore AES-GCM.
+            if (isNativeAndroidSecureStorage()) {
+                await setAndroidEncryptedItem(name, value);
+                localStorage.removeItem(name);
+                localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
+                localStorage.removeItem('ashke-ghalam-currency');
+                await idbService.remove(name).catch(() => {});
+                await idbService.remove('ashke-ghalam-rbac-v14-accounting').catch(() => {});
+                return;
+            }
 
-            // ۲. ذخیره‌سازی ناهمگام در IndexedDB
+            // Windows Electron keeps the main full-state snapshot encrypted by OS safeStorage.
+            if (desktopDatabaseService.isDesktopDatabaseAvailable()) {
+                const saved = await desktopDatabaseService.saveToDatabase(value);
+                if (!saved) throw new Error('SECURE_DESKTOP_DATABASE_WRITE_FAILED');
+                localStorage.removeItem(name);
+                localStorage.removeItem('ashke-ghalam-currency');
+                return;
+            }
+
+            // Browser/PWA fallback: IndexedDB is retained for compatibility, but is not
+            // claimed to provide hardware-backed at-rest encryption.
             try {
                 await idbService.set(name, value);
                 localStorage.removeItem(name);
-
-                // ذخیره کش سریع واحد پول جهت محاسبات سریع و بدون لگ
                 try {
                     const parsed = JSON.parse(value);
                     const currency = parsed?.state?.config?.currency;
-                    if (currency) {
-                        localStorage.setItem('ashke-ghalam-currency', currency);
-                    }
+                    if (currency) localStorage.setItem('ashke-ghalam-currency', currency);
                 } catch {}
             } catch (e) {
+                // Legacy web mode only. Never use this plaintext fallback in native apps.
                 console.error('Error saving state to IndexedDB:', e);
-                // Fallback to localStorage on IndexedDB failure
-                try {
-                    localStorage.setItem(name, value);
-                } catch (lsError: any) {
-                    if (lsError && (lsError.name === 'QuotaExceededError' || lsError.code === 22 || lsError.number === -2147024882)) {
-                        console.warn('[Store] LocalStorage quota exceeded. Clearing cache keys...');
-                        const keys = Object.keys(localStorage);
-                        keys.forEach(key => {
-                            if (key.startsWith('cache-') || key.startsWith('local-')) {
-                                localStorage.removeItem(key);
-                            }
-                        });
-                        try {
-                            localStorage.setItem(name, value);
-                        } catch {}
-                    }
-                }
+                localStorage.setItem(name, value);
             }
         },
         removeItem: async (name) => {
+            if (isNativeAndroidSecureStorage()) {
+                await removeAndroidEncryptedItem(name);
+                localStorage.removeItem(name);
+            }
             try {
                 await idbService.remove(name);
             } catch (e) {
                 console.error('Error removing state from IndexedDB:', e);
             }
             localStorage.removeItem(name);
+            localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
             localStorage.removeItem('ashke-ghalam-currency');
         }
-      })),
+      }))
       partialize: (state) => Object.fromEntries(
         Object.entries(state).filter(([key, val]) => 
           typeof val !== 'function' && !['notifications', 'isOnline', 'currentUser'].includes(key)

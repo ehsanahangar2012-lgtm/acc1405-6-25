@@ -8,6 +8,8 @@ import {
 } from './types-financial';
 import { generateId, getPersianDate } from './utils';
 import { useStore } from './store';
+import { createAndroidAwareStateStorage } from './services/androidSecureStorage';
+import { createJSONStorage } from 'zustand/middleware';
 
 interface FinancialState {
   // حسابداری دوبل
@@ -649,7 +651,8 @@ export const useFinancialStore = create<FinancialState>()(
       }
     }),
     {
-      name: 'financial-store-v1'
+      name: 'financial-store-v1',
+      storage: createJSONStorage(() => createAndroidAwareStateStorage())
     }
   )
 );
