@@ -194,3 +194,11 @@ body.light .sidebar-scrollbar { scrollbar-color: #0f766e #edf2f7 !important; }
 body.light .sidebar-scrollbar::-webkit-scrollbar-thumb { background: #0f766e !important; border-color: #cbd5e1 !important; }
 
 /* Keep official invoice/print sheets white regardless of application theme. */
+
+/* Bright teal/green fills need dark foregrounds for a stronger contrast ratio. */
+body.light :is([class~="bg-teal-500"], [class~="bg-teal-600"], [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-green-500"], [class~="bg-green-600"], [class~="bg-blue-500"], [class~="bg-sky-500"], [class~="bg-cyan-600"]) {
+  color: #102a2b !important;
+}
+body.light :is([class~="bg-teal-500"], [class~="bg-teal-600"], [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-green-500"], [class~="bg-green-600"], [class~="bg-blue-500"], [class~="bg-sky-500"], [class~="bg-cyan-600"]) * {
+  color: #102a2b !important;
+}
