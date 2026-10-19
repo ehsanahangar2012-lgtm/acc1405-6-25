@@ -27,6 +27,7 @@ import { hardwareIdService, DeviceInfo } from '../services/hardwareIdService';
 import { encryptedStorageService, AppManifest } from '../services/encryptedStorageService';
 import { idbService } from '../services/indexedDBService';
 import { workspaceService } from '../services/workspaceService';
+import { verifyServerLicenseReceipt } from '../services/serverLicenseReceiptService';
 
 interface ActivationDashboardProps {
     isOpen?: boolean;
@@ -142,11 +143,22 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
             }
 
             if (response?.ok && data?.allowed === true && data?.status === 'ACTIVE') {
+                const verifiedReceipt = await verifyServerLicenseReceipt({
+                    hostUrl: resolvedServerUrl,
+                    licenseKey: cleanLicenseKey,
+                    workspaceId: cleanWorkspaceId,
+                    hwid,
+                    receipt: data.license_receipt
+                });
+                if (!verifiedReceipt) {
+                    throw new Error('امضای دیجیتال پاسخ لایسنس معتبر نیست؛ کلاینت فعال نشد.');
+                }
+                const receiptPayload = verifiedReceipt.payload;
                 const resolvedCompany = data.title || companyName || 'مشتری مجاز هاست';
-                const resolvedExpireDate = data.expire_date || '1410-12-29';
-                const resolvedUnlimited = data.is_unlimited === true;
-                const resolvedFeatures = Array.isArray(data.features) ? data.features.filter((feature: unknown) => typeof feature === 'string') as string[] : ['BASIC_MODULES'];
-                const resolvedPlan = typeof data.plan === 'string' ? data.plan : (resolvedUnlimited ? 'GOLD' : 'LICENSED');
+                const resolvedExpireDate = receiptPayload.expire_date;
+                const resolvedUnlimited = receiptPayload.is_unlimited === true;
+                const resolvedFeatures = receiptPayload.features.filter((feature: unknown) => typeof feature === 'string') as string[];
+                const resolvedPlan = receiptPayload.plan;
                 const newManifest = encryptedStorageService.createManifestObject({
                     licenseKey: cleanLicenseKey,
                     hardwareId: hwid,
@@ -171,14 +183,17 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                     serverVerified: true,
                     workspaceId: cleanWorkspaceId,
                     licenseKey: cleanLicenseKey,
+                    licenseReceipt: data.license_receipt,
+                    hwid,
                     companyName: resolvedCompany,
+                    plan: resolvedPlan,
                     expireDate: resolvedExpireDate,
                     isUnlimited: resolvedUnlimited,
                     hostUrl: resolvedServerUrl,
                     syncToken: cleanLicenseKey,
                     workspaceToken: cleanLicenseKey,
-                    maxCustomers: Number.isFinite(Number(data.max_customers)) ? Number(data.max_customers) : 30,
-                    maxDocuments: Number.isFinite(Number(data.max_documents)) ? Number(data.max_documents) : 100,
+                    maxCustomers: receiptPayload.max_customers,
+                    maxDocuments: receiptPayload.max_documents,
                     features: resolvedFeatures,
                     verifiedAt: new Date().toISOString()
                 }));
@@ -194,17 +209,17 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                     standaloneOfflineMode: false
                 });
 
+                window.dispatchEvent(new CustomEvent('ashk-license-updated'));
                 setManifest(newManifest);
-                setMessage({ type: 'success', text: 'سرور معتبر بودن لایسنس را تأیید کرد؛ اتصال به فضای کاری اختصاصی ثبت شد.' });
+                setMessage({ type: 'success', text: 'امضای دیجیتال و اعتبار لایسنس از سرور تأیید شد؛ اتصال ثبت گردید.' });
                 if (onActivationSuccess) onActivationSuccess(newManifest);
             } else {
                 setMessage({ type: 'error', text: data?.message || 'سرور، فضای کاری یا کلید لایسنس را تأیید نکرد. لایسنس فعال نشد.' });
             }
         } catch (err: any) {
-            // در صورت عدم دسترسی به اینترنت، پیشنهاد فعال‌سازی آفلاین
-            setMessage({ 
-                type: 'error', 
-                text: 'ارتباط با سرور برقرار نشد. برای جلوگیری از فعال‌سازی جعلی، لایسنس تجاری فقط پس از تأیید آنلاین سرور فعال می‌شود.' 
+            setMessage({
+                type: 'error',
+                text: err?.message || 'ارتباط امن با سرور برقرار نشد؛ لایسنس فعال نشد.'
             });
         } finally {
             setIsLoading(false);
