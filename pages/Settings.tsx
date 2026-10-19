@@ -312,7 +312,8 @@ const Settings = () => {
                                             onChange={(e) => updateConfig({ appTheme: e.target.value as any })}
                                             className="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3.5 text-white text-xs font-black outline-none focus:border-teal-400"
                                         >
-                                            <option value="DARK">حالت تیره حرفه‌ای با کنتراست بالا (پیش‌فرض)</option>
+                                            <option value="DARK">حالت تیره فعلی اشک قلم (پیش‌فرض)</option>
+                                            <option value="LIGHT">تم روشن حرفه‌ای (نمای جدید مدیریتی)</option>
                                             <option value="SYSTEM">تطبیق خودکار با سیستم عامل</option>
                                         </select>
                                     </div>
