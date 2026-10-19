@@ -145,6 +145,8 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                 const resolvedCompany = data.title || companyName || 'مشتری مجاز هاست';
                 const resolvedExpireDate = data.expire_date || '1410-12-29';
                 const resolvedUnlimited = data.is_unlimited === true;
+                const resolvedFeatures = Array.isArray(data.features) ? data.features.filter((feature: unknown) => typeof feature === 'string') as string[] : ['BASIC_MODULES'];
+                const resolvedPlan = typeof data.plan === 'string' ? data.plan : (resolvedUnlimited ? 'GOLD' : 'LICENSED');
                 const newManifest = encryptedStorageService.createManifestObject({
                     licenseKey: cleanLicenseKey,
                     hardwareId: hwid,
@@ -154,7 +156,8 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                     expireDate: resolvedExpireDate,
                     isUnlimited: resolvedUnlimited,
                     standaloneOfflineMode: false,
-                    customApiBaseUrl: resolvedServerUrl
+                    customApiBaseUrl: resolvedServerUrl,
+                    features: resolvedFeatures
                 });
 
                 await encryptedStorageService.saveAppManifest(newManifest);
@@ -163,7 +166,7 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                 localStorage.setItem('ashk_license_key', cleanLicenseKey);
                 localStorage.removeItem('ashk_activation_code');
                 localStorage.setItem('ashk_license_type', resolvedUnlimited ? 'UNLIMITED' : 'LIMITED');
-                localStorage.setItem('ashk_license_plan', resolvedUnlimited ? 'UNLIMITED' : 'LICENSED');
+                localStorage.setItem('ashk_license_plan', resolvedPlan);
                 localStorage.setItem('ashk_server_license_data', JSON.stringify({
                     serverVerified: true,
                     workspaceId: cleanWorkspaceId,
@@ -172,6 +175,11 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                     expireDate: resolvedExpireDate,
                     isUnlimited: resolvedUnlimited,
                     hostUrl: resolvedServerUrl,
+                    syncToken: cleanLicenseKey,
+                    workspaceToken: cleanLicenseKey,
+                    maxCustomers: Number.isFinite(Number(data.max_customers)) ? Number(data.max_customers) : 30,
+                    maxDocuments: Number.isFinite(Number(data.max_documents)) ? Number(data.max_documents) : 100,
+                    features: resolvedFeatures,
                     verifiedAt: new Date().toISOString()
                 }));
                 localStorage.setItem('ashk_host_url', resolvedServerUrl);
@@ -196,7 +204,7 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
             // در صورت عدم دسترسی به اینترنت، پیشنهاد فعال‌سازی آفلاین
             setMessage({ 
                 type: 'error', 
-                text: 'ارتباط با سرور برقرار نشد (محیط آفلاین یا فیلترینگ). لطفاً از تب فعال‌سازی آفلاین استفاده کنید.' 
+                text: 'ارتباط با سرور برقرار نشد. برای جلوگیری از فعال‌سازی جعلی، لایسنس تجاری فقط پس از تأیید آنلاین سرور فعال می‌شود.' 
             });
         } finally {
             setIsLoading(false);
@@ -205,61 +213,11 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
 
     const handleOfflineActivation = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!licenseKey.trim()) {
-            setMessage({ type: 'error', text: 'لطفاً شماره لایسنس را وارد کنید.' });
-            return;
-        }
-
-        if (!activationCode.trim()) {
-            setMessage({ type: 'error', text: 'لطفاً کد فعال‌سازی آفلاین را وارد کنید.' });
-            return;
-        }
-
-        setIsLoading(true);
-        setMessage(null);
-
-        try {
-            const hwid = deviceInfo?.hwid || await hardwareIdService.getHardwareId();
-            const verification = hardwareIdService.verifyOfflineActivationCode(licenseKey, hwid, activationCode);
-
-            if (verification.valid && verification.payload) {
-                const p = verification.payload;
-                const newManifest = encryptedStorageService.createManifestObject({
-                    licenseKey: p.licenseKey || licenseKey.trim(),
-                    hardwareId: hwid,
-                    workspaceId: p.workspaceId || workspaceId || 'default',
-                    companyName: p.companyName || companyName || 'کاربر آفلاین اشک قلم',
-                    expireDate: p.expireDate || '1410-12-29',
-                    isUnlimited: p.isUnlimited ?? true,
-                    standaloneOfflineMode: true
-                });
-
-                await encryptedStorageService.saveAppManifest(newManifest);
-                idbService.setScope({ workspaceId: newManifest.workspaceId, licenseKey: newManifest.licenseKey });
-                localStorage.setItem('ashk_license_status', 'ACTIVATED');
-                localStorage.setItem('ashk_license_key', newManifest.licenseKey);
-                localStorage.setItem('ashk_activation_code', activationCode.trim());
-                localStorage.setItem('ashk_license_type', newManifest.isUnlimited ? 'UNLIMITED' : 'LIMITED');
-                localStorage.removeItem('ashk_server_license_data');
-                await workspaceService.updateConfig({
-                    workspaceId: newManifest.workspaceId,
-                    licenseKey: newManifest.licenseKey,
-                    standaloneOfflineMode: true,
-                    workspaceToken: '',
-                    customServerUrl: ''
-                });
-
-                setManifest(newManifest);
-                setMessage({ type: 'success', text: 'فعال‌سازی آفلاین کاملاً معتبر و موفقیت‌آمیز بود! مانیفست دستگاه ثبت گردید.' });
-                if (onActivationSuccess) onActivationSuccess(newManifest);
-            } else {
-                setMessage({ type: 'error', text: verification.error || 'کد فعال‌سازی آفلاین معتبر نمی‌باشد.' });
-            }
-        } catch (e: any) {
-            setMessage({ type: 'error', text: e.message || 'خطا در پردازش کد فعال‌سازی آفلاین.' });
-        } finally {
-            setIsLoading(false);
-        }
+        setActiveTab('online');
+        setMessage({
+            type: 'error',
+            text: 'کدهای آفلاین قدیمی با رازِ تعبیه‌شده در کلاینت قابل جعل بودند و دیگر پذیرفته نمی‌شوند. لطفاً لایسنس ثبت‌شده را از طریق سرور مادر و تب فعال‌سازی آنلاین بررسی کنید.'
+        });
     };
 
     return (
