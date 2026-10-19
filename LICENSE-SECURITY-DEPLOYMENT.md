@@ -57,4 +57,6 @@ The reserved \`default\`/\`main\` workspace no longer has an anonymous super-adm
 
 **Do not treat this branch as a production security sign-off yet.** On this branch, `api.php` requires registered workspace credentials and limits global CRUD to the mother administrator; customer support-chat reads are scoped to their workspace. `host-api.php` validates the server-held mother administrator credential and no longer trusts a frontend API token. The legacy `server-api-database.php` and `server-api-upload.php` endpoints return HTTP 410. CI now checks these guards against a disposable test host, but the actual deployed host still needs verification.
 
+Host-package assembly now skips runtime data directories and private environment/database/key files, cleans stale runtime directories from `dist`, and includes a CI regression test with dummy registry and customer-data fixtures. Only the data-directory deny-rules file is copied into a fresh host package; production data must be created on the target host after deployment.
+
 Also verify all directory-deny rules against the actual hosting stack (Apache \`.htaccess\` versus Nginx rules), validate backups/uploads from a separate browser, and run the portal → issue → activate → sync → revoke flow against the real deployed host. CI uses a disposable test registry and does not prove production hosting configuration.
