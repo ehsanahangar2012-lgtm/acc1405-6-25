@@ -84,8 +84,16 @@ try {
     expectAbsent(output);
   }
 
-  if (!fs.existsSync(path.join(dist, 'data', '.htaccess'))) {
-    findings.push('dist/data/.htaccess deny-rules file is missing');
+  for (const runtimeDir of runtimeDirs) {
+    const denyFile = path.join(dist, runtimeDir, '.htaccess');
+    if (!fs.existsSync(denyFile)) {
+      findings.push(`dist/${runtimeDir}/.htaccess deny-rules file is missing`);
+      continue;
+    }
+    const rules = fs.readFileSync(denyFile, 'utf8');
+    if (!rules.includes('Require all denied') || !rules.includes('Deny from all')) {
+      findings.push(`dist/${runtimeDir}/.htaccess is missing compatible deny rules`);
+    }
   }
   scanDist(dist);
 
