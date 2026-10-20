@@ -252,6 +252,29 @@ public static class AccountingOperations
             throw new InvalidOperationException("مقدار افزایش موجودی باید مثبت باشد.");
         product.StockQuantity += quantity;
     }
+
+    public static void CancelInvoice(AccountingData data, string invoiceId)
+    {
+        var invoice = data.Invoices.SingleOrDefault(i => i.Id == invoiceId)
+            ?? throw new InvalidOperationException("فاکتور پیدا نشد.");
+        if (invoice.Status != "صادر شده")
+            throw new InvalidOperationException("فقط فاکتور صادرشدهٔ تسویه‌نشده قابل لغو است.");
+        if (AccountingRules.PaidForInvoice(data, invoice.Id) != 0m)
+            throw new InvalidOperationException("برای فاکتور دارای دریافت، لغو مستقیم مجاز نیست.");
+
+        // Validate all products before changing any stock to keep cancellation atomic.
+        var products = invoice.Lines.Select(line => new
+        {
+            Line = line,
+            Product = data.Products.SingleOrDefault(product => product.Id == line.ProductId)
+        }).ToList();
+        if (products.Any(item => item.Product is null))
+            throw new InvalidOperationException("یکی از کالاهای این فاکتور برای برگشت موجودی پیدا نشد.");
+        foreach (var item in products)
+            item.Product!.StockQuantity += item.Line.Quantity;
+
+        invoice.Status = "لغو شده";
+    }
 }
 
 public static class AccountingDataValidator
@@ -320,7 +343,8 @@ public static class AccountingDataValidator
         foreach (var invoice in data.Invoices)
         {
             var paid = AccountingRules.PaidForInvoice(data, invoice.Id);
-            if (paid > invoice.Total || (invoice.Status == "تسویه شده" && paid != invoice.Total))
+            if (paid > invoice.Total || (invoice.Status == "تسویه شده" && paid != invoice.Total) ||
+                (invoice.Status == "لغو شده" && paid != 0m))
                 throw new InvalidDataException("مبالغ دریافتی با وضعیت فاکتور سازگار نیست.");
         }
 
