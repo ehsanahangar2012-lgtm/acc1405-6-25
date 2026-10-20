@@ -12,7 +12,4 @@
     <Product>Ashke Ghalam Accounting</Product>
     <Description>Native Windows WPF accounting application</Description>
   </PropertyGroup>
-  <ItemGroup>
-    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
-  </ItemGroup>
 </Project>

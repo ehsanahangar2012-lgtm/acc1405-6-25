@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace AshkeGhalam.Windows.Models;
 
 public sealed class AccountingData
