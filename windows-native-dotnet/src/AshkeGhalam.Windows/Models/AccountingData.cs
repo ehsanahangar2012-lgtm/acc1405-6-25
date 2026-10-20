@@ -144,15 +144,22 @@ public static class AccountingOperations
         if (draft.TaxRatePercent < 0m || draft.TaxRatePercent > 100m)
             throw new InvalidOperationException("درصد مالیات باید بین صفر تا صد باشد.");
 
+        foreach (var group in draft.Lines.GroupBy(line => line.ProductId, StringComparer.Ordinal))
+        {
+            var product = data.Products.SingleOrDefault(p => p.Id == group.Key)
+                ?? throw new InvalidOperationException("یکی از کالاهای فاکتور پیدا نشد.");
+            var requiredQuantity = group.Sum(line => line.Quantity);
+            if (requiredQuantity <= 0m || product.StockQuantity < requiredQuantity)
+                throw new InvalidOperationException($"موجودی کالای «{product.Name}» کافی نیست. موجودی: {product.StockQuantity:N2}");
+        }
+
         var resolved = new List<(ProductRecord Product, InvoiceLine Line)>();
         foreach (var item in draft.Lines)
         {
             var product = data.Products.SingleOrDefault(p => p.Id == item.ProductId)
-                ?? throw new InvalidOperationException($"کالای «{item.ProductName}» پیدا نشد.");
+                ?? throw new InvalidOperationException("یکی از کالاهای فاکتور پیدا نشد.");
             if (item.Quantity <= 0m || item.UnitPrice < 0m)
                 throw new InvalidOperationException("تعداد باید مثبت و قیمت نمی‌تواند منفی باشد.");
-            if (product.StockQuantity < item.Quantity)
-                throw new InvalidOperationException($"موجودی کالای «{product.Name}» کافی نیست. موجودی: {product.StockQuantity:N2}");
             var line = new InvoiceLine
             {
                 ProductId = product.Id,
@@ -274,16 +281,18 @@ public static class AccountingDataValidator
         var invoiceNumbers = new HashSet<int>();
         foreach (var invoice in data.Invoices)
         {
-            if (invoice is null || invoice.Number < 1 || !invoiceNumbers.Add(invoice.Number) ||
+            if (invoice is null || invoice.Lines is null || invoice.Lines.Count == 0 || invoice.Lines.Any(line => line is null))
+                throw new InvalidDataException("فاکتور فاقد اقلام معتبر است.");
+
+            if (invoice.Number < 1 || !invoiceNumbers.Add(invoice.Number) ||
                 !customerIds.Contains(invoice.CustomerId) || string.IsNullOrWhiteSpace(invoice.CustomerName) ||
-                invoice.Lines is null || invoice.Lines.Count == 0 || invoice.TaxRatePercent < 0m ||
-                invoice.TaxRatePercent > 100m || invoice.Subtotal < 0m ||
+                invoice.TaxRatePercent < 0m || invoice.TaxRatePercent > 100m || invoice.Subtotal < 0m ||
                 invoice.TaxAmount != AccountingRules.CalculateTax(invoice.Subtotal, invoice.TaxRatePercent) ||
                 invoice.Total != AccountingRules.CalculateTotal(invoice.Subtotal, invoice.TaxRatePercent) ||
-                invoice.Subtotal != AccountingRules.Money(invoice.Lines.Sum(l => l.LineTotal)) ||
-                invoice.Lines.Any(l => l is null || string.IsNullOrWhiteSpace(l.ProductId) ||
-                    string.IsNullOrWhiteSpace(l.ProductName) || l.Quantity <= 0m || l.UnitPrice < 0m ||
-                    l.LineTotal != AccountingRules.Money(l.Quantity * l.UnitPrice)) ||
+                invoice.Subtotal != AccountingRules.Money(invoice.Lines.Sum(line => line.LineTotal)) ||
+                invoice.Lines.Any(line => string.IsNullOrWhiteSpace(line.ProductId) ||
+                    string.IsNullOrWhiteSpace(line.ProductName) || line.Quantity <= 0m || line.UnitPrice < 0m ||
+                    line.LineTotal != AccountingRules.Money(line.Quantity * line.UnitPrice)) ||
                 !new[] { "صادر شده", "تسویه شده", "لغو شده" }.Contains(invoice.Status, StringComparer.Ordinal))
                 throw new InvalidDataException("فاکتور ناقص یا ناسازگار است.");
         }
