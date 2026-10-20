@@ -10,6 +10,9 @@
     <AssemblyName>AshkeGhalam.Windows</AssemblyName>
     <Version>16.55.0</Version>
     <Product>Ashke Ghalam Accounting</Product>
-    <Description>Native Windows WPF scaffold for Ashke Ghalam accounting</Description>
+    <Description>Native Windows WPF accounting application</Description>
   </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.0" />
+  </ItemGroup>
 </Project>
