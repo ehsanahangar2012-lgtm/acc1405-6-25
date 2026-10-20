@@ -160,13 +160,14 @@ public static class AccountingOperations
                 ?? throw new InvalidOperationException("یکی از کالاهای فاکتور پیدا نشد.");
             if (item.Quantity <= 0m || item.UnitPrice < 0m)
                 throw new InvalidOperationException("تعداد باید مثبت و قیمت نمی‌تواند منفی باشد.");
+            var unitPrice = AccountingRules.Money(item.UnitPrice);
             var line = new InvoiceLine
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
                 Quantity = item.Quantity,
-                UnitPrice = AccountingRules.Money(item.UnitPrice),
-                LineTotal = AccountingRules.Money(item.Quantity * item.UnitPrice)
+                UnitPrice = unitPrice,
+                LineTotal = AccountingRules.Money(item.Quantity * unitPrice)
             };
             resolved.Add((product, line));
         }
