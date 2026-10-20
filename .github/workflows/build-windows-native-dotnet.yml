@@ -46,6 +46,21 @@ jobs:
       - name: Publish self-contained Windows x64 EXE
         run: dotnet publish windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:DebugType=None -p:DebugSymbols=false -o "$env:RUNNER_TEMP\AshkeGhalam-Windows"
 
+      - name: Smoke-test published WPF executable startup
+        shell: pwsh
+        run: |
+          $exePath = Join-Path $env:RUNNER_TEMP "AshkeGhalam-Windows\AshkeGhalam.Windows.exe"
+          if (-not (Test-Path -LiteralPath $exePath)) {
+            throw "Published WPF executable was not found: $exePath"
+          }
+          $process = Start-Process -FilePath $exePath -PassThru
+          Start-Sleep -Seconds 5
+          $process.Refresh()
+          if ($process.HasExited) {
+            throw "Published WPF executable exited unexpectedly with code $($process.ExitCode)."
+          }
+          Stop-Process -Id $process.Id -Force
+
       - name: Upload EXE artifact
         uses: actions/upload-artifact@v4
         with:
