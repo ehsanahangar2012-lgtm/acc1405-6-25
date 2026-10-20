@@ -38,10 +38,18 @@ public sealed class ApiEndpointPolicyTests
     }
 
     [TestMethod]
-    public void RejectsNonRelativeRequestPaths()
+    public async Task RejectsAbsoluteRequestUri()
     {
         using var client = new HttpsApiClient(new Uri("https://acc.ashkghalam.ir/"));
         using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("https://example.com/steal", UriKind.Absolute));
-        Assert.ThrowsException<ArgumentException>(() => client.SendAsync(request));
+        await Assert.ThrowsExceptionAsync<ArgumentException>(() => client.SendAsync(request));
+    }
+
+    [TestMethod]
+    public async Task RejectsNetworkPathReference()
+    {
+        using var client = new HttpsApiClient(new Uri("https://acc.ashkghalam.ir/"));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("//example.com/path", UriKind.Relative));
+        await Assert.ThrowsExceptionAsync<ArgumentException>(() => client.SendAsync(request));
     }
 }

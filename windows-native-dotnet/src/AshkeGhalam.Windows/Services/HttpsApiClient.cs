@@ -11,11 +11,12 @@ namespace AshkeGhalam.Windows.Services;
 public sealed class HttpsApiClient : IDisposable
 {
     private readonly HttpClient _httpClient;
+    private readonly Uri _baseAddress;
     private bool _disposed;
 
     public HttpsApiClient(Uri baseAddress, TimeSpan? timeout = null)
     {
-        var validatedAddress = ApiEndpointPolicy.ValidateBaseAddress(baseAddress);
+        _baseAddress = ApiEndpointPolicy.ValidateBaseAddress(baseAddress);
         var handler = new HttpClientHandler
         {
             AllowAutoRedirect = false,
@@ -24,7 +25,7 @@ public sealed class HttpsApiClient : IDisposable
 
         _httpClient = new HttpClient(handler, disposeHandler: true)
         {
-            BaseAddress = validatedAddress,
+            BaseAddress = _baseAddress,
             Timeout = timeout ?? TimeSpan.FromSeconds(20)
         };
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -37,9 +38,15 @@ public sealed class HttpsApiClient : IDisposable
         ObjectDisposedException.ThrowIf(_disposed, this);
         ArgumentNullException.ThrowIfNull(request);
 
-        if (request.RequestUri is null || request.RequestUri.IsAbsoluteUri)
+        var requestUri = request.RequestUri;
+        if (requestUri is null ||
+            requestUri.IsAbsoluteUri ||
+            requestUri.OriginalString.StartsWith("//", StringComparison.Ordinal) ||
+            requestUri.OriginalString.Contains('\\') ||
+            !Uri.TryCreate(_baseAddress, requestUri, out var resolvedUri) ||
+            !HasSameOrigin(_baseAddress, resolvedUri))
         {
-            throw new ArgumentException("Only relative API paths are allowed.", nameof(request));
+            throw new ArgumentException("Only same-origin relative HTTPS API paths are allowed.", nameof(request));
         }
 
         var response = await _httpClient.SendAsync(
@@ -54,17 +61,21 @@ public sealed class HttpsApiClient : IDisposable
             throw new HttpRequestException("API redirects are disabled by client policy.");
         }
 
-        if (!string.Equals(
-                response.RequestMessage?.RequestUri?.Scheme,
-                Uri.UriSchemeHttps,
-                StringComparison.OrdinalIgnoreCase))
+        if (response.RequestMessage?.RequestUri is not Uri finalUri ||
+            !HasSameOrigin(_baseAddress, finalUri))
         {
             response.Dispose();
-            throw new HttpRequestException("The API response did not remain on HTTPS.");
+            throw new HttpRequestException("The API response did not remain on its configured HTTPS origin.");
         }
 
         return response;
     }
+
+    private static bool HasSameOrigin(Uri expected, Uri actual) =>
+        string.Equals(expected.Scheme, actual.Scheme, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(expected.Host, actual.Host, StringComparison.OrdinalIgnoreCase) &&
+        expected.Port == actual.Port &&
+        string.Equals(actual.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
 
     public void Dispose()
     {
