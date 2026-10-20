@@ -18,6 +18,29 @@ public sealed class AccountingBehaviorTests
     }
 
     [TestMethod]
+    public void InvoiceLinesUseRoundedUnitPriceForConsistentTotals()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        var invoice = AccountingOperations.CreateInvoice(data, new InvoiceDraft
+        {
+            CustomerId = data.Customers[0].Id,
+            TaxRatePercent = 0m,
+            Lines = [new InvoiceLine { ProductId = data.Products[0].Id, ProductName = data.Products[0].Name, Quantity = 3m, UnitPrice = 1.555m, LineTotal = 4.68m }]
+        });
+        Assert.AreEqual(1.56m, invoice.Lines[0].UnitPrice);
+        Assert.AreEqual(4.68m, invoice.Subtotal);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void RejectsDuplicateProductSkuInStoredData()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        data.Products.Add(new ProductRecord { Id = "product-test-2", Name = "کالای دوم", Sku = "sku-1", StockQuantity = 1m, UnitPrice = 10m });
+        Assert.ThrowsException<InvalidDataException>(() => AccountingDataValidator.Validate(data));
+    }
+
+    [TestMethod]
     public void RejectsTaxRateAboveOneHundredPercent()
     {
         Assert.ThrowsException<ArgumentOutOfRangeException>(()=>AccountingRules.CalculateTotal(100m,101m));
@@ -56,6 +79,28 @@ public sealed class AccountingBehaviorTests
         Assert.AreEqual(10m,data.Products[0].StockQuantity);
         Assert.AreEqual(0,data.Invoices.Count);
         Assert.AreEqual(1,data.NextInvoiceNumber);
+    }
+
+    [TestMethod]
+    public void CancellingUnpaidInvoiceRestoresInventory()
+    {
+        var data = CreateSampleData(includeInvoice: true);
+        var invoice = data.Invoices[0];
+        Assert.AreEqual(0m, data.Products[0].StockQuantity);
+        AccountingOperations.CancelInvoice(data, invoice.Id);
+        Assert.AreEqual("لغو شده", invoice.Status);
+        Assert.AreEqual(10m, data.Products[0].StockQuantity);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void CancellingAnInvoiceWithPaymentIsRejected()
+    {
+        var data = CreateSampleData(includeInvoice: true);
+        var invoice = data.Invoices[0];
+        AccountingOperations.RecordPayment(data, invoice.Id, 10m, "نقدی", "");
+        Assert.ThrowsException<InvalidOperationException>(() => AccountingOperations.CancelInvoice(data, invoice.Id));
+        Assert.AreEqual(0m, data.Products[0].StockQuantity);
     }
 
     [TestMethod]

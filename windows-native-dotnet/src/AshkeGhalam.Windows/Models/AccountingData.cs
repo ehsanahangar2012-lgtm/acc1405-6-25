@@ -273,10 +273,15 @@ public static class AccountingDataValidator
                 throw new InvalidDataException("رکورد مشتری ناقص است.");
 
         var productIds = UniqueIds(data.Products.Select(p => p?.Id), "کالا");
+        var skuValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in data.Products)
+        {
             if (p is null || string.IsNullOrWhiteSpace(p.Name) || p.Name.Trim().Length < 2 ||
                 p.StockQuantity < 0m || p.UnitPrice < 0m)
                 throw new InvalidDataException("رکورد کالا ناقص یا نامعتبر است.");
+            if (!string.IsNullOrWhiteSpace(p.Sku) && !skuValues.Add(p.Sku.Trim()))
+                throw new InvalidDataException("کد کالای تکراری در داده‌ها وجود دارد.");
+        }
 
         var invoiceIds = UniqueIds(data.Invoices.Select(i => i?.Id), "فاکتور");
         var invoiceNumbers = new HashSet<int>();

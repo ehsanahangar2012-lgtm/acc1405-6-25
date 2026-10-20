@@ -3,6 +3,8 @@ using System.IO;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
 using Microsoft.Win32;
 using AshkeGhalam.Windows.Dialogs;
 using AshkeGhalam.Windows.Models;
@@ -116,6 +118,34 @@ public partial class MainWindow : Window
             Commit(data => data.Customers.Add(customer), "مشتری ذخیره شد");
     }
 
+    private void EditCustomer_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (CustomersGrid.SelectedItem is not CustomerRecord selected) { MessageBox.Show(this, "یک مشتری را انتخاب کنید."); return; }
+        var dialog = new CustomerDialog(this, selected);
+        if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord changed)
+            Commit(data =>
+            {
+                var index = data.Customers.FindIndex(c => c.Id == changed.Id);
+                if (index < 0) throw new InvalidOperationException("مشتری پیدا نشد.");
+                data.Customers[index] = changed;
+                // Invoice/payment names remain historical snapshots.
+            }, "مشخصات مشتری به‌روزرسانی شد");
+    }
+
+    private void DeleteCustomer_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (CustomersGrid.SelectedItem is not CustomerRecord selected) { MessageBox.Show(this, "یک مشتری را انتخاب کنید."); return; }
+        if (_data.Invoices.Any(i => i.CustomerId == selected.Id))
+        {
+            MessageBox.Show(this, "این مشتری سابقهٔ فاکتور دارد؛ برای حفظ سوابق مالی، حذف آن مجاز نیست.", "حذف مشتری", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (MessageBox.Show(this, $"مشتری «{selected.Name}» حذف شود؟", "تأیید حذف", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Commit(data => data.Customers.RemoveAll(c => c.Id == selected.Id), "مشتری حذف شد");
+    }
+
     private void AddProduct_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
@@ -127,6 +157,40 @@ public partial class MainWindow : Window
                     throw new InvalidOperationException("کد کالای تکراری مجاز نیست.");
                 data.Products.Add(product);
             }, "کالا و موجودی اولیه ذخیره شد");
+    }
+
+    private void EditProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (ProductsGrid.SelectedItem is not ProductRecord selected) { MessageBox.Show(this, "یک کالا را انتخاب کنید."); return; }
+        var dialog = new ProductDialog(this, selected);
+        if (dialog.ShowDialog() == true && dialog.Result is ProductRecord changed)
+            Commit(data =>
+            {
+                if (!string.IsNullOrWhiteSpace(changed.Sku) && data.Products.Any(p => p.Id != changed.Id && string.Equals(p.Sku, changed.Sku, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("کد کالای تکراری مجاز نیست.");
+                var index = data.Products.FindIndex(p => p.Id == changed.Id);
+                if (index < 0) throw new InvalidOperationException("کالا پیدا نشد.");
+                data.Products[index] = changed;
+            }, "مشخصات کالا به‌روزرسانی شد");
+    }
+
+    private void DeleteProduct_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (ProductsGrid.SelectedItem is not ProductRecord selected) { MessageBox.Show(this, "یک کالا را انتخاب کنید."); return; }
+        if (_data.Invoices.Any(i => i.Lines.Any(l => l.ProductId == selected.Id)))
+        {
+            MessageBox.Show(this, "این کالا در سوابق فاکتور وجود دارد؛ برای حفظ سوابق، حذف آن مجاز نیست.", "حذف کالا", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (selected.StockQuantity != 0m)
+        {
+            MessageBox.Show(this, "برای حفظ کنترل موجودی، حذف کالای دارای موجودی مجاز نیست.", "حذف کالا", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (MessageBox.Show(this, $"کالای «{selected.Name}» حذف شود؟", "تأیید حذف", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Commit(data => data.Products.RemoveAll(p => p.Id == selected.Id), "کالا حذف شد");
     }
 
     private void AddStock_Click(object sender, RoutedEventArgs e)
@@ -153,6 +217,71 @@ public partial class MainWindow : Window
             Commit(data => AccountingOperations.CreateInvoice(data, draft), "فاکتور ثبت شد و موجودی کالا به‌روزرسانی شد");
             MainTabs.SelectedIndex = 3;
         }
+    }
+
+    private void CancelInvoice_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (InvoicesGrid.SelectedItem is not InvoiceRecord invoice) { MessageBox.Show(this, "یک فاکتور را انتخاب کنید."); return; }
+        if (MessageBox.Show(this, $"فاکتور شماره {invoice.Number} لغو و موجودی اقلام برگشت داده شود؟ فقط فاکتور بدون دریافت قابل لغو است.",
+            "تأیید لغو فاکتور", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        Commit(data => AccountingOperations.CancelInvoice(data, invoice.Id), "فاکتور لغو و موجودی برگشت داده شد");
+    }
+
+    private void PrintInvoice_Click(object sender, RoutedEventArgs e)
+    {
+        if (InvoicesGrid.SelectedItem is not InvoiceRecord invoice) { MessageBox.Show(this, "یک فاکتور را انتخاب کنید."); return; }
+        try
+        {
+            var printDialog = new PrintDialog();
+            if (printDialog.ShowDialog() != true) return;
+            var doc = new FlowDocument
+            {
+                FontFamily = new FontFamily("Segoe UI"),
+                FontSize = 12,
+                FlowDirection = FlowDirection.RightToLeft,
+                PagePadding = new Thickness(45),
+                ColumnWidth = 720
+            };
+            doc.Blocks.Add(new Paragraph(new Run("اشک قلم — فاکتور فروش"))
+            {
+                FontSize = 22, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 20)
+            });
+            doc.Blocks.Add(new Paragraph(new Run($"شماره فاکتور: {invoice.Number}     تاریخ: {invoice.CreatedAt.ToLocalTime():yyyy/MM/dd HH:mm}"))
+            { TextAlignment = TextAlignment.Right });
+            doc.Blocks.Add(new Paragraph(new Run($"مشتری: {invoice.CustomerName}")) { TextAlignment = TextAlignment.Right });
+            if (!string.IsNullOrWhiteSpace(invoice.Notes))
+                doc.Blocks.Add(new Paragraph(new Run($"توضیحات: {invoice.Notes}")) { TextAlignment = TextAlignment.Right });
+
+            var table = new Table { CellSpacing = 0 };
+            table.Columns.Add(new TableColumn { Width = new GridLength(4, GridUnitType.Star) });
+            table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+            table.Columns.Add(new TableColumn { Width = new GridLength(2, GridUnitType.Star) });
+            table.Columns.Add(new TableColumn { Width = new GridLength(2, GridUnitType.Star) });
+            var group = new TableRowGroup();
+            var heading = new TableRow();
+            foreach (var label in new[] { "شرح کالا", "تعداد", "قیمت واحد", "جمع" })
+                heading.Cells.Add(new TableCell(new Paragraph(new Run(label)))
+                { FontWeight = FontWeights.Bold, Padding = new Thickness(6), BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.4) });
+            group.Rows.Add(heading);
+            foreach (var line in invoice.Lines)
+            {
+                var row = new TableRow();
+                foreach (var value in new[] { line.ProductName, line.Quantity.ToString("N2"), line.UnitPrice.ToString("N2"), line.LineTotal.ToString("N2") })
+                    row.Cells.Add(new TableCell(new Paragraph(new Run(value)))
+                    { Padding = new Thickness(6), BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.4) });
+                group.Rows.Add(row);
+            }
+            table.RowGroups.Add(group);
+            doc.Blocks.Add(table);
+            doc.Blocks.Add(new Paragraph(new Run($"جمع: {invoice.Subtotal:N2}")) { TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 18, 0, 0) });
+            doc.Blocks.Add(new Paragraph(new Run($"مالیات ({invoice.TaxRatePercent:N2}%): {invoice.TaxAmount:N2}")) { TextAlignment = TextAlignment.Left });
+            doc.Blocks.Add(new Paragraph(new Run($"مبلغ نهایی: {invoice.Total:N2}")) { FontSize = 17, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Left });
+            doc.Blocks.Add(new Paragraph(new Run($"وضعیت: {invoice.Status}")) { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 18, 0, 0) });
+            printDialog.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, $"AshkeGhalam-Invoice-{invoice.Number}");
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "چاپ فاکتور", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
     private void AddPayment_Click(object sender, RoutedEventArgs e)

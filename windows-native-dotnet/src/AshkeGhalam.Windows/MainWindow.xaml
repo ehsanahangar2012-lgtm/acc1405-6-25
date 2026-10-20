@@ -95,6 +95,8 @@
                         <TextBlock Text="اطلاعات مشتری در حافظه محلی این رایانه ذخیره می‌شود." Style="{StaticResource SectionHint}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                             <Button Content="ثبت مشتری جدید" Click="AddCustomer_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="ویرایش مشتری انتخابی" Click="EditCustomer_Click"/>
+                            <Button Content="حذف مشتری انتخابی" Click="DeleteCustomer_Click"/>
                             <Button Content="خروجی CSV" Click="ExportCustomers_Click"/>
                         </StackPanel>
                     </StackPanel>
@@ -116,6 +118,8 @@
                         <TextBlock Text="صدور فاکتور، موجودی قابل دسترس را به‌صورت محلی کاهش می‌دهد." Style="{StaticResource SectionHint}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                             <Button Content="ثبت کالا" Click="AddProduct_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="ویرایش کالای انتخابی" Click="EditProduct_Click"/>
+                            <Button Content="حذف کالای انتخابی" Click="DeleteProduct_Click"/>
                             <Button Content="ورود موجودی" Click="AddStock_Click"/>
                             <Button Content="خروجی CSV" Click="ExportProducts_Click"/>
                         </StackPanel>
@@ -140,6 +144,8 @@
                         <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                             <Button Content="صدور فاکتور" Click="AddInvoice_Click" Background="#0F766E" Foreground="White"/>
                             <Button Content="ثبت دریافت" Click="AddPayment_Click"/>
+                            <Button Content="لغو فاکتور انتخابی" Click="CancelInvoice_Click"/>
+                            <Button Content="چاپ فاکتور انتخابی" Click="PrintInvoice_Click"/>
                             <Button Content="خروجی CSV" Click="ExportInvoices_Click"/>
                         </StackPanel>
                     </StackPanel>
