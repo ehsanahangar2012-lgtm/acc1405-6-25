@@ -1,8 +1,11 @@
 using System.Globalization;
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using QRCoder;
 using AshkeGhalam.Windows.Models;
 
 namespace AshkeGhalam.Windows.Dialogs;
@@ -10,7 +13,27 @@ namespace AshkeGhalam.Windows.Dialogs;
 public sealed class InvoicePreviewWindow : Window
 {
     private readonly InvoiceRecord _invoice;
-    private readonly FlowDocument _document;
+    private FlowDocument _document;
+    private FlowDocumentScrollViewer _viewer = null!;
+    private string _theme = "smart";
+
+    private sealed record ThemeOption(string Key, string Label);
+    private sealed record InvoicePalette(Color Accent, Color Soft, Color Ink);
+
+    private static readonly ThemeOption[] InvoiceThemes =
+    [
+        new("modern", "شرکتی مدرن"),
+        new("official", "رسمی و اداری"),
+        new("premium", "لوکس / مدیریتی"),
+        new("thermal", "حرارتی"),
+        new("minimal", "مینیمال"),
+        new("classic", "کلاسیک"),
+        new("smart", "هوشمند"),
+        new("colorful", "رنگی"),
+        new("industrial", "صنعتی"),
+        new("creative", "خلاقانه"),
+        new("persian", "ایرانی")
+    ];
 
     public InvoicePreviewWindow(
         Window owner,
@@ -108,7 +131,7 @@ public sealed class InvoicePreviewWindow : Window
         FlowDirection = FlowDirection.RightToLeft;
         Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
 
-        _document = BuildDocument(invoice);
+        _document = BuildDocument(invoice, _theme);
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -137,6 +160,26 @@ public sealed class InvoicePreviewWindow : Window
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Left
         };
+        var themeSelector = new ComboBox
+        {
+            ItemsSource = InvoiceThemes,
+            DisplayMemberPath = nameof(ThemeOption.Label),
+            SelectedValuePath = nameof(ThemeOption.Key),
+            SelectedValue = _theme,
+            Width = 155,
+            Height = 38,
+            Margin = new Thickness(0, 0, 8, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = "قالب رنگ و چیدمان پیش‌نمایش"
+        };
+        themeSelector.SelectionChanged += (_, _) =>
+        {
+            if (themeSelector.SelectedValue is not string selected || selected == _theme) return;
+            _theme = selected;
+            _document = BuildDocument(_invoice, _theme);
+            if (_viewer is not null) _viewer.Document = _document;
+        };
+        buttons.Children.Add(themeSelector);
         var print = new Button
         {
             Content = "چاپ / انتخاب چاپگر",
@@ -175,6 +218,235 @@ public sealed class InvoicePreviewWindow : Window
             Background = Brushes.White,
             Padding = new Thickness(12)
         };
+        _viewer = viewer;
+        paper.Child = viewer;
+        Grid.SetRow(paper, 1);
+        root.Children.Add(toolbar);
+        root.Children.Add(paper);
+        Content = root;
+    }
+
+using System.Globalization;
+using System.IO;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using QRCoder;
+using AshkeGhalam.Windows.Models;
+
+namespace AshkeGhalam.Windows.Dialogs;
+
+public sealed class InvoicePreviewWindow : Window
+{
+    private readonly InvoiceRecord _invoice;
+    private FlowDocument _document;
+    private FlowDocumentScrollViewer _viewer = null!;
+    private string _theme = "smart";
+
+    private sealed record ThemeOption(string Key, string Label);
+    private sealed record InvoicePalette(Color Accent, Color Soft, Color Ink);
+
+    private static readonly ThemeOption[] InvoiceThemes =
+    [
+        new("modern", "شرکتی مدرن"),
+        new("official", "رسمی و اداری"),
+        new("premium", "لوکس / مدیریتی"),
+        new("thermal", "حرارتی"),
+        new("minimal", "مینیمال"),
+        new("classic", "کلاسیک"),
+        new("smart", "هوشمند"),
+        new("colorful", "رنگی"),
+        new("industrial", "صنعتی"),
+        new("creative", "خلاقانه"),
+        new("persian", "ایرانی")
+    ];
+
+    public InvoicePreviewWindow(
+        Window owner,
+        InvoiceDraft draft,
+        IReadOnlyList<CustomerRecord> people,
+        IReadOnlyList<InvoiceRecord> invoices)
+        : this(owner, BuildDraftPreview(draft, people, invoices))
+    {
+    }
+
+    private static InvoiceRecord BuildDraftPreview(
+        InvoiceDraft draft,
+        IReadOnlyList<CustomerRecord> people,
+        IReadOnlyList<InvoiceRecord> invoices)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        var person = people.SingleOrDefault(candidate => candidate.Id == draft.CustomerId)
+            ?? throw new InvalidOperationException("طرف حساب پیش‌نمایش پیدا نشد.");
+
+        var floor = draft.Type switch { "SALE" => 1000, "PROFORMA" => 2000, "PURCHASE" => 3000, _ => 0 };
+        var number = invoices.Where(invoice => invoice.Type == draft.Type)
+            .Select(invoice => invoice.Number).DefaultIfEmpty(floor).Max() + 1;
+        while (invoices.Any(invoice => invoice.Number == number)) number++;
+
+        var prefix = !string.IsNullOrWhiteSpace(draft.Prefix) ? draft.Prefix.Trim() : draft.Type switch
+        {
+            "SALE" => "INV-", "PURCHASE" => "PUR-", "PROFORMA" => "PRO-", _ => "INV-"
+        };
+        var createdAt = draft.Date == default ? DateTimeOffset.Now : draft.Date;
+        var lines = draft.Lines.Select(line => new InvoiceLine
+        {
+            ProductId = line.ProductId,
+            ProductName = line.ProductName,
+            SerialNumber = line.SerialNumber,
+            Quantity = line.Quantity,
+            BuyPrice = AccountingRules.Money(line.BuyPrice),
+            UnitPrice = AccountingRules.Money(line.UnitPrice),
+            Profit = draft.Type == "SALE"
+                ? AccountingRules.Money((line.UnitPrice - line.BuyPrice) * line.Quantity)
+                : 0m,
+            LineTotal = AccountingRules.Money(line.Quantity * line.UnitPrice),
+            Description = line.Description,
+            EntryOrder = line.EntryOrder
+        }).ToList();
+        var subtotal = AccountingRules.Money(lines.Sum(line => line.LineTotal));
+        var discount = AccountingRules.Money(draft.Discount);
+        var taxAmount = draft.TaxIsAmount
+            ? AccountingRules.Money(draft.TaxAmount)
+            : AccountingRules.CalculateTax(subtotal, draft.TaxRatePercent);
+        var total = AccountingRules.Money(subtotal - discount + taxAmount);
+        var description = string.IsNullOrWhiteSpace(draft.Description)
+            ? string.Join("، ", lines.Select(line => line.ProductName).Distinct())
+            : draft.Description.Trim();
+
+        return new InvoiceRecord
+        {
+            Number = number,
+            Type = draft.Type,
+            Prefix = prefix,
+            TrackingCode = $"{prefix}{number:D4}-{createdAt:yyyyMMdd}",
+            CustomerId = person.Id,
+            CustomerName = person.Name,
+            Description = description,
+            Lines = lines,
+            Subtotal = subtotal,
+            TaxRatePercent = draft.TaxIsAmount ? 0m : draft.TaxRatePercent,
+            TaxAmount = taxAmount,
+            TaxIsAmount = draft.TaxIsAmount,
+            Discount = discount,
+            Total = total,
+            CashAmount = AccountingRules.Money(draft.CashAmount),
+            CheckAmount = 0m,
+            CreatedAt = createdAt,
+            DueDate = draft.DueDate,
+            Notes = draft.Notes,
+            DriverName = draft.DriverName,
+            DriverPhone = draft.DriverPhone,
+            VehiclePlate = draft.VehiclePlate,
+            TaxId = draft.TaxId,
+            ShowPreviousBalance = draft.ShowPreviousBalance,
+            Status = "پیش‌نمایش — ذخیره نشده"
+        };
+    }
+
+    public InvoicePreviewWindow(Window owner, InvoiceRecord invoice)
+    {
+        _invoice = invoice ?? throw new ArgumentNullException(nameof(invoice));
+        Owner = owner;
+        Title = $"پیش‌نمایش {invoice.TypeLabel} — {invoice.DisplayNumber}";
+        Width = 1080;
+        Height = 820;
+        MinWidth = 760;
+        MinHeight = 560;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        FlowDirection = FlowDirection.RightToLeft;
+        Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
+
+        _document = BuildDocument(invoice, _theme);
+        var root = new Grid { Margin = new Thickness(14) };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 0, 0, 10) };
+        var title = new StackPanel { Orientation = Orientation.Vertical };
+        title.Children.Add(new TextBlock
+        {
+            Text = $"پیش‌نمایش فاکتور {invoice.DisplayNumber}",
+            FontSize = 22,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42))
+        });
+        title.Children.Add(new TextBlock
+        {
+            Text = "این صفحه قبل از چاپ، شماره سند، طرف حساب، اقلام، تخفیف، مالیات و جمع نهایی را نشان می‌دهد.",
+            FontSize = 12,
+            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 0)
+        });
+        toolbar.Children.Add(title);
+
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Left
+        };
+        var themeSelector = new ComboBox
+        {
+            ItemsSource = InvoiceThemes,
+            DisplayMemberPath = nameof(ThemeOption.Label),
+            SelectedValuePath = nameof(ThemeOption.Key),
+            SelectedValue = _theme,
+            Width = 155,
+            Height = 38,
+            Margin = new Thickness(0, 0, 8, 0),
+            VerticalContentAlignment = VerticalAlignment.Center,
+            ToolTip = "قالب رنگ و چیدمان پیش‌نمایش"
+        };
+        themeSelector.SelectionChanged += (_, _) =>
+        {
+            if (themeSelector.SelectedValue is not string selected || selected == _theme) return;
+            _theme = selected;
+            _document = BuildDocument(_invoice, _theme);
+            if (_viewer is not null) _viewer.Document = _document;
+        };
+        buttons.Children.Add(themeSelector);
+        var print = new Button
+        {
+            Content = "چاپ / انتخاب چاپگر",
+            MinWidth = 150,
+            Height = 38,
+            Background = new SolidColorBrush(Color.FromRgb(15, 118, 110)),
+            Foreground = Brushes.White,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+        print.Click += Print_Click;
+        buttons.Children.Add(print);
+        buttons.Children.Add(new Button
+        {
+            Content = "بستن پیش‌نمایش",
+            MinWidth = 120,
+            Height = 38,
+            IsCancel = true
+        });
+        DockPanel.SetDock(buttons, Dock.Left);
+        toolbar.Children.Add(buttons);
+
+        var paper = new Border
+        {
+            Background = Brushes.White,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(8)
+        };
+        var viewer = new FlowDocumentScrollViewer
+        {
+            Document = _document,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+            IsToolBarVisible = true,
+            Background = Brushes.White,
+            Padding = new Thickness(12)
+        };
+        _viewer = viewer;
         paper.Child = viewer;
         Grid.SetRow(paper, 1);
         root.Children.Add(toolbar);
@@ -315,6 +587,47 @@ public sealed class InvoicePreviewWindow : Window
         document.Blocks.Add(new Paragraph(new Run($"وضعیت سند: {invoice.Status}"))
         { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 14, 0, 0) });
 
+        try
+        {
+            var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CUSTOMER|{invoice.CustomerName}";
+            var qr = CreateQrImage(payload);
+            var qrCard = new Border
+            {
+                BorderBrush = new SolidColorBrush(palette.Accent),
+                BorderThickness = new Thickness(1),
+                Background = new SolidColorBrush(palette.Soft),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(10),
+                Margin = new Thickness(0, 18, 0, 6),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Child = new StackPanel
+                {
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Children =
+                    {
+                        qr,
+                        new TextBlock
+                        {
+                            Text = "QR فاکتور — کد پیگیری و مبلغ",
+                            FontSize = 9,
+                            Foreground = new SolidColorBrush(palette.Ink),
+                            TextAlignment = TextAlignment.Center,
+                            Margin = new Thickness(0, 6, 0, 0)
+                        }
+                    }
+                }
+            };
+            document.Blocks.Add(new BlockUIContainer(qrCard));
+        }
+        catch (Exception qrError)
+        {
+            document.Blocks.Add(new Paragraph(new Run("تولید QR این سند انجام نشد: " + qrError.Message))
+            {
+                Foreground = Brushes.DarkRed,
+                Margin = new Thickness(0, 8, 0, 8)
+            });
+        }
+
         document.Blocks.Add(new Paragraph(new Run(
             "امضای صادرکننده: ................................       تحویل‌گیرنده: ................................       مهر و امضا: ................................"))
         {
@@ -326,6 +639,52 @@ public sealed class InvoicePreviewWindow : Window
         return document;
     }
 
+    private static Image CreateQrImage(string payload)
+    {
+        using var generator = new QRCodeGenerator();
+        using var data = generator.CreateQrCode(payload, QRCodeGenerator.ECCLevel.M);
+        var bytes = new PngByteQRCode(data).GetGraphic(6);
+        using var stream = new MemoryStream(bytes);
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.StreamSource = stream;
+        bitmap.EndInit();
+        bitmap.Freeze();
+        return new Image
+        {
+            Source = bitmap,
+            Width = 108,
+            Height = 108,
+            Stretch = Stretch.Uniform,
+            SnapsToDevicePixels = true
+        };
+    }
+
+    private void Print_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var printDialog = new PrintDialog();
+            if (printDialog.ShowDialog() != true)
+                return;
+            printDialog.PrintDocument(
+                ((IDocumentPaginatorSource)_document).DocumentPaginator,
+                $"AshkeGhalam-Invoice-{_invoice.Number}");
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "چاپ فاکتور", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static string FormatDate(DateTimeOffset value)
+    {
+        var calendar = new PersianCalendar();
+        var date = value.LocalDateTime;
+        return $"{calendar.GetYear(date):0000}/{calendar.GetMonth(date):00}/{calendar.GetDayOfMonth(date):00}";
+    }
+}
     private void Print_Click(object sender, RoutedEventArgs e)
     {
         try
