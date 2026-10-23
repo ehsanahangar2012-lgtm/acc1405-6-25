@@ -11,6 +11,7 @@ public sealed class AccountingData
     public List<InvoiceRecord> Invoices { get; set; } = [];
     public List<PaymentRecord> Payments { get; set; } = [];
     public List<ExpenseRecord> Expenses { get; set; } = [];
+    public List<CheckRecord> Checks { get; set; } = [];
 
     public AccountingData DeepCopy() => new()
     {
@@ -31,7 +32,16 @@ public sealed class AccountingData
         Payments = Payments.Select(p => new PaymentRecord
         { Id=p.Id, InvoiceId=p.InvoiceId, InvoiceNumber=p.InvoiceNumber, CustomerName=p.CustomerName, Amount=p.Amount, Method=p.Method, Reference=p.Reference, CreatedAt=p.CreatedAt }).ToList(),
         Expenses = Expenses.Select(e => new ExpenseRecord
-        { Id=e.Id, Title=e.Title, Category=e.Category, Amount=e.Amount, Notes=e.Notes, CreatedAt=e.CreatedAt }).ToList()
+        { Id=e.Id, Title=e.Title, Category=e.Category, Amount=e.Amount, Notes=e.Notes, CreatedAt=e.CreatedAt }).ToList(),
+        Checks = Checks.Select(c => new CheckRecord
+        {
+            Id=c.Id, BankName=c.BankName, Amount=c.Amount, DueDate=c.DueDate, IssueDate=c.IssueDate,
+            Status=c.Status, SayadId=c.SayadId, CheckNumber=c.CheckNumber, HolderName=c.HolderName,
+            PersonId=c.PersonId, PersonName=c.PersonName, RelatedInvoiceId=c.RelatedInvoiceId,
+            ImagePath=c.ImagePath, IsHighPriority=c.IsHighPriority, Description=c.Description,
+            CheckType=c.CheckType, CreatedAt=c.CreatedAt,
+            History=c.History.Select(h => new CheckHistoryRecord { ChangedAt=h.ChangedAt, Status=h.Status, Note=h.Note }).ToList()
+        }).ToList()
     };
 }
 
@@ -101,6 +111,36 @@ public sealed class ExpenseRecord
     public decimal Amount { get; set; }
     public string Notes { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+}
+
+public sealed class CheckRecord
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string BankName { get; set; } = "";
+    public decimal Amount { get; set; }
+    public DateTimeOffset DueDate { get; set; } = DateTimeOffset.Today.AddDays(30);
+    public DateTimeOffset? IssueDate { get; set; }
+    // Internal values mirror the source application; display labels remain Persian.
+    public string Status { get; set; } = "PENDING";
+    public string SayadId { get; set; } = "";
+    public string CheckNumber { get; set; } = "";
+    public string HolderName { get; set; } = "";
+    public string PersonId { get; set; } = "";
+    public string PersonName { get; set; } = "";
+    public string RelatedInvoiceId { get; set; } = "";
+    public string ImagePath { get; set; } = "";
+    public bool IsHighPriority { get; set; }
+    public string Description { get; set; } = "";
+    public string CheckType { get; set; } = "RECEIVED";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+    public List<CheckHistoryRecord> History { get; set; } = [];
+}
+
+public sealed class CheckHistoryRecord
+{
+    public DateTimeOffset ChangedAt { get; set; } = DateTimeOffset.Now;
+    public string Status { get; set; } = "PENDING";
+    public string Note { get; set; } = "";
 }
 
 public sealed class InvoiceDraft
@@ -286,10 +326,10 @@ public static class AccountingDataValidator
         if (data.SchemaVersion != 1)
             throw new InvalidDataException("نسخهٔ ساختار داده پشتیبانی نمی‌شود.");
         if (data.Customers is null || data.Products is null || data.Invoices is null ||
-            data.Payments is null || data.Expenses is null ||
+            data.Payments is null || data.Expenses is null || data.Checks is null ||
             data.Customers.Count > 100_000 || data.Products.Count > 100_000 ||
             data.Invoices.Count > 500_000 || data.Payments.Count > 1_000_000 ||
-            data.Expenses.Count > 1_000_000)
+            data.Expenses.Count > 1_000_000 || data.Checks.Count > 1_000_000)
             throw new InvalidDataException("ساختار یا اندازهٔ دادهٔ حسابداری معتبر نیست.");
 
         var customerIds = UniqueIds(data.Customers.Select(c => c?.Id), "مشتری");
@@ -353,6 +393,23 @@ public static class AccountingDataValidator
             if (expense is null || string.IsNullOrWhiteSpace(expense.Title) ||
                 expense.Amount <= 0m || expense.Amount != AccountingRules.Money(expense.Amount))
                 throw new InvalidDataException("رکورد هزینه ناقص یا نامعتبر است.");
+
+        UniqueIds(data.Checks.Select(c => c?.Id), "چک");
+        var validCheckStatuses = new[] { "PENDING", "DEPOSITED", "PASSED", "BOUNCED", "TRANSFERRED", "CASHED", "RETURNED" };
+        var validCheckTypes = new[] { "RECEIVED", "ISSUED" };
+        foreach (var check in data.Checks)
+        {
+            if (check is null || string.IsNullOrWhiteSpace(check.BankName) ||
+                string.IsNullOrWhiteSpace(check.HolderName) || check.Amount <= 0m ||
+                check.Amount != AccountingRules.Money(check.Amount) ||
+                !validCheckStatuses.Contains(check.Status, StringComparer.Ordinal) ||
+                !validCheckTypes.Contains(check.CheckType, StringComparer.Ordinal) ||
+                check.DueDate == default || check.History is null || check.History.Count > 10_000 ||
+                check.History.Any(h => h is null || !validCheckStatuses.Contains(h.Status, StringComparer.Ordinal)))
+                throw new InvalidDataException("رکورد چک ناقص یا نامعتبر است.");
+            if (!string.IsNullOrWhiteSpace(check.RelatedInvoiceId) && !invoiceIds.Contains(check.RelatedInvoiceId))
+                throw new InvalidDataException("چک به فاکتور ناموجود پیوند داده شده است.");
+        }
 
         return data;
     }
