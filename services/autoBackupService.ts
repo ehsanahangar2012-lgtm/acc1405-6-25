@@ -10,6 +10,7 @@
 import { hostBackupService, BackupResult, HostBackupEntry } from './hostBackupService';
 import { idbService } from './indexedDBService';
 import { useFinancialStore } from '../store-financial';
+import { checksumLocalBackupData, verifyLocalBackupRecord, LocalBackupIntegrityRecord } from './localBackupIntegrity';
 import { hasNativeBackupStorage, getNativeBackupValue, setNativeBackupValue, removeNativeBackupValue } from './nativeBackupStorage';
 
 const LOCAL_IDB_KEY = 'auto_backups';
@@ -17,13 +18,7 @@ const MAX_LOCAL_BACKUPS = 10;
 const NATIVE_BACKUP_INDEX_KEY = 'auto-backups:index';
 const nativeBackupRecordKey = (id: string) => `auto-backups:record:${id}`;
 
-interface LocalBackup {
-    id: string;
-    timestamp: number;
-    data: string;       // JSON.stringify(state)
-    size: number;
-    label: string;
-}
+interface LocalBackup extends LocalBackupIntegrityRecord {}
 
 class AutoBackupService {
     private intervalId: ReturnType<typeof setInterval> | null = null;
@@ -78,14 +73,18 @@ class AutoBackupService {
      * بکاپ لوکال در IndexedDB (برای حالت آفلاین)
      */
     async createLocalBackup(state: any): Promise<void> {
-        const id = Date.now().toString();
+        const timestamp = Date.now();
+        const id = timestamp.toString();
         const data = JSON.stringify({ ...state, financialData: useFinancialStore.getState() });
+        const nativeEncrypted = hasNativeBackupStorage();
         const backup: LocalBackup = {
             id,
-            timestamp: Date.now(),
+            timestamp,
             data,
             size: new Blob([data]).size,
-            label: `بکاپ محلی رمزگذاری‌شده - ${new Intl.DateTimeFormat('fa-IR').format(new Date())}`,
+            label: `${nativeEncrypted ? 'بکاپ محلی رمزگذاری‌شدهٔ بومی' : 'بکاپ محلی مرورگر؛ بدون رمزگذاری در حالت سکون'} - ${new Intl.DateTimeFormat('fa-IR').format(new Date(timestamp))}`,
+            checksumAlgorithm: 'sha256',
+            checksum: checksumLocalBackupData(data)
         };
 
         try {
@@ -171,7 +170,12 @@ class AutoBackupService {
             return valid;
         }
 
-        return this.readLegacyLocalBackups();
+        return (await this.readLegacyLocalBackups()).map(item => ({
+            ...item,
+            label: item.checksumAlgorithm === 'sha256' && typeof item.checksum === 'string'
+                ? item.label
+                : item.label.replace('بکاپ محلی رمزگذاری‌شده', 'بکاپ قدیمی مرورگر؛ رمزگذاری در حالت سکون تأیید نشده')
+        }));
     }
 
     private async removeLegacyLocalBackupCopies(): Promise<void> {
@@ -183,20 +187,18 @@ class AutoBackupService {
     /**
      * بازیابی بکاپ لوکال
      */
+    async verifyBackupIntegrity(backupId: string): Promise<boolean> {
+        const backup = (await this.getLocalBackups()).find(item => item.id === backupId);
+        if (!backup) throw new Error('بکاپ محلی پیدا نشد.');
+        return verifyLocalBackupRecord(backup).integrityVerified;
+    }
+
     async restoreBackup(backupId: string): Promise<any> {
-        if (hasNativeBackupStorage()) {
-            if (typeof backupId !== 'string' || !/^[0-9]{1,32}$/.test(backupId)) throw new Error('شناسه بکاپ معتبر نیست.');
-            const raw = await getNativeBackupValue(nativeBackupRecordKey(backupId));
-            if (raw === null) throw new Error('بکاپ محلی رمزگذاری‌شده پیدا نشد.');
-            const backup = JSON.parse(raw) as LocalBackup;
-            const restored = JSON.parse(backup.data);
-            if (!restored || typeof restored !== 'object' || Array.isArray(restored)) throw new Error('ساختار داده بازیابی‌شده معتبر نیست.');
-            return restored;
-        }
-        const backups = await this.getLocalBackups();
-        const backup = backups.find(item => item.id === backupId);
-        if (!backup) throw new Error('بکاپ یافت نشد');
-        return JSON.parse(backup.data);
+        const backup = (await this.getLocalBackups()).find(item => item.id === backupId);
+        if (!backup) throw new Error('بکاپ محلی پیدا نشد.');
+        // This repeats integrity checks in the restore service so callers cannot bypass
+        // the UI warning, and no caller mutates the live store on failure.
+        return verifyLocalBackupRecord(backup).data;
     }
 
     /**

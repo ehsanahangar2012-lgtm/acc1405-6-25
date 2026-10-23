@@ -640,6 +640,10 @@ const BackupManager = () => {
         }
         setActionLoadingId(snapshotId);
         try {
+            const integrityVerified = await autoBackupService.verifyBackupIntegrity(snapshotId);
+            if (!integrityVerified && !confirm('این بکاپ قدیمی است و کنترل یکپارچگی زمان ایجاد ندارد. ساختار داده بررسی می‌شود، اما دستکاری قبلی آن قابل تشخیص نیست. فقط در صورت اعتماد به منبع فایل ادامه دهید.')) {
+                return;
+            }
             const data = await autoBackupService.restoreBackup(snapshotId);
             const migrated = backupMigrationService.migrateBackupData(data);
             hydrateStore(migrated);
