@@ -158,6 +158,7 @@ public sealed class InvoicePreviewWindow : Window
         MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft;
+        FontFamily = CreatePersianFontFamily();
         Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
 
         _document = BuildDocument(invoice, _theme, _showQr, _company, _currencyLabel, _invoiceFooter);
@@ -255,6 +256,36 @@ public sealed class InvoicePreviewWindow : Window
         Content = root;
     }
 
+    private static FontFamily CreatePersianFontFamily()
+    {
+        // Prefer the font embedded as a WPF Resource. A local installation is not required.
+        // If a manually checked-out source tree is missing the asset, use a safe system font
+        // rather than allowing font resolution to take down the invoice preview.
+        try
+        {
+            var embedded = new FontFamily(new Uri("pack://application:,,,/"), "./Assets/Fonts/#Vazirmatn");
+            if (embedded.GetTypefaces().Any())
+                return embedded;
+        }
+        catch
+        {
+            // Continue to the installed-family fallback.
+        }
+
+        try
+        {
+            var installed = new FontFamily("Vazirmatn");
+            if (installed.GetTypefaces().Any())
+                return installed;
+        }
+        catch
+        {
+            // Segoe UI is present on supported Windows desktop installations.
+        }
+
+        return new FontFamily("Segoe UI");
+    }
+
     private static InvoicePalette GetPalette(string theme) => theme switch
     {
         "official" => new(Color.FromRgb(51, 65, 85), Color.FromRgb(241, 245, 249), Color.FromRgb(15, 23, 42)),
@@ -278,6 +309,7 @@ public sealed class InvoicePreviewWindow : Window
         string invoiceFooter)
     {
         var palette = GetPalette(theme);
+        var invoiceLines = invoice.Lines ?? [];
         var accent = new SolidColorBrush(palette.Accent);
         var soft = new SolidColorBrush(palette.Soft);
         var ink = new SolidColorBrush(palette.Ink);
@@ -287,7 +319,7 @@ public sealed class InvoicePreviewWindow : Window
 
         var document = new FlowDocument
         {
-            FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
+            FontFamily = CreatePersianFontFamily(),
             FontSize = 12,
             FlowDirection = FlowDirection.RightToLeft,
             PagePadding = new Thickness(36),
@@ -433,7 +465,7 @@ public sealed class InvoicePreviewWindow : Window
         }
         group.Rows.Add(header);
 
-        foreach (var line in invoice.Lines)
+        foreach (var line in invoiceLines)
         {
             var row = new TableRow();
             var values = new[]
@@ -457,7 +489,7 @@ public sealed class InvoicePreviewWindow : Window
             group.Rows.Add(row);
         }
 
-        if (invoice.Lines.Count == 0)
+        if (invoiceLines.Count == 0)
         {
             group.Rows.Add(new TableRow
             {
