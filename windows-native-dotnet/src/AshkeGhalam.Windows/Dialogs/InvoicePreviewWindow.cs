@@ -76,6 +76,7 @@ public sealed class InvoicePreviewWindow : Window
         {
             ProductId = line.ProductId,
             ProductName = line.ProductName,
+            Unit = line.Unit,
             SerialNumber = line.SerialNumber,
             Quantity = line.Quantity,
             BuyPrice = AccountingRules.Money(line.BuyPrice),
@@ -439,7 +440,7 @@ public sealed class InvoicePreviewWindow : Window
             {
                 string.IsNullOrWhiteSpace(line.Description) ? line.ProductName : $"{line.ProductName}\n{line.Description}",
                 line.Quantity.ToString("N2", CultureInfo.CurrentCulture),
-                "—",
+                string.IsNullOrWhiteSpace(line.Unit) ? "—" : line.Unit,
                 line.UnitPrice.ToString("N2", CultureInfo.CurrentCulture) + " " + currencyLabel,
                 line.LineTotal.ToString("N2", CultureInfo.CurrentCulture) + " " + currencyLabel
             };
@@ -499,13 +500,21 @@ public sealed class InvoicePreviewWindow : Window
         { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 14, 0, 0) });
 
         if (!string.IsNullOrWhiteSpace(invoiceFooter))
-            document.Blocks.Add(new Paragraph(new Run(invoiceFooter))
+        {
+            foreach (var note in invoiceFooter
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(note => !string.IsNullOrWhiteSpace(note))
+                .Distinct(StringComparer.Ordinal))
             {
-                Foreground = Brushes.DimGray,
-                FontSize = 10,
-                Margin = new Thickness(0, 10, 0, 8),
-                TextAlignment = TextAlignment.Right
-            });
+                document.Blocks.Add(new Paragraph(new Run("• " + note))
+                {
+                    Foreground = Brushes.DimGray,
+                    FontSize = 10,
+                    Margin = new Thickness(0, 2, 0, 2),
+                    TextAlignment = TextAlignment.Right
+                });
+            }
+        }
 
         var brandMarks = new StackPanel
         {
