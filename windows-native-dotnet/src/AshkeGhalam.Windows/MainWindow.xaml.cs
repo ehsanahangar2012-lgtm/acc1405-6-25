@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -38,6 +39,7 @@ public partial class MainWindow : Window
         {
             var loaded = _store.Load();
             _data = loaded;
+            EnsureConfigurationDefaults();
 
             // Safely reconcile legacy operational records on a clone. If the account chart
             // has a conflict, preserve all loaded business data and report the accounting issue.
@@ -307,6 +309,7 @@ public partial class MainWindow : Window
         RefreshFinancialReports();
         RefreshDueCalendar();
         RefreshCashFlowForecast();
+        RefreshAccountingConfigurationPanels();
     }
 
     private void RefreshLedger()
@@ -1132,7 +1135,8 @@ public partial class MainWindow : Window
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         var dialog = new InvoiceDialog(
             this, _data.Customers, _data.Products, _data.Invoices,
-            AddCustomerInline, AddProductInline);
+            AddCustomerInline, AddProductInline,
+            _data.Preferences.InvoiceTheme, _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile());
         if (dialog.ShowDialog() == true && dialog.Result is InvoiceDraft draft)
         {
             var message = draft.Type switch
@@ -1180,71 +1184,22 @@ public partial class MainWindow : Window
             return;
         }
 
-        new InvoicePreviewWindow(this, invoice).ShowDialog();
+        new InvoicePreviewWindow(this, invoice, _data.Preferences.InvoiceTheme,
+            _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile()).ShowDialog();
     }
 
     private void PrintInvoice_Click(object sender, RoutedEventArgs e)
     {
-        if (InvoicesGrid.SelectedItem is not InvoiceRecord invoice) { MessageBox.Show(this, "یک فاکتور را انتخاب کنید."); return; }
-        try
+        var invoice = InvoicesGrid.SelectedItem as InvoiceRecord;
+        if (invoice is null)
         {
-            var printDialog = new PrintDialog();
-            if (printDialog.ShowDialog() != true) return;
-            var doc = new FlowDocument
-            {
-                FontFamily = new FontFamily("Segoe UI"),
-                FontSize = 12,
-                FlowDirection = FlowDirection.RightToLeft,
-                PagePadding = new Thickness(45),
-                ColumnWidth = 720
-            };
-            doc.Blocks.Add(new Paragraph(new Run($"اشک قلم — {invoice.TypeLabel}"))
-            {
-                FontSize = 22, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 20)
-            });
-            doc.Blocks.Add(new Paragraph(new Run($"شماره سند: {invoice.DisplayNumber}     کد پیگیری: {invoice.TrackingCode}     تاریخ: {invoice.CreatedAt.ToLocalTime():yyyy/MM/dd HH:mm}"))
-            { TextAlignment = TextAlignment.Right });
-            doc.Blocks.Add(new Paragraph(new Run($"طرف حساب: {invoice.CustomerName}")) { TextAlignment = TextAlignment.Right });
-            if (invoice.DueDate is DateTimeOffset dueDate)
-                doc.Blocks.Add(new Paragraph(new Run($"سررسید: {dueDate.ToLocalTime():yyyy/MM/dd}")) { TextAlignment = TextAlignment.Right });
-            if (!string.IsNullOrWhiteSpace(invoice.DriverName) || !string.IsNullOrWhiteSpace(invoice.VehiclePlate))
-                doc.Blocks.Add(new Paragraph(new Run($"راننده: {invoice.DriverName}   تلفن: {invoice.DriverPhone}   خودرو: {invoice.VehiclePlate}")) { TextAlignment = TextAlignment.Right });
-            if (!string.IsNullOrWhiteSpace(invoice.TaxId))
-                doc.Blocks.Add(new Paragraph(new Run($"شناسه مالیاتی: {invoice.TaxId}")) { TextAlignment = TextAlignment.Right });
-            if (!string.IsNullOrWhiteSpace(invoice.Notes))
-                doc.Blocks.Add(new Paragraph(new Run($"توضیحات: {invoice.Notes}")) { TextAlignment = TextAlignment.Right });
-
-            var table = new Table { CellSpacing = 0 };
-            table.Columns.Add(new TableColumn { Width = new GridLength(4, GridUnitType.Star) });
-            table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
-            table.Columns.Add(new TableColumn { Width = new GridLength(2, GridUnitType.Star) });
-            table.Columns.Add(new TableColumn { Width = new GridLength(2, GridUnitType.Star) });
-            var group = new TableRowGroup();
-            var heading = new TableRow();
-            foreach (var label in new[] { "شرح کالا", "تعداد", "قیمت واحد", "جمع" })
-                heading.Cells.Add(new TableCell(new Paragraph(new Run(label)))
-                { FontWeight = FontWeights.Bold, Padding = new Thickness(6), BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.4) });
-            group.Rows.Add(heading);
-            foreach (var line in invoice.Lines)
-            {
-                var row = new TableRow();
-                foreach (var value in new[] { line.ProductName, line.Quantity.ToString("N2"), line.UnitPrice.ToString("N2"), line.LineTotal.ToString("N2") })
-                    row.Cells.Add(new TableCell(new Paragraph(new Run(value)))
-                    { Padding = new Thickness(6), BorderBrush = Brushes.Gray, BorderThickness = new Thickness(0.4) });
-                group.Rows.Add(row);
-            }
-            table.RowGroups.Add(group);
-            doc.Blocks.Add(table);
-            doc.Blocks.Add(new Paragraph(new Run($"جمع کالاها: {invoice.Subtotal:N2}")) { TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 18, 0, 0) });
-            doc.Blocks.Add(new Paragraph(new Run($"تخفیف: {invoice.Discount:N2}")) { TextAlignment = TextAlignment.Left });
-            doc.Blocks.Add(new Paragraph(new Run($"{(invoice.TaxIsAmount ? "مالیات" : $"مالیات ({invoice.TaxRatePercent:N2}%)")}: {invoice.TaxAmount:N2}")) { TextAlignment = TextAlignment.Left });
-            doc.Blocks.Add(new Paragraph(new Run($"مبلغ نهایی: {invoice.Total:N2}")) { FontSize = 17, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Left });
-            doc.Blocks.Add(new Paragraph(new Run($"نقدی ثبت‌شده: {invoice.CashAmount:N2}    مبلغ چک: {invoice.CheckAmount:N2}")) { TextAlignment = TextAlignment.Left });
-            doc.Blocks.Add(new Paragraph(new Run($"وضعیت: {invoice.Status}")) { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 18, 0, 0) });
-            printDialog.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, $"AshkeGhalam-Invoice-{invoice.Number}");
+            MessageBox.Show(this, "یک فاکتور را انتخاب کنید.", "چاپ فاکتور",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
         }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "چاپ فاکتور", MessageBoxButton.OK, MessageBoxImage.Error); }
+        // Preview and print share the same theme and QR output.
+        new InvoicePreviewWindow(this, invoice, _data.Preferences.InvoiceTheme,
+            _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile()).ShowDialog();
     }
 
     private void AddPayment_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType(null);
