@@ -301,8 +301,9 @@ public sealed class InvoiceDialog : Window
             foreach (var line in _existingInvoice.Lines)
                 _lines.Add(new InvoiceLine
                 {
-                    ProductId = line.ProductId, ProductName = line.ProductName, SerialNumber = line.SerialNumber,
-                    Quantity = line.Quantity, BuyPrice = line.BuyPrice, UnitPrice = line.UnitPrice, Profit = line.Profit,
+                    ProductId = line.ProductId, ProductName = line.ProductName,
+                    Unit = string.IsNullOrWhiteSpace(line.Unit) ? _products.FirstOrDefault(product => product.Id == line.ProductId)?.Unit ?? "عدد" : line.Unit,
+                    SerialNumber = line.SerialNumber, Quantity = line.Quantity, BuyPrice = line.BuyPrice, UnitPrice = line.UnitPrice, Profit = line.Profit,
                     LineTotal = line.LineTotal, Description = line.Description, EntryOrder = line.EntryOrder
                 });
         }
@@ -431,6 +432,7 @@ public sealed class InvoiceDialog : Window
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
+                Unit = product.Unit,
                 SerialNumber = product.SerialNumber,
                 Quantity = quantity,
                 BuyPrice = buyPrice,
@@ -464,6 +466,7 @@ public sealed class InvoiceDialog : Window
             {
                 ProductId = line.ProductId,
                 ProductName = product.Name,
+                Unit = product.Unit,
                 SerialNumber = product.SerialNumber,
                 Quantity = line.Quantity,
                 BuyPrice = buyPrice,
@@ -561,8 +564,9 @@ public sealed class InvoiceDialog : Window
             ShowPreviousBalance = _showPreviousBalance.IsChecked == true,
             Lines = _lines.Select(line => new InvoiceLine
             {
-                ProductId = line.ProductId, ProductName = line.ProductName, SerialNumber = line.SerialNumber,
-                Quantity = line.Quantity, BuyPrice = line.BuyPrice, UnitPrice = line.UnitPrice, Profit = line.Profit,
+                ProductId = line.ProductId, ProductName = line.ProductName,
+                Unit = string.IsNullOrWhiteSpace(line.Unit) ? _products.FirstOrDefault(product => product.Id == line.ProductId)?.Unit ?? "عدد" : line.Unit,
+                SerialNumber = line.SerialNumber, Quantity = line.Quantity, BuyPrice = line.BuyPrice, UnitPrice = line.UnitPrice, Profit = line.Profit,
                 LineTotal = line.LineTotal, Description = line.Description, EntryOrder = line.EntryOrder
             }).ToList()
         };
