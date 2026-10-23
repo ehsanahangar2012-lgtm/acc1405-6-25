@@ -1776,6 +1776,18 @@ public partial class MainWindow : Window
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "بازیابی انجام نشد", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
+    private void ShowPersonKardex_Click(object sender, RoutedEventArgs e)
+    {
+        if (CustomersGrid.SelectedItem is not CustomerRecord person)
+        {
+            MessageBox.Show(this, "ابتدا یک شخص را از جدول انتخاب کنید.", "کاردکس اشخاص",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        new PersonKardexWindow(this, person, _data).ShowDialog();
+    }
+
     private void ExportCustomers_Click(object sender, RoutedEventArgs e) =>
         ExportCsv("persons.csv", new[] { "Id", "Code", "Name", "Type", "IsCustomer", "IsSupplier", "Category", "Phone", "Email", "NationalId", "Address", "Notes", "Balance", "CreatedAt" },
             _data.Customers.Select(p => new[]
