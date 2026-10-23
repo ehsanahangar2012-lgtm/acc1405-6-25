@@ -329,17 +329,39 @@ public partial class MainWindow : Window
                 return;
             }
 
-            LicenseStatusText.Text =
-                $"رسید رمزگذاری‌شده موجود است؛ آخرین بررسی آنلاین: {state.VerifiedAtUtc.ToLocalTime():yyyy/MM/dd HH:mm}. " +
-                "این اطلاعات به‌تنهایی تأیید زنده یا وضعیت فعلی سرور را ثابت نمی‌کند.";
+            var sessionPayload = _sessionEntitlements;
+            if (sessionPayload is not null && sessionPayload.ExpiresAt <= DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+            {
+                _sessionEntitlements = null;
+                sessionPayload = null;
+                _sessionLicenseFailure = "رسید لایسنس منقضی شده است؛ بررسی آنلاین مجدد لازم است.";
+            }
+
+            if (sessionPayload is not null)
+            {
+                LicenseStatusText.Text =
+                    $"تأیید آنلاین در همین نشست موفق است؛ زمان تأیید: {state.VerifiedAtUtc.ToLocalTime():yyyy/MM/dd HH:mm}. " +
+                    "سقف‌های فعلی برای عملیات ثبت جدید اعمال می‌شوند.";
+            }
+            else
+            {
+                LicenseStatusText.Text =
+                    $"رسید ذخیره‌شدهٔ قبلی: {state.VerifiedAtUtc.ToLocalTime():yyyy/MM/dd HH:mm}. این رسید در نشست فعلی فعال نیست." +
+                    (string.IsNullOrWhiteSpace(_sessionLicenseFailure) ? " برای فعال‌سازی مجدد، بررسی آنلاین انجام دهید." : " " + _sessionLicenseFailure);
+            }
+
+            var displayedPayload = sessionPayload ?? state.Payload;
+            var companyName = string.IsNullOrWhiteSpace(state.CompanyName)
+                ? (displayedPayload.CompanyName ?? "ثبت نشده") : state.CompanyName;
             LicensePlanText.Text =
-                $"طرح ذخیره‌شده: {state.Payload.Plan}  •  شرکت: {(string.IsNullOrWhiteSpace(state.CompanyName) ? "ثبت نشده" : state.CompanyName)}  •  انقضا: {(state.Payload.IsUnlimited ? "نامحدود" : state.Payload.ExpireDate)}";
+                $"{(sessionPayload is null ? "آخرین طرح ذخیره‌شده (غیرفعال)" : "طرح تأییدشده در این نشست")}: {displayedPayload.Plan}  •  شرکت: {companyName}  •  انقضا: {(displayedPayload.IsUnlimited ? "نامحدود" : displayedPayload.ExpireDate)}";
+            var limits = NativeLicenseQuotaService.GetLimits(sessionPayload);
             LicenseQuotaText.Text =
-                $"سقف مشتریان: {QuotaLabel(state.Payload.MaxCustomers)}  •  سقف اسناد: {QuotaLabel(state.Payload.MaxDocuments)}  •  سقف کاربران: {QuotaLabel(state.Payload.MaxUsers)}";
+                $"سقف فعلی عملیات ثبت جدید — مشتریان: {QuotaLabel(limits.MaxCustomers)}  •  اسناد: {QuotaLabel(limits.MaxDocuments)}  •  کاربران: {QuotaLabel(displayedPayload.MaxUsers)}";
             LicenseFeaturesText.Text =
                 "امکانات درج‌شده در رسید: " +
-                (state.Payload.Features.Count == 0 ? "در رسید ذکر نشده" : string.Join("، ", state.Payload.Features.Take(30))) +
-                (state.Payload.Features.Count > 30 ? "، ..." : "");
+                (displayedPayload.Features.Count == 0 ? "در رسید ذکر نشده" : string.Join("، ", displayedPayload.Features.Take(30))) +
+                (displayedPayload.Features.Count > 30 ? "، ..." : "");
         }
         catch (Exception)
         {
