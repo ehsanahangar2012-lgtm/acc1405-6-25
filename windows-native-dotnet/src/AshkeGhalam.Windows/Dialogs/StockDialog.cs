@@ -42,7 +42,7 @@ public sealed class StockDialog:Window
     private static void FormatNumericField(TextBox field)
     {
         if (string.IsNullOrWhiteSpace(field.Text)) return;
-        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "مقدار").ToString("N2", CultureInfo.GetCultureInfo("fa-IR")); }
+        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "مقدار").ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")); }
         catch (InvalidOperationException) { }
     }
 }
