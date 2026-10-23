@@ -343,6 +343,36 @@
                     </DataGrid>
                 </Grid>
             </TabItem>
+            <TabItem Header="حواله‌های انبار">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="حواله‌ها و گردش موجودی" FontSize="23" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="رسید ورود، حواله خروج، برگشت از فروش/خرید و تعدیل با ثبت گردش موجودی؛ انتقال بین چند انبار تا تکمیل موجودی تفکیک‌شده فعال نیست." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <Button Content="ثبت حواله / رسید" Click="AddVoucher_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="تغییر مرحله تحویل" Click="AdvanceVoucherStatus_Click"/>
+                            <Button Content="حذف حواله در انتظار و برگشت موجودی" Click="DeleteVoucher_Click"/>
+                            <Button Content="خروجی CSV" Click="ExportVouchers_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="VouchersGrid" Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="شماره" Binding="{Binding Number}" Width="75"/>
+                            <DataGridTextColumn Header="کد پیگیری" Binding="{Binding TrackingCode}" Width="175"/>
+                            <DataGridTextColumn Header="نوع سند" Binding="{Binding TypeLabel}" Width="110"/>
+                            <DataGridTextColumn Header="نوع گردش" Binding="{Binding MovementTypeLabel}" Width="145"/>
+                            <DataGridTextColumn Header="تاریخ شمسی" Binding="{Binding DateLabel}" Width="110"/>
+                            <DataGridTextColumn Header="شخص مرتبط" Binding="{Binding PersonName}" Width="175"/>
+                            <DataGridTextColumn Header="تعداد اقلام" Binding="{Binding ItemCount}" Width="85"/>
+                            <DataGridTextColumn Header="جمع تعداد" Binding="{Binding QuantityTotal, StringFormat={}{0:N2}}" Width="110"/>
+                            <DataGridTextColumn Header="ارزش تخمینی" Binding="{Binding EstimatedValue, StringFormat={}{0:N2}}" Width="130"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="110"/>
+                            <DataGridTextColumn Header="توضیحات" Binding="{Binding Notes}" Width="240"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
                 </TabControl>
                 <Border x:Name="MigrationPanel" Visibility="Collapsed" Background="#F1F5F9" CornerRadius="14" Padding="28">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -390,6 +420,8 @@
                         <Button Tag="payments" Content="دریافت‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="expenses" Content="هزینه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="backup" Content="پشتیبان‌گیری محلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="checks" Content="مدیریت چک" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="vouchers" Content="حواله‌های انبار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="مدیریت کسب‌وکار" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="projects" Content="پروژه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="contracts" Content="قراردادها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
