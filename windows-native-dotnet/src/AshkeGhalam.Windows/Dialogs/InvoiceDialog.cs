@@ -16,6 +16,9 @@ public sealed class InvoiceDialog : Window
     private readonly IReadOnlyList<InvoiceRecord> _invoices;
     private readonly Func<Window, CustomerRecord?>? _quickAddCustomer;
     private readonly Func<Window, ProductRecord?>? _quickAddProduct;
+    private readonly string _defaultInvoiceTheme;
+    private readonly bool _showInvoiceQr;
+    private readonly CompanyProfileRecord? _companyProfile;
 
     private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), ItemsSource = new[]
     {
@@ -53,7 +56,10 @@ public sealed class InvoiceDialog : Window
         IReadOnlyList<ProductRecord> products,
         IReadOnlyList<InvoiceRecord> invoices,
         Func<Window, CustomerRecord?>? quickAddCustomer = null,
-        Func<Window, ProductRecord?>? quickAddProduct = null)
+        Func<Window, ProductRecord?>? quickAddProduct = null,
+        string? defaultInvoiceTheme = null,
+        bool showInvoiceQr = true,
+        CompanyProfileRecord? companyProfile = null)
     {
         Owner = owner;
         _people = people.ToList();
@@ -61,6 +67,9 @@ public sealed class InvoiceDialog : Window
         _invoices = invoices;
         _quickAddCustomer = quickAddCustomer;
         _quickAddProduct = quickAddProduct;
+        _defaultInvoiceTheme = defaultInvoiceTheme ?? "smart";
+        _showInvoiceQr = showInvoiceQr;
+        _companyProfile = companyProfile;
         Title = "ثبت فاکتور / پیش‌فاکتور";
         Width = 760;
         Height = 900;
@@ -470,7 +479,7 @@ public sealed class InvoiceDialog : Window
         try
         {
             var draft = BuildDraft();
-            new InvoicePreviewWindow(this, draft, _people, _invoices).ShowDialog();
+            new InvoicePreviewWindow(this, draft, _people, _invoices, _defaultInvoiceTheme, _showInvoiceQr, _companyProfile).ShowDialog();
         }
         catch (Exception ex)
         {
