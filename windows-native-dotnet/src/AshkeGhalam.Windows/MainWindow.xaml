@@ -795,7 +795,7 @@
                         </Border>
                         <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
                             <StackPanel>
-                                <TextBlock x:Name="AdvancedSettingsSection" Text="تنظیمات فاکتور و چاپ" FontSize="17" FontWeight="Bold"/>
+                                <TextBlock Text="تنظیمات فاکتور و چاپ" FontSize="17" FontWeight="Bold"/>
                                 <UniformGrid Columns="2" Margin="0,12,0,0">
                                     <StackPanel Margin="0,0,12,10"><TextBlock Text="قالب پیش‌فرض" Margin="0,0,0,5"/><ComboBox x:Name="InvoiceThemeSelector" MinHeight="34" SelectedIndex="0">
                                         <ComboBoxItem Content="شرکتی مدرن" Tag="modern"/><ComboBoxItem Content="رسمی و اداری" Tag="official"/><ComboBoxItem Content="لوکس / مدیریتی" Tag="premium"/><ComboBoxItem Content="حرارتی" Tag="thermal"/><ComboBoxItem Content="مینیمال" Tag="minimal"/><ComboBoxItem Content="کلاسیک" Tag="classic"/><ComboBoxItem Content="هوشمند" Tag="smart"/><ComboBoxItem Content="رنگی" Tag="colorful"/><ComboBoxItem Content="صنعتی" Tag="industrial"/><ComboBoxItem Content="خلاقانه" Tag="creative"/><ComboBoxItem Content="ایرانی" Tag="persian"/>
