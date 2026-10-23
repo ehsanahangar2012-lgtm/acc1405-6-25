@@ -236,6 +236,50 @@ public sealed class NativeOperationalPostingServiceTests
         Assert.AreEqual(500m, active.Amount);
     }
 
+    [TestMethod]
+    public void SpendingReceivedCheckPostsReductionOfPayablesAgainstCheckAsset()
+    {
+        var data = CreateData();
+        data.Checks.Add(new CheckRecord
+        {
+            Id = "check-spent-1",
+            CheckType = "RECEIVED",
+            CheckNumber = "884422",
+            BankName = "بانک آزمون",
+            HolderName = "ذی‌نفع",
+            Amount = 750m,
+            Status = "TRANSFERRED",
+            CreatedAt = DateTimeOffset.Now,
+            History =
+            [
+                new CheckHistoryRecord
+                {
+                    Status = "PENDING",
+                    ChangedAt = DateTimeOffset.Now.AddMinutes(-2),
+                    Note = "ثبت اولیه"
+                },
+                new CheckHistoryRecord
+                {
+                    Status = "TRANSFERRED",
+                    ChangedAt = DateTimeOffset.Now,
+                    Note = "خرج چک به ذی‌نفع"
+                }
+            ]
+        });
+
+        NativeOperationalPostingService.Reconcile(data);
+
+        var entry = data.JournalEntries.Single(e => e.ReferenceType == "AUTO_CHECK_STATUS");
+        Assert.AreEqual(750m, entry.Amount);
+        Assert.AreEqual("2110", data.LedgerAccounts.Single(a => a.Id == entry.DebitAccountId).Code,
+            "The payables balance must be reduced by the endorsed cheque.");
+        Assert.AreEqual("1140", data.LedgerAccounts.Single(a => a.Id == entry.CreditAccountId).Code,
+            "An un-deposited received cheque leaves the cheque asset account.");
+        NativeOperationalPostingService.Reconcile(data);
+        Assert.AreEqual(1, data.JournalEntries.Count(e => e.ReferenceType == "AUTO_CHECK_STATUS"),
+            "Reconciliation must not create duplicate source postings.");
+    }
+
     private static AccountingData CreateData()
     {
         var data = new AccountingData();
