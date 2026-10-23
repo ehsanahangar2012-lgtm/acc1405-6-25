@@ -17,6 +17,7 @@ public sealed class PaymentDialog : Window
     public decimal Amount{get;private set;}
     public string Method{get;private set;}="نقدی";
     public string Reference{get;private set;}="";
+    private readonly string _currencyLabel;
 
     private sealed class InvoiceOption
     {
@@ -24,7 +25,7 @@ public sealed class PaymentDialog : Window
         public string Label{get;init;}="";
     }
 
-    public PaymentDialog(Window owner, AccountingData data, string? invoiceTypeFilter = null, PaymentRecord? existingPayment = null)
+    public PaymentDialog(Window owner, AccountingData data, string? invoiceTypeFilter = null, PaymentRecord? existingPayment = null, string? currencyCode = "RIAL")
     {
         var title = existingPayment is not null ? "ویرایش دریافت/پرداخت" : invoiceTypeFilter switch
         {
@@ -32,6 +33,7 @@ public sealed class PaymentDialog : Window
             "PURCHASE" => "ثبت پرداخت به تأمین‌کننده",
             _ => "ثبت دریافت/پرداخت طرف حساب"
         };
+        _currencyLabel = string.Equals(currencyCode, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "تومان" : "ریال";
         Owner=owner;Title=title;Width=530;Height=450;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
         _amount.LostFocus += (_, _) => FormatNumericField(_amount);
@@ -42,7 +44,7 @@ public sealed class PaymentDialog : Window
             .Select(i=>new InvoiceOption
             {
                 Invoice=i,
-                Label=$"{i.TypeLabel} {i.DisplayNumber} — {i.CustomerName} — مانده {(AccountingRules.RemainingForInvoice(data,i) + (i.Id == existingPayment?.InvoiceId ? existingPayment.Amount : 0m)):N2}"
+                Label=$"{i.TypeLabel} {i.DisplayNumber} — {i.CustomerName} — مانده {(AccountingRules.RemainingForInvoice(data,i) + (i.Id == existingPayment?.InvoiceId ? existingPayment.Amount : 0m)):N2} {_currencyLabel}"
             }).ToList();
         var root=new StackPanel{Margin=new Thickness(22)};
         root.Children.Add(new TextBlock{Text=title,FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
@@ -60,7 +62,7 @@ public sealed class PaymentDialog : Window
                 Margin = new Thickness(0, 0, 0, 8)
             });
         }
-        Add(root,"سند قطعی و مانده",_invoice);Add(root,"مبلغ تسویه",_amount);Add(root,"روش دریافت / پرداخت",_method);Add(root,"شماره پیگیری / توضیح",_reference);
+        Add(root,"سند قطعی و مانده",_invoice);Add(root,$"مبلغ تسویه ({_currencyLabel})",_amount);Add(root,"روش دریافت / پرداخت",_method);Add(root,"شماره پیگیری / توضیح",_reference);
         var buttons=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,18,0,0)};
         var ok=new Button{Content=existingPayment is null ? "ثبت عملیات نقدی/مالی" : "ذخیره تغییرات",Width=140,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
         buttons.Children.Add(ok);buttons.Children.Add(new Button{Content="انصراف",Width=90,Height=36,IsCancel=true});root.Children.Add(buttons);Content=root;
