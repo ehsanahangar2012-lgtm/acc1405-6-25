@@ -339,10 +339,6 @@ public sealed class InvoiceDraft
     public string TaxId { get; init; } = "";
     public bool ShowPreviousBalance { get; init; } = true;
     public List<InvoiceLine> Lines { get; init; } = [];
-} = "";
-    public decimal TaxRatePercent { get; init; }
-    public string Notes { get; init; } = "";
-    public List<InvoiceLine> Lines { get; init; } = [];
 }
 
 public static class AccountingRules
