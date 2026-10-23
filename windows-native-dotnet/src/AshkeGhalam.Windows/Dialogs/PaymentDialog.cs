@@ -32,7 +32,7 @@ public sealed class PaymentDialog : Window
             .Select(i=>new InvoiceOption{Invoice=i,Label=$"{i.TypeLabel} {i.DisplayNumber} — {i.CustomerName} — مانده {AccountingRules.RemainingForInvoice(data,i):N2}"}).ToList();
         var root=new StackPanel{Margin=new Thickness(22)};
         root.Children.Add(new TextBlock{Text="ثبت دریافت یا پرداخت",FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
-        Add(root,"فاکتور و مانده",_invoice);Add(root,"مبلغ دریافت",_amount);Add(root,"روش دریافت",_method);Add(root,"شماره پیگیری / توضیح",_reference);
+        Add(root,"سند قطعی و مانده",_invoice);Add(root,"مبلغ تسویه",_amount);Add(root,"روش دریافت / پرداخت",_method);Add(root,"شماره پیگیری / توضیح",_reference);
         var buttons=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,18,0,0)};
         var ok=new Button{Content="ثبت عملیات نقدی/مالی",Width=110,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
         buttons.Children.Add(ok);buttons.Children.Add(new Button{Content="انصراف",Width=90,Height=36,IsCancel=true});root.Children.Add(buttons);Content=root;
@@ -47,7 +47,7 @@ public sealed class PaymentDialog : Window
                 InvoiceId=option.Invoice.Id;Amount=AccountingRules.Money(amount);
                 Method=_method.SelectedItem?.ToString()??"نقدی";Reference=_reference.Text.Trim();DialogResult=true;
             }
-            catch(Exception ex){MessageBox.Show(this,ex.Message,"بررسی دریافت",MessageBoxButton.OK,MessageBoxImage.Warning);}
+            catch(Exception ex){MessageBox.Show(this,ex.Message,"بررسی عملیات مالی",MessageBoxButton.OK,MessageBoxImage.Warning);}
         };
     }
 
