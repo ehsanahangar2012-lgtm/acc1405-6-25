@@ -838,20 +838,12 @@
                         <Button Tag="checks" Content="مدیریت چک" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="finance" Content="امور مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="customers" Content="اشخاص" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="reports" Content="گزارشات عمومی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="users" Content="کاربران و سطح دسترسی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="reports" Content="گزارشات مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="عملیات محلی موجود" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="payments" Content="دریافت‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="expenses" Content="هزینه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="backup" Content="پشتیبان‌گیری محلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="vouchers" Content="حواله‌های انبار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <TextBlock Text="مدیریت کسب‌وکار" Style="{StaticResource NavSectionLabel}"/>
-                        <Button Tag="projects" Content="پروژه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="contracts" Content="قراردادها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="assets" Content="دارایی‌های ثابت" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="budget" Content="بودجه‌بندی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="marketing" Content="بازاریابی و سئو" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="import-center" Content="مرکز واردات اسناد" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="حسابداری پیشرفته" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="accounting" Content="حسابداری دوبل" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="cashflow-predictor" Content="پیش‌بینی جریان نقدینگی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
@@ -865,28 +857,17 @@
                         <TextBlock Text="گزارشات و تحلیل" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="financial-reports" Content="گزارشات مالی پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="ai-assistant" Content="دستیار هوشمند مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <TextBlock Text="امضای دیجیتال" Style="{StaticResource NavSectionLabel}"/>
-                        <Button Tag="signature-dashboard" Content="داشبورد امضا" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="signature-management" Content="مدیریت امضا" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="خدمات تجاری و ابری" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="moadian" Content="سامانه مؤدیان مالیاتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="pos-terminal" Content="کارتخوان بانکی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="cloud-vault" Content="پشتیبان ابری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="sms-center" Content="پنل پیامک هوشمند" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="multi-user-lan" Content="شبکه محلی چندکاربره" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="client-broadcast" Content="اطلاعیه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="activation" Content="اتصال و فعال‌سازی لایسنس" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="mobile-catalog" Content="کاتالوگ ویزیتوری همراه" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="catalog" Content="کاتالوگ محصول" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="support-sla" Content="پشتیبانی و تمدید" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="تنظیمات و سیستم" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="companies" Content="چندشرکتی و مشخصات شرکت" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="server" Content="ارتباط با سرور اصلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="fiscal-year" Content="سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="security" Content="امنیت داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="data-sync" Content="همگام‌سازی داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="advanced-settings" Content="تنظیمات پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="settings" Content="تنظیمات عمومی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="updates" Content="مرکز به‌روزرسانی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="help" Content="آموزش و راهنما" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
