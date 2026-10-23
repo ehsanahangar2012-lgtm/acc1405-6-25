@@ -13,6 +13,8 @@ namespace AshkeGhalam.Windows.Dialogs;
 public sealed class InvoicePreviewWindow : Window
 {
     private readonly InvoiceRecord _invoice;
+    private readonly CompanyProfileRecord? _company;
+    private readonly bool _showQr;
     private FlowDocument _document;
     private FlowDocumentScrollViewer _viewer = null!;
     private string _theme = "smart";
@@ -39,8 +41,11 @@ public sealed class InvoicePreviewWindow : Window
         Window owner,
         InvoiceDraft draft,
         IReadOnlyList<CustomerRecord> people,
-        IReadOnlyList<InvoiceRecord> invoices)
-        : this(owner, BuildDraftPreview(draft, people, invoices))
+        IReadOnlyList<InvoiceRecord> invoices,
+        string? defaultTheme = null,
+        bool showQr = true,
+        CompanyProfileRecord? company = null)
+        : this(owner, BuildDraftPreview(draft, people, invoices), defaultTheme, showQr, company)
     {
     }
 
@@ -118,9 +123,19 @@ public sealed class InvoicePreviewWindow : Window
         };
     }
 
-    public InvoicePreviewWindow(Window owner, InvoiceRecord invoice)
+    public InvoicePreviewWindow(
+        Window owner,
+        InvoiceRecord invoice,
+        string? defaultTheme = null,
+        bool showQr = true,
+        CompanyProfileRecord? company = null)
     {
         _invoice = invoice ?? throw new ArgumentNullException(nameof(invoice));
+        _company = company;
+        _showQr = showQr;
+        _theme = InvoiceThemes.Any(option => string.Equals(option.Key, defaultTheme, StringComparison.Ordinal))
+            ? defaultTheme!
+            : "smart";
         Owner = owner;
         Title = $"پیش‌نمایش {invoice.TypeLabel} — {invoice.DisplayNumber}";
         Width = 1080;
@@ -131,7 +146,7 @@ public sealed class InvoicePreviewWindow : Window
         FlowDirection = FlowDirection.RightToLeft;
         Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
 
-        _document = BuildDocument(invoice, _theme);
+        _document = BuildDocument(invoice, _theme, _showQr, _company);
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -176,7 +191,7 @@ public sealed class InvoicePreviewWindow : Window
         {
             if (themeSelector.SelectedValue is not string selected || selected == _theme) return;
             _theme = selected;
-            _document = BuildDocument(_invoice, _theme);
+            _document = BuildDocument(_invoice, _theme, _showQr, _company);
             if (_viewer is not null) _viewer.Document = _document;
         };
         buttons.Children.Add(themeSelector);
@@ -454,8 +469,34 @@ public sealed class InvoicePreviewWindow : Window
         Content = root;
     }
 
-    private static FlowDocument BuildDocument(InvoiceRecord invoice)
+    private static InvoicePalette GetPalette(string theme) => theme switch
     {
+        "official" => new(Color.FromRgb(51, 65, 85), Color.FromRgb(241, 245, 249), Color.FromRgb(15, 23, 42)),
+        "premium" => new(Color.FromRgb(139, 106, 37), Color.FromRgb(248, 241, 223), Color.FromRgb(41, 37, 36)),
+        "thermal" => new(Color.FromRgb(17, 24, 39), Color.FromRgb(243, 244, 246), Color.FromRgb(17, 24, 39)),
+        "minimal" => new(Color.FromRgb(100, 116, 139), Color.FromRgb(248, 250, 252), Color.FromRgb(30, 41, 59)),
+        "classic" => new(Color.FromRgb(30, 64, 175), Color.FromRgb(239, 246, 255), Color.FromRgb(30, 41, 59)),
+        "colorful" => new(Color.FromRgb(124, 58, 237), Color.FromRgb(245, 243, 255), Color.FromRgb(30, 27, 75)),
+        "industrial" => new(Color.FromRgb(55, 65, 81), Color.FromRgb(243, 244, 246), Color.FromRgb(31, 41, 55)),
+        "creative" => new(Color.FromRgb(3, 105, 161), Color.FromRgb(224, 242, 254), Color.FromRgb(12, 74, 110)),
+        "persian" => new(Color.FromRgb(154, 52, 18), Color.FromRgb(255, 247, 237), Color.FromRgb(67, 20, 7)),
+        _ => new(Color.FromRgb(15, 118, 110), Color.FromRgb(231, 248, 244), Color.FromRgb(15, 23, 42))
+    };
+
+    private static FlowDocument BuildDocument(
+        InvoiceRecord invoice,
+        string theme,
+        bool showQr,
+        CompanyProfileRecord? company)
+    {
+        var palette = GetPalette(theme);
+        var accent = new SolidColorBrush(palette.Accent);
+        var soft = new SolidColorBrush(palette.Soft);
+        var ink = new SolidColorBrush(palette.Ink);
+        accent.Freeze();
+        soft.Freeze();
+        ink.Freeze();
+
         var document = new FlowDocument
         {
             FontFamily = new FontFamily("Segoe UI"),
@@ -463,16 +504,43 @@ public sealed class InvoicePreviewWindow : Window
             FlowDirection = FlowDirection.RightToLeft,
             PagePadding = new Thickness(36),
             ColumnWidth = 760,
-            Background = Brushes.White
+            Background = Brushes.White,
+            Foreground = ink
         };
 
         document.Blocks.Add(new Paragraph(new Run($"اشک قلم — {invoice.TypeLabel}"))
         {
             FontSize = 25,
             FontWeight = FontWeights.Bold,
+            Foreground = accent,
             TextAlignment = TextAlignment.Center,
             Margin = new Thickness(0, 0, 0, 18)
         });
+
+        if (company is not null)
+        {
+            var companyName = string.IsNullOrWhiteSpace(company.LegalName) ? company.Name : company.LegalName;
+            document.Blocks.Add(new Paragraph(new Run(
+                $"{companyName}   •   شعبه: {company.Branch}   •   تلفن: {company.Phone}"))
+            {
+                Foreground = accent,
+                FontSize = 10,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, -6, 0, 14)
+            });
+            if (!string.IsNullOrWhiteSpace(company.Address) ||
+                !string.IsNullOrWhiteSpace(company.NationalId) ||
+                !string.IsNullOrWhiteSpace(company.TaxId))
+            {
+                document.Blocks.Add(new Paragraph(new Run(
+                    $"نشانی: {company.Address}   •   شناسه ملی: {company.NationalId}   •   شناسه مالیاتی: {company.TaxId}"))
+                {
+                    Foreground = Brushes.DimGray,
+                    FontSize = 9,
+                    TextAlignment = TextAlignment.Center
+                });
+            }
+        }
 
         document.Blocks.Add(new Paragraph(new Run(
             $"شماره سند: {invoice.DisplayNumber}     کد پیگیری: {invoice.TrackingCode}     تاریخ: {FormatDate(invoice.CreatedAt)}"))
@@ -494,7 +562,7 @@ public sealed class InvoicePreviewWindow : Window
         }
 
         if (!string.IsNullOrWhiteSpace(invoice.TaxId))
-            document.Blocks.Add(new Paragraph(new Run($"شناسه مالیاتی: {invoice.TaxId}")) { TextAlignment = TextAlignment.Right });
+            document.Blocks.Add(new Paragraph(new Run($"شناسه مالیاتی فاکتور: {invoice.TaxId}")) { TextAlignment = TextAlignment.Right });
         if (!string.IsNullOrWhiteSpace(invoice.Description))
             document.Blocks.Add(new Paragraph(new Run($"شرح: {invoice.Description}")) { TextAlignment = TextAlignment.Right });
         if (!string.IsNullOrWhiteSpace(invoice.Notes))
@@ -514,9 +582,10 @@ public sealed class InvoicePreviewWindow : Window
             header.Cells.Add(new TableCell(new Paragraph(new Run(label)))
             {
                 FontWeight = FontWeights.Bold,
-                Background = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+                Background = soft,
+                Foreground = accent,
                 Padding = new Thickness(7),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                BorderBrush = accent,
                 BorderThickness = new Thickness(0.5)
             });
         }
@@ -578,6 +647,7 @@ public sealed class InvoicePreviewWindow : Window
         {
             FontSize = 19,
             FontWeight = FontWeights.Bold,
+            Foreground = accent,
             TextAlignment = TextAlignment.Left,
             Margin = new Thickness(0, 8, 0, 0)
         });
@@ -587,45 +657,49 @@ public sealed class InvoicePreviewWindow : Window
         document.Blocks.Add(new Paragraph(new Run($"وضعیت سند: {invoice.Status}"))
         { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 14, 0, 0) });
 
-        try
+        if (showQr)
         {
-            var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CUSTOMER|{invoice.CustomerName}";
-            var qr = CreateQrImage(payload);
-            var qrCard = new Border
+            try
             {
-                BorderBrush = new SolidColorBrush(palette.Accent),
-                BorderThickness = new Thickness(1),
-                Background = new SolidColorBrush(palette.Soft),
-                CornerRadius = new CornerRadius(8),
-                Padding = new Thickness(10),
-                Margin = new Thickness(0, 18, 0, 6),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Child = new StackPanel
+                var companyName = company?.Name ?? "اشک قلم";
+                var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CUSTOMER|{invoice.CustomerName}|COMPANY|{companyName}";
+                var qr = CreateQrImage(payload);
+                var qrCard = new Border
                 {
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    Children =
+                    BorderBrush = accent,
+                    BorderThickness = new Thickness(1),
+                    Background = soft,
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(10),
+                    Margin = new Thickness(0, 18, 0, 6),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Child = new StackPanel
                     {
-                        qr,
-                        new TextBlock
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Children =
                         {
-                            Text = "QR فاکتور — کد پیگیری و مبلغ",
-                            FontSize = 9,
-                            Foreground = new SolidColorBrush(palette.Ink),
-                            TextAlignment = TextAlignment.Center,
-                            Margin = new Thickness(0, 6, 0, 0)
+                            qr,
+                            new TextBlock
+                            {
+                                Text = "QR فاکتور — کد پیگیری و مبلغ",
+                                FontSize = 9,
+                                Foreground = ink,
+                                TextAlignment = TextAlignment.Center,
+                                Margin = new Thickness(0, 6, 0, 0)
+                            }
                         }
                     }
-                }
-            };
-            document.Blocks.Add(new BlockUIContainer(qrCard));
-        }
-        catch (Exception qrError)
-        {
-            document.Blocks.Add(new Paragraph(new Run("تولید QR این سند انجام نشد: " + qrError.Message))
+                };
+                document.Blocks.Add(new BlockUIContainer(qrCard));
+            }
+            catch (Exception qrError)
             {
-                Foreground = Brushes.DarkRed,
-                Margin = new Thickness(0, 8, 0, 8)
-            });
+                document.Blocks.Add(new Paragraph(new Run("تولید QR این سند انجام نشد: " + qrError.Message))
+                {
+                    Foreground = Brushes.DarkRed,
+                    Margin = new Thickness(0, 8, 0, 8)
+                });
+            }
         }
 
         document.Blocks.Add(new Paragraph(new Run(
