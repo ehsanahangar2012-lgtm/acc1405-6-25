@@ -197,30 +197,40 @@
                     </DataGrid>
                 </Grid>
             </TabItem>
-            <TabItem Header="فاکتورها">
+            <TabItem Header="فاکتورهای فروش/خرید">
                 <Grid Margin="8">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                     <StackPanel>
-                        <TextBlock Text="فاکتورهای فروش" FontSize="23" FontWeight="Bold"/>
-                        <TextBlock Text="مبالغ با نوع decimal محاسبه و پیش از ثبت اعتبارسنجی می‌شوند. نرخ مالیات را فقط مطابق وضعیت قانونی خود وارد کنید." Style="{StaticResource SectionHint}"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                            <Button Content="صدور فاکتور" Click="AddInvoice_Click" Background="#0F766E" Foreground="White"/>
-                            <Button Content="ثبت دریافت" Click="AddPayment_Click"/>
-                            <Button Content="لغو فاکتور انتخابی" Click="CancelInvoice_Click"/>
-                            <Button Content="چاپ فاکتور انتخابی" Click="PrintInvoice_Click"/>
-                            <Button Content="خروجی CSV" Click="ExportInvoices_Click"/>
-                        </StackPanel>
+                        <TextBlock Text="فاکتور فروش، خرید و پیش‌فاکتور" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="هم‌ترازی با گردش اصلی: شماره‌گذاری مستقل INV-/PUR-/PRO-، تخفیف و مالیات مبلغی؛ فروش موجودی را کاهش می‌دهد، خرید افزایش می‌دهد و پیش‌فاکتور بدون اثر موجودی است." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,12,0,0">
+                            <Button Content="صدور سند جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="تبدیل پیش‌فاکتور به فروش" Click="ConvertProformaToSale_Click"/>
+                            <Button Content="ثبت دریافت/پرداخت" Click="AddPayment_Click"/>
+                            <Button Content="لغو سند انتخابی" Click="CancelInvoice_Click"/>
+                            <Button Content="چاپ سند انتخابی" Click="PrintInvoice_Click"/>
+                            <Button Content="خروجی CSV کامل" Click="ExportInvoices_Click"/>
+                        </WrapPanel>
                     </StackPanel>
-                    <DataGrid x:Name="InvoicesGrid" Grid.Row="1">
+                    <DataGrid x:Name="InvoicesGrid" Grid.Row="1"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              CanUserResizeColumns="True">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="شماره" Binding="{Binding Number}" Width="80"/>
-                            <DataGridTextColumn Header="مشتری" Binding="{Binding CustomerName}" Width="*"/>
-                            <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="*"/>
-                            <DataGridTextColumn Header="جمع" Binding="{Binding Subtotal, StringFormat={}{0:N2}}" Width="135"/>
-                            <DataGridTextColumn Header="مالیات" Binding="{Binding TaxAmount, StringFormat={}{0:N2}}" Width="125"/>
-                            <DataGridTextColumn Header="مبلغ کل" Binding="{Binding Total, StringFormat={}{0:N2}}" Width="150"/>
+                            <DataGridTextColumn Header="نوع سند" Binding="{Binding TypeLabel}" Width="115"/>
+                            <DataGridTextColumn Header="شماره سند" Binding="{Binding DisplayNumber}" Width="130"/>
+                            <DataGridTextColumn Header="کد پیگیری" Binding="{Binding TrackingCode}" Width="190"/>
+                            <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="180"/>
+                            <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="200"/>
+                            <DataGridTextColumn Header="جمع کالاها" Binding="{Binding Subtotal, StringFormat={}{0:N2}}" Width="130"/>
+                            <DataGridTextColumn Header="تخفیف" Binding="{Binding Discount, StringFormat={}{0:N2}}" Width="110"/>
+                            <DataGridTextColumn Header="مالیات" Binding="{Binding TaxAmount, StringFormat={}{0:N2}}" Width="110"/>
+                            <DataGridTextColumn Header="مبلغ نهایی" Binding="{Binding Total, StringFormat={}{0:N2}}" Width="135"/>
+                            <DataGridTextColumn Header="نقدی" Binding="{Binding CashAmount, StringFormat={}{0:N2}}" Width="110"/>
+                            <DataGridTextColumn Header="چک" Binding="{Binding CheckAmount, StringFormat={}{0:N2}}" Width="110"/>
+                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy}" Width="110"/>
+                            <DataGridTextColumn Header="سررسید" Binding="{Binding DueDate, StringFormat=dd/MM/yyyy}" Width="110"/>
                             <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="110"/>
-                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="145"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
