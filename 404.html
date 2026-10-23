@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'" />
+    <meta name="theme-color" content="#111827" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+    <link rel="manifest" href="/acc1405-6-25/assets/manifest-BxQLvIDH.json">
+    <title>سامانه ابری حسابداری و مدیریت اشک قلم</title>
+    <meta name="description" content="سامانه یکپارچه حسابداری، انبارداری، صدور فاکتور و گزارش‌های مالی اشک قلم" />
+    <meta property="og:title" content="سامانه ابری حسابداری و مدیریت اشک قلم" />
+    <meta property="og:description" content="سامانه یکپارچه حسابداری، انبارداری، صدور فاکتور و گزارش‌های مالی اشک قلم" />
+    <style>
+      body {
+        background-color: var(--color-background, #f8fafc);
+        color: var(--color-text, #0f172a);
+        font-family: 'Vazirmatn', Vazir, Tahoma, Arial, sans-serif;
+        -webkit-tap-highlight-color: transparent;
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+        user-select: none;
+        overflow-x: hidden;
+        min-height: 100vh;
+      }
+      body.dark {
+        background-color: var(--color-background, #111827);
+        color: var(--color-text, #f8fafc);
+      }
+      input, textarea, select {
+        -webkit-user-select: text;
+        user-select: text;
+      }
+      @media (max-width: 768px) {
+        * { box-sizing: border-box; }
+        html, body { overflow-x: hidden; width: 100%; }
+        h1 { font-size: 1.5rem !important; }
+        h2 { font-size: 1.25rem !important; }
+        h3 { font-size: 1.1rem !important; }
+        .text-4xl { font-size: 1.75rem !important; }
+        .text-3xl { font-size: 1.5rem !important; }
+        .text-2xl { font-size: 1.25rem !important; }
+        .p-8 { padding: 1rem !important; }
+        .p-12 { padding: 1.25rem !important; }
+        .rounded-[3rem] { border-radius: 1.5rem !important; }
+        .rounded-[2.5rem] { border-radius: 1.25rem !important; }
+        input, textarea, select { font-size: 16px !important; }
+      }
+      ::-webkit-scrollbar { width: 4px; height: 4px; }
+      ::-webkit-scrollbar-track { background: #111827; }
+      ::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+      @media print {
+        @page { size: A4; margin: 0; }
+        .no-print { display: none !important; }
+        body { background: white !important; color: black !important; }
+        #root { background: white !important; }
+        .print-container { position: absolute; top: 0; left: 0; width: 100%; display: block !important; z-index: 9999; }
+      }
+    </style>
+  <script type="module" crossorigin src="/acc1405-6-25/assets/index-BqSXLff6.js"></script>
+  <link rel="stylesheet" crossorigin href="/acc1405-6-25/assets/index-Du9-TRsf.css">
+<meta name="ashk-preview-build" content="d6b136f68599e81b829f261296ab8391e965a1f0">
+</head>
+  <body>
+    <div id="browser-preview-notice" hidden role="status">پیش‌نمایش مرورگری · اتصال به سرور اصلی غیرفعال است · داده‌ها فقط محلی‌اند</div>
+    <script>
+      if ((window.location.hostname === '127.0.0.1' && window.location.port === '4173') ||
+          window.location.hostname.endsWith('.github.io')) {
+        document.getElementById('browser-preview-notice')?.removeAttribute('hidden');
+      }
+    </script>
+    <style>
+      #browser-preview-notice[hidden] { display: none; }
+      #browser-preview-notice {
+        position: fixed; top: 8px; right: 8px; z-index: 2147483647;
+        max-width: calc(100% - 16px); padding: 6px 10px; border-radius: 8px;
+        background: rgba(124, 45, 18, .96); color: #fff;
+        font: 12px/1.5 Tahoma, Arial, sans-serif; box-shadow: 0 2px 10px #0003;
+        pointer-events: none;
+      }
+    </style>
+    <div id="root"></div>
+  <script>
+    const isBrowserPreviewHost =
+      (window.location.hostname === '127.0.0.1' && window.location.port === '4173') ||
+      window.location.hostname.endsWith('.github.io');
+    const isNativeAndroid = /AshkeGhalam-Android-Native/i.test(navigator.userAgent);
+
+    // Keep local / hosted preview and Capacitor builds isolated from stale PWA caches.
+    if (isBrowserPreviewHost || isNativeAndroid) {
+      const cleanupTasks = [];
+      if ('serviceWorker' in navigator) {
+        cleanupTasks.push(navigator.serviceWorker.getRegistrations().then(registrations => {
+          if (registrations.length) {
+            return Promise.all(registrations.map(registration => registration.unregister())).then(() => true);
+          }
+          return false;
+        }));
+      }
+      if ('caches' in window) {
+        cleanupTasks.push(caches.keys().then(keys => {
+          const staleKeys = keys.filter(key => /^(static|dynamic|images|api)-v/i.test(key));
+          return Promise.all(staleKeys.map(key => caches.delete(key))).then(() => staleKeys.length > 0);
+        }));
+      }
+      Promise.all(cleanupTasks).then(results => {
+        const cleanupKey = 'ashk-preview-cache-reset-v1';
+        if (results.some(Boolean) && sessionStorage.getItem(cleanupKey) !== '1') {
+          sessionStorage.setItem(cleanupKey, '1');
+          window.location.reload();
+        }
+      }).catch(() => {});
+    } else if ('serviceWorker' in navigator) {
+      window.addEventListener('load', async () => {
+        try {
+          const reg = await navigator.serviceWorker.register('/sw.js');
+          console.log('✅ SW registered');
+          
+          // بررسی آپدیت
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            newWorker?.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                if (confirm('نسخه جدید موجود است. بارگذاری مجدد؟')) {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                  window.location.reload();
+                }
+              }
+            });
+          });
+        } catch (err) {
+          console.error('❌ SW error:', err);
+        }
+      });
+    }
+  </script>
+<script>
+          (() => {
+            const initialBuild = document.querySelector('meta[name="ashk-preview-build"]')?.content;
+            if (!initialBuild || initialBuild === 'local') return;
+            window.setInterval(async () => {
+              try {
+                const response = await fetch('./version.json?check=' + Date.now(), { cache: 'no-store' });
+                if (!response.ok) return;
+                const version = await response.json();
+                if (version?.sha && version.sha !== initialBuild) window.location.reload();
+              } catch (_) {}
+            }, 20000);
+          })();
+        </script>
+</body>
+</html>

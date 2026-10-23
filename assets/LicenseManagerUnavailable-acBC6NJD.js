@@ -1,0 +1,1 @@
+import{j as e}from"./index-BqSXLff6.js";const s=()=>e.jsx("div",{className:"min-h-screen flex items-center justify-center p-8 bg-slate-950 text-slate-200",dir:"rtl",children:"این بخش فقط در پرتال مادرِ وب در دسترس است."});export{s as default};
