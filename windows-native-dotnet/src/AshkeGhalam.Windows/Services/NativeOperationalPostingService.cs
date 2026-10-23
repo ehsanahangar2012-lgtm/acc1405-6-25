@@ -162,32 +162,52 @@ public static class NativeOperationalPostingService
 
     private static void ReverseInvoiceEntries(AccountingData data, InvoiceRecord invoice)
     {
+        var linkedPaymentIds = data.Payments
+            .Where(payment => payment.InvoiceId == invoice.Id)
+            .Select(payment => payment.Id)
+            .ToHashSet(StringComparer.Ordinal);
+
         var sourceEntries = data.JournalEntries
-            .Where(entry => entry.ReferenceId == invoice.Id &&
-                entry.ReferenceType.StartsWith("AUTO_INVOICE_", StringComparison.Ordinal) &&
-                entry.Status is "POSTED" or "APPROVED")
+            .Where(entry =>
+                entry.Status is "POSTED" or "APPROVED" &&
+                ((entry.ReferenceId == invoice.Id &&
+                  entry.ReferenceType.StartsWith("AUTO_INVOICE_", StringComparison.Ordinal)) ||
+                 (linkedPaymentIds.Contains(entry.ReferenceId) &&
+                  entry.ReferenceType == "AUTO_PAYMENT")) &&
+                !WasReversed(data, entry))
             .ToList();
 
         foreach (var source in sourceEntries)
-        {
-            var reversalType = "AUTO_REVERSAL_" + source.Id;
-            if (data.JournalEntries.Any(entry => entry.ReferenceType == reversalType && entry.ReferenceId == invoice.Id))
-                continue;
+            ReverseEntry(data, source);
+    }
 
-            NativeLedgerService.PostEntry(data, new AccountingEntryRecord
-            {
-                Date = ToJalaliDate(DateTimeOffset.Now),
-                Description = $"برگشت خودکار: {source.Description}",
-                DebitAccountId = source.CreditAccountId,
-                CreditAccountId = source.DebitAccountId,
-                Amount = source.Amount,
-                ReferenceId = invoice.Id,
-                ReferenceType = reversalType,
-                DocumentType = "ADJUSTMENT",
-                FiscalYear = source.FiscalYear,
-                Status = "POSTED"
-            });
-        }
+    private static bool WasReversed(AccountingData data, AccountingEntryRecord source)
+    {
+        var reversalType = "AUTO_REVERSAL_" + source.Id;
+        return data.JournalEntries.Any(entry =>
+            entry.ReferenceType == reversalType &&
+            entry.ReferenceId == source.ReferenceId &&
+            (entry.Status is "POSTED" or "APPROVED"));
+    }
+
+    private static void ReverseEntry(AccountingData data, AccountingEntryRecord source)
+    {
+        if (WasReversed(data, source))
+            return;
+
+        NativeLedgerService.PostEntry(data, new AccountingEntryRecord
+        {
+            Date = ToJalaliDate(DateTimeOffset.Now),
+            Description = $"برگشت خودکار: {source.Description}",
+            DebitAccountId = source.CreditAccountId,
+            CreditAccountId = source.DebitAccountId,
+            Amount = source.Amount,
+            ReferenceId = source.ReferenceId,
+            ReferenceType = "AUTO_REVERSAL_" + source.Id,
+            DocumentType = "ADJUSTMENT",
+            FiscalYear = source.FiscalYear,
+            Status = "POSTED"
+        });
     }
 
     private static void PostOnce(
@@ -201,21 +221,48 @@ public static class NativeOperationalPostingService
         decimal amount)
     {
         amount = AccountingRules.Money(amount);
+        var debit = amount > 0m ? FindRequiredAccount(data, debitCode) : null;
+        var credit = amount > 0m ? FindRequiredAccount(data, creditCode) : null;
+        var normalizedDate = amount > 0m ? NativeLedgerService.NormalizeAndValidateDate(date) : "";
+
+        var activeSources = data.JournalEntries
+            .Where(entry => entry.ReferenceId == referenceId &&
+                entry.ReferenceType == referenceType &&
+                (entry.Status is "POSTED" or "APPROVED") &&
+                !WasReversed(data, entry))
+            .ToList();
+
         if (amount <= 0m)
+        {
+            foreach (var stale in activeSources)
+                ReverseEntry(data, stale);
             return;
+        }
 
-        if (data.JournalEntries.Any(entry =>
-            entry.ReferenceId == referenceId && entry.ReferenceType == referenceType))
+        var matching = activeSources.FirstOrDefault(entry =>
+            entry.Amount == amount &&
+            entry.DebitAccountId == debit!.Id &&
+            entry.CreditAccountId == credit!.Id &&
+            entry.Date == normalizedDate &&
+            entry.Description == description);
+
+        if (matching is not null)
+        {
+            // Keep one matching active posting and reverse any stale duplicates left by older builds.
+            foreach (var stale in activeSources.Where(entry => entry.Id != matching.Id))
+                ReverseEntry(data, stale);
             return;
+        }
 
-        var debit = FindRequiredAccount(data, debitCode);
-        var credit = FindRequiredAccount(data, creditCode);
+        foreach (var stale in activeSources)
+            ReverseEntry(data, stale);
+
         NativeLedgerService.PostEntry(data, new AccountingEntryRecord
         {
-            Date = date,
+            Date = normalizedDate,
             Description = description,
-            DebitAccountId = debit.Id,
-            CreditAccountId = credit.Id,
+            DebitAccountId = debit!.Id,
+            CreditAccountId = credit!.Id,
             Amount = amount,
             ReferenceId = referenceId,
             ReferenceType = referenceType,
