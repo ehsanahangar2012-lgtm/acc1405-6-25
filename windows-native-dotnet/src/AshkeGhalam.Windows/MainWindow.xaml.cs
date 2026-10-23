@@ -141,7 +141,149 @@ public partial class MainWindow : Window
         ReportPayables.Text = payables.ToString("N2", CultureInfo.CurrentCulture);
         ReportExpenses.Text = expenses.ToString("N2", CultureInfo.CurrentCulture);
         ReportCash.Text = (salesReceipts - purchasePayments - expenses).ToString("N2", CultureInfo.CurrentCulture);
+        RefreshLedger();
     }
+
+    private void RefreshLedger()
+    {
+        var accountById = _data.LedgerAccounts.ToDictionary(a => a.Id, a => a);
+        LedgerAccountsGrid.ItemsSource = null;
+        LedgerAccountsGrid.ItemsSource = _data.LedgerAccounts
+            .OrderBy(a => a.Code, StringComparer.OrdinalIgnoreCase)
+            .Select(a => new LedgerAccountGridRow(
+                a.Id, a.Code, a.Name, AccountTypeLabel(a.Type), AccountLevelLabel(a.Level),
+                string.IsNullOrWhiteSpace(a.ParentId) ? "—" :
+                    accountById.TryGetValue(a.ParentId, out var parent) ? $"{parent.Code} — {parent.Name}" : "والد نامشخص",
+                a.IsActive))
+            .ToList();
+
+        LedgerEntriesGrid.ItemsSource = null;
+        LedgerEntriesGrid.ItemsSource = _data.JournalEntries
+            .OrderByDescending(j => j.Number)
+            .Select(j => new JournalEntryGridRow(
+                j.Number.ToString("D4", CultureInfo.InvariantCulture), j.Date, j.Description,
+                accountById.TryGetValue(j.DebitAccountId, out var debit) ? $"{debit.Code} — {debit.Name}" : "حساب حذف‌شده",
+                accountById.TryGetValue(j.CreditAccountId, out var credit) ? $"{credit.Code} — {credit.Name}" : "حساب حذف‌شده",
+                j.Amount, DocumentTypeLabel(j.DocumentType), JournalStatusLabel(j.Status)))
+            .ToList();
+
+        TrialBalanceGrid.ItemsSource = null;
+        TrialBalanceGrid.ItemsSource = NativeLedgerService.GetTrialBalance(_data)
+            .Select(line => new TrialBalanceGridRow(
+                line.Code, line.Name, AccountTypeLabel(line.Type), line.Debit, line.Credit, line.Balance))
+            .ToList();
+
+        var posted = _data.JournalEntries.Where(j => j.Status is "POSTED" or "APPROVED").ToList();
+        var totalDebit = posted.Sum(j => j.Amount);
+        var totalCredit = posted.Sum(j => j.Amount);
+        LedgerSummary.Text =
+            $"سرفصل‌ها: {_data.LedgerAccounts.Count:N0}  •  اسناد قطعی: {posted.Count:N0}  •  " +
+            $"جمع بدهکار: {totalDebit:N2}  •  جمع بستانکار: {totalCredit:N2}";
+    }
+
+    private void SeedLedgerAccounts_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (_data.LedgerAccounts.Count > 0)
+        {
+            MessageBox.Show(this, "در حال حاضر سرفصل حساب وجود دارد؛ عملیات ایجاد سرفصل پایه فقط برای دفتر خالی مجاز است.",
+                "کدینگ حساب‌ها", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (MessageBox.Show(this, "۱۶ سرفصل اصلی پیشنهادی ایجاد شود؟ این عملیات فقط کدینگ حساب‌های محلی را اضافه می‌کند و از نسخهٔ اصلی واردات انجام نمی‌دهد.",
+            "ایجاد کدینگ پایه", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            return;
+        Commit(NativeLedgerService.SeedDefaultChart, "سرفصل‌های پایه ایجاد شد");
+    }
+
+    private void AddLedgerAccount_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var dialog = new LedgerAccountDialog(this, _data.LedgerAccounts);
+        if (dialog.ShowDialog() != true || dialog.Result is not ChartOfAccountRecord draft) return;
+        Commit(data => NativeLedgerService.AddAccount(
+            data, draft.Code, draft.Name, draft.Type, draft.Level, draft.ParentId), "سرفصل حساب اضافه شد");
+    }
+
+    private void AddJournalEntry_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var activeAccounts = _data.LedgerAccounts.Where(a => a.IsActive).ToList();
+        if (activeAccounts.Count < 2)
+        {
+            MessageBox.Show(this, "ابتدا حداقل دو حساب فعال داشته باشید. می‌توانید از «ایجاد سرفصل‌های پایه» شروع کنید.",
+                "کدینگ حساب‌ها ناقص است", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new JournalEntryDialog(this, activeAccounts);
+        if (dialog.ShowDialog() != true || dialog.Result is not AccountingEntryRecord draft) return;
+        var number = 0;
+        Commit(data => number = NativeLedgerService.PostEntry(data, draft).Number,
+            $"سند حسابداری شماره {number:D4} ثبت قطعی شد");
+    }
+
+    private void ExportJournalEntries_Click(object sender, RoutedEventArgs e) =>
+        ExportCsv("journal-entries.csv",
+            new[] { "DocumentNumber", "Date", "Description", "DebitAccountCode", "DebitAccountName",
+                "CreditAccountCode", "CreditAccountName", "Amount", "DocumentType", "FiscalYear", "Status",
+                "ReferenceType", "ReferenceId", "CreatedAt" },
+            _data.JournalEntries.OrderBy(j => j.Number).Select(j =>
+            {
+                var debit = _data.LedgerAccounts.SingleOrDefault(a => a.Id == j.DebitAccountId);
+                var credit = _data.LedgerAccounts.SingleOrDefault(a => a.Id == j.CreditAccountId);
+                return new[]
+                {
+                    j.Number.ToString(CultureInfo.InvariantCulture), j.Date, j.Description,
+                    debit?.Code ?? "", debit?.Name ?? "", credit?.Code ?? "", credit?.Name ?? "",
+                    j.Amount.ToString(CultureInfo.InvariantCulture), j.DocumentType, j.FiscalYear, j.Status,
+                    j.ReferenceType, j.ReferenceId, j.CreatedAt.ToString("O", CultureInfo.InvariantCulture)
+                };
+            }));
+
+    private void ExportTrialBalance_Click(object sender, RoutedEventArgs e) =>
+        ExportCsv("trial-balance.csv",
+            new[] { "AccountCode", "AccountName", "AccountType", "Debit", "Credit", "DebitMinusCredit" },
+            NativeLedgerService.GetTrialBalance(_data).Select(line => new[]
+            {
+                line.Code, line.Name, line.Type,
+                line.Debit.ToString(CultureInfo.InvariantCulture),
+                line.Credit.ToString(CultureInfo.InvariantCulture),
+                line.Balance.ToString(CultureInfo.InvariantCulture)
+            }));
+
+    private static string AccountTypeLabel(string type) => type switch
+    {
+        "ASSET" => "دارایی", "LIABILITY" => "بدهی", "EQUITY" => "حقوق مالکانه",
+        "REVENUE" => "درآمد", "EXPENSE" => "هزینه", _ => type
+    };
+
+    private static string AccountLevelLabel(string level) => level switch
+    {
+        "MAIN" => "کل / اصلی", "SUB" => "معین", "DETAIL" => "تفصیلی", _ => level
+    };
+
+    private static string DocumentTypeLabel(string type) => type switch
+    {
+        "OPERATIONAL" => "عملیاتی", "OPENING" => "افتتاحیه", "CLOSING" => "اختتامیه",
+        "ADJUSTMENT" => "اصلاحی", _ => type
+    };
+
+    private static string JournalStatusLabel(string status) => status switch
+    {
+        "DRAFT" => "پیش‌نویس", "APPROVED" => "تأییدشده", "POSTED" => "ثبت قطعی", _ => status
+    };
+
+    private sealed record LedgerAccountGridRow(
+        string Id, string Code, string Name, string TypeLabel, string LevelLabel, string ParentName, bool IsActive);
+
+    private sealed record JournalEntryGridRow(
+        string DisplayNumber, string Date, string Description, string DebitAccount, string CreditAccount,
+        decimal Amount, string DocumentTypeLabel, string StatusLabel);
+
+    private sealed record TrialBalanceGridRow(
+        string Code, string Name, string TypeLabel, decimal Debit, decimal Credit, decimal Balance);
 
     private void AddCustomer_Click(object sender, RoutedEventArgs e)
     {
@@ -699,7 +841,7 @@ public partial class MainWindow : Window
             ["budget"] = new("بودجه‌بندی", "مدیریت کسب‌وکار", "/budget", null),
             ["marketing"] = new("بازاریابی و سئو", "مدیریت کسب‌وکار", "/marketing", null),
             ["import-center"] = new("مرکز واردات اسناد", "مدیریت کسب‌وکار", "/import-center", null),
-            ["accounting"] = new("حسابداری دوبل", "حسابداری پیشرفته", "/accounting", null),
+            ["accounting"] = new("حسابداری دوبل", "حسابداری پیشرفته", "/accounting", 10),
             ["cashflow-predictor"] = new("پیش‌بینی جریان نقدینگی", "حسابداری پیشرفته", "/cashflow-predictor", null),
             ["cashflow"] = new("جریان نقدینگی", "حسابداری پیشرفته", "/cashflow", null),
             ["tax"] = new("مدیریت مالیات", "حسابداری پیشرفته", "/tax", null),
