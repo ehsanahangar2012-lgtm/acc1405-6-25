@@ -9,7 +9,7 @@ public static class NumericTextBoxFormatter
 {
     private static readonly ConditionalWeakTable<TextBox, FormatState> States = new();
     private static readonly CultureInfo DisplayCulture = CreateDisplayCulture();
-    private const string DecimalCharacters = "./٫";
+    private const string DecimalCharacters = ".٫";
 
     private sealed class FormatState
     {
@@ -20,7 +20,7 @@ public static class NumericTextBoxFormatter
     {
         var culture = (CultureInfo)CultureInfo.GetCultureInfo("fa-IR").Clone();
         culture.NumberFormat.NumberGroupSeparator = ",";
-        culture.NumberFormat.NumberDecimalSeparator = "/";
+        culture.NumberFormat.NumberDecimalSeparator = ".";
         return culture;
     }
 
@@ -52,14 +52,14 @@ public static class NumericTextBoxFormatter
             : 0;
         var endsWithDecimal = DecimalCharacters.Contains(current[^1]);
         var formatted = Format(value);
-        if (endsWithDecimal && !formatted.Contains('/')) formatted += "/";
+        if (endsWithDecimal && !formatted.Contains('.')) formatted += ".";
         if (formatted == current) return;
 
         state.Formatting = true;
         try
         {
             field.Text = formatted;
-            var formattedDecimalIndex = formatted.IndexOf('/');
+            var formattedDecimalIndex = formatted.IndexOf('.');
             if (decimalIndexInPrefix >= 0)
             {
                 if (formattedDecimalIndex < 0) formattedDecimalIndex = formatted.Length;
