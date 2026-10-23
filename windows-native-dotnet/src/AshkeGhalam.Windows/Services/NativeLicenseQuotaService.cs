@@ -18,11 +18,15 @@ public static class NativeLicenseQuotaService
     public static int CountDocuments(AccountingData data)
     {
         ArgumentNullException.ThrowIfNull(data);
-        // Mirrors the source quota service's broad document domain: invoices, vouchers,
-        // payments/transactions, checks and locally recorded expenses. Journal records are
-        // included because the native branch adds a separate ledger module.
-        return checked(data.Invoices.Count + data.Vouchers.Count + data.Payments.Count +
-            data.Checks.Count + data.Expenses.Count + data.JournalEntries.Count);
+        // Match the source licenseQuotaService/store.ts formula exactly:
+        // invoices + vouchers + transactions/payments + checks.
+        // Expenses and journal rows are not independent quota documents in the source app.
+        // Initial cash embedded in an invoice is not a separate source transaction, even though
+        // the local WPF model represents it as a PaymentRecord for outstanding-balance math.
+        var standalonePayments = data.Payments.Count(payment =>
+            !payment.Reference.StartsWith("دریافت نقدی هنگام ثبت فاکتور", StringComparison.Ordinal) &&
+            !payment.Reference.StartsWith("پرداخت نقدی هنگام ثبت فاکتور خرید", StringComparison.Ordinal));
+        return checked(data.Invoices.Count + data.Vouchers.Count + standalonePayments + data.Checks.Count);
     }
 
     public static NativeQuotaLimits GetLimits(VerifiedLicensePayload? sessionEntitlements)
