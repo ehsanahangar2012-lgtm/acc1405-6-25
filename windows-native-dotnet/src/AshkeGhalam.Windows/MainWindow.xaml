@@ -90,7 +90,7 @@
                     <StackPanel Margin="8">
                         <TextBlock Text="نمای کلی کسب‌وکار" FontSize="25" FontWeight="Bold" Foreground="#0F172A"/>
                         <TextBlock Text="خلاصه از اطلاعات ذخیره‌شده در همین رایانه" Style="{StaticResource SectionHint}"/>
-                        <UniformGrid Columns="4" Margin="0,18,0,12">
+                        <UniformGrid Columns="5" Margin="0,18,0,12">
                             <Border Background="White" CornerRadius="12" Padding="16" Margin="0,0,10,0" BorderBrush="#E2E8F0" BorderThickness="1">
                                 <StackPanel><TextBlock Text="مشتریان" Foreground="#64748B"/><TextBlock x:Name="CustomerCount" Text="۰" FontSize="26" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0"/></StackPanel>
                             </Border>
@@ -98,27 +98,31 @@
                                 <StackPanel><TextBlock Text="کالاها" Foreground="#64748B"/><TextBlock x:Name="ProductCount" Text="۰" FontSize="26" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0"/></StackPanel>
                             </Border>
                             <Border Background="White" CornerRadius="12" Padding="16" Margin="0,0,10,0" BorderBrush="#E2E8F0" BorderThickness="1">
-                                <StackPanel><TextBlock Text="فاکتورهای صادرشده" Foreground="#64748B"/><TextBlock x:Name="InvoiceCount" Text="۰" FontSize="26" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0"/></StackPanel>
+                                <StackPanel><TextBlock Text="اسناد صادرشده" Foreground="#64748B"/><TextBlock x:Name="InvoiceCount" Text="۰" FontSize="26" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0"/></StackPanel>
                             </Border>
                             <Border Background="White" CornerRadius="12" Padding="16" BorderBrush="#E2E8F0" BorderThickness="1">
                                 <StackPanel><TextBlock Text="ارزش فروش" Foreground="#64748B"/><TextBlock x:Name="SalesTotal" Text="۰" FontSize="22" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
+                            </Border>
+                            <Border Background="White" CornerRadius="12" Padding="16" BorderBrush="#E2E8F0" BorderThickness="1">
+                                <StackPanel><TextBlock Text="ارزش خرید" Foreground="#64748B"/><TextBlock x:Name="PurchasesTotal" Text="۰" FontSize="22" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
                             </Border>
                         </UniformGrid>
                         <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,4,0,0">
                             <StackPanel>
                                 <TextBlock Text="وضعیت مالی" FontSize="18" FontWeight="Bold"/>
-                                <UniformGrid Columns="3" Margin="0,14,0,0">
+                                <UniformGrid Columns="4" Margin="0,14,0,0">
                                     <StackPanel><TextBlock Text="دریافت ثبت‌شده" Foreground="#64748B"/><TextBlock x:Name="PaymentsTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
-                                    <StackPanel><TextBlock Text="مانده فاکتورها" Foreground="#64748B"/><TextBlock x:Name="ReceivablesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                    <StackPanel><TextBlock Text="مطالبات فروش" Foreground="#64748B"/><TextBlock x:Name="ReceivablesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                    <StackPanel><TextBlock Text="پرداختنی خرید" Foreground="#64748B"/><TextBlock x:Name="PayablesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
                                     <StackPanel><TextBlock Text="هزینه‌ها" Foreground="#64748B"/><TextBlock x:Name="ExpensesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
                                 </UniformGrid>
                             </StackPanel>
                         </Border>
-                        <TextBlock Text="آخرین فاکتورها" FontSize="18" FontWeight="Bold" Margin="0,20,0,0"/>
+                        <TextBlock Text="آخرین اسناد" FontSize="18" FontWeight="Bold" Margin="0,20,0,0"/>
                         <DataGrid x:Name="RecentInvoicesGrid" Height="235">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="شماره" Binding="{Binding Number}" Width="80"/>
-                                <DataGridTextColumn Header="مشتری" Binding="{Binding CustomerName}" Width="*"/>
+                                <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="105"/>\n                                <DataGridTextColumn Header="شماره سند" Binding="{Binding DisplayNumber}" Width="120"/>
+                                <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="*"/>
                                 <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="150"/>
                                 <DataGridTextColumn Header="مبلغ کل" Binding="{Binding Total, StringFormat={}{0:N2}}" Width="150"/>
                                 <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="120"/>
@@ -239,15 +243,15 @@
                 <Grid Margin="8">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                     <StackPanel>
-                        <TextBlock Text="دریافت از مشتریان" FontSize="23" FontWeight="Bold"/>
-                        <TextBlock Text="ثبت دریافت فقط تا سقف ماندهٔ فاکتور انتخابی مجاز است." Style="{StaticResource SectionHint}"/>
-                        <Button Content="ثبت دریافت جدید" Click="AddPayment_Click" HorizontalAlignment="Right" Margin="0,14,0,0" Background="#0F766E" Foreground="White"/>
+                        <TextBlock Text="سوابق دریافت و پرداخت" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="تسویهٔ فاکتور فروش و خرید؛ فقط تا سقف ماندهٔ سند انتخابی ثبت می‌شود." Style="{StaticResource SectionHint}"/>
+                        <Button Content="ثبت دریافت / پرداخت جدید" Click="AddPayment_Click" HorizontalAlignment="Right" Margin="0,14,0,0" Background="#0F766E" Foreground="White"/>
                     </StackPanel>
                     <DataGrid x:Name="PaymentsGrid" Grid.Row="1">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="شماره فاکتور" Binding="{Binding InvoiceNumber}" Width="120"/>
-                            <DataGridTextColumn Header="مشتری" Binding="{Binding CustomerName}" Width="*"/>
-                            <DataGridTextColumn Header="مبلغ دریافتی" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="170"/>
+                            <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="*"/>
+                            <DataGridTextColumn Header="مبلغ تسویه" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="170"/>
                             <DataGridTextColumn Header="روش" Binding="{Binding Method}" Width="130"/>
                             <DataGridTextColumn Header="پیگیری" Binding="{Binding Reference}" Width="*"/>
                             <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="145"/>
@@ -281,12 +285,16 @@
                         <TextBlock Text="گزارش‌ها از داده‌های محلی ثبت‌شده ساخته می‌شوند؛ واحد پول ورودی را در همهٔ رکوردها یکسان نگه دارید." Style="{StaticResource SectionHint}"/>
                         <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,16,0,0">
                             <StackPanel>
-                                <TextBlock Text="فروش خالص (بدون فاکتورهای لغوشده)" FontSize="14" Foreground="#64748B"/>
+                                <TextBlock Text="فروش خالص (بدون اسناد لغوشده)" FontSize="14" Foreground="#64748B"/>
                                 <TextBlock x:Name="ReportSales" Text="۰" FontSize="28" FontWeight="Bold" Foreground="#0F766E" Margin="0,6,0,16"/>
-                                <TextBlock Text="دریافت‌ها" FontSize="13" Foreground="#64748B"/>
+                                <TextBlock Text="خرید ثبت‌شده" FontSize="13" Foreground="#64748B"/>
+                                <TextBlock x:Name="ReportPurchases" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
+                                <TextBlock Text="دریافت / پرداخت ثبت‌شده" FontSize="13" Foreground="#64748B"/>
                                 <TextBlock x:Name="ReportPayments" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
-                                <TextBlock Text="مانده مطالبات" FontSize="13" Foreground="#64748B"/>
+                                <TextBlock Text="مطالبات فروش" FontSize="13" Foreground="#64748B"/>
                                 <TextBlock x:Name="ReportReceivables" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
+                                <TextBlock Text="پرداختنی خرید" FontSize="13" Foreground="#64748B"/>
+                                <TextBlock x:Name="ReportPayables" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
                                 <TextBlock Text="هزینه‌ها" FontSize="13" Foreground="#64748B"/>
                                 <TextBlock x:Name="ReportExpenses" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
                                 <TextBlock Text="خالص جریان نقدی ساده = دریافت‌ها منهای هزینه‌ها" FontSize="12" Foreground="#64748B"/>
