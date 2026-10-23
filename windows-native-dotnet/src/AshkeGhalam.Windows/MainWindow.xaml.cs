@@ -790,10 +790,35 @@ public partial class MainWindow : Window
         return _sessionEntitlements;
     }
 
+    private static string NextCode(IEnumerable<string> existingCodes, string prefix)
+    {
+        var used = existingCodes
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var max = 0;
+        foreach (var code in used)
+        {
+            if (!code.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                continue;
+            var suffix = code[prefix.Length..];
+            if (int.TryParse(suffix, NumberStyles.None, CultureInfo.InvariantCulture, out var number))
+                max = Math.Max(max, number);
+        }
+
+        var candidateNumber = checked(max + 1);
+        while (used.Contains(prefix + candidateNumber.ToString("D5", CultureInfo.InvariantCulture)))
+            candidateNumber = checked(candidateNumber + 1);
+
+        return prefix + candidateNumber.ToString("D5", CultureInfo.InvariantCulture);
+    }
+
     private void AddCustomer_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable() || !ConfirmCanAddCustomer()) return;
-        var dialog = new CustomerDialog(this);
+        var suggestedCode = NextCode(_data.Customers.Select(person => person.Code), "CUS-");
+        var dialog = new CustomerDialog(this, suggestedCode: suggestedCode);
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord customer)
             Commit(data =>
             {
@@ -838,7 +863,8 @@ public partial class MainWindow : Window
     private void AddProduct_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
-        var dialog = new ProductDialog(this);
+        var suggestedCode = NextCode(_data.Products.Select(product => product.Code), "SKU-");
+        var dialog = new ProductDialog(this, suggestedCode: suggestedCode);
         if (dialog.ShowDialog() == true && dialog.Result is ProductRecord product)
             Commit(data =>
             {
