@@ -883,7 +883,9 @@
                     </StackPanel>
                     <WrapPanel Grid.Row="1" Margin="0,14,0,0">
                         <ComboBox x:Name="KardexModuleProductSelector" MinWidth="320" Height="36" Padding="8,4" DisplayMemberPath="Name" SelectionChanged="KardexModuleProductSelector_SelectionChanged" Margin="0,0,8,8"/>
-                        <Button Content="بازکردن کارتکس کامل" Click="ShowKardexFromModule_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                        <Button Content="📊 بازکردن کارتکس کامل" Click="ShowKardexFromModule_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                        <Button Content="🖨 چاپ کارتکس" Click="PrintKardexModule_Click" Margin="0,0,8,8"/>
+                        <Button Content="📄 خروجی CSV" Click="ExportKardexModule_Click" Margin="0,0,8,8"/>
                     </WrapPanel>
                     <StackPanel Grid.Row="2">
                         <TextBlock x:Name="KardexModuleSummary" Text="برای مشاهدهٔ گردش، کالا را انتخاب کنید." Foreground="#334155" FontWeight="SemiBold" Margin="0,4,0,4"/>
