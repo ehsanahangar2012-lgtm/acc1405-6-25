@@ -35,6 +35,30 @@ public sealed class NativeLicenseQuotaServiceTests
     }
 
     [TestMethod]
+    public void DocumentQuotaCountsOnlySourceInvoiceVoucherTransactionAndCheckCollections()
+    {
+        var data = new AccountingData();
+        data.Invoices.Add(new InvoiceRecord { Number = 1001 });
+        data.Vouchers.Add(new VoucherRecord { Number = 1 });
+        data.Payments.Add(new PaymentRecord
+        {
+            Id = "standalone-payment",
+            Reference = "پرداخت بانکی مستقل"
+        });
+        data.Payments.Add(new PaymentRecord
+        {
+            Id = "invoice-embedded-cash",
+            Reference = "دریافت نقدی هنگام ثبت فاکتور"
+        });
+        data.Checks.Add(new CheckRecord { BankName = "بانک آزمون" });
+        data.Expenses.Add(new ExpenseRecord { Title = "هزینه آزمون", Amount = 1m });
+        data.JournalEntries.Add(new AccountingEntryRecord { Number = 1 });
+
+        Assert.AreEqual(4, NativeLicenseQuotaService.CountDocuments(data),
+            "Source quota formula is invoices + vouchers + standalone transactions/payments + checks.");
+    }
+
+    [TestMethod]
     public void VerifiedHemayatEntitlementUsesSourceFallbackLimitsWhenClaimsUseMinusOne()
     {
         var payload = ValidEntitlement();
