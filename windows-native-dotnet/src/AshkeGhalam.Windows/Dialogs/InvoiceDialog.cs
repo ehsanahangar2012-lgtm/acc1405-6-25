@@ -11,9 +11,11 @@ namespace AshkeGhalam.Windows.Dialogs;
 public sealed class InvoiceDialog : Window
 {
     private sealed record Choice(string Value, string Label);
-    private readonly IReadOnlyList<CustomerRecord> _people;
-    private readonly IReadOnlyList<ProductRecord> _products;
+    private readonly List<CustomerRecord> _people;
+    private readonly List<ProductRecord> _products;
     private readonly IReadOnlyList<InvoiceRecord> _invoices;
+    private readonly Func<Window, CustomerRecord?>? _quickAddCustomer;
+    private readonly Func<Window, ProductRecord?>? _quickAddProduct;
 
     private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), ItemsSource = new[]
     {
@@ -49,12 +51,16 @@ public sealed class InvoiceDialog : Window
         Window owner,
         IReadOnlyList<CustomerRecord> people,
         IReadOnlyList<ProductRecord> products,
-        IReadOnlyList<InvoiceRecord> invoices)
+        IReadOnlyList<InvoiceRecord> invoices,
+        Func<Window, CustomerRecord?>? quickAddCustomer = null,
+        Func<Window, ProductRecord?>? quickAddProduct = null)
     {
         Owner = owner;
-        _people = people;
-        _products = products;
+        _people = people.ToList();
+        _products = products.ToList();
         _invoices = invoices;
+        _quickAddCustomer = quickAddCustomer;
+        _quickAddProduct = quickAddProduct;
         Title = "ثبت فاکتور / پیش‌فاکتور";
         Width = 760;
         Height = 900;
@@ -68,7 +74,7 @@ public sealed class InvoiceDialog : Window
         _lineList.ItemsSource = _lines;
         // A ListBox can show a readable projection while keeping actual InvoiceLine values in the collection.
         _lineList.ItemsSource = _lines.Select(ToText).ToList();
-        _product.ItemsSource = products;
+        _product.ItemsSource = _products;
 
         var root = new StackPanel { Margin = new Thickness(22) };
         root.Children.Add(new TextBlock
@@ -90,6 +96,16 @@ public sealed class InvoiceDialog : Window
         AddField(root, "نوع سند", _type);
         root.Children.Add(_numberPreview);
         AddField(root, "طرف حساب (مشتری یا تأمین‌کننده بر اساس نوع سند)", _person);
+        var addPersonInline = new Button
+        {
+            Content = "＋ ثبت شخص جدید بدون بستن فاکتور",
+            Height = 32,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(12, 4, 12, 4),
+            Margin = new Thickness(0, 3, 0, 8)
+        };
+        addPersonInline.Click += (_, _) => AddPersonInline();
+        root.Children.Add(addPersonInline);
 
         var dates = new Grid { Margin = new Thickness(0, 2, 0, 0) };
         dates.ColumnDefinitions.Add(new ColumnDefinition());
@@ -110,6 +126,17 @@ public sealed class InvoiceDialog : Window
 
         root.Children.Add(new TextBlock { Text = "اقلام سند", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 12, 0, 4) });
         AddField(root, "کالا", _product);
+        var addProductInline = new Button
+        {
+            Content = "＋ ثبت کالای جدید بدون بستن فاکتور",
+            Height = 32,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(12, 4, 12, 4),
+            Margin = new Thickness(0, 3, 0, 8)
+        };
+        addProductInline.Click += (_, _) => AddProductInline();
+        root.Children.Add(addProductInline);
+
         var lineRow = new WrapPanel { Margin = new Thickness(0, 2, 0, 4), VerticalAlignment = VerticalAlignment.Center };
         lineRow.Children.Add(_quantity);
         lineRow.Children.Add(_price);
@@ -207,6 +234,50 @@ public sealed class InvoiceDialog : Window
         RefreshNumberPreview();
         RefreshLines();
         RefreshTotals();
+    }
+
+    private void AddPersonInline()
+    {
+        if (_quickAddCustomer is null)
+        {
+            MessageBox.Show(this, "ثبت سریع شخص در این فرم آماده نیست.", "ثبت شخص", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var created = _quickAddCustomer(this);
+        if (created is null) return;
+        if (_people.All(person => person.Id != created.Id))
+            _people.Add(created);
+
+        RefreshPeople();
+        var visible = _person.Items.Cast<CustomerRecord>().FirstOrDefault(person => person.Id == created.Id);
+        if (visible is not null)
+            _person.SelectedItem = visible;
+        else
+            MessageBox.Show(this,
+                CurrentType == "PURCHASE"
+                    ? "شخص ثبت شد؛ برای انتخاب در فاکتور خرید باید نقش تأمین‌کننده برای او فعال باشد."
+                    : "شخص ثبت شد؛ برای انتخاب در فاکتور فروش باید نقش مشتری برای او فعال باشد.",
+                "نقش طرف حساب", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void AddProductInline()
+    {
+        if (_quickAddProduct is null)
+        {
+            MessageBox.Show(this, "ثبت سریع کالا در این فرم آماده نیست.", "ثبت کالا", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var created = _quickAddProduct(this);
+        if (created is null) return;
+        if (_products.All(product => product.Id != created.Id))
+            _products.Add(created);
+
+        _product.ItemsSource = null;
+        _product.ItemsSource = _products;
+        _product.SelectedItem = _product.Items.Cast<ProductRecord>().FirstOrDefault(product => product.Id == created.Id);
+        ApplyDefaultPrice();
     }
 
     private string CurrentType => (_type.SelectedItem as Choice)?.Value ?? "SALE";
