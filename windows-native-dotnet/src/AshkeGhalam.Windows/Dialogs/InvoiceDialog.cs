@@ -21,6 +21,8 @@ public sealed class InvoiceDialog : Window
     private readonly CompanyProfileRecord? _companyProfile;
     private readonly string _defaultInvoicePrefix;
     private readonly decimal _defaultTaxRatePercent;
+    private readonly string _currencyLabel;
+    private readonly string _invoiceFooter;
     private readonly CheckBox _taxIsAmount = new() { Content = "مالیات مبلغی است (خاموش: درصد از جمع کالاها)", IsChecked = true, Margin = new Thickness(0, 6, 0, 0) };
 
     private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), ItemsSource = new[]
@@ -64,7 +66,9 @@ public sealed class InvoiceDialog : Window
         bool showInvoiceQr = true,
         CompanyProfileRecord? companyProfile = null,
         string? defaultInvoicePrefix = null,
-        decimal defaultTaxRatePercent = 0m)
+        decimal defaultTaxRatePercent = 0m,
+        string? currencyCode = "RIAL",
+        string? invoiceFooter = null)
     {
         Owner = owner;
         _people = people.ToList();
@@ -77,6 +81,13 @@ public sealed class InvoiceDialog : Window
         _companyProfile = companyProfile;
         _defaultInvoicePrefix = string.IsNullOrWhiteSpace(defaultInvoicePrefix) ? "INV-" : defaultInvoicePrefix.Trim();
         _defaultTaxRatePercent = defaultTaxRatePercent is >= 0m and <= 100m ? defaultTaxRatePercent : 0m;
+        _currencyLabel = currencyCode?.Trim().ToUpperInvariant() switch
+        {
+            "TOMAN" => "تومان",
+            "RIAL" or "" or null => "ریال",
+            _ => currencyCode.Trim()
+        };
+        _invoiceFooter = invoiceFooter ?? "";
         _taxIsAmount.IsChecked = _defaultTaxRatePercent == 0m;
         _tax.Text = _taxIsAmount.IsChecked == true
             ? "0"
@@ -415,7 +426,7 @@ public sealed class InvoiceDialog : Window
         var total = AccountingRules.Money(subtotal - discount + tax);
         var remaining = total - cash;
         var taxLabel = isTaxAmount ? "مالیات مبلغی" : $"مالیات ({taxInput:N2}٪)";
-        _totals.Text = $"جمع کالاها: {subtotal:N2}   |   تخفیف: {discount:N2}   |   {taxLabel}: {tax:N2}\nمبلغ نهایی: {total:N2}   |   نقدی: {cash:N2}   |   مانده پس از نقدی: {remaining:N2}";
+        _totals.Text = $"جمع کالاها: {subtotal:N2} {_currencyLabel}   |   تخفیف: {discount:N2} {_currencyLabel}   |   {taxLabel}: {tax:N2} {_currencyLabel}\nمبلغ نهایی: {total:N2} {_currencyLabel}   |   نقدی: {cash:N2} {_currencyLabel}   |   مانده پس از نقدی: {remaining:N2} {_currencyLabel}";
     }
 
     private void RefreshNumberPreview() => _numberPreview.Text = BuildNumberPreview(CurrentType);
@@ -502,7 +513,7 @@ public sealed class InvoiceDialog : Window
         try
         {
             var draft = BuildDraft();
-            new InvoicePreviewWindow(this, draft, _people, _invoices, _defaultInvoiceTheme, _showInvoiceQr, _companyProfile).ShowDialog();
+            new InvoicePreviewWindow(this, draft, _people, _invoices, _defaultInvoiceTheme, _showInvoiceQr, _companyProfile, _currencyLabel, _invoiceFooter).ShowDialog();
         }
         catch (Exception ex)
         {
