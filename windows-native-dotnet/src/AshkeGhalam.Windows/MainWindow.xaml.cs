@@ -178,7 +178,7 @@ public partial class MainWindow : Window
     {
         if (e.OriginalSource != MainTabs) return;
         RefreshAll();
-        if (MainTabs.SelectedIndex == 16) RefreshLicensePanel();
+        if (MainTabs.SelectedIndex == 13) RefreshLicensePanel();
 
         // The selected-content-only TabControl template realizes one page at a time.
         // Reapply the current palette after WPF has created the newly selected page.
