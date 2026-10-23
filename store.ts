@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Person, Product, Invoice, Check, Voucher, CompanyProfile, SystemConfig, AppUser, ModulePermission, Role, UserPermissions, Transaction, CheckTransfer, LogisticsProfile, Salary, InvoiceType, Notification, OfflineOperation, Contract } from './types';
-import { generateId, getPersianDate, generateTrackingCode, toPersianDigits, downloadJSON } from './utils';
+import { generateId, getPersianDate, generateTrackingCode, toPersianDigits } from './utils';
+import { saveEncryptedBackupFile } from './services/nativeBackupFileService';
 import { ImportBatch, ImportMappingConfig } from './types-import';
 import { backupService } from './services/backupService';
 import { backupEncryptionService } from './services/backupEncryptionService';
@@ -2085,8 +2086,21 @@ export const useStore = create<AppState>()(
               return;
           }
           const encryptedText = backupEncryptionService.encryptJson(backupData, passphrase);
-          downloadJSON(JSON.parse(encryptedText), `AshkeGhalam-Backup-Encrypted-${getPersianDate().replaceAll("/", "-")}`);
+          const fileName = `AshkeGhalam-ManualBackup-${Date.now()}.json`;
           // No plaintext full-export copy is uploaded by this action.
+          void saveEncryptedBackupFile(fileName, encryptedText).then(result => {
+              if (result.cancelled) return;
+              if (!result.success) throw new Error('ذخیره فایل پشتیبان رمزگذاری‌شده تأیید نشد.');
+              const message = result.method === 'desktop'
+                  ? 'فایل پشتیبان رمزگذاری‌شده روی دیسک ذخیره شد: ' + result.location
+                  : result.method === 'android'
+                      ? 'فایل پشتیبان رمزگذاری‌شده در مسیر انتخابی ذخیره شد.'
+                      : 'فایل پشتیبان رمزگذاری‌شده برای دانلود ارسال شد؛ رمز را جدا از فایل نگه دارید.';
+              get().addNotification('success', message);
+          }).catch(error => {
+              console.error('Portable backup export failed:', error);
+              get().addNotification('error', 'صدور فایل پشتیبان ناموفق بود: ' + (error?.message || 'خطای نامشخص'));
+          });
       }
     };
     },

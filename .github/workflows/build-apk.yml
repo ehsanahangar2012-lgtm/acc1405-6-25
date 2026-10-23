@@ -58,7 +58,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Type-check project
-        run: bun run lint && bun run test:backup-encryption
+        run: bun run lint && bun run test:backup-encryption && node scripts/test-desktop-backup-safety.mjs
 
       - name: Setup PHP for server syntax checks
         uses: shivammathur/setup-php@v2

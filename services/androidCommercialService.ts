@@ -1,17 +1,10 @@
-import { registerPlugin } from '@capacitor/core';
+import { saveEncryptedBackupFile } from './nativeBackupFileService';
 import { isAndroidApp, getPersianDate, toPersianDigits, formatCurrency } from '../utils';
 import { APP_VERSION } from '../config';
 import { backupEncryptionService } from './backupEncryptionService';
 import { licenseQuotaService } from './licenseQuotaService';
 import { workspaceService } from './workspaceService';
 import { securityService } from './securityService';
-
-interface NativeBackupPlugin {
-    saveBackup(options: { fileName: string; content: string; mimeType?: string }): Promise<{
-        success?: boolean; cancelled?: boolean; uri?: string; bytesWritten?: number;
-    }>;
-}
-const nativeBackupPlugin = registerPlugin<NativeBackupPlugin>('NativeBackup');
 
 export interface BusinessProfile {
     companyName: string;
@@ -464,23 +457,10 @@ class AndroidCommercialService {
         const dateStr = new Date().toISOString().slice(0, 10);
         const fileName = `AshkeGhalam-Android-Backup-v${APP_VERSION}-${dateStr}.agbak`;
 
-        if (isAndroidApp()) {
-            const result = await nativeBackupPlugin.saveBackup({ fileName, content: encryptedJson, mimeType: 'application/json' });
-            if (result?.cancelled) return { success: false, cancelled: true, fileName };
-            if (!result?.success) throw new Error('ذخیره فایل پشتیبان در مسیر انتخاب‌شده تأیید نشد.');
-            return { success: true, location: result.uri, fileName };
-        }
-
-        const blob = new Blob([encryptedJson], { type: 'application/json;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = fileName;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
-        return { success: true, fileName };
+        const result = await saveEncryptedBackupFile(fileName, encryptedJson);
+        if (result.cancelled) return { success: false, cancelled: true, fileName };
+        if (!result.success) throw new Error('ذخیره فایل پشتیبان رمزگذاری‌شده تأیید نشد.');
+        return { success: true, location: result.location, fileName };
     }
 
     /**

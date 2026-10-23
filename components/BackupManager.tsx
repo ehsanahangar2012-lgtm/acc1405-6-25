@@ -7,7 +7,8 @@ import {
     Wifi, WifiOff, Server, Code, Cpu, Eye, X
 } from 'lucide-react';
 import { useStore } from '../store';
-import { downloadJSON, getPersianDate, toPersianDigits, fetchWithTimeout } from '../utils';
+import { getPersianDate, toPersianDigits, fetchWithTimeout } from '../utils';
+import { saveEncryptedBackupFile } from '../services/nativeBackupFileService';
 import { hostBackupService, HostBackupEntry } from '../services/hostBackupService';
 import { securityService } from '../services/securityService';
 import { backupEncryptionService } from '../services/backupEncryptionService';
@@ -495,28 +496,19 @@ const BackupManager = () => {
             // detection for this file come from the password-derived encryption envelope.
             backupData.signature = securityService.signBackup(backupData);
             const encryptedText = backupEncryptionService.encryptJson(backupData, backupExportPassword);
-            const dateStr = getPersianDate().replaceAll('/', '-');
-            const desktopAPI = (window as any).electronDesktopAPI;
-            let savedNativePath = '';
-
-            if (desktopAPI && typeof desktopAPI.writeLocalBackup === 'function') {
-                const fileName = 'AshkeGhalam-ManualBackup-' + Date.now() + '.json';
-                const result = await desktopAPI.writeLocalBackup(fileName, encryptedText);
-                if (result?.success && typeof result.filePath === 'string') savedNativePath = result.filePath;
-                else if (result?.error && result.error !== 'BACKUP_DIRECTORY_NOT_SELECTED') {
-                    throw new Error('ذخیره فایل پشتیبان روی دیسک ناموفق بود: ' + result.error);
-                }
-            }
-
-            // Exporting a file must not silently send a plaintext copy to the cloud.
-            if (savedNativePath) {
-                if (addNotification) addNotification('success', 'فایل پشتیبان رمزگذاری‌شده روی دیسک ذخیره شد: ' + savedNativePath);
-                else alert('فایل پشتیبان رمزگذاری‌شده روی دیسک ذخیره شد.');
-            } else {
-                downloadJSON(JSON.parse(encryptedText), 'AshkeGhalam-Backup-Encrypted-' + dateStr);
-                if (addNotification) addNotification('success', 'فایل پشتیبان رمزگذاری‌شده دانلود شد. رمز را جدا از فایل نگه دارید.');
-                else alert('فایل پشتیبان رمزگذاری‌شده دانلود شد؛ رمز را جداگانه نگه دارید.');
-            }
+            // Android uses its system picker, Windows uses the personal backup directory,
+            // and browser/PWA mode downloads the already-encrypted envelope.
+            const fileName = 'AshkeGhalam-ManualBackup-' + Date.now() + '.json';
+            const result = await saveEncryptedBackupFile(fileName, encryptedText);
+            if (result.cancelled) return;
+            if (!result.success) throw new Error('ذخیره فایل پشتیبان رمزگذاری‌شده تأیید نشد.');
+            const message = result.method === 'desktop'
+                ? 'فایل پشتیبان رمزگذاری‌شده روی دیسک ذخیره شد: ' + result.location
+                : result.method === 'android'
+                    ? 'فایل پشتیبان رمزگذاری‌شده در مسیر انتخابی ذخیره شد.'
+                    : 'فایل پشتیبان رمزگذاری‌شده برای دانلود ارسال شد؛ رمز را جدا از فایل نگه دارید.';
+            if (addNotification) addNotification('success', message);
+            else alert(message);
         } catch (error: any) {
             console.error(error);
             if (addNotification) addNotification('error', 'صدور فایل پشتیبان ناموفق بود: ' + (error?.message || 'خطای نامشخص'));

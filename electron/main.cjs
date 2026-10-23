@@ -6,6 +6,7 @@ const os = require('os');
 const crypto = require('crypto');
 const url = require('url');
 const packageMeta = require('../package.json');
+const { isManagedBackupFileName } = require('./backupSafety.cjs');
 
 // Keep Chromium's platform defaults for GPU selection, process limits, and memory management.
 // Forcing unsupported GPU paths or extra renderer processes can increase crashes, RAM use, and stutter.
@@ -637,8 +638,7 @@ ipcMain.handle('write-local-backup', async (event, payload) => {
 
     const fileName = typeof payload?.fileName === 'string' ? payload.fileName : '';
     const data = typeof payload?.data === 'string' ? payload.data : null;
-    const safeName = /^(?:AshkeGhalam-Backup-(?:auto|manual)|AshkeGhalam-ManualBackup)-[A-Za-z0-9_.-]{1,180}\\.json$/;
-    if (!safeName.test(fileName) || path.basename(fileName) !== fileName) {
+    if (!isManagedBackupFileName(fileName)) {
         return { success: false, error: 'INVALID_BACKUP_FILENAME' };
     }
     if (data === null) return { success: false, error: 'INVALID_BACKUP_DATA' };
@@ -671,11 +671,10 @@ ipcMain.handle('write-local-backup', async (event, payload) => {
         tempPath = '';
 
         // Retain up to 100 managed backup files and prune files older than 30 days.
-        const managedPattern = /^(?:AshkeGhalam-Backup-(?:auto|manual)|AshkeGhalam-ManualBackup)-[A-Za-z0-9_.-]{1,180}\\.json$/;
         const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
         const entries = [];
         for (const name of await fs.promises.readdir(directory)) {
-            if (!managedPattern.test(name)) continue;
+            if (!isManagedBackupFileName(name)) continue;
             const fullPath = path.join(directory, name);
             try {
                 const stat = await fs.promises.stat(fullPath);
