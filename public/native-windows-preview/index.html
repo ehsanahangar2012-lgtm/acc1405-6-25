@@ -3171,6 +3171,7 @@ var qrcode = function() {
   // Auto-reload the browser UI when a new preview build is published to this same path.
   fetch('./version.json?check='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(v=>{if(v?.build)$('buildId').textContent=v.build}).catch(()=>{});
   let buildSnapshot='';setInterval(async()=>{try{const r=await fetch('./version.json?check='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();if(v?.build&&buildSnapshot&&v.build!==buildSnapshot)location.reload();if(v?.build)buildSnapshot=v.build;}catch{}},20000);
+  if ($('checkDue') && !$('checkDue').value) $('checkDue').value=todayIso();
   renderAll();
 })();
 </script>
