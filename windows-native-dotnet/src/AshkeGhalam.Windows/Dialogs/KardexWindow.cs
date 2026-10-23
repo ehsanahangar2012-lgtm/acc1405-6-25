@@ -16,7 +16,7 @@ public sealed class KardexWindow : Window
         Owner = owner; Title = $"کارتکس کالا — {product.Name}";
         Width = 1120; Height = 720; MinWidth = 800; MinHeight = 520;
         WindowStartupLocation = WindowStartupLocation.CenterOwner; FlowDirection = FlowDirection.RightToLeft;
-        FontFamily = new FontFamily("Vazirmatn, Tahoma, Segoe UI");
+        FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
         var history = movements.Where(item => item.ProductId == product.Id).OrderBy(item => item.Date).ThenBy(item => item.Timestamp).ToList();
         var balance = product.StockQuantity - history.Sum(item => item.SignedQuantity);
@@ -41,7 +41,7 @@ public sealed class KardexWindow : Window
         var grid = new DataGrid { ItemsSource = rows, AutoGenerateColumns = false, IsReadOnly = true, CanUserSortColumns = true,
             HeadersVisibility = DataGridHeadersVisibility.Column, GridLinesVisibility = DataGridGridLinesVisibility.Horizontal, RowHeight = 34,
             ColumnHeaderHeight = 40, Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
-            FontFamily = new FontFamily("Vazirmatn, Tahoma, Segoe UI") };
+            FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn") };
         grid.Columns.Add(new DataGridTextColumn { Header = "تاریخ", Binding = new Binding(nameof(KardexRow.Date)), Width = 100 });
         grid.Columns.Add(new DataGridTextColumn { Header = "نوع گردش", Binding = new Binding(nameof(KardexRow.Movement)), Width = 150 });
         grid.Columns.Add(new DataGridTextColumn { Header = "سند مرجع", Binding = new Binding(nameof(KardexRow.Document)), Width = 170 });

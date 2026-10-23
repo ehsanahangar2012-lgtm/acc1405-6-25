@@ -37,6 +37,7 @@ public sealed class CustomerDialog : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
+        FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
 
         _code.Text = existing?.Code ?? suggestedCode;

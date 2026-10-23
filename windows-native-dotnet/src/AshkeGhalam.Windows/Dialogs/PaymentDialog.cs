@@ -32,7 +32,8 @@ public sealed class PaymentDialog : Window
             _ => "ثبت دریافت/پرداخت طرف حساب"
         };
         Owner=owner;Title=title;Width=530;Height=450;WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        FlowDirection=FlowDirection.RightToLeft;Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
+        FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
+        _amount.LostFocus += (_, _) => FormatNumericField(_amount);
         _invoice.DisplayMemberPath=nameof(InvoiceOption.Label);
         _invoice.ItemsSource=data.Invoices.Where(i=>i.Status!="لغو شده"&&i.Type!="PROFORMA"&&
                 (string.IsNullOrWhiteSpace(invoiceTypeFilter) || i.Type == invoiceTypeFilter) &&
@@ -71,6 +72,13 @@ public sealed class PaymentDialog : Window
             }
             catch(Exception ex){MessageBox.Show(this,ex.Message,"بررسی عملیات مالی",MessageBoxButton.OK,MessageBoxImage.Warning);}
         };
+    }
+
+    private static void FormatNumericField(TextBox field)
+    {
+        if (string.IsNullOrWhiteSpace(field.Text)) return;
+        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "مبلغ").ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("fa-IR")); }
+        catch (InvalidOperationException) { }
     }
 
     private static void Add(Panel root,string label,Control field)

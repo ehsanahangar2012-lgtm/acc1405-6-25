@@ -21,7 +21,7 @@ public sealed class VoucherPreviewWindow : Window
         Width = 1000; Height = 800; MinWidth = 760; MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft;
-        FontFamily = new FontFamily("Vazirmatn, Tahoma, Segoe UI");
+        FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
         Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
         _document = BuildDocument(voucher, company);
         var root = new Grid { Margin = new Thickness(14) };
@@ -49,7 +49,7 @@ public sealed class VoucherPreviewWindow : Window
     {
         var accent = new SolidColorBrush(Color.FromRgb(15, 118, 110));
         var soft = new SolidColorBrush(Color.FromRgb(231, 248, 244));
-        var document = new FlowDocument { FontFamily = new FontFamily("Vazirmatn, Tahoma, Segoe UI"), FontSize = 12,
+        var document = new FlowDocument { FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 12,
             FlowDirection = FlowDirection.RightToLeft, PagePadding = new Thickness(28), ColumnWidth = 760,
             Background = Brushes.White, Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)) };
         var logo = CreateImage(company?.LogoDataBase64, 112, 82);

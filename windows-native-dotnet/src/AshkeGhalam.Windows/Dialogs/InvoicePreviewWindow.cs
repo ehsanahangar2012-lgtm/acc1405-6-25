@@ -286,7 +286,7 @@ public sealed class InvoicePreviewWindow : Window
 
         var document = new FlowDocument
         {
-            FontFamily = new FontFamily("Vazirmatn, Tahoma, Segoe UI"),
+            FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
             FontSize = 12,
             FlowDirection = FlowDirection.RightToLeft,
             PagePadding = new Thickness(36),

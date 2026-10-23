@@ -20,7 +20,8 @@ public sealed class ExpenseDialog : Window
     public ExpenseDialog(Window owner)
     {
         Owner=owner;Title="ثبت هزینه";Width=450;Height=460;WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        FlowDirection=FlowDirection.RightToLeft;Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
+        FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
+        _amount.LostFocus += (_, _) => FormatNumericField(_amount);
         var root=new StackPanel{Margin=new Thickness(22)};
         root.Children.Add(new TextBlock{Text="هزینهٔ جدید",FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
         Add(root,"عنوان هزینه",_title);Add(root,"دسته‌بندی",_category);Add(root,"مبلغ",_amount);Add(root,"توضیحات",_notes);
@@ -39,6 +40,13 @@ public sealed class ExpenseDialog : Window
             }
             catch(Exception ex){MessageBox.Show(this,ex.Message,"بررسی هزینه",MessageBoxButton.OK,MessageBoxImage.Warning);}
         };
+    }
+
+    private static void FormatNumericField(TextBox field)
+    {
+        if (string.IsNullOrWhiteSpace(field.Text)) return;
+        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "مبلغ").ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("fa-IR")); }
+        catch (InvalidOperationException) { }
     }
 
     private static void Add(Panel root,string label,Control field)
