@@ -419,7 +419,8 @@
     $('addDraftLine').addEventListener('click',()=>{
       const p=state.products.find(p=>p.id===$('f_lineProduct').value);const qty=Number($('f_lineQty').value);const price=Number($('f_linePrice').value);
       if(!p||!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0){toast('کالا، تعداد و قیمت را بررسی کن.');return}
-      if($('f_type').value==='SALE'&&qty>p.stock-(p.reserved||0)){toast('موجودی آزاد برای این قلم کافی نیست.');return}
+      const alreadyAdded=draftLines.filter(line=>line.productId===p.id).reduce((sum,line)=>sum+line.qty,0);
+      if($('f_type').value==='SALE'&&alreadyAdded+qty>p.stock-(p.reserved||0)){toast('موجودی آزاد برای مجموع اقلام این کالا کافی نیست.');return}
       draftLines.push({productId:p.id,code:p.code,name:p.name,qty,price,total:Math.round(qty*price*100)/100,description:$('f_lineDesc').value});
       $('f_lineQty').value='1';$('f_lineDesc').value='';renderDraftLines();refreshInvoiceDraftTotals();
     });
