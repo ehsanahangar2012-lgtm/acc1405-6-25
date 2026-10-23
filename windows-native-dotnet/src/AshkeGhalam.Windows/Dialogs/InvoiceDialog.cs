@@ -272,8 +272,16 @@ public sealed class InvoiceDialog : Window
         var save = new Button { Content = "ذخیره سند", Width = 125, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 8) };
         buttons.Children.Add(save);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true, Margin = new Thickness(0, 0, 0, 8) });
-        root.Children.Add(buttons);
-        Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        var layout = new Grid { Margin = new Thickness(0) };
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var body = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        Grid.SetRow(body, 0);
+        Grid.SetRow(buttons, 1);
+        buttons.Margin = new Thickness(22, 10, 22, 18);
+        layout.Children.Add(body);
+        layout.Children.Add(buttons);
+        Content = layout;
 
         foreach (var field in new[] { _quantity, _price, _discount, _tax, _cashAmount })
             NumericTextBoxFormatter.Attach(field);
