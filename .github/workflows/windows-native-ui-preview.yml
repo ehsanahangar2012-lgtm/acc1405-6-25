@@ -49,7 +49,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist/native-windows-preview
-          printf '{"build":"%s","sha":"%s","updatedAt":"%s"}\n' "$GITHUB_RUN_NUMBER" "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/native-windows-preview/version.json
+          printf '{"build":"%s","sha":"%s","updatedAt":"%s"}\n' "$GITHUB_RUN_NUMBER" "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/version.json
+          cp dist/version.json dist/native-windows-preview/version.json
 
       - name: Upload GitHub Pages package
         uses: actions/upload-pages-artifact@v3
