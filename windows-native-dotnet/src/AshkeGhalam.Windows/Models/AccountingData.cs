@@ -7,6 +7,7 @@ public sealed class AccountingData
     public int SchemaVersion { get; set; } = 1;
     public int NextInvoiceNumber { get; set; } = 1;
     public int NextVoucherNumber { get; set; } = 1;
+    public int NextJournalNumber { get; set; } = 1;
     public List<CustomerRecord> Customers { get; set; } = [];
     public List<ProductRecord> Products { get; set; } = [];
     public List<InvoiceRecord> Invoices { get; set; } = [];
@@ -15,12 +16,16 @@ public sealed class AccountingData
     public List<CheckRecord> Checks { get; set; } = [];
     public List<VoucherRecord> Vouchers { get; set; } = [];
     public List<InventoryMovementRecord> InventoryMovements { get; set; } = [];
+    // These collections are optional in old local files; initializers keep old schema-v1 data readable.
+    public List<ChartOfAccountRecord> LedgerAccounts { get; set; } = [];
+    public List<AccountingEntryRecord> JournalEntries { get; set; } = [];
 
     public AccountingData DeepCopy() => new()
     {
         SchemaVersion = SchemaVersion,
         NextInvoiceNumber = NextInvoiceNumber,
         NextVoucherNumber = NextVoucherNumber,
+        NextJournalNumber = NextJournalNumber,
         Customers = Customers.Select(c => new CustomerRecord
         {
             Id=c.Id, Code=c.Code, Name=c.Name, Phone=c.Phone, Email=c.Email, Balance=c.Balance,
@@ -85,6 +90,16 @@ public sealed class AccountingData
             Id=m.Id, ProductId=m.ProductId, VoucherId=m.VoucherId, ReferenceId=m.ReferenceId,
             MovementType=m.MovementType, SignedQuantity=m.SignedQuantity, Date=m.Date,
             ReferenceType=m.ReferenceType, Description=m.Description, Timestamp=m.Timestamp
+        }).ToList(),
+        LedgerAccounts = LedgerAccounts.Select(a => new ChartOfAccountRecord
+        {
+            Id=a.Id, Code=a.Code, Name=a.Name, Type=a.Type, Level=a.Level, ParentId=a.ParentId, IsActive=a.IsActive
+        }).ToList(),
+        JournalEntries = JournalEntries.Select(j => new AccountingEntryRecord
+        {
+            Id=j.Id, Number=j.Number, Date=j.Date, Description=j.Description, DebitAccountId=j.DebitAccountId,
+            CreditAccountId=j.CreditAccountId, Amount=j.Amount, ReferenceId=j.ReferenceId, ReferenceType=j.ReferenceType,
+            DocumentType=j.DocumentType, FiscalYear=j.FiscalYear, Status=j.Status, CreatedAt=j.CreatedAt
         }).ToList()
     };
 }
@@ -228,6 +243,36 @@ public sealed class ExpenseRecord
     public string Category { get; set; } = "عمومی";
     public decimal Amount { get; set; }
     public string Notes { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+}
+
+public sealed class ChartOfAccountRecord
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Code { get; set; } = "";
+    public string Name { get; set; } = "";
+    // Values mirror types-financial.ts: ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE.
+    public string Type { get; set; } = "ASSET";
+    // MAIN, SUB, DETAIL; ParentId is empty only for a top-level account.
+    public string Level { get; set; } = "MAIN";
+    public string ParentId { get; set; } = "";
+    public bool IsActive { get; set; } = true;
+}
+
+public sealed class AccountingEntryRecord
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public int Number { get; set; }
+    public string Date { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string DebitAccountId { get; set; } = "";
+    public string CreditAccountId { get; set; } = "";
+    public decimal Amount { get; set; }
+    public string ReferenceId { get; set; } = "";
+    public string ReferenceType { get; set; } = "";
+    public string DocumentType { get; set; } = "OPERATIONAL";
+    public string FiscalYear { get; set; } = "";
+    public string Status { get; set; } = "DRAFT";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
 }
 
@@ -820,10 +865,12 @@ public static class AccountingDataValidator
         if (data.Customers is null || data.Products is null || data.Invoices is null ||
             data.Payments is null || data.Expenses is null || data.Checks is null ||
             data.Vouchers is null || data.InventoryMovements is null ||
+            data.LedgerAccounts is null || data.JournalEntries is null ||
             data.Customers.Count > 100_000 || data.Products.Count > 100_000 ||
             data.Invoices.Count > 500_000 || data.Payments.Count > 1_000_000 ||
             data.Expenses.Count > 1_000_000 || data.Checks.Count > 1_000_000 ||
-            data.Vouchers.Count > 1_000_000 || data.InventoryMovements.Count > 2_000_000)
+            data.Vouchers.Count > 1_000_000 || data.InventoryMovements.Count > 2_000_000 ||
+            data.LedgerAccounts.Count > 100_000 || data.JournalEntries.Count > 1_000_000)
             throw new InvalidDataException("ساختار یا اندازهٔ دادهٔ حسابداری معتبر نیست.");
 
         var customerIds = UniqueIds(data.Customers.Select(c => c?.Id), "شخص");
@@ -983,6 +1030,53 @@ public static class AccountingDataValidator
             if (!referenceExists)
                 throw new InvalidDataException("سند مرجع گردش موجودی پیدا نشد.");
         }
+
+        // Native parity increment: validate chart-of-accounts and the source app's single-line
+        // double-entry records. A posted item always debits and credits the exact same amount.
+        var accountIds = UniqueIds(data.LedgerAccounts.Select(a => a?.Id), "سرفصل حساب");
+        var accountCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var accountTypes = new[] { "ASSET", "LIABILITY", "EQUITY", "REVENUE", "EXPENSE" };
+        var accountLevels = new[] { "MAIN", "SUB", "DETAIL" };
+        foreach (var account in data.LedgerAccounts)
+        {
+            if (account is null || string.IsNullOrWhiteSpace(account.Code) || string.IsNullOrWhiteSpace(account.Name) ||
+                !accountTypes.Contains(account.Type, StringComparer.Ordinal) ||
+                !accountLevels.Contains(account.Level, StringComparer.Ordinal))
+                throw new InvalidDataException("سرفصل حساب ناقص یا نامعتبر است.");
+            if (!accountCodes.Add(account.Code.Trim()))
+                throw new InvalidDataException("کد سرفصل حساب تکراری است.");
+            if (account.Level == "MAIN" && !string.IsNullOrWhiteSpace(account.ParentId))
+                throw new InvalidDataException("حساب اصلی نباید والد داشته باشد.");
+            if (account.Level != "MAIN")
+            {
+                var parent = data.LedgerAccounts.SingleOrDefault(a => a.Id == account.ParentId);
+                var expectedParentLevel = account.Level == "SUB" ? "MAIN" : "SUB";
+                if (parent is null || parent.Id == account.Id || parent.Level != expectedParentLevel)
+                    throw new InvalidDataException("والد سرفصل باید از سطح بلافصل بالاتر انتخاب شود.");
+            }
+        }
+
+        UniqueIds(data.JournalEntries.Select(j => j?.Id), "سند حسابداری");
+        var journalNumbers = new HashSet<int>();
+        var allowedDocumentTypes = new[] { "OPERATIONAL", "OPENING", "CLOSING", "ADJUSTMENT" };
+        var allowedJournalStatuses = new[] { "DRAFT", "APPROVED", "POSTED" };
+        foreach (var entry in data.JournalEntries)
+        {
+            if (entry is null || entry.Number <= 0 || string.IsNullOrWhiteSpace(entry.Date) ||
+                string.IsNullOrWhiteSpace(entry.Description) || entry.Description.Trim().Length < 2 ||
+                !accountIds.Contains(entry.DebitAccountId) || !accountIds.Contains(entry.CreditAccountId) ||
+                entry.DebitAccountId == entry.CreditAccountId || entry.Amount <= 0m ||
+                entry.Amount != AccountingRules.Money(entry.Amount) ||
+                !allowedDocumentTypes.Contains(entry.DocumentType, StringComparer.Ordinal) ||
+                !allowedJournalStatuses.Contains(entry.Status, StringComparer.Ordinal))
+                throw new InvalidDataException("سند حسابداری دوبل ناقص یا نامعتبر است.");
+            if (!journalNumbers.Add(entry.Number))
+                throw new InvalidDataException("شماره سند حسابداری تکراری است.");
+            if (entry.CreatedAt == default)
+                throw new InvalidDataException("زمان ثبت سند حسابداری معتبر نیست.");
+        }
+        if (data.NextJournalNumber < 1 || data.NextJournalNumber <= data.JournalEntries.Select(j => j.Number).DefaultIfEmpty(0).Max())
+            throw new InvalidDataException("شمارندهٔ شماره سند حسابداری نامعتبر است.");
 
         return data;
     }
