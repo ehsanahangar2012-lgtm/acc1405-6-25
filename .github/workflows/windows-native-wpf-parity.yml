@@ -19,7 +19,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: windows-native-wpf-${{ github.run_id }}
+  group: windows-native-wpf-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -107,18 +107,8 @@ jobs:
           $package = Join-Path $env:RUNNER_TEMP 'AshkeGhalam-Windows-Native.zip'
           if (-not (Test-Path -LiteralPath $package)) { throw "Published package was not found at $package" }
 
-          # Many rapid pushes can leave older runs queued. Only the exact current
-          # branch head may replace the download package.
-          $branchLine = git ls-remote origin refs/heads/feature/windows-native-dotnet | Select-Object -First 1
-          if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($branchLine)) {
-            throw "Could not confirm the latest migration branch head before publishing."
-          }
-          $branchSha = ($branchLine -split '\s+')[0]
-          if ($branchSha -ne $env:GITHUB_SHA) {
-            Write-Host "Skipping stale build $env:GITHUB_SHA; current branch head is $branchSha."
-            exit 0
-          }
-
+          # A branch-scoped concurrency group cancels older branch builds before they
+          # can overwrite the download package. Never check out or modify the source branch here.
           $size = (Get-Item -LiteralPath $package).Length
           if ($size -ge 100MB) { throw "Package is $size bytes; GitHub rejects regular Git files of 100 MB or more." }
 
