@@ -1561,6 +1561,290 @@ public partial class MainWindow : Window
         string SayadId, string CheckNumber, string DueDateLabel, string IssueDateLabel,
         string StatusLabel, string PriorityLabel, string PersonName);
 
+    private void EnsureConfigurationDefaults()
+    {
+        _data.Companies ??= [];
+        if (_data.Companies.Count == 0)
+            _data.Companies.Add(new CompanyProfileRecord());
+
+        if (string.IsNullOrWhiteSpace(_data.ActiveCompanyId) ||
+            !_data.Companies.Any(company => company.Id == _data.ActiveCompanyId))
+            _data.ActiveCompanyId = _data.Companies[0].Id;
+
+        _data.Preferences ??= new AccountingPreferences();
+        _data.MoadianSettings ??= new MoadianSettingsRecord();
+        _data.ServerConnection ??= new ServerConnectionSettings();
+    }
+
+    private CompanyProfileRecord? ActiveCompanyProfile()
+    {
+        EnsureConfigurationDefaults();
+        return _data.Companies.FirstOrDefault(company => company.Id == _data.ActiveCompanyId);
+    }
+
+    private void PopulateCompanyProfile(CompanyProfileRecord? company)
+    {
+        if (company is null) return;
+        CompanyProfileName.Text = company.Name;
+        CompanyLegalName.Text = company.LegalName;
+        CompanyNationalId.Text = company.NationalId;
+        CompanyTaxId.Text = company.TaxId;
+        CompanyProfilePhone.Text = company.Phone;
+        CompanyProfileBranch.Text = company.Branch;
+        CompanyProfileAddress.Text = company.Address;
+    }
+
+    private void RefreshAccountingConfigurationPanels()
+    {
+        EnsureConfigurationDefaults();
+
+        CompanyProfileSelector.ItemsSource = null;
+        CompanyProfileSelector.ItemsSource = _data.Companies;
+        CompanyProfileSelector.SelectedValuePath = nameof(CompanyProfileRecord.Id);
+        CompanyProfileSelector.SelectedValue = _data.ActiveCompanyId;
+        PopulateCompanyProfile(CompanyProfileSelector.SelectedItem as CompanyProfileRecord);
+
+        InvoiceThemeSelector.SelectedItem = InvoiceThemeSelector.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.Preferences.InvoiceTheme, StringComparison.Ordinal))
+            ?? InvoiceThemeSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "smart", StringComparison.Ordinal));
+        SettingsCurrencySelector.SelectedItem = SettingsCurrencySelector.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.Preferences.Currency, StringComparison.Ordinal))
+            ?? SettingsCurrencySelector.Items.OfType<ComboBoxItem>().FirstOrDefault();
+        SettingsTaxRate.Text = _data.Preferences.DefaultTaxRatePercent.ToString(CultureInfo.InvariantCulture);
+        SettingsInvoicePrefix.Text = _data.Preferences.SalesInvoicePrefix;
+        SettingsShowInvoiceQr.IsChecked = _data.Preferences.ShowInvoiceQr;
+        SettingsInvoiceFooter.Text = _data.Preferences.InvoiceFooter;
+
+        MoadianTaxpayerId.Text = _data.MoadianSettings.TaxpayerId;
+        MoadianApiBaseUrl.Text = _data.MoadianSettings.ApiBaseUrl;
+        MoadianEnvironmentSelector.SelectedItem = MoadianEnvironmentSelector.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.MoadianSettings.Environment, StringComparison.Ordinal))
+            ?? MoadianEnvironmentSelector.Items.OfType<ComboBoxItem>().FirstOrDefault();
+        MoadianIsConfigured.IsChecked = _data.MoadianSettings.IsConfigured;
+
+        ServerBaseUrl.Text = _data.ServerConnection.BaseUrl;
+        ServerWorkspaceId.Text = _data.ServerConnection.WorkspaceId;
+        ServerSyncModeSelector.SelectedItem = ServerSyncModeSelector.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.ServerConnection.SyncMode, StringComparison.Ordinal))
+            ?? ServerSyncModeSelector.Items.OfType<ComboBoxItem>().FirstOrDefault();
+    }
+
+    private void CompanyProfileSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_uiReady || CompanyProfileSelector.SelectedItem is not CompanyProfileRecord selected) return;
+        PopulateCompanyProfile(selected);
+    }
+
+    private void AddCompanyProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var name = CompanyProfileName.Text.Trim();
+        if (name.Length < 2)
+        {
+            MessageBox.Show(this, "برای شرکت جدید نام قابل نمایش وارد کنید.", "پروفایل شرکت",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var profile = new CompanyProfileRecord
+        {
+            Name = name,
+            LegalName = CompanyLegalName.Text.Trim(),
+            NationalId = CompanyNationalId.Text.Trim(),
+            TaxId = CompanyTaxId.Text.Trim(),
+            Phone = CompanyProfilePhone.Text.Trim(),
+            Branch = string.IsNullOrWhiteSpace(CompanyProfileBranch.Text) ? "مرکزی" : CompanyProfileBranch.Text.Trim(),
+            Address = CompanyProfileAddress.Text.Trim()
+        };
+        Commit(data =>
+        {
+            data.Companies ??= [];
+            if (data.Companies.Any(company => string.Equals(company.Name.Trim(), profile.Name, StringComparison.OrdinalIgnoreCase) &&
+                                                string.Equals(company.Branch.Trim(), profile.Branch, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("شرکتی با همین نام و شعبه از قبل وجود دارد.");
+            data.Companies.Add(profile);
+            data.ActiveCompanyId = profile.Id;
+        }, "پروفایل شرکت اضافه شد؛ جداسازی مستقل دفترکل هنوز تکمیل نشده است.");
+    }
+
+    private void ActivateCompanyProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (CompanyProfileSelector.SelectedItem is not CompanyProfileRecord selected)
+        {
+            MessageBox.Show(this, "ابتدا یک پروفایل شرکت انتخاب کنید.");
+            return;
+        }
+        Commit(data =>
+        {
+            if (!data.Companies.Any(company => company.Id == selected.Id))
+                throw new InvalidOperationException("پروفایل انتخاب‌شده پیدا نشد.");
+            data.ActiveCompanyId = selected.Id;
+        }, "پروفایل شرکت فعال برای سربرگ فاکتور انتخاب شد.");
+    }
+
+    private void SaveCompanyProfile_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (CompanyProfileSelector.SelectedItem is not CompanyProfileRecord selected)
+        {
+            MessageBox.Show(this, "برای ذخیره ابتدا پروفایل شرکت را انتخاب کنید.");
+            return;
+        }
+        var name = CompanyProfileName.Text.Trim();
+        if (name.Length < 2)
+        {
+            MessageBox.Show(this, "نام شرکت باید دست‌کم دو نویسه باشد.");
+            return;
+        }
+        Commit(data =>
+        {
+            var company = data.Companies.FirstOrDefault(item => item.Id == selected.Id)
+                ?? throw new InvalidOperationException("پروفایل شرکت پیدا نشد.");
+            company.Name = name;
+            company.LegalName = CompanyLegalName.Text.Trim();
+            company.NationalId = CompanyNationalId.Text.Trim();
+            company.TaxId = CompanyTaxId.Text.Trim();
+            company.Phone = CompanyProfilePhone.Text.Trim();
+            company.Branch = string.IsNullOrWhiteSpace(CompanyProfileBranch.Text) ? "مرکزی" : CompanyProfileBranch.Text.Trim();
+            company.Address = CompanyProfileAddress.Text.Trim();
+        }, "مشخصات پروفایل شرکت ذخیره شد.");
+    }
+
+    private void SaveAccountingPreferences_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        decimal taxRate;
+        try { taxRate = PersianNumberParser.ParseDecimal(SettingsTaxRate.Text, "نرخ مالیات"); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "تنظیمات حسابداری", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (taxRate < 0m || taxRate > 100m)
+        {
+            MessageBox.Show(this, "نرخ مالیات باید بین صفر تا ۱۰۰ درصد باشد.");
+            return;
+        }
+        var theme = (InvoiceThemeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "smart";
+        var currency = (SettingsCurrencySelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "RIAL";
+        Commit(data =>
+        {
+            data.Preferences = new AccountingPreferences
+            {
+                InvoiceTheme = theme,
+                ShowInvoiceQr = SettingsShowInvoiceQr.IsChecked == true,
+                Currency = currency,
+                DefaultTaxRatePercent = taxRate,
+                SalesInvoicePrefix = string.IsNullOrWhiteSpace(SettingsInvoicePrefix.Text) ? "INV-" : SettingsInvoicePrefix.Text.Trim(),
+                InvoiceFooter = SettingsInvoiceFooter.Text.Trim()
+            };
+        }, "تنظیمات حسابداری ذخیره شد؛ در پیش‌نمایش‌های بعدی اعمال می‌شود.");
+    }
+
+    private void SaveMoadianSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var apiBase = MoadianApiBaseUrl.Text.Trim();
+        if (!string.IsNullOrWhiteSpace(apiBase))
+        {
+            try { apiBase = ApiEndpointPolicy.ValidateBaseAddress(apiBase).ToString(); }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "نشانی API مؤدیان", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+        }
+        var environment = (MoadianEnvironmentSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "Sandbox";
+        Commit(data =>
+        {
+            data.MoadianSettings = new MoadianSettingsRecord
+            {
+                TaxpayerId = MoadianTaxpayerId.Text.Trim(),
+                Environment = environment,
+                ApiBaseUrl = apiBase,
+                IsConfigured = MoadianIsConfigured.IsChecked == true
+            };
+        }, "پروفایل محلی مؤدی ذخیره شد؛ ارسال رسمی هنوز فعال نیست.");
+    }
+
+    private void BuildMoadianPayload_Click(object sender, RoutedEventArgs e)
+    {
+        var invoice = InvoicesGrid.SelectedItem as InvoiceRecord
+            ?? _data.Invoices.LastOrDefault(item => item.Type == "SALE" && item.Status != "لغو شده");
+        if (invoice is null)
+        {
+            MessageBox.Show(this, "برای ساخت JSON نمونه ابتدا یک فاکتور فروش ثبت و انتخاب کنید.");
+            return;
+        }
+
+        var payload = new
+        {
+            previewOnly = true,
+            submitted = false,
+            environment = _data.MoadianSettings.Environment,
+            taxpayerId = _data.MoadianSettings.TaxpayerId,
+            company = ActiveCompanyProfile()?.LegalName,
+            invoice = new
+            {
+                number = invoice.Number,
+                trackingCode = invoice.TrackingCode,
+                date = FormatPersianDate(invoice.CreatedAt),
+                customer = invoice.CustomerName,
+                total = invoice.Total,
+                discount = invoice.Discount,
+                tax = invoice.TaxAmount,
+                items = invoice.Lines.Select(line => new
+                {
+                    product = line.ProductName,
+                    quantity = line.Quantity,
+                    unitPrice = line.UnitPrice,
+                    lineTotal = line.LineTotal
+                }).ToList()
+            },
+            note = "این JSON نمونه برای بازبینی رابط است؛ قالب رسمی و ارسال API پیاده‌سازی نشده است."
+        };
+        MoadianPayloadPreview.Text = JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = true });
+        FooterStatus.Text = "JSON نمونه ساخته شد؛ هیچ درخواستی به سامانهٔ مؤدیان ارسال نشده است.";
+    }
+
+    private void SaveServerConnection_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        Uri baseAddress;
+        try { baseAddress = ApiEndpointPolicy.ValidateBaseAddress(ServerBaseUrl.Text); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "نشانی سرور", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var syncMode = (ServerSyncModeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "manual";
+        Commit(data =>
+        {
+            data.ServerConnection = new ServerConnectionSettings
+            {
+                BaseUrl = baseAddress.ToString(),
+                WorkspaceId = ServerWorkspaceId.Text.Trim(),
+                SyncMode = syncMode
+            };
+        }, "تنظیمات اتصال امن ذخیره شد؛ همگام‌سازی داده‌های مالی هنوز غیرفعال است.");
+    }
+
+    private void ValidateServerConnection_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var baseAddress = ApiEndpointPolicy.ValidateBaseAddress(ServerBaseUrl.Text);
+            ServerConnectionStatusText.Text = "نشانی HTTPS معتبر: " + baseAddress.Host + "؛ API یا همگام‌سازی ارسال/آزمون نشد.";
+            FooterStatus.Text = "فقط قالب نشانی سرور اعتبارسنجی شد؛ هیچ دادهٔ حسابداری ارسال نشده است.";
+        }
+        catch (Exception ex)
+        {
+            ServerConnectionStatusText.Text = "نشانی نامعتبر: " + ex.Message;
+            MessageBox.Show(this, ex.Message, "اعتبارسنجی نشانی HTTPS", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     // Native navigation mirrors the existing Ashke Ghalam sidebar. Unported pages are
     // deliberately marked as pending instead of being represented by fake functionality.
     private sealed record NativeModuleLink(string Title, string Group, string OriginalRoute, int? NativeTabIndex);
