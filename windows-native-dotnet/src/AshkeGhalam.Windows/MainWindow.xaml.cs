@@ -99,6 +99,16 @@ public partial class MainWindow : Window
                     CheckStatusLabel(c.Status), c.IsHighPriority ? "اولویت‌دار" : "عادی", c.PersonName))
                 .ToList();
         }
+        if (FindName("VouchersGrid") is DataGrid vouchersGrid)
+        {
+            vouchersGrid.ItemsSource = null;
+            vouchersGrid.ItemsSource = _data.Vouchers.OrderByDescending(v => v.Number)
+                .Select(v => new VoucherGridRow(v, v.Number, v.TrackingCode, VoucherTypeLabel(v.Type),
+                    FormatPersianDate(v.Date), v.PersonName, v.Items.Count,
+                    v.Items.Sum(i => i.Quantity), v.EstimatedValue, VoucherStatusLabel(v.Status),
+                    VoucherMovementTypeLabel(v.MovementType), v.Notes))
+                .ToList();
+        }
         RecentInvoicesGrid.ItemsSource = null;
         RecentInvoicesGrid.ItemsSource = _data.Invoices.OrderByDescending(i => i.Number).Take(10).ToList();
 
@@ -433,6 +443,69 @@ public partial class MainWindow : Window
 
     private static string CsvEscape(string? value) => "\"" + (value ?? "").Replace("\"", "\"\"") + "\"";
 
+    private void AddVoucher_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (_data.Products.Count == 0)
+        { MessageBox.Show(this, "برای ثبت حواله ابتدا کالا ثبت کنید.", "پیش‌نیاز حواله", MessageBoxButton.OK, MessageBoxImage.Information); return; }
+        var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices);
+        if (dialog.ShowDialog() == true && dialog.Result is VoucherRecord voucher)
+            Commit(data => AccountingOperations.CreateVoucher(data, voucher), "حواله ثبت و گردش موجودی به‌صورت اتمی ذخیره شد");
+    }
+
+    private void AdvanceVoucherStatus_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (FindName("VouchersGrid") is not DataGrid grid || grid.SelectedItem is not VoucherGridRow row)
+        { MessageBox.Show(this, "ابتدا یک حواله را انتخاب کنید."); return; }
+        var current = row.Record.Status;
+        var next = current switch { "PENDING" => "IN_TRANSIT", "IN_TRANSIT" => "DELIVERED", _ => "" };
+        if (string.IsNullOrEmpty(next)) { MessageBox.Show(this, "این حواله تحویل نهایی شده است."); return; }
+        var message = next == "IN_TRANSIT" ? "وضعیت حواله به «در مسیر» تغییر کند؟" : "تحویل حواله تأیید و زمان تحویل ثبت شود؟";
+        if (MessageBox.Show(this, message, "تغییر وضعیت حواله", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Commit(data => AccountingOperations.ChangeVoucherStatus(data, row.Record.Id, next),
+            next == "DELIVERED" ? "تحویل حواله ثبت شد" : "حواله به وضعیت در مسیر تغییر کرد");
+    }
+
+    private void DeleteVoucher_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (FindName("VouchersGrid") is not DataGrid grid || grid.SelectedItem is not VoucherGridRow row)
+        { MessageBox.Show(this, "ابتدا یک حواله را انتخاب کنید."); return; }
+        if (row.Record.Status != "PENDING")
+        { MessageBox.Show(this, "برای جلوگیری از حذف سند در مسیر یا تحویل‌شده، فقط حوالهٔ در انتظار قابل حذف است.", "حذف محدود شده", MessageBoxButton.OK, MessageBoxImage.Warning); return; }
+        if (MessageBox.Show(this, $"حواله شماره {row.Record.Number} حذف و اثر موجودی آن برگشت داده شود؟", "تأیید حذف", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        Commit(data => AccountingOperations.DeleteVoucher(data, row.Record.Id), "حواله حذف و گردش موجودی آن برگشت داده شد");
+    }
+
+    private void ExportVouchers_Click(object sender, RoutedEventArgs e) =>
+        ExportCsv("inventory-vouchers.csv", new[] { "Number", "TrackingCode", "Date", "Type", "MovementType", "PersonName", "RelatedInvoiceId", "Items", "TotalWeight", "EstimatedValue", "Status", "VehicleNumber", "Supervisor", "ReceiverPhone", "ReturnReason", "Notes" },
+            _data.Vouchers.OrderBy(v => v.Number).Select(v => new[]
+            {
+                v.Number.ToString(CultureInfo.InvariantCulture), v.TrackingCode, FormatPersianDate(v.Date), v.Type, v.MovementType,
+                v.PersonName, v.RelatedInvoiceId, string.Join("؛ ", v.Items.Select(i => $"{i.ProductName} ({i.Quantity:N2} {i.Unit})")),
+                v.TotalWeight.ToString(CultureInfo.InvariantCulture), v.EstimatedValue.ToString(CultureInfo.InvariantCulture),
+                VoucherStatusLabel(v.Status), v.VehicleNumber, v.Supervisor, v.ReceiverPhone, v.ReturnReason, v.Notes
+            }));
+
+    private static string VoucherTypeLabel(string type) => type switch
+    { "IN" => "ورود کالا", "OUT" => "خروج کالا", "RETURN" => "برگشت کالا", _ => type };
+
+    private static string VoucherStatusLabel(string status) => status switch
+    { "PENDING" => "در انتظار", "IN_TRANSIT" => "در مسیر", "DELIVERED" => "تحویل‌شده", _ => status };
+
+    private static string VoucherMovementTypeLabel(string type) => type switch
+    {
+        "GOODS_RECEIPT" => "رسید خرید", "GOODS_ISSUE" => "حواله فروش",
+        "INVENTORY_ADJUSTMENT" => "تعدیل موجودی", "PRODUCTION_CONSUMPTION" => "مصرف تولید",
+        "PRODUCTION_OUTPUT" => "خروجی تولید", "RETURN_RECEIPT" => "برگشت از فروش",
+        "RETURN_ISSUE" => "برگشت از خرید", "INTERNAL_TRANSFER" => "انتقال انبار", _ => type
+    };
+
+    private sealed record VoucherGridRow(VoucherRecord Record, int Number, string TrackingCode, string TypeLabel,
+        string DateLabel, string PersonName, int ItemCount, decimal QuantityTotal, decimal EstimatedValue,
+        string StatusLabel, string MovementTypeLabel, string Notes);
+
     private void AddCheck_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
@@ -551,6 +624,7 @@ public partial class MainWindow : Window
             ["invoices"] = new("فاکتورها", "منوی اصلی", "/invoices", 3),
             ["inventory"] = new("انبارداری", "منوی اصلی", "/inventory", 2),
             ["checks"] = new("مدیریت چک", "منوی اصلی", "/checks", 8),
+            ["vouchers"] = new("حواله‌های انبار", "عملیات محلی موجود", "/inventory (حواله‌های انبار)", 9),
             ["finance"] = new("امور مالی", "منوی اصلی", "/finance", null),
             ["customers"] = new("اشخاص", "منوی اصلی", "/customers", 1),
             ["reports"] = new("گزارشات عمومی", "گزارشات و تحلیل", "/reports", 6),
