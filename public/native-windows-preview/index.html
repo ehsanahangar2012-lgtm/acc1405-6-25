@@ -134,6 +134,16 @@
     <div class="modal-foot"><div class="muted" id="formHint">فیلدهای دارای * الزامی هستند.</div><div><button class="btn" data-close="formOverlay">انصراف</button> <button class="btn primary" id="saveForm">ذخیره آزمایشی</button></div></div>
   </div>
 </div>
+<div class="overlay" id="inlineEntityOverlay" role="dialog" aria-modal="true" aria-labelledby="inlineEntityTitle" style="z-index:30">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="inlineEntityTitle">ثبت سریع</div><button class="btn small" data-close="inlineEntityOverlay" aria-label="بستن">✕</button></div>
+    <div class="modal-body">
+      <div class="panel-note" style="margin-bottom:14px">این فرم داخل فاکتور باز می‌شود؛ فرم و اقلام فاکتور حفظ می‌شوند. داده‌ها فقط نمونه و محلی هستند.</div>
+      <div id="inlineEntityBody"></div>
+    </div>
+    <div class="modal-foot"><div class="muted">کد پیشنهادی خودکار است؛ کد تکراری پذیرفته نمی‌شود.</div><div><button class="btn" data-close="inlineEntityOverlay">انصراف</button> <button class="btn primary" id="inlineEntitySave">ذخیره و بازگشت به فاکتور</button></div></div>
+  </div>
+</div>
 <div class="overlay" id="invoiceOverlay" role="dialog" aria-modal="true" aria-labelledby="invoicePreviewTitle">
   <div class="modal wide">
     <div class="modal-head"><div><div class="modal-title" id="invoicePreviewTitle">پیش‌نمایش فاکتور</div><div class="panel-note">نمایشی برای کنترل جدول و جمع‌ها پیش از چاپ</div></div><button class="btn small" data-close="invoiceOverlay">✕ بستن</button></div>
@@ -187,6 +197,7 @@
   let currentPage = 'dashboard';
   let formMode = null;
   let selectedInvoiceId = null;
+  let inlineEntityMode = null;
   let draftLines = [];
   let toastTimer;
 
@@ -279,6 +290,102 @@
   const field = (label,name,value='',type='text',full=false,required=false) => '<div class="field-wrap '+(full?'full':'')+'"><label class="field-label" for="f_'+name+'">'+esc(label)+(required?' *':'')+'</label><input class="field" id="f_'+name+'" name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+(required?'required':'')+'></div>';
   const textarea = (label,name,value='',full=true) => '<div class="field-wrap '+(full?'full':'')+'"><label class="field-label" for="f_'+name+'">'+esc(label)+'</label><textarea class="field" id="f_'+name+'" name="'+name+'">'+esc(value)+'</textarea></div>';
   const selectField = (label,name,options,selected='',full=false) => '<div class="field-wrap '+(full?'full':'')+'"><label class="field-label" for="f_'+name+'">'+esc(label)+'</label><select class="field" id="f_'+name+'" name="'+name+'">'+options.map(([v,l])=>'<option value="'+esc(v)+'" '+(v===selected?'selected':'')+'>'+esc(l)+'</option>').join('')+'</select></div>';
+  const eligibleInvoiceCustomers = type => state.customers.filter(c =>
+    type === 'PURCHASE'
+      ? ['تأمین‌کننده','هر دو'].includes(c.role)
+      : ['مشتری','هر دو'].includes(c.role)
+  );
+  const refreshInvoiceCustomerOptions = preferredId => {
+    const select = $('f_customerId');
+    if (!select) return;
+    const previous = preferredId || select.value;
+    const customers = eligibleInvoiceCustomers($('f_type')?.value || 'SALE');
+    select.innerHTML = customers.map(c => '<option value="'+esc(c.id)+'">'+esc(c.name)+'</option>').join('');
+    select.value = customers.some(c => c.id === previous) ? previous : (customers[0]?.id || '');
+  };
+  const refreshInvoiceProductOptions = preferredId => {
+    const select = $('f_lineProduct');
+    if (!select) return;
+    const previous = preferredId || select.value;
+    select.innerHTML = state.products.map(p => '<option value="'+esc(p.id)+'">'+esc(p.name+' — '+p.code)+'</option>').join('');
+    select.value = state.products.some(p => p.id === previous) ? previous : (state.products[0]?.id || '');
+    select.dispatchEvent(new Event('change'));
+  };
+  const openInlineEntity = mode => {
+    inlineEntityMode = mode;
+    const body = $('inlineEntityBody');
+    if (mode === 'customer') {
+      $('inlineEntityTitle').textContent = 'ثبت شخص از داخل فاکتور';
+      const code = nextCode(state.customers, 'code', 'CUS-');
+      body.innerHTML = '<div class="form-grid">'
+        + '<div class="field-wrap"><label class="field-label" for="quickCode">کد شخص *</label><input class="field" id="quickCode" value="'+esc(code)+'" required></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickName">نام شخص / شرکت *</label><input class="field" id="quickName" required placeholder="نام مشتری یا تأمین‌کننده"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickRole">نقش طرف حساب *</label><select class="field" id="quickRole"><option value="مشتری">مشتری</option><option value="تأمین‌کننده">تأمین‌کننده</option><option value="هر دو">مشتری و تأمین‌کننده</option></select></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickCategory">دسته‌بندی</label><input class="field" id="quickCategory" value="عمومی"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickPhone">تلفن</label><input class="field" id="quickPhone" inputmode="tel"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickEmail">ایمیل</label><input class="field" id="quickEmail" type="email"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickNationalId">شناسه ملی</label><input class="field" id="quickNationalId"></div>'
+        + '<div class="field-wrap full"><label class="field-label" for="quickAddress">نشانی</label><input class="field" id="quickAddress"></div>'
+        + '<div class="field-wrap full"><label class="field-label" for="quickNotes">یادداشت</label><textarea class="field" id="quickNotes" rows="2"></textarea></div></div>';
+    } else if (mode === 'product') {
+      $('inlineEntityTitle').textContent = 'ثبت کالا از داخل فاکتور';
+      const code = nextCode(state.products, 'code', 'SKU-');
+      body.innerHTML = '<div class="form-grid">'
+        + '<div class="field-wrap"><label class="field-label" for="quickCode">کد کالا *</label><input class="field" id="quickCode" value="'+esc(code)+'" required></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickName">نام کالا *</label><input class="field" id="quickName" required placeholder="نام دقیق کالا"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickSerial">شماره سریال</label><input class="field" id="quickSerial"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickUnit">واحد</label><input class="field" id="quickUnit" value="عدد"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickCategory">دسته‌بندی</label><input class="field" id="quickCategory"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickShelf">قفسه / محل انبار</label><input class="field" id="quickShelf"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickStock">موجودی اولیه</label><input class="field" id="quickStock" type="number" min="0" value="0"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickMin">حداقل موجودی</label><input class="field" id="quickMin" type="number" min="0" value="0"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickBuy">قیمت خرید</label><input class="field" id="quickBuy" type="number" min="0" value="0"></div>'
+        + '<div class="field-wrap"><label class="field-label" for="quickSell">قیمت فروش</label><input class="field" id="quickSell" type="number" min="0" value="0"></div></div>';
+    } else {
+      return;
+    }
+    $('inlineEntityOverlay').classList.add('open');
+    const focus = $('inlineEntityBody').querySelector('input:not([readonly])');
+    if (focus) focus.focus();
+  };
+  const saveInlineEntity = () => {
+    const read = id => $(id)?.value?.trim() || '';
+    const code = read('quickCode'), name = read('quickName');
+    if (name.length < 2 || !code) { toast('نام و کد معتبر وارد کن.'); return; }
+    if (inlineEntityMode === 'customer') {
+      if (state.customers.some(x => String(x.code).toLowerCase() === code.toLowerCase())) {
+        toast('کد شخص تکراری است.'); return;
+      }
+      const customer = {
+        id: crypto.randomUUID(), code, name, role: read('quickRole') || 'مشتری',
+        category: read('quickCategory') || 'عمومی', phone: read('quickPhone'),
+        email: read('quickEmail'), nationalId: read('quickNationalId'),
+        address: read('quickAddress'), notes: read('quickNotes'), createdAt: todayIso()
+      };
+      state.customers.push(customer);
+      persist(); renderAll(); refreshInvoiceCustomerOptions(customer.id);
+      $('inlineEntityOverlay').classList.remove('open');
+      toast('شخص نمونه ثبت شد؛ فاکتور باز ماند.');
+    } else if (inlineEntityMode === 'product') {
+      if (state.products.some(x => String(x.code).toLowerCase() === code.toLowerCase())) {
+        toast('کد کالا تکراری است.'); return;
+      }
+      const number = id => Number(read(id) || 0);
+      const stock=number('quickStock'), min=number('quickMin'), buy=number('quickBuy'), sell=number('quickSell');
+      if (![stock,min,buy,sell].every(v => Number.isFinite(v) && v >= 0)) {
+        toast('موجودی و قیمت باید صفر یا مثبت باشند.'); return;
+      }
+      const product = {
+        id: crypto.randomUUID(), code, name, serial: read('quickSerial'),
+        unit: read('quickUnit') || 'عدد', category: read('quickCategory'),
+        shelf: read('quickShelf'), stock, reserved: 0, min, buy, sell
+      };
+      state.products.push(product);
+      persist(); renderAll(); refreshInvoiceProductOptions(product.id);
+      $('inlineEntityOverlay').classList.remove('open');
+      toast('کالای نمونه ثبت شد؛ فاکتور باز ماند.');
+    }
+  };
   const openForm = mode => {
     formMode=mode;draftLines=[];
     const body=$('formBody');let title='',html='';
@@ -289,11 +396,11 @@
       title='ثبت سریع کالا';const code=nextCode(state.products,'code','SKU-');
       html='<div class="panel-note" style="margin-bottom:14px">کد کالا هنگام بازشدن فرم پیشنهاد شده و هنگام ذخیره تکراری‌بودن آن کنترل می‌شود.</div><div class="form-grid">'+field('کد کالا','code',code,'text',false,true)+field('نام کالا','name','','text',false,true)+field('شماره سریال','serial')+field('واحد','unit','عدد')+field('دسته‌بندی','category')+field('قفسه / محل انبار','shelf')+field('موجودی اولیه','stock','0','number',false,true)+field('حداقل موجودی','min','0','number')+field('قیمت خرید','buy','0','number')+field('قیمت فروش','sell','0','number')+'</div>';
     }else if(mode==='invoice'){
-      title='صدور سند جدید';if(!state.customers.length||!state.products.length){toast('برای فاکتور، ابتدا شخص و کالا ثبت کن.');return}
-      const customerOptions=state.customers.filter(c=>c.role!=='تأمین‌کننده').map(c=>[c.id,c.name]);
+      title='صدور سند جدید';
+      const customerOptions=eligibleInvoiceCustomers('SALE').map(c=>[c.id,c.name]);
       const prefix=(type)=>type==='SALE'?'INV-':type==='PURCHASE'?'PUR-':'PRO-';
       const num=(type)=>String(Math.max(type==='SALE'?1000:type==='PURCHASE'?3000:2000,...state.invoices.filter(i=>i.type===type).map(i=>i.number||0))+1).padStart(4,'0');
-      html='<div class="form-grid">'+selectField('نوع سند','type',[['SALE','فاکتور فروش'],['PURCHASE','فاکتور خرید'],['PROFORMA','پیش‌فاکتور']],'SALE')+selectField('طرف حساب','customerId',customerOptions,customerOptions[0]?.[0]||'')+field('شماره پیشنهادی','numberPreview','INV-'+num('SALE'),'text',false,true)+field('تاریخ صدور','date',todayIso(),'date')+field('سررسید (اختیاری)','due','','date')+field('تخفیف مبلغی','discount','0','number')+field('مالیات مبلغی','tax','0','number')+field('دریافت نقدی اولیه','cash','0','number')+field('شرح فاکتور','description','')+'</div><div class="panel-head" style="margin-top:18px"><div class="panel-title">اقلام فاکتور</div><span class="badge" id="draftLineCount">۰ قلم</span></div><div class="form-grid">'+selectField('کالا','lineProduct',state.products.map(p=>[p.id,p.name+' — '+p.code]),state.products[0]?.id||'')+field('تعداد','lineQty','1','number')+field('قیمت واحد','linePrice',String(state.products[0]?.sell||0),'number')+field('شرح قلم','lineDesc')+'</div><div class="toolbar" style="margin-top:10px"><button type="button" class="btn" id="addDraftLine">＋ افزودن قلم به فاکتور</button><span class="muted" id="draftSubtotal">جمع اقلام: ۰</span></div><div class="table-wrap"><table><thead><tr><th>کد</th><th>نام کالا</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th><th></th></tr></thead><tbody id="draftLinesBody"></tbody></table></div><div class="invoice-total"><div>جمع اقلام<br><strong id="draftSubtotalBig">۰</strong></div><div>مبلغ نهایی<br><strong id="draftTotalBig">۰</strong></div><div>مانده پس از نقدی<br><strong id="draftRemaining">۰</strong></div></div><div class="footnote">ثبت این فرم فقط در داده‌های نمونهٔ مرورگر انجام می‌شود؛ در WPF اصلی نیز شماره‌گذاری، موجودی و کنترل‌های مالی باید جداگانه آزمون شوند.</div>';
+      html='<div class="form-grid">'+selectField('نوع سند','type',[['SALE','فاکتور فروش'],['PURCHASE','فاکتور خرید'],['PROFORMA','پیش‌فاکتور']],'SALE')+selectField('طرف حساب','customerId',customerOptions,customerOptions[0]?.[0]||'')+'<div class="field-wrap"><label class="field-label">ثبت سریع</label><button type="button" class="btn" id="quickAddCustomerFromInvoice">＋ ثبت شخص جدید</button></div>'+field('شماره پیشنهادی','numberPreview','INV-'+num('SALE'),'text',false,true)+field('تاریخ صدور','date',todayIso(),'date')+field('سررسید (اختیاری)','due','','date')+field('تخفیف مبلغی','discount','0','number')+field('مالیات مبلغی','tax','0','number')+field('دریافت نقدی اولیه','cash','0','number')+field('شرح فاکتور','description','')+'</div><div class="panel-head" style="margin-top:18px"><div class="panel-title">اقلام فاکتور</div><span class="badge" id="draftLineCount">۰ قلم</span></div><div class="form-grid">'+selectField('کالا','lineProduct',state.products.map(p=>[p.id,p.name+' — '+p.code]),state.products[0]?.id||'')+'<div class="field-wrap"><label class="field-label">ثبت سریع</label><button type="button" class="btn" id="quickAddProductFromInvoice">＋ ثبت کالای جدید</button></div>'+field('تعداد','lineQty','1','number')+field('قیمت واحد','linePrice',String(state.products[0]?.sell||0),'number')+field('شرح قلم','lineDesc')+'</div><div class="toolbar" style="margin-top:10px"><button type="button" class="btn" id="addDraftLine">＋ افزودن قلم به فاکتور</button><span class="muted" id="draftSubtotal">جمع اقلام: ۰</span></div><div class="table-wrap"><table><thead><tr><th>کد</th><th>نام کالا</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th><th></th></tr></thead><tbody id="draftLinesBody"></tbody></table></div><div class="invoice-total"><div>جمع اقلام<br><strong id="draftSubtotalBig">۰</strong></div><div>مبلغ نهایی<br><strong id="draftTotalBig">۰</strong></div><div>مانده پس از نقدی<br><strong id="draftRemaining">۰</strong></div></div><div class="footnote">ثبت این فرم فقط در داده‌های نمونهٔ مرورگر انجام می‌شود؛ در WPF اصلی نیز شماره‌گذاری، موجودی و کنترل‌های مالی باید جداگانه آزمون شوند.</div>';
     }else if(mode==='payment'){
       title='ثبت دریافت / پرداخت';html='<div class="form-grid">'+selectField('جهت','direction',[['دریافت','دریافت'],['پرداخت','پرداخت']],'دریافت')+selectField('فاکتور مرتبط','invoice',state.invoices.map(i=>[i.tracking,i.tracking+' — '+i.customer]),state.invoices[0]?.tracking||'')+selectField('روش','method',[['نقدی','نقدی'],['بانک','انتقال بانکی'],['چک','چک']],'نقدی')+field('مبلغ','amount','0','number',false,true)+field('شماره مرجع / رسید','reference')+'</div>';
     }else if(mode==='expense'){
@@ -307,7 +414,7 @@
   };
   const wireDraftLines = () => {
     const updatePrice=()=>{const p=state.products.find(p=>p.id===$('f_lineProduct').value);if(p)$('f_linePrice').value=$('f_type').value==='SALE'?p.sell:p.buy};
-    const onType=()=>{const type=$('f_type').value;$('f_numberPreview').value=({SALE:'INV-',PURCHASE:'PUR-',PROFORMA:'PRO-'}[type])+String(Math.max(type==='SALE'?1000:type==='PURCHASE'?3000:2000,...state.invoices.filter(i=>i.type===type).map(i=>i.number||0))+1).padStart(4,'0');updatePrice();refreshInvoiceDraftTotals()};
+    const onType=()=>{const type=$('f_type').value;$('f_numberPreview').value=({SALE:'INV-',PURCHASE:'PUR-',PROFORMA:'PRO-'}[type])+String(Math.max(type==='SALE'?1000:type==='PURCHASE'?3000:2000,...state.invoices.filter(i=>i.type===type).map(i=>i.number||0))+1).padStart(4,'0');refreshInvoiceCustomerOptions();updatePrice();refreshInvoiceDraftTotals()};
     $('f_type').addEventListener('change',onType);$('f_lineProduct').addEventListener('change',updatePrice);
     $('addDraftLine').addEventListener('click',()=>{
       const p=state.products.find(p=>p.id===$('f_lineProduct').value);const qty=Number($('f_lineQty').value);const price=Number($('f_linePrice').value);
@@ -376,6 +483,8 @@
     const nav=e.target.closest('[data-page]');if(nav){go(nav.dataset.page);return}
     const link=e.target.closest('[data-page-link]');if(link){go(link.dataset.pageLink);return}
     const action=e.target.closest('[data-action]');if(action){const what=action.dataset.action;if(what==='preview-last'){const last=state.invoices[state.invoices.length-1];if(last)showInvoice(last.id);else toast('هنوز فاکتوری ثبت نشده است.')}else if(what==='export')exportJson();else openForm(what);return}
+    if(e.target.closest('#quickAddCustomerFromInvoice')){openInlineEntity('customer');return}
+    if(e.target.closest('#quickAddProductFromInvoice')){openInlineEntity('product');return}
     const preview=e.target.closest('[data-preview]');if(preview){showInvoice(preview.dataset.preview);return}
     const editC=e.target.closest('[data-edit-customer]');if(editC){toast('ویرایش کامل در نسخهٔ WPF پیاده‌سازی می‌شود؛ این پنجره برای آزمون چیدمان و ثبت نمونه است.');return}
     const editP=e.target.closest('[data-edit-product]');if(editP){toast('ویرایش کامل در نسخهٔ WPF پیاده‌سازی می‌شود؛ این پنجره برای آزمون چیدمان و ثبت نمونه است.');return}
@@ -383,6 +492,7 @@
     const close=e.target.closest('[data-close]');if(close){$(close.dataset.close).classList.remove('open');return}
   });
   $('saveForm').addEventListener('click',saveForm);
+  $('inlineEntitySave').addEventListener('click',saveInlineEntity);
   $('searchCustomers').addEventListener('input',renderCustomers);$('filterCustomerRole').addEventListener('change',renderCustomers);
   $('searchProducts').addEventListener('input',renderProducts);$('filterStock').addEventListener('change',renderProducts);
   $('searchInvoices').addEventListener('input',renderInvoices);$('filterInvoiceType').addEventListener('change',renderInvoices);
