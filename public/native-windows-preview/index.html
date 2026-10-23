@@ -95,23 +95,23 @@
       </div>
     </section>
     <section class="page" id="page-customers" hidden>
-      <div class="page-head"><div><div class="page-title">مدیریت اشخاص</div><div class="page-sub">کد یکتا، نقش مشتری/تأمین‌کننده، اطلاعات تماس، شناسه ملی و نشانی</div></div><div class="head-actions"><button class="btn primary" data-action="customer">＋ ثبت شخص</button><button class="btn" data-action="export">خروجی JSON</button></div></div>
+      <div class="page-head"><div><div class="page-title">مدیریت اشخاص</div><div class="page-sub">کد یکتا، نقش مشتری/تأمین‌کننده، اطلاعات تماس، شناسه ملی و نشانی</div></div><div class="head-actions"><button class="btn primary" data-action="customer">＋ ثبت شخص</button><button class="btn" data-export-csv="customers">خروجی CSV</button><button class="btn" data-action="export">خروجی JSON</button></div></div>
       <div class="panel"><div class="toolbar"><input class="search" id="searchCustomers" placeholder="جست‌وجو در کد، نام، تلفن یا نشانی…" aria-label="جست‌وجوی اشخاص"><select class="select" style="width:150px" id="filterCustomerRole"><option value="">همه نقش‌ها</option><option value="مشتری">مشتری</option><option value="تأمین‌کننده">تأمین‌کننده</option><option value="هر دو">هر دو نقش</option></select><span class="badge" id="customerCountLabel"></span></div><div class="table-wrap"><table><thead><tr><th>کد شخص</th><th>نام / شرکت</th><th>نقش</th><th>دسته‌بندی</th><th>تلفن</th><th>ایمیل</th><th>شناسه ملی</th><th>نشانی</th><th>تاریخ ثبت</th><th>عملیات</th></tr></thead><tbody id="customersBody"></tbody></table></div></div>
     </section>
     <section class="page" id="page-products" hidden>
-      <div class="page-head"><div><div class="page-title">کالا و انبار</div><div class="page-sub">کد کالا، سریال، واحد، دسته‌بندی، موجودی، آستانهٔ سفارش و قیمت‌ها</div></div><div class="head-actions"><button class="btn primary" data-action="product">＋ ثبت کالا</button><button class="btn" data-action="stock">↥ ورود موجودی</button></div></div>
+      <div class="page-head"><div><div class="page-title">کالا و انبار</div><div class="page-sub">کد کالا، سریال، واحد، دسته‌بندی، موجودی، آستانهٔ سفارش و قیمت‌ها</div></div><div class="head-actions"><button class="btn primary" data-action="product">＋ ثبت کالا</button><button class="btn" data-action="stock">↥ ورود موجودی</button><button class="btn" data-export-csv="products">خروجی CSV</button></div></div>
       <div class="panel"><div class="toolbar"><input class="search" id="searchProducts" placeholder="جست‌وجو در کد، نام، دسته، سریال یا قفسه…" aria-label="جست‌وجوی کالا"><select class="select" style="width:150px" id="filterStock"><option value="">همهٔ موجودی‌ها</option><option value="low">موجودی کم</option><option value="ok">موجودی مناسب</option></select><span class="badge" id="productCountLabel"></span></div><div class="table-wrap"><table><thead><tr><th>کد کالا</th><th>نام کالا</th><th>سریال</th><th>دسته‌بندی</th><th>واحد</th><th>موجودی</th><th>رزرو</th><th>حداقل</th><th>قیمت خرید</th><th>قیمت فروش</th><th>قفسه</th><th>عملیات</th></tr></thead><tbody id="productsBody"></tbody></table></div></div>
     </section>
     <section class="page" id="page-invoices" hidden>
-      <div class="page-head"><div><div class="page-title">فاکتورها و پیش‌فاکتورها</div><div class="page-sub">شماره‌گذاری خودکار، ردیف کالاها، مالیات و تخفیف، سررسید و پیش‌نمایش چاپ</div></div><div class="head-actions"><button class="btn primary" data-action="invoice">＋ سند جدید</button></div></div>
+      <div class="page-head"><div><div class="page-title">فاکتورها و پیش‌فاکتورها</div><div class="page-sub">شماره‌گذاری خودکار، ردیف کالاها، مالیات و تخفیف، سررسید و پیش‌نمایش چاپ</div></div><div class="head-actions"><button class="btn primary" data-action="invoice">＋ سند جدید</button><button class="btn" data-export-csv="invoices">خروجی CSV</button></div></div>
       <div class="panel"><div class="toolbar"><input class="search" id="searchInvoices" placeholder="جست‌وجو در شماره، طرف حساب یا شرح…" aria-label="جست‌وجوی فاکتورها"><select class="select" style="width:160px" id="filterInvoiceType"><option value="">همهٔ انواع</option><option value="SALE">فروش</option><option value="PURCHASE">خرید</option><option value="PROFORMA">پیش‌فاکتور</option></select><span class="badge" id="invoiceCountLabel"></span></div><div class="table-wrap"><table><thead><tr><th>نوع</th><th>شماره سند</th><th>کد پیگیری</th><th>طرف حساب</th><th>شرح</th><th>جمع کالا</th><th>تخفیف</th><th>مالیات</th><th>مبلغ نهایی</th><th>سررسید</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="invoicesBody"></tbody></table></div></div>
     </section>
     <section class="page" id="page-payments" hidden>
-      <div class="page-head"><div><div class="page-title">دریافت‌ها و پرداخت‌ها</div><div class="page-sub">تراکنش‌های محلی نمونه برای گردش کار رابط</div></div><button class="btn primary" data-action="payment">＋ ثبت دریافت/پرداخت</button></div>
+      <div class="page-head"><div><div class="page-title">دریافت‌ها و پرداخت‌ها</div><div class="page-sub">تراکنش‌های محلی نمونه برای گردش کار رابط</div></div><div class="head-actions"><button class="btn primary" data-action="payment">＋ ثبت دریافت/پرداخت</button><button class="btn" data-export-csv="payments">خروجی CSV</button></div></div>
       <div class="panel"><div class="panel-head"><div class="panel-title">تراکنش‌های ثبت‌شده</div><span class="badge">آزمایشی</span></div><div class="table-wrap"><table><thead><tr><th>تاریخ</th><th>نوع</th><th>شماره فاکتور</th><th>طرف حساب</th><th>روش</th><th>مبلغ</th><th>مرجع</th></tr></thead><tbody id="paymentsBody"></tbody></table></div></div>
     </section>
     <section class="page" id="page-expenses" hidden>
-      <div class="page-head"><div><div class="page-title">هزینه‌ها</div><div class="page-sub">ثبت مبلغ، دسته‌بندی، توضیحات و کنترل خروجی نقدی</div></div><button class="btn primary" data-action="expense">＋ ثبت هزینه</button></div>
+      <div class="page-head"><div><div class="page-title">هزینه‌ها</div><div class="page-sub">ثبت مبلغ، دسته‌بندی، توضیحات و کنترل خروجی نقدی</div></div><div class="head-actions"><button class="btn primary" data-action="expense">＋ ثبت هزینه</button><button class="btn" data-export-csv="expenses">خروجی CSV</button></div></div>
       <div class="panel"><div class="panel-head"><div class="panel-title">فهرست هزینه‌های نمونه</div></div><div class="table-wrap"><table><thead><tr><th>تاریخ</th><th>عنوان هزینه</th><th>دسته‌بندی</th><th>مبلغ</th><th>یادداشت</th></tr></thead><tbody id="expensesBody"></tbody></table></div></div>
     </section>
     <section class="page" id="page-forecast" hidden>
@@ -470,6 +470,25 @@
     }
     persist();$('formOverlay').classList.remove('open');toast('عملیات آزمایشی ذخیره شد.');renderAll();
   };
+  const exportVisibleTableCsv = (bodyId, filename, excludeOperations = false) => {
+    const body = $(bodyId);
+    const table = body?.closest('table');
+    if (!table) { toast('جدول برای خروجی CSV پیدا نشد.'); return; }
+    const headers = [...table.querySelectorAll('thead th')].map(th => th.innerText.trim());
+    const visibleHeaders = excludeOperations ? headers.slice(0, -1) : headers;
+    const rows = [...body.querySelectorAll('tr')]
+      .filter(row => !row.querySelector('td.empty'))
+      .map(row => [...row.querySelectorAll('td')].slice(0, visibleHeaders.length).map(td => td.innerText.trim()));
+    const quote = value => '"' + String(value ?? '').replace(/"/g, '""') + '"';
+    const csv = '\uFEFF' + [visibleHeaders, ...rows].map(row => row.map(quote).join(',')).join('\r\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url; link.download = filename; link.style.display = 'none';
+    document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast('خروجی CSV جدول آماده شد.');
+  };
   const showInvoice = id => {
     const i=state.invoices.find(x=>x.id===id);if(!i){toast('فاکتور پیدا نشد.');return}selectedInvoiceId=id;
     const type=typeLabel(i.type);
@@ -486,6 +505,19 @@
     const action=e.target.closest('[data-action]');if(action){const what=action.dataset.action;if(what==='preview-last'){const last=state.invoices[state.invoices.length-1];if(last)showInvoice(last.id);else toast('هنوز فاکتوری ثبت نشده است.')}else if(what==='export')exportJson();else openForm(what);return}
     if(e.target.closest('#quickAddCustomerFromInvoice')){openInlineEntity('customer');return}
     if(e.target.closest('#quickAddProductFromInvoice')){openInlineEntity('product');return}
+    const csv=e.target.closest('[data-export-csv]');
+    if(csv){
+      const mapping={
+        customers:['customersBody','ashkghalam-people.csv',true],
+        products:['productsBody','ashkghalam-products.csv',true],
+        invoices:['invoicesBody','ashkghalam-invoices.csv',true],
+        payments:['paymentsBody','ashkghalam-payments.csv',false],
+        expenses:['expensesBody','ashkghalam-expenses.csv',false]
+      };
+      const config=mapping[csv.dataset.exportCsv];
+      if(config)exportVisibleTableCsv(...config);
+      return;
+    }
     const preview=e.target.closest('[data-preview]');if(preview){showInvoice(preview.dataset.preview);return}
     const editC=e.target.closest('[data-edit-customer]');if(editC){toast('ویرایش کامل در نسخهٔ WPF پیاده‌سازی می‌شود؛ این پنجره برای آزمون چیدمان و ثبت نمونه است.');return}
     const editP=e.target.closest('[data-edit-product]');if(editP){toast('ویرایش کامل در نسخهٔ WPF پیاده‌سازی می‌شود؛ این پنجره برای آزمون چیدمان و ثبت نمونه است.');return}
