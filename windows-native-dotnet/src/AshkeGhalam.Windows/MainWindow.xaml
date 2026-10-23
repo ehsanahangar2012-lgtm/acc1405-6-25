@@ -172,7 +172,7 @@
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                     <StackPanel>
                         <TextBlock Text="مدیریت اشخاص" FontSize="23" FontWeight="Bold"/>
-                        <TextBlock Text="مدل پرونده از نسخهٔ اصلی توسعه یافته است: کد، نقش مشتری/تأمین‌کننده، دسته‌بندی، اطلاعات تماس و یادداشت. ماندهٔ حساب هنوز با انتقال دفترکل اصلی محاسبه نمی‌شود." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <TextBlock Text="پرونده شامل کد، نقش، دسته‌بندی و اطلاعات تماس است. برای گردش بدهکار/بستانکار، فاکتورها، دریافت/پرداخت و چک‌های مستقل، «کاردکس مالی شخص انتخابی» را باز کنید؛ هزینه‌های مستقیم شخص و برخی گردش‌های قدیمی هنوز نیازمند تطبیق بیشترند." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
                         <WrapPanel Margin="0,14,0,0">
                             <TextBox x:Name="CustomersSearchBox" Tag="customers" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در کد، نام، تلفن، ایمیل و نشانی" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
                             <ComboBox x:Name="CustomersPageSize" Tag="customers" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
@@ -726,7 +726,7 @@
                         <TextBlock Text="تنظیمات حسابداری و پروفایل شرکت‌ها" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
                         <TextBlock Text="پروفایل شرکت فعال، مشخصات چاپ فاکتور و گزینه‌های محلی را مدیریت کنید. تنظیمات در فایل دادهٔ محلی ذخیره می‌شوند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,18"/>
                         <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="10" Padding="13" Margin="0,0,0,14">
-                            <TextBlock Text="محدودیت فعلی: این نسخه پروفایل چند شرکت را ذخیره می‌کند، اما جداسازی دفترکل، اسناد و موجودی برای هر شرکت هنوز پیاده‌سازی نشده است. تا تکمیل جداسازی داده‌ها، از یک مجموعه دادهٔ عملیاتی برای چند شرکت به‌صورت هم‌زمان استفاده نکنید." Foreground="#9A3412" TextWrapping="Wrap"/>
+                            <TextBlock Text="فضای کاری اشخاص، کالاها، فاکتورها، موجودی، دریافت/پرداخت، چک‌ها و دفتر برای هر شرکت جدا ذخیره می‌شود. دادهٔ قدیمی نخستین بار به شرکت فعال فعلی نسبت داده می‌شود و به شرکت‌های تازه کپی نمی‌شود. پیش از استفادهٔ عملی، پشتیبان‌گیری و بازیابی چندشرکتی را با دادهٔ آزمایشی بررسی کنید؛ این آزمون میدانی هنوز انجام نشده است." Foreground="#9A3412" TextWrapping="Wrap"/>
                         </Border>
                         <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,0,0,14">
                             <Grid>
