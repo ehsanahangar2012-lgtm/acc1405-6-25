@@ -126,7 +126,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch --orphan windows-native-download
           if ($LASTEXITCODE -ne 0) { throw "Could not create the isolated binary download branch." }
-          git rm -r -f -- .
+          # An orphan branch has an empty index; remove the original checkout files as untracked.
+          git clean -fdx
           if ($LASTEXITCODE -ne 0) { throw "Could not clear the isolated download branch worktree." }
           Copy-Item -LiteralPath $package -Destination (Join-Path $repoRoot $zipName) -Force
           $buildInfo | Set-Content -LiteralPath (Join-Path $repoRoot 'BUILD-INFO.txt') -Encoding utf8
