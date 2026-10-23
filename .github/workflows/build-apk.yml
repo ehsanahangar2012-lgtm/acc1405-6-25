@@ -152,19 +152,21 @@ jobs:
           cp Preview-Browser.bat browser-preview-package/Preview-Browser.bat
           cp README-BROWSER-PREVIEW.md browser-preview-package/README-BROWSER-PREVIEW.md
 
+      # Give the live preview artifact priority; a downloadable ZIP upload must not block Pages.
+      - name: Upload isolated online preview
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/fix/core-data-integrity'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
       - name: Upload browser preview artifact
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: AshkeGhalam-Browser-Preview
           path: browser-preview-package/
           if-no-files-found: error
           retention-days: 14
-
-      - name: Upload isolated online preview
-        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/fix/core-data-integrity'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
 
   deploy-browser-preview:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/fix/core-data-integrity'
