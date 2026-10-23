@@ -21,11 +21,14 @@ public partial class MainWindow : Window
     private VerifiedLicensePayload? _sessionEntitlements;
     private string _sessionLicenseFailure = "";
     private bool _canWrite;
+    private bool _uiReady;
+    private readonly Dictionary<string, int> _gridPages = new(StringComparer.Ordinal);
     private string _startupAccountingWarning = "";
 
     public MainWindow()
     {
         InitializeComponent();
+        _uiReady = true;
         Loaded += MainWindow_Loaded;
     }
 
@@ -114,18 +117,140 @@ public partial class MainWindow : Window
         }
     }
 
+    private void GridSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!_uiReady || sender is not FrameworkElement { Tag: string key }) return;
+        _gridPages[key] = 1;
+        RefreshPagedGrid(key);
+    }
+
+    private void GridPageSize_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_uiReady || sender is not FrameworkElement { Tag: string key }) return;
+        _gridPages[key] = 1;
+        RefreshPagedGrid(key);
+    }
+
+    private void GridPreviousPage_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string key }) return;
+        _gridPages[key] = Math.Max(1, _gridPages.GetValueOrDefault(key, 1) - 1);
+        RefreshPagedGrid(key);
+    }
+
+    private void GridNextPage_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string key }) return;
+        _gridPages[key] = _gridPages.GetValueOrDefault(key, 1) + 1;
+        RefreshPagedGrid(key);
+    }
+
+    private string GridSearchText(string key) => key switch
+    {
+        "customers" => CustomersSearchBox.Text,
+        "products" => ProductsSearchBox.Text,
+        "invoices" => InvoicesSearchBox.Text,
+        "payments" => PaymentsSearchBox.Text,
+        "expenses" => ExpensesSearchBox.Text,
+        _ => ""
+    };
+
+    private int GridPageSize(string key)
+    {
+        var controlName = key switch
+        {
+            "customers" => "CustomersPageSize",
+            "products" => "ProductsPageSize",
+            "invoices" => "InvoicesPageSize",
+            "payments" => "PaymentsPageSize",
+            "expenses" => "ExpensesPageSize",
+            _ => ""
+        };
+        if (FindName(controlName) is ComboBox combo &&
+            combo.SelectedItem is ComboBoxItem item &&
+            int.TryParse(item.Tag?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var size) &&
+            size is 100 or 250 or 500)
+            return size;
+        return 100;
+    }
+
+    private static bool MatchesSearch(string query, params string?[] values) =>
+        string.IsNullOrWhiteSpace(query) ||
+        values.Any(value => (value ?? "").Contains(query, StringComparison.CurrentCultureIgnoreCase));
+
+    private void BindPagedGrid<T>(string key, DataGrid grid, List<T> filteredItems)
+    {
+        var pageSize = GridPageSize(key);
+        var pageCount = Math.Max(1, (filteredItems.Count + pageSize - 1) / pageSize);
+        var requestedPage = _gridPages.GetValueOrDefault(key, 1);
+        var page = Math.Clamp(requestedPage, 1, pageCount);
+        _gridPages[key] = page;
+
+        grid.ItemsSource = null;
+        grid.ItemsSource = filteredItems.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+        var stem = key switch
+        {
+            "customers" => "Customers",
+            "products" => "Products",
+            "invoices" => "Invoices",
+            "payments" => "Payments",
+            "expenses" => "Expenses",
+            _ => ""
+        };
+        if (FindName(stem + "PageInfo") is TextBlock info)
+            info.Text = $"صفحه {page:N0} از {pageCount:N0}  •  {filteredItems.Count:N0} ردیف";
+        if (FindName(stem + "PreviousPage") is Button previous)
+            previous.IsEnabled = page > 1;
+        if (FindName(stem + "NextPage") is Button next)
+            next.IsEnabled = page < pageCount;
+    }
+
+    private void RefreshPagedGrid(string key)
+    {
+        var query = GridSearchText(key).Trim();
+        switch (key)
+        {
+            case "customers":
+                BindPagedGrid(key, CustomersGrid, _data.Customers
+                    .Where(c => MatchesSearch(query, c.Code, c.Name, c.Type, c.Category, c.Phone,
+                        c.Email, c.NationalId, c.Address, c.Notes))
+                    .OrderBy(c => c.Name).ToList());
+                break;
+            case "products":
+                BindPagedGrid(key, ProductsGrid, _data.Products
+                    .Where(p => MatchesSearch(query, p.Name, p.Code, p.SerialNumber, p.Unit,
+                        p.CategoryPath, p.ShelfLocation, p.Description, p.ImageUrl))
+                    .OrderBy(p => p.Name).ToList());
+                break;
+            case "invoices":
+                BindPagedGrid(key, InvoicesGrid, _data.Invoices
+                    .Where(i => MatchesSearch(query, i.DisplayNumber, i.Number.ToString(CultureInfo.InvariantCulture),
+                        i.TrackingCode, i.CustomerName, i.Description, i.Status, i.TypeLabel))
+                    .OrderByDescending(i => i.Number).ToList());
+                break;
+            case "payments":
+                BindPagedGrid(key, PaymentsGrid, _data.Payments
+                    .Where(p => MatchesSearch(query, p.InvoiceNumber.ToString(CultureInfo.InvariantCulture),
+                        p.CustomerName, p.Method, p.Reference, p.Amount.ToString(CultureInfo.CurrentCulture)))
+                    .OrderByDescending(p => p.CreatedAt).ToList());
+                break;
+            case "expenses":
+                BindPagedGrid(key, ExpensesGrid, _data.Expenses
+                    .Where(expense => MatchesSearch(query, expense.Title, expense.Category, expense.Notes,
+                        expense.Amount.ToString(CultureInfo.CurrentCulture)))
+                    .OrderByDescending(expense => expense.CreatedAt).ToList());
+                break;
+        }
+    }
+
     private void RefreshAll()
     {
-        CustomersGrid.ItemsSource = null;
-        CustomersGrid.ItemsSource = _data.Customers.OrderBy(c => c.Name).ToList();
-        ProductsGrid.ItemsSource = null;
-        ProductsGrid.ItemsSource = _data.Products.OrderBy(p => p.Name).ToList();
-        InvoicesGrid.ItemsSource = null;
-        InvoicesGrid.ItemsSource = _data.Invoices.OrderByDescending(i => i.Number).ToList();
-        PaymentsGrid.ItemsSource = null;
-        PaymentsGrid.ItemsSource = _data.Payments.OrderByDescending(p => p.CreatedAt).ToList();
-        ExpensesGrid.ItemsSource = null;
-        ExpensesGrid.ItemsSource = _data.Expenses.OrderByDescending(x => x.CreatedAt).ToList();
+        RefreshPagedGrid("customers");
+        RefreshPagedGrid("products");
+        RefreshPagedGrid("invoices");
+        RefreshPagedGrid("payments");
+        RefreshPagedGrid("expenses");
         if (FindName("ChecksGrid") is DataGrid checksGrid)
         {
             checksGrid.ItemsSource = null;
@@ -1217,6 +1342,33 @@ public partial class MainWindow : Window
                 i.Total.ToString(CultureInfo.InvariantCulture), i.CashAmount.ToString(CultureInfo.InvariantCulture),
                 i.CheckAmount.ToString(CultureInfo.InvariantCulture), i.DueDate?.ToString("O") ?? "",
                 i.DriverName, i.DriverPhone, i.VehiclePlate, i.TaxId, i.Status, i.CreatedAt.ToString("O"), i.Notes
+            }));
+
+    private void ExportPayments_Click(object sender, RoutedEventArgs e) =>
+        ExportCsv("payments.csv",
+            new[] { "InvoiceId", "InvoiceNumber", "CustomerName", "Amount", "Method", "Reference", "CreatedAt" },
+            _data.Payments.OrderByDescending(payment => payment.CreatedAt).Select(payment => new[]
+            {
+                payment.InvoiceId,
+                payment.InvoiceNumber.ToString(CultureInfo.InvariantCulture),
+                payment.CustomerName,
+                payment.Amount.ToString(CultureInfo.InvariantCulture),
+                payment.Method,
+                payment.Reference,
+                payment.CreatedAt.ToString("O", CultureInfo.InvariantCulture)
+            }));
+
+    private void ExportExpenses_Click(object sender, RoutedEventArgs e) =>
+        ExportCsv("expenses.csv",
+            new[] { "Id", "Title", "Category", "Amount", "Notes", "CreatedAt" },
+            _data.Expenses.OrderByDescending(expense => expense.CreatedAt).Select(expense => new[]
+            {
+                expense.Id,
+                expense.Title,
+                expense.Category,
+                expense.Amount.ToString(CultureInfo.InvariantCulture),
+                expense.Notes,
+                expense.CreatedAt.ToString("O", CultureInfo.InvariantCulture)
             }));
 
     private void ExportReport_Click(object sender, RoutedEventArgs e)
