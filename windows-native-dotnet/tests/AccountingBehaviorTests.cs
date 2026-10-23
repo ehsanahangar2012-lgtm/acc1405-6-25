@@ -207,6 +207,62 @@ public sealed class AccountingBehaviorTests
         Assert.ThrowsException<InvalidDataException>(() => AccountingDataValidator.Validate(data));
     }
 
+    [TestMethod]
+    public void NativePersonRecordDeepCopyPreservesRolesAndIdentityFields()
+    {
+        var person = new CustomerRecord
+        {
+            Id = "person-test-1", Code = "P-100", Name = "شخص آزمایشی", Phone = "09120000000",
+            Email = "person@example.test", Balance = -125.50m, Category = "فروش", Type = "CUSTOMER",
+            IsCustomer = true, IsSupplier = true, NationalId = "1234567890", Address = "نشانی آزمون", Notes = "یادداشت",
+        };
+        var clone = new AccountingData { Customers = [person] }.DeepCopy();
+        var copied = clone.Customers[0];
+
+        Assert.AreNotSame(person, copied);
+        Assert.AreEqual("P-100", copied.Code);
+        Assert.AreEqual("person@example.test", copied.Email);
+        Assert.AreEqual(-125.50m, copied.Balance);
+        Assert.IsTrue(copied.IsCustomer);
+        Assert.IsTrue(copied.IsSupplier);
+        Assert.AreEqual("1234567890", copied.NationalId);
+        Assert.AreEqual("مشتری و تأمین‌کننده", copied.RoleLabel);
+        AccountingDataValidator.Validate(clone);
+    }
+
+    [TestMethod]
+    public void RejectsDuplicatePersonCodesIgnoringCase()
+    {
+        var data = new AccountingData
+        {
+            Customers =
+            [
+                new CustomerRecord { Id = "person-test-1", Code = "P-100", Name = "شخص اول" },
+                new CustomerRecord { Id = "person-test-2", Code = "p-100", Name = "شخص دوم" }
+            ]
+        };
+
+        Assert.ThrowsException<InvalidDataException>(() => AccountingDataValidator.Validate(data));
+    }
+
+    [TestMethod]
+    public void SaleInvoiceCannotUseSupplierOnlyRecord()
+    {
+        var data = new AccountingData
+        {
+            Customers = [new CustomerRecord { Id = "supplier-1", Name = "تأمین‌کننده", Type = "VENDOR", IsCustomer = false, IsSupplier = true }],
+            Products = [new ProductRecord { Id = "product-1", Name = "کالا", Sku = "SKU-1", StockQuantity = 10m, UnitPrice = 10m }]
+        };
+
+        Assert.ThrowsException<InvalidOperationException>(() => AccountingOperations.CreateInvoice(data, new InvoiceDraft
+        {
+            CustomerId = "supplier-1", TaxRatePercent = 0m,
+            Lines = [new InvoiceLine { ProductId = "product-1", ProductName = "کالا", Quantity = 1m, UnitPrice = 10m, LineTotal = 10m }]
+        }));
+        Assert.AreEqual(10m, data.Products[0].StockQuantity);
+        Assert.AreEqual(0, data.Invoices.Count);
+    }
+
     private static AccountingData CreateSampleData(bool includeInvoice)
     {
         var customer=new CustomerRecord{Id="customer-test-1",Name="مشتری آزمایشی",Phone="09120000000",Address="تهران"};
