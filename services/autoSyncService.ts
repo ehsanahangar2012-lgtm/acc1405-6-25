@@ -38,6 +38,24 @@ class AutoSyncService {
     private deviceId: string;
     private lastUserInteraction: number = 0;
 
+    private readonly handleOnline = () => {
+        if (!this.canSyncWithServer()) return;
+        deletedRecordsRegistry.startAutoSync();
+        notificationService.wentOnline();
+        this.scheduleIdleSync();
+    };
+
+    private readonly handleOffline = () => {
+        notificationService.wentOffline();
+    };
+
+    private readonly handleVisibilityChange = () => {
+        if (!document.hidden && this.canSyncWithServer() && !this.isSyncing) {
+            deletedRecordsRegistry.startAutoSync();
+            this.scheduleIdleSync(500);
+        }
+    };
+
     constructor() {
         this.deviceId = this.getOrCreateDeviceId();
         if (typeof window !== 'undefined') {
@@ -79,34 +97,19 @@ class AutoSyncService {
         if (this.syncInterval) return;
         if (typeof window === 'undefined') return;
 
-        // اگر سیستم در حالت محلی مستقل و خام است، هیچ سینکی با سرور شروع نمی‌شود
-        if (!this.canSyncWithServer()) {
-            return;
+        // شنونده‌ها حتی در حالت آفلاین ثبت می‌شوند تا پس از اتصال مجدد، سینک از سر گرفته شود.
+        if (this.canSyncWithServer()) {
+            deletedRecordsRegistry.startAutoSync();
         }
 
-        deletedRecordsRegistry.startAutoSync();
+        window.addEventListener('online', this.handleOnline);
+        window.addEventListener('offline', this.handleOffline);
+        document.addEventListener('visibilitychange', this.handleVisibilityChange);
 
-        window.addEventListener('online', () => {
-            if (this.canSyncWithServer()) {
-                notificationService.wentOnline();
-                this.scheduleIdleSync();
-            }
-        });
-
-        window.addEventListener('offline', () => {
-            notificationService.wentOffline();
-        });
-
-        // Pull خودکار هنگام بازگشت کاربر به تب
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden && this.canSyncWithServer() && !this.isSyncing) {
-                this.scheduleIdleSync(500);
-            }
-        });
-
-        // همگام‌سازی دوره‌ای سبک
+        // همگام‌سازی دوره‌ای سبک؛ اگر تنظیمات ابر بعداً فعال شود نیز سرویس آماده است.
         this.syncInterval = setInterval(() => {
             if (this.canSyncWithServer() && !this.isSyncing) {
+                deletedRecordsRegistry.startAutoSync();
                 // اگر کاربر کمتر از ۳ ثانیه پیش کلیک یا تایپ کرده، سینک را به تاخیر بینداز
                 if (Date.now() - this.lastUserInteraction < 3000) {
                     return;
@@ -115,9 +118,10 @@ class AutoSyncService {
             }
         }, SYNC_INTERVAL_MS);
 
-        // بارگذاری اولیه با تاخیر امن
+        // بارگذاری اولیه با تاخیر امن؛ در حالت آفلاین هیچ درخواست سروری اجرا نمی‌شود.
         setTimeout(() => {
             if (this.canSyncWithServer()) {
+                deletedRecordsRegistry.startAutoSync();
                 this.scheduleIdleSync(0);
             }
         }, INITIAL_DELAY_MS);
@@ -151,6 +155,11 @@ class AutoSyncService {
         if (this.syncInterval) {
             clearInterval(this.syncInterval);
             this.syncInterval = null;
+        }
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('online', this.handleOnline);
+            window.removeEventListener('offline', this.handleOffline);
+            document.removeEventListener('visibilitychange', this.handleVisibilityChange);
         }
         deletedRecordsRegistry.stopAutoSync();
     }
