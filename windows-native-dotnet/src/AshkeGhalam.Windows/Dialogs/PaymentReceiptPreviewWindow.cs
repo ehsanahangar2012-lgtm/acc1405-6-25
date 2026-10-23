@@ -129,7 +129,7 @@ public sealed class PaymentReceiptPreviewWindow : Window
         var receiptNumber = !string.IsNullOrWhiteSpace(payment.Reference)
             ? payment.Reference.Trim()
             : $"RCPT-{payment.CreatedAt:yyyyMMdd-HHmm}";
-        var headerGrid = new Grid { Width = 640, FlowDirection = FlowDirection.RightToLeft };
+        var headerGrid = new Grid { Width = 604, FlowDirection = FlowDirection.RightToLeft };
         headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var headerText = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 12, 0) };
