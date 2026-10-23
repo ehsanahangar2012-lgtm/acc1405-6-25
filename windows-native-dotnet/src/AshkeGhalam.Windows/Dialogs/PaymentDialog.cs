@@ -9,10 +9,28 @@ namespace AshkeGhalam.Windows.Dialogs;
 
 public sealed class PaymentDialog : Window
 {
-    private readonly ComboBox _invoice=new(){MinWidth=350};
+    private readonly ComboBox _customer = new()
+    {
+        Height = 34, MinWidth = 280, DisplayMemberPath = nameof(CustomerRecord.Name),
+        IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300
+    };
+    private readonly ComboBox _invoice = new()
+    {
+        Height = 34, MinWidth = 350, IsTextSearchEnabled = true,
+        IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300
+    };
+    private readonly TextBlock _remainingHint = new()
+    {
+        Margin = new Thickness(0, 5, 0, 4), TextWrapping = TextWrapping.Wrap,
+        Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105))
+    };
     private readonly TextBox _amount=new(){Height=34,Text="0",Padding=new Thickness(8,4,8,4)};
-    private readonly ComboBox _method=new(){Height=32,ItemsSource=new[]{"نقدی","کارت‌خوان","واریز بانکی","چک","سایر"},SelectedIndex=0};
+    private readonly ComboBox _method=new(){Height=32,ItemsSource=new[]{"نقدی","کارت‌خوان","واریز بانکی","چک","سایر"},SelectedIndex=0,IsTextSearchEnabled=true,IsTextSearchCaseSensitive=false};
     private readonly TextBox _reference=new(){Height=32,Padding=new Thickness(8,4,8,4)};
+    private readonly AccountingData _data;
+    private readonly string? _invoiceTypeFilter;
+    private readonly PaymentRecord? _existingPayment;
+    private readonly List<InvoiceRecord> _eligibleInvoices = [];
     public string InvoiceId{get;private set;}="";
     public decimal Amount{get;private set;}
     public string Method{get;private set;}="نقدی";
@@ -34,21 +52,40 @@ public sealed class PaymentDialog : Window
             _ => "ثبت دریافت/پرداخت طرف حساب"
         };
         _currencyLabel = string.Equals(currencyCode, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "تومان" : "ریال";
-        Owner=owner;Title=title;Width=530;Height=450;WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
+        _data = data;
+        _invoiceTypeFilter = invoiceTypeFilter;
+        _existingPayment = existingPayment;
+        Owner = owner;
+        Title = title;
+        Width = 590;
+        Height = 540;
+        MinHeight = 430;
+        MinWidth = 520;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        FlowDirection = FlowDirection.RightToLeft;
+        FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
+        Background = Brushes.White;
+        ResizeMode = ResizeMode.CanResize;
         NumericTextBoxFormatter.Attach(_amount);
-        _invoice.DisplayMemberPath=nameof(InvoiceOption.Label);
-        _invoice.ItemsSource=data.Invoices.Where(i=>i.Status!="لغو شده"&&i.Type!="PROFORMA"&&
-                (string.IsNullOrWhiteSpace(invoiceTypeFilter) || i.Type == invoiceTypeFilter) &&
-                (AccountingRules.RemainingForInvoice(data,i)>0 || i.Id == existingPayment?.InvoiceId))
-            .Select(i=>new InvoiceOption
-            {
-                Invoice=i,
-                Label=$"{i.TypeLabel} {i.DisplayNumber} — {i.CustomerName} — مانده {(AccountingRules.RemainingForInvoice(data,i) + (i.Id == existingPayment?.InvoiceId ? existingPayment.Amount : 0m)):N2} {_currencyLabel}"
-            }).ToList();
-        var root=new StackPanel{Margin=new Thickness(22)};
-        root.Children.Add(new TextBlock{Text=title,FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
-        if (_invoice.Items.Count == 0)
+
+        var existingInvoice = data.Invoices.FirstOrDefault(invoice => invoice.Id == existingPayment?.InvoiceId);
+        _eligibleInvoices.AddRange(data.Invoices.Where(invoice =>
+            invoice.Status != "لغو شده" && invoice.Type != "PROFORMA" &&
+            (string.IsNullOrWhiteSpace(invoiceTypeFilter) || invoice.Type == invoiceTypeFilter) &&
+            (AccountingRules.RemainingForInvoice(data, invoice) > 0 || invoice.Id == existingPayment?.InvoiceId)));
+
+        var customerChoices = data.Customers.Where(person =>
+                _eligibleInvoices.Any(invoice => invoice.CustomerId == person.Id) ||
+                (existingInvoice is not null && existingInvoice.CustomerId == person.Id))
+            .OrderBy(person => person.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        _customer.ItemsSource = customerChoices;
+        _customer.SelectedItem = customerChoices.FirstOrDefault(person => person.Id == existingInvoice?.CustomerId)
+            ?? customerChoices.FirstOrDefault();
+
+        var root = new StackPanel { Margin = new Thickness(22) };
+        root.Children.Add(new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 12) });
+        if (_eligibleInvoices.Count == 0)
         {
             root.Children.Add(new TextBlock
             {
@@ -62,13 +99,33 @@ public sealed class PaymentDialog : Window
                 Margin = new Thickness(0, 0, 0, 8)
             });
         }
-        Add(root,"سند قطعی و مانده",_invoice);Add(root,$"مبلغ تسویه ({_currencyLabel})",_amount);Add(root,"روش دریافت / پرداخت",_method);Add(root,"شماره پیگیری / توضیح",_reference);
-        var buttons=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,18,0,0)};
-        var ok=new Button{Content=existingPayment is null ? "ثبت عملیات نقدی/مالی" : "ذخیره تغییرات",Width=140,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
-        buttons.Children.Add(ok);buttons.Children.Add(new Button{Content="انصراف",Width=90,Height=36,IsCancel=true});root.Children.Add(buttons);Content=root;
-        var invoiceOptions = _invoice.Items.Cast<InvoiceOption>().ToList();
-        if (invoiceOptions.Count > 0)
-            _invoice.SelectedItem = invoiceOptions.FirstOrDefault(option => option.Invoice.Id == existingPayment?.InvoiceId) ?? invoiceOptions[0];
+
+        Add(root, "طرف حساب", _customer);
+        Add(root, "فاکتور قطعی (بر اساس طرف حساب)", _invoice);
+        root.Children.Add(_remainingHint);
+        Add(root, $"مبلغ تسویه ({_currencyLabel})", _amount);
+        Add(root, "روش دریافت / پرداخت", _method);
+        Add(root, "شماره پیگیری / توضیح", _reference);
+
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 10, 22, 18) };
+        var ok = new Button { Content = existingPayment is null ? "ثبت عملیات نقدی/مالی" : "ذخیره تغییرات", Width = 150, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        buttons.Children.Add(ok);
+        buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
+
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var body = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root };
+        Grid.SetRow(body, 0);
+        Grid.SetRow(buttons, 1);
+        layout.Children.Add(body);
+        layout.Children.Add(buttons);
+        Content = layout;
+
+        _customer.SelectionChanged += (_, _) => RefreshInvoiceChoices();
+        _invoice.SelectionChanged += (_, _) => RefreshRemainingHint();
+        RefreshInvoiceChoices();
+
         if (existingPayment is not null)
         {
             _amount.Text = NumericTextBoxFormatter.Format(existingPayment.Amount);
@@ -93,6 +150,45 @@ public sealed class PaymentDialog : Window
             }
             catch(Exception ex){MessageBox.Show(this,ex.Message,"بررسی عملیات مالی",MessageBoxButton.OK,MessageBoxImage.Warning);}
         };
+    }
+
+    private void RefreshInvoiceChoices()
+    {
+        var person = _customer.SelectedItem as CustomerRecord;
+        var previousInvoiceId = (_invoice.SelectedItem as InvoiceOption)?.Invoice.Id;
+        var options = _eligibleInvoices
+            .Where(invoice => person is not null && invoice.CustomerId == person.Id)
+            .OrderByDescending(invoice => invoice.Number)
+            .Select(invoice => new InvoiceOption
+            {
+                Invoice = invoice,
+                Label = $"{invoice.TypeLabel} {invoice.DisplayNumber} — {invoice.CustomerName} — مانده {RemainingAmount(invoice):N2} {_currencyLabel}"
+            })
+            .ToList();
+
+        _invoice.ItemsSource = options;
+        _invoice.SelectedItem = options.FirstOrDefault(option => option.Invoice.Id == previousInvoiceId)
+            ?? options.FirstOrDefault(option => option.Invoice.Id == _existingPayment?.InvoiceId)
+            ?? options.FirstOrDefault();
+        if (_existingPayment is null && _invoice.SelectedItem is InvoiceOption selected)
+            _amount.Text = NumericTextBoxFormatter.Format(RemainingAmount(selected.Invoice));
+        RefreshRemainingHint();
+    }
+
+    private decimal RemainingAmount(InvoiceRecord invoice)
+    {
+        var remaining = AccountingRules.RemainingForInvoice(_data, invoice);
+        if (_existingPayment?.InvoiceId == invoice.Id)
+            remaining = AccountingRules.Money(remaining + _existingPayment.Amount);
+        return Math.Max(0m, remaining);
+    }
+
+    private void RefreshRemainingHint()
+    {
+        if (_invoice.SelectedItem is InvoiceOption option)
+            _remainingHint.Text = $"ماندهٔ مجاز این فاکتور: {RemainingAmount(option.Invoice):N2} {_currencyLabel}. مبلغ دلخواه را می‌توانید کمتر وارد کنید.";
+        else
+            _remainingHint.Text = "برای طرف حساب انتخاب‌شده، فاکتور قطعیِ دارای مانده‌ای وجود ندارد.";
     }
 
     private static void FormatNumericField(TextBox field)
