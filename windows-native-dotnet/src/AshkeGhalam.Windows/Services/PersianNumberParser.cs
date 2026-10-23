@@ -15,7 +15,8 @@ public static class PersianNumberParser
             if (c >= '۰' && c <= '۹') normalized.Append((char)('0' + c - '۰'));
             else if (c >= '٠' && c <= '٩') normalized.Append((char)('0' + c - '٠'));
             else if (c == '٬' || c == '،' || c == ',') continue;
-            else if (c == '٫' || c == '/') normalized.Append('.');
+            else if (c == '٫') normalized.Append('.');
+            else if (c == '/') return false;
             else normalized.Append(c);
         }
         var text = normalized.ToString().Replace(" ", "");
