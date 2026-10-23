@@ -1680,18 +1680,55 @@ public partial class MainWindow : Window
     private void AddPaymentForInvoiceType(string? invoiceTypeFilter)
     {
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
-        var dialog = new PaymentDialog(this, _data, invoiceTypeFilter);
+        var dialog = new PaymentDialog(this, _data, invoiceTypeFilter, currencyCode: _data.Preferences.Currency);
         ApplyCurrentThemeTo(dialog);
-        if (dialog.ShowDialog() == true)
+        if (dialog.ShowDialog() != true) return;
+
+        CheckRecord? paymentCheck = null;
+        if (string.Equals(dialog.Method, "چک", StringComparison.Ordinal))
         {
-            var message = invoiceTypeFilter switch
+            if (!ConfirmCanAddDocument()) return;
+            var invoice = _data.Invoices.FirstOrDefault(item => item.Id == dialog.InvoiceId);
+            if (invoice is null)
             {
-                "SALE" => "دریافت از مشتری ثبت شد",
-                "PURCHASE" => "پرداخت به تأمین‌کننده ثبت شد",
-                _ => "عملیات دریافت/پرداخت ثبت شد"
-            };
-            Commit(data => AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference), message);
+                MessageBox.Show(this, "فاکتور مرجع دریافت/پرداخت پیدا نشد؛ چک مرتبط ثبت نشد.",
+                    "ثبت سند چک", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            var checkType = invoice.Type == "SALE" ? "RECEIVED" : "ISSUED";
+            var checkDialog = new CheckDialog(this, null, _data.Customers, _data.Preferences.Currency,
+                dialog.Amount, checkType, invoice.Id, invoice.CustomerId, invoice.CustomerName);
+            ApplyCurrentThemeTo(checkDialog);
+            if (checkDialog.ShowDialog() != true || checkDialog.Result is not CheckRecord createdCheck)
+                return;
+            if (createdCheck.Amount != dialog.Amount)
+            {
+                MessageBox.Show(this,
+                    $"مبلغ چک ({FormatMoney(createdCheck.Amount)}) باید دقیقاً با مبلغ دریافت/پرداخت ({FormatMoney(dialog.Amount)}) برابر باشد.",
+                    "تطبیق مبلغ چک", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            paymentCheck = createdCheck;
         }
+
+        var message = invoiceTypeFilter switch
+        {
+            "SALE" => paymentCheck is null ? "دریافت از مشتری ثبت شد" : "دریافت از مشتری و سند چک دریافتی ثبت شد",
+            "PURCHASE" => paymentCheck is null ? "پرداخت به تأمین‌کننده ثبت شد" : "پرداخت به تأمین‌کننده و سند چک پرداختی ثبت شد",
+            _ => paymentCheck is null ? "عملیات دریافت/پرداخت ثبت شد" : "عملیات دریافت/پرداخت و سند چک ثبت شد"
+        };
+        Commit(data =>
+        {
+            AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference);
+            if (paymentCheck is not null)
+            {
+                if (!string.IsNullOrWhiteSpace(paymentCheck.SayadId) &&
+                    data.Checks.Any(check => string.Equals(check.SayadId, paymentCheck.SayadId, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("شناسهٔ صیادی تکراری است.");
+                data.Checks.Add(paymentCheck);
+            }
+        }, message);
     }
 
     private void EditExpense_Click(object sender, RoutedEventArgs e)
