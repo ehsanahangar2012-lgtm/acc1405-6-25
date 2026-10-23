@@ -101,7 +101,7 @@ public partial class MainWindow : Window
         if (!_uiReady || !IsLoaded || ApplicationThemeSelector.SelectedItem is not ComboBoxItem selected)
             return;
         ApplicationThemeService.Apply(this, selected.Tag?.ToString());
-        UpdateNavigationSelection(_activeNavigationKey);
+        UpdateNavigationSelection(_activeNavigationKey, selected.Tag?.ToString());
     }
 
     private void ApplyCurrentThemeTo(Window dialog) =>
@@ -2747,11 +2747,11 @@ public partial class MainWindow : Window
             migrationFooter.Text = "این بخش هنوز برای استفادهٔ عملی آماده نیست؛ نسخهٔ فعلی وب/اندروید/الکترون دست‌نخورده باقی می‌ماند.";
     }
 
-    private void UpdateNavigationSelection(string activeKey)
+    private void UpdateNavigationSelection(string activeKey, string? themeOverride = null)
     {
         _activeNavigationKey = activeKey;
         if (FindName("NavigationRoot") is not DependencyObject root) return;
-        var isDark = ApplicationThemeService.Normalize(_data.Preferences?.ApplicationTheme) == "dark";
+        var isDark = ApplicationThemeService.Normalize(themeOverride ?? _data.Preferences?.ApplicationTheme) == "dark";
         var pending = new Stack<DependencyObject>();
         pending.Push(root);
         while (pending.Count > 0)
