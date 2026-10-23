@@ -396,7 +396,10 @@ public sealed class CheckDialog : Window
                 SayadId = _sayadId.Text.Trim(),
                 CheckNumber = _checkNumber.Text.Trim(),
                 HolderName = holder,
-                PersonId = linkedPerson?.Id ?? (_existing?.PersonId ?? _prefillPersonId),
+                PersonId = linkedPerson?.Id ?? (
+                    string.Equals(_personName.Text.Trim(), _existing?.PersonName ?? _prefillPersonName, StringComparison.CurrentCultureIgnoreCase)
+                        ? (_existing?.PersonId ?? _prefillPersonId)
+                        : ""),
                 PersonName = _personName.Text.Trim(),
                 RelatedInvoiceId = _existing?.RelatedInvoiceId ?? _relatedInvoiceId,
                 ImagePath = _existing?.ImagePath ?? "",
