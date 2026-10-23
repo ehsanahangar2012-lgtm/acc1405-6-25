@@ -320,8 +320,7 @@ public sealed class InvoicePreviewWindow : Window
         {
             TextAlignment = TextAlignment.Right,
             Margin = new Thickness(0, 34, 0, 0),
-            Padding = new Thickness(0, 12, 0, 12),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225))
+            Padding = new Thickness(0, 12, 0, 12)
         });
 
         return document;
