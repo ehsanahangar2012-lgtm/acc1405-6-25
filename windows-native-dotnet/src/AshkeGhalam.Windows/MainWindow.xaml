@@ -163,10 +163,18 @@
                         <TextBlock Text="مدیریت اشخاص" FontSize="23" FontWeight="Bold"/>
                         <TextBlock Text="مدل پرونده از نسخهٔ اصلی توسعه یافته است: کد، نقش مشتری/تأمین‌کننده، دسته‌بندی، اطلاعات تماس و یادداشت. ماندهٔ حساب هنوز با انتقال دفترکل اصلی محاسبه نمی‌شود." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
                         <WrapPanel Margin="0,14,0,0">
-                            <Button Content="ثبت شخص جدید" Click="AddCustomer_Click" Background="#0F766E" Foreground="White"/>
-                            <Button Content="ویرایش شخص انتخابی" Click="EditCustomer_Click"/>
-                            <Button Content="حذف شخص انتخابی" Click="DeleteCustomer_Click"/>
-                            <Button Content="خروجی CSV کامل پرونده‌ها" Click="ExportCustomers_Click"/>
+                            <TextBox x:Name="CustomersSearchBox" Tag="customers" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در کد، نام، تلفن، ایمیل و نشانی" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="CustomersPageSize" Tag="customers" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="CustomersPreviousPage" Tag="customers" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="CustomersPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="CustomersNextPage" Tag="customers" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="ثبت شخص جدید" Click="AddCustomer_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ثبت تأمین‌کننده" Click="AddSupplier_Click" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش شخص انتخابی" Click="EditCustomer_Click" Margin="0,0,8,8"/>
+                            <Button Content="حذف شخص انتخابی" Click="DeleteCustomer_Click" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV کامل پرونده‌ها" Click="ExportCustomers_Click" Margin="0,0,8,8"/>
                         </WrapPanel>
                     </StackPanel>
                     <DataGrid x:Name="CustomersGrid" Grid.Row="1"
@@ -195,13 +203,20 @@
                     <StackPanel>
                         <TextBlock Text="کالا و انبار" FontSize="23" FontWeight="Bold"/>
                         <TextBlock Text="پرونده کالا با فیلدهای مدل اصلی گسترش یافته است؛ موجودی رزروشده حفظ می‌شود و گردش حواله‌های چندانباره هنوز در مرحلهٔ مهاجرت است." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                            <Button Content="ثبت کالا" Click="AddProduct_Click" Background="#0F766E" Foreground="White"/>
-                            <Button Content="ویرایش کالای انتخابی" Click="EditProduct_Click"/>
-                            <Button Content="حذف کالای انتخابی" Click="DeleteProduct_Click"/>
-                            <Button Content="ورود موجودی" Click="AddStock_Click"/>
-                            <Button Content="خروجی CSV" Click="ExportProducts_Click"/>
-                        </StackPanel>
+                        <WrapPanel Margin="0,14,0,0">
+                            <TextBox x:Name="ProductsSearchBox" Tag="products" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در کد، نام، سریال، دسته‌بندی و قفسه" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="ProductsPageSize" Tag="products" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="ProductsPreviousPage" Tag="products" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="ProductsPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="ProductsNextPage" Tag="products" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="ثبت کالا" Click="AddProduct_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش کالای انتخابی" Click="EditProduct_Click" Margin="0,0,8,8"/>
+                            <Button Content="حذف کالای انتخابی" Click="DeleteProduct_Click" Margin="0,0,8,8"/>
+                            <Button Content="ورود موجودی" Click="AddStock_Click" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV" Click="ExportProducts_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
                     </StackPanel>
                     <DataGrid x:Name="ProductsGrid" Grid.Row="1"
                               HorizontalScrollBarVisibility="Auto"
@@ -233,13 +248,20 @@
                         <TextBlock Text="فاکتور فروش، خرید و پیش‌فاکتور" FontSize="23" FontWeight="Bold"/>
                         <TextBlock Text="هم‌ترازی با گردش اصلی: شماره‌گذاری مستقل INV-/PUR-/PRO-، تخفیف و مالیات مبلغی؛ فروش موجودی را کاهش می‌دهد، خرید افزایش می‌دهد و پیش‌فاکتور بدون اثر موجودی است." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
                         <WrapPanel Margin="0,12,0,0">
-                            <Button Content="صدور سند جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White"/>
-                            <Button Content="تبدیل پیش‌فاکتور به فروش" Click="ConvertProformaToSale_Click"/>
-                            <Button Content="ثبت دریافت/پرداخت" Click="AddPayment_Click"/>
-                            <Button Content="لغو سند انتخابی" Click="CancelInvoice_Click"/>
-                            <Button Content="پیش‌نمایش سند انتخابی" Click="PreviewInvoice_Click"/>
-                            <Button Content="چاپ سند انتخابی" Click="PrintInvoice_Click"/>
-                            <Button Content="خروجی CSV کامل" Click="ExportInvoices_Click"/>
+                            <TextBox x:Name="InvoicesSearchBox" Tag="invoices" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در شماره، طرف حساب، شرح و وضعیت" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="InvoicesPageSize" Tag="invoices" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="InvoicesPreviousPage" Tag="invoices" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="InvoicesPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="InvoicesNextPage" Tag="invoices" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="صدور سند جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="تبدیل پیش‌فاکتور به فروش" Click="ConvertProformaToSale_Click" Margin="0,0,8,8"/>
+                            <Button Content="ثبت دریافت/پرداخت" Click="AddPayment_Click" Margin="0,0,8,8"/>
+                            <Button Content="لغو سند انتخابی" Click="CancelInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="پیش‌نمایش سند انتخابی" Click="PreviewInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="چاپ سند انتخابی" Click="PrintInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV کامل" Click="ExportInvoices_Click" Margin="0,0,8,8"/>
                         </WrapPanel>
                     </StackPanel>
                     <DataGrid x:Name="InvoicesGrid" Grid.Row="1"
@@ -271,7 +293,17 @@
                     <StackPanel>
                         <TextBlock Text="سوابق دریافت و پرداخت" FontSize="23" FontWeight="Bold"/>
                         <TextBlock Text="تسویهٔ فاکتور فروش و خرید؛ فقط تا سقف ماندهٔ سند انتخابی ثبت می‌شود." Style="{StaticResource SectionHint}"/>
-                        <Button Content="ثبت دریافت / پرداخت جدید" Click="AddPayment_Click" HorizontalAlignment="Right" Margin="0,14,0,0" Background="#0F766E" Foreground="White"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <TextBox x:Name="PaymentsSearchBox" Tag="payments" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در شماره فاکتور، طرف حساب، روش و مرجع" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="PaymentsPageSize" Tag="payments" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="PaymentsPreviousPage" Tag="payments" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="PaymentsPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="PaymentsNextPage" Tag="payments" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="ثبت دریافت / پرداخت جدید" Click="AddPayment_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV" Click="ExportPayments_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
                     </StackPanel>
                     <DataGrid x:Name="PaymentsGrid" Grid.Row="1">
                         <DataGrid.Columns>
@@ -291,7 +323,17 @@
                     <StackPanel>
                         <TextBlock Text="هزینه‌های ثبت‌شده" FontSize="23" FontWeight="Bold"/>
                         <TextBlock Text="این ثبت هزینه‌ها، گردش نقدی ساده است و جایگزین دفتر کل و کدینگ حسابداری رسمی نیست." Style="{StaticResource SectionHint}"/>
-                        <Button Content="ثبت هزینه" Click="AddExpense_Click" HorizontalAlignment="Right" Margin="0,14,0,0" Background="#0F766E" Foreground="White"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <TextBox x:Name="ExpensesSearchBox" Tag="expenses" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در عنوان، دسته و یادداشت" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="ExpensesPageSize" Tag="expenses" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="ExpensesPreviousPage" Tag="expenses" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="ExpensesPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="ExpensesNextPage" Tag="expenses" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="ثبت هزینه" Click="AddExpense_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV" Click="ExportExpenses_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
                     </StackPanel>
                     <DataGrid x:Name="ExpensesGrid" Grid.Row="1">
                         <DataGrid.Columns>
