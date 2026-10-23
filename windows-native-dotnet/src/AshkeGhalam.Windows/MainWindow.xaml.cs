@@ -1616,6 +1616,26 @@ public partial class MainWindow : Window
         }
     }
 
+    private void PreviewPaymentReceipt_Click(object sender, RoutedEventArgs e)
+    {
+        if (PaymentsGrid.SelectedItem is not PaymentRecord payment)
+        {
+            MessageBox.Show(this, "ابتدا یک دریافت یا پرداخت را از جدول انتخاب کنید.",
+                "پیش‌نمایش رسید", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var invoice = _data.Invoices.FirstOrDefault(item => item.Id == payment.InvoiceId);
+        if (invoice is null)
+        {
+            MessageBox.Show(this, "فاکتور مرجع این عملیات پیدا نشد؛ رسید بدون مرجع قابل نمایش نیست.",
+                "پیش‌نمایش رسید", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        new PaymentReceiptPreviewWindow(this, payment, invoice, ActiveCompanyProfile(), _data.Preferences.Currency).ShowDialog();
+    }
+
     private void AddPayment_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType(null);
 
     private void AddReceipt_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType("SALE");
