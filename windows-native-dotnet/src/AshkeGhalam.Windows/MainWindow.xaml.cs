@@ -181,6 +181,7 @@ public partial class MainWindow : Window
         RefreshLedger();
         RefreshFinancialReports();
         RefreshDueCalendar();
+        RefreshCashFlowForecast();
     }
 
     private void RefreshLedger()
@@ -352,6 +353,109 @@ public partial class MainWindow : Window
             $"مبلغ معوق: {overdue.Sum(item => item.Amount).ToString("N2", CultureInfo.CurrentCulture)}";
     }
 
+    private void RefreshCashFlowForecast_Click(object sender, RoutedEventArgs e) =>
+        RefreshCashFlowForecast();
+
+    private int SelectedCashFlowHorizonDays()
+    {
+        if (CashFlowHorizonCombo.SelectedItem is ComboBoxItem item &&
+            int.TryParse(item.Tag?.ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var days) &&
+            days is 30 or 60 or 90)
+            return days;
+        return 30;
+    }
+
+    private void RefreshCashFlowForecast()
+    {
+        var forecast = CashFlowForecastService.Build(_data, SelectedCashFlowHorizonDays());
+        static string Money(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+
+        CashFlowOpeningBalance.Text = Money(forecast.OpeningBalance);
+        CashFlowExpectedInflows.Text = Money(forecast.TotalExpectedInflows);
+        CashFlowExpectedOutflows.Text = Money(forecast.TotalExpectedOutflows);
+        CashFlowProjectedClosingBalance.Text = Money(forecast.ProjectedClosingBalance);
+        CashFlowProjectedClosingBalance.Foreground = forecast.ProjectedClosingBalance < 0m
+            ? new SolidColorBrush(Color.FromRgb(185, 28, 28))
+            : new SolidColorBrush(Color.FromRgb(15, 118, 110));
+
+        var overdueCount = forecast.Movements.Count(movement => movement.IsOverdue);
+        CashFlowStatusSummary.Text =
+            $"افق {forecast.HorizonDays:N0} روزه • تعهدهای لحاظ‌شده: {forecast.Movements.Count:N0} • " +
+            $"سررسیدگذشته: {overdueCount:N0} • " +
+            (forecast.ProjectedClosingBalance < 0m ? "هشدار: احتمال کسری وجه" : "مانده پیش‌بینی‌شده مثبت است");
+
+        CashFlowProjectionGrid.ItemsSource = null;
+        CashFlowProjectionGrid.ItemsSource = forecast.Projection.Select(line =>
+            new CashFlowProjectionGridRow(
+                FormatPersianDate(line.Date),
+                line.ExpectedInflows,
+                line.ExpectedOutflows,
+                line.NetChange,
+                line.ProjectedBalance,
+                line.MovementCount,
+                line.OverdueCount)).ToList();
+
+        CashFlowMovementsGrid.ItemsSource = null;
+        CashFlowMovementsGrid.ItemsSource = forecast.Movements.Select(movement =>
+            new CashFlowMovementGridRow(
+                FormatPersianDate(movement.Date),
+                movement.Direction,
+                movement.Kind,
+                movement.DocumentNumber,
+                movement.Counterparty,
+                movement.Amount,
+                movement.Status,
+                movement.IsOverdue
+                    ? $"{-movement.DaysFromDue:N0} روز معوق"
+                    : movement.DaysFromDue == 0
+                        ? "امروز"
+                        : $"{movement.DaysFromDue:N0} روز مانده",
+                movement.ReferenceType,
+                movement.ReferenceId)).ToList();
+    }
+
+    private void ExportCashFlowForecast_Click(object sender, RoutedEventArgs e)
+    {
+        var forecast = CashFlowForecastService.Build(_data, SelectedCashFlowHorizonDays());
+        var rows = new List<string[]>
+        {
+            new[]
+            {
+                "SUMMARY", "", "", "", "", "",
+                forecast.OpeningBalance.ToString(CultureInfo.InvariantCulture),
+                forecast.TotalExpectedInflows.ToString(CultureInfo.InvariantCulture),
+                forecast.TotalExpectedOutflows.ToString(CultureInfo.InvariantCulture),
+                forecast.ProjectedClosingBalance.ToString(CultureInfo.InvariantCulture),
+                forecast.HorizonDays.ToString(CultureInfo.InvariantCulture), "", "", "", ""
+            }
+        };
+
+        rows.AddRange(forecast.Projection.Select(line => new[]
+        {
+            "DAILY", FormatPersianDate(line.Date), "", "", "", "",
+            "", line.ExpectedInflows.ToString(CultureInfo.InvariantCulture),
+            line.ExpectedOutflows.ToString(CultureInfo.InvariantCulture),
+            line.ProjectedBalance.ToString(CultureInfo.InvariantCulture),
+            line.MovementCount.ToString(CultureInfo.InvariantCulture),
+            line.OverdueCount.ToString(CultureInfo.InvariantCulture), "", "", ""
+        }));
+
+        rows.AddRange(forecast.Movements.Select(movement => new[]
+        {
+            "MOVEMENT", FormatPersianDate(movement.Date), movement.Direction, movement.Kind,
+            movement.DocumentNumber, movement.Counterparty, movement.Amount.ToString(CultureInfo.InvariantCulture),
+            "", "", "", "", movement.IsOverdue ? "OVERDUE" : movement.Status,
+            movement.DaysFromDue.ToString(CultureInfo.InvariantCulture),
+            movement.ReferenceType, movement.ReferenceId
+        }));
+
+        ExportCsv("cashflow-forecast.csv",
+            new[] { "RowType", "Date", "Direction", "Kind", "DocumentNumber", "Counterparty",
+                "Amount", "ExpectedInflows", "ExpectedOutflows", "ProjectedBalance", "MovementCount",
+                "OverdueCountOrStatus", "DaysFromDue", "ReferenceType", "ReferenceId" },
+            rows);
+    }
+
     private void ExportDueCalendar_Click(object sender, RoutedEventArgs e)
     {
         var items = DueCalendarService.GetItems(_data);
@@ -435,6 +539,14 @@ public partial class MainWindow : Window
     private sealed record JournalEntryGridRow(
         string DisplayNumber, string Date, string Description, string DebitAccount, string CreditAccount,
         decimal Amount, string DocumentTypeLabel, string StatusLabel);
+
+    private sealed record CashFlowProjectionGridRow(
+        string Date, decimal Inflows, decimal Outflows, decimal NetChange,
+        decimal ProjectedBalance, int MovementCount, int OverdueCount);
+
+    private sealed record CashFlowMovementGridRow(
+        string Date, string Direction, string Kind, string DocumentNumber, string Counterparty,
+        decimal Amount, string Status, string DueStatus, string ReferenceType, string ReferenceId);
 
     private sealed record DueCalendarGridRow(
         string DueDate, string Kind, string DocumentNumber, string Contact,
@@ -1235,8 +1347,8 @@ public partial class MainWindow : Window
             ["marketing"] = new("بازاریابی و سئو", "مدیریت کسب‌وکار", "/marketing", null),
             ["import-center"] = new("مرکز واردات اسناد", "مدیریت کسب‌وکار", "/import-center", null),
             ["accounting"] = new("حسابداری دوبل", "حسابداری پیشرفته", "/accounting", 12),
-            ["cashflow-predictor"] = new("پیش‌بینی جریان نقدینگی", "حسابداری پیشرفته", "/cashflow-predictor", null),
-            ["cashflow"] = new("جریان نقدینگی", "حسابداری پیشرفته", "/cashflow", null),
+            ["cashflow-predictor"] = new("پیش‌بینی جریان نقدینگی", "حسابداری پیشرفته", "/cashflow-predictor", 14),
+            ["cashflow"] = new("جریان نقدینگی", "حسابداری پیشرفته", "/cashflow", 14),
             ["tax"] = new("مدیریت مالیات", "حسابداری پیشرفته", "/tax", null),
             ["loans"] = new("وام‌ها", "حسابداری پیشرفته", "/loans", null),
             ["due-calendar"] = new("تقویم سررسید و اقساط", "حسابداری پیشرفته", "/due-calendar", 8),
