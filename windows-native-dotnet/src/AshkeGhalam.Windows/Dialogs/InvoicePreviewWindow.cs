@@ -499,8 +499,8 @@ public sealed class InvoicePreviewWindow : Window
         {
             try
             {
-                var companyName = company?.Name ?? "اشک قلم";
-                var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CURRENCY|{currencyLabel}|CUSTOMER|{invoice.CustomerName}|COMPANY|{companyName}";
+                var qrCompanyName = company?.Name ?? "اشک قلم";
+                var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CURRENCY|{currencyLabel}|CUSTOMER|{invoice.CustomerName}|COMPANY|{qrCompanyName}";
                 var qr = CreateQrImage(payload);
                 var qrCard = new Border
                 {
