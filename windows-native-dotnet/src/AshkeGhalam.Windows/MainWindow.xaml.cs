@@ -89,6 +89,11 @@ public partial class MainWindow : Window
         PaymentsGrid.ItemsSource = _data.Payments.OrderByDescending(p => p.CreatedAt).ToList();
         ExpensesGrid.ItemsSource = null;
         ExpensesGrid.ItemsSource = _data.Expenses.OrderByDescending(x => x.CreatedAt).ToList();
+        if (FindName("ChecksGrid") is DataGrid checksGrid)
+        {
+            checksGrid.ItemsSource = null;
+            checksGrid.ItemsSource = _data.Checks.OrderBy(c => c.DueDate).ThenByDescending(c => c.CreatedAt).ToList();
+        }
         RecentInvoicesGrid.ItemsSource = null;
         RecentInvoicesGrid.ItemsSource = _data.Invoices.OrderByDescending(i => i.Number).Take(10).ToList();
 
@@ -400,6 +405,105 @@ public partial class MainWindow : Window
     }
 
     private static string CsvEscape(string? value) => "\"" + (value ?? "").Replace("\"", "\"\"") + "\"";
+
+    private void AddCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var dialog = new CheckDialog(this);
+        if (dialog.ShowDialog() != true || dialog.Result is not CheckRecord check) return;
+        Commit(data =>
+        {
+            if (!string.IsNullOrWhiteSpace(check.SayadId) && data.Checks.Any(x => string.Equals(x.SayadId, check.SayadId, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("شناسهٔ صیادی تکراری است.");
+            data.Checks.Add(check);
+        }, "چک ثبت شد؛ وضعیت آن فقط به‌صورت محلی ثبت شده است");
+    }
+
+    private void EditCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckRecord selected)
+        { MessageBox.Show(this, "یک چک را انتخاب کنید."); return; }
+        var dialog = new CheckDialog(this, selected);
+        if (dialog.ShowDialog() != true || dialog.Result is not CheckRecord changed) return;
+        Commit(data =>
+        {
+            if (!string.IsNullOrWhiteSpace(changed.SayadId) && data.Checks.Any(x => x.Id != changed.Id && string.Equals(x.SayadId, changed.SayadId, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("شناسهٔ صیادی تکراری است.");
+            var index = data.Checks.FindIndex(x => x.Id == changed.Id);
+            if (index < 0) throw new InvalidOperationException("چک پیدا نشد.");
+            data.Checks[index] = changed;
+        }, "مشخصات چک به‌روزرسانی شد");
+    }
+
+    private void ChangeCheckStatus_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckRecord selected)
+        { MessageBox.Show(this, "ابتدا یک چک را انتخاب کنید."); return; }
+        var dialog = new CheckStatusDialog(this, selected.Status);
+        if (dialog.ShowDialog() != true) return;
+        if (string.Equals(selected.Status, dialog.SelectedStatus, StringComparison.Ordinal))
+        { MessageBox.Show(this, "وضعیت انتخاب‌شده با وضعیت فعلی تفاوتی ندارد."); return; }
+        Commit(data =>
+        {
+            var check = data.Checks.SingleOrDefault(x => x.Id == selected.Id)
+                ?? throw new InvalidOperationException("چک پیدا نشد.");
+            check.Status = dialog.SelectedStatus;
+            check.History.Add(new CheckHistoryRecord { ChangedAt = DateTimeOffset.Now, Status = dialog.SelectedStatus, Note = dialog.Note });
+        }, "وضعیت چک در سوابق محلی ثبت شد؛ هیچ استعلام بانکی انجام نشده است");
+    }
+
+    private void DeleteCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckRecord selected)
+        { MessageBox.Show(this, "یک چک را انتخاب کنید."); return; }
+        if (!string.IsNullOrWhiteSpace(selected.RelatedInvoiceId) || selected.Status != "PENDING")
+        {
+            MessageBox.Show(this, "برای حفظ سابقهٔ مالی، فقط چکِ در انتظار و بدون پیوند فاکتور قابل حذف است. چک‌های دیگر را با وضعیت مناسب نگه دارید.",
+                "حذف چک مجاز نیست", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (MessageBox.Show(this, "چک انتخابی حذف شود؟", "تأیید حذف", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        Commit(data => data.Checks.RemoveAll(x => x.Id == selected.Id), "چک حذف شد");
+    }
+
+    private void ExportChecks_Click(object sender, RoutedEventArgs e) =>
+        ExportCsv("checks.csv", new[] { "CheckType", "HolderName", "BankName", "Amount", "SayadId", "CheckNumber", "DueDate", "IssueDate", "Status", "PersonName", "Description" },
+            _data.Checks.Select(check => new[]
+            {
+                CheckTypeLabel(check.CheckType), check.HolderName, check.BankName,
+                check.Amount.ToString(CultureInfo.InvariantCulture), check.SayadId, check.CheckNumber,
+                FormatPersianDate(check.DueDate), check.IssueDate is DateTimeOffset issue ? FormatPersianDate(issue) : "",
+                CheckStatusLabel(check.Status), check.PersonName, check.Description
+            }));
+
+    private static string CheckStatusLabel(string status) => status switch
+    {
+        "PENDING" => "در انتظار",
+        "DEPOSITED" => "واگذار به بانک",
+        "PASSED" => "پاس‌شده",
+        "BOUNCED" => "برگشتی",
+        "TRANSFERRED" => "واگذار شده",
+        "CASHED" => "وصول‌شده",
+        "RETURNED" => "عودت‌شده",
+        _ => status
+    };
+
+    private static string CheckTypeLabel(string type) => type switch
+    {
+        "RECEIVED" => "دریافتی",
+        "ISSUED" => "پرداختی",
+        _ => type
+    };
+
+    private static string FormatPersianDate(DateTimeOffset value)
+    {
+        var calendar = new PersianCalendar();
+        return string.Format(CultureInfo.InvariantCulture, "{0:0000}/{1:00}/{2:00}",
+            calendar.GetYear(value.DateTime), calendar.GetMonth(value.DateTime), calendar.GetDayOfMonth(value.DateTime));
+    }
 
     // Native navigation mirrors the existing Ashke Ghalam sidebar. Unported pages are
     // deliberately marked as pending instead of being represented by fake functionality.
