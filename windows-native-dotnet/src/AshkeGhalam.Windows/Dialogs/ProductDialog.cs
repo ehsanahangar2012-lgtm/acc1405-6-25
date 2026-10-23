@@ -192,7 +192,7 @@ public sealed class ProductDialog : Window
     private static void FormatNumericField(TextBox field)
     {
         if (string.IsNullOrWhiteSpace(field.Text)) return;
-        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "عدد").ToString("N2", CultureInfo.GetCultureInfo("fa-IR")); }
+        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "عدد").ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")); }
         catch (InvalidOperationException) { }
     }
 
