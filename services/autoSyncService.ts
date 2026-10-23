@@ -33,6 +33,7 @@ export interface DeviceSyncStatus {
 class AutoSyncService {
     private syncInterval: ReturnType<typeof setInterval> | null = null;
     private isSyncing = false;
+    private isFullSyncRunning = false;
     private lastSyncHashes: Map<string, number> = new Map();
     private lastSyncTime: number = 0;
     private deviceId: string;
@@ -141,13 +142,17 @@ class AutoSyncService {
     }
 
     private async executeFullSyncCycle() {
-        if (!this.canSyncWithServer() || this.isSyncing) return;
+        // قفل مستقل برای کل چرخه؛ isSyncing فقط مرحلهٔ ارسال را پوشش می‌دهد.
+        if (!this.canSyncWithServer() || this.isSyncing || this.isFullSyncRunning) return;
+        this.isFullSyncRunning = true;
         try {
             await this.loadFromHost();
             await syncQueue.processQueue();
             await this.syncToHost();
         } catch (e) {
             console.warn('Sync cycle completed with notice:', e);
+        } finally {
+            this.isFullSyncRunning = false;
         }
     }
 
