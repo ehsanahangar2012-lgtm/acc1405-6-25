@@ -167,7 +167,7 @@ public sealed class CheckDialog : Window
         _highPriority.IsChecked = existing?.IsHighPriority ?? false;
         _amount.LostFocus += (_, _) => FormatAmount();
         _amount.TextChanged += Amount_TextChanged;
-        foreach (var combo in new[] { _bankName, _holderName, _personName, _checkType, _status })
+        foreach (var combo in new[] { _bankName, _holderName, _personName })
             AttachDropDownOpen(combo);
 
         var header = new StackPanel();
@@ -304,7 +304,15 @@ public sealed class CheckDialog : Window
         if (!PersianNumberParser.TryParseDecimal(current, out var value)) return;
 
         var oldCaret = Math.Clamp(_amount.CaretIndex, 0, current.Length);
-        var digitsBeforeCaret = current.Take(oldCaret).Count(char.IsDigit);
+        var prefix = current[..oldCaret];
+        var decimalInPrefix = prefix.IndexOfAny(['٫', '.']);
+        var integerDigitsBeforeCaret = decimalInPrefix >= 0
+            ? prefix[..decimalInPrefix].Count(char.IsDigit)
+            : prefix.Count(char.IsDigit);
+        var fractionDigitsBeforeCaret = decimalInPrefix >= 0
+            ? prefix[(decimalInPrefix + 1)..].Count(char.IsDigit)
+            : 0;
+
         var formatted = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
         if (endsWithDecimal && !formatted.Contains('٫') && !formatted.Contains('.')) formatted += "٫";
         if (formatted == current) return;
@@ -313,18 +321,35 @@ public sealed class CheckDialog : Window
         try
         {
             _amount.Text = formatted;
-            var digitCount = 0;
+            var decimalIndex = formatted.IndexOfAny(['٫', '.']);
             var caret = formatted.Length;
-            for (var i = 0; i < formatted.Length; i++)
+            if (decimalInPrefix >= 0)
             {
-                if (char.IsDigit(formatted[i])) digitCount++;
-                if (digitCount >= digitsBeforeCaret)
+                if (decimalIndex < 0) decimalIndex = formatted.Length;
+                var fractionCount = 0;
+                caret = decimalIndex;
+                for (var i = decimalIndex + 1; i < formatted.Length; i++)
                 {
-                    caret = Math.Min(formatted.Length, i + 1);
-                    break;
+                    if (char.IsDigit(formatted[i])) fractionCount++;
+                    caret = i + 1;
+                    if (fractionCount >= fractionDigitsBeforeCaret) break;
+                }
+                if (fractionDigitsBeforeCaret == 0) caret = Math.Min(formatted.Length, decimalIndex + 1);
+            }
+            else
+            {
+                var digitCount = 0;
+                for (var i = 0; i < formatted.Length; i++)
+                {
+                    if (char.IsDigit(formatted[i])) digitCount++;
+                    if (digitCount >= integerDigitsBeforeCaret)
+                    {
+                        caret = i + 1;
+                        break;
+                    }
                 }
             }
-            _amount.CaretIndex = caret;
+            _amount.CaretIndex = Math.Clamp(caret, 0, formatted.Length);
         }
         finally { _formattingAmount = false; }
     }
@@ -337,12 +362,29 @@ public sealed class CheckDialog : Window
 
     private static void AttachDropDownOpen(ComboBox combo)
     {
-        combo.PreviewMouseLeftButtonDown += (_, _) =>
-            combo.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input,
-                new Action(() => { if (combo.IsEnabled && combo.IsVisible) combo.IsDropDownOpen = true; }));
-        combo.GotKeyboardFocus += (_, _) =>
-            combo.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input,
-                new Action(() => { if (combo.IsEnabled && combo.IsVisible) combo.IsDropDownOpen = true; }));
+        // Editable ComboBoxes normally place the caret when the text surface is clicked.
+        // Open the list only from that text surface, not on every focus change: otherwise
+        // keyboard navigation and choosing a result can unexpectedly reopen the popup.
+        if (!combo.IsEditable) return;
+        combo.Loaded += (_, _) =>
+        {
+            combo.ApplyTemplate();
+            if (combo.Template.FindName("PART_EditableTextBox", combo) is not TextBox editableTextBox)
+                return;
+
+            editableTextBox.PreviewMouseLeftButtonDown += (_, _) =>
+                combo.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input,
+                    new Action(() =>
+                    {
+                        if (combo.IsEnabled && combo.IsVisible && combo.IsEditable)
+                            combo.IsDropDownOpen = true;
+                    }));
+            editableTextBox.PreviewKeyDown += (_, e) =>
+            {
+                if (e.Key == Key.Down && !combo.IsDropDownOpen)
+                    combo.IsDropDownOpen = true;
+            };
+        };
     }
 
     private void SaveResult()
@@ -455,9 +497,6 @@ public sealed class CheckDialog : Window
             _year.ItemsSource = Enumerable.Range(Math.Max(1300, currentYear - 30), 61).ToList();
             _month.ItemsSource = MonthNames;
             _day.ItemsSource = Enumerable.Range(1, 31).ToList();
-            AttachDropDownOpen(_year);
-            AttachDropDownOpen(_month);
-            AttachDropDownOpen(_day);
             _year.SelectionChanged += (_, _) => RefreshDayChoices();
             _month.SelectionChanged += (_, _) => RefreshDayChoices();
             Children.Add(_year);
