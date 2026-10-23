@@ -19,6 +19,25 @@ assert.match(html, /const exportVisibleTableCsv = \(bodyId, filename, excludeOpe
 for (const id of ['customers','products','invoices','payments','expenses']) {
   assert.ok(html.includes('data-export-csv="' + id + '"'), "Missing CSV export action for: " + id);
 }
+
+for (const id of ["page-vouchers","page-cardex","page-checks","page-moadian","page-companies","page-settings","page-server"]) {
+  assert.ok(html.includes('id="' + id + '"'), "Missing accounting module UI: " + id);
+}
+for (const id of ["activeCompanySelector","invoiceThemeSelect","invoiceQrToggle","downloadInvoiceQr","saveVoucher","saveCheck","companiesList","saveCompany","settingsInvoiceTheme","saveSettings","moadianInvoicesBody","saveMoadianConfig","serverBaseUrl","testServerConfig"]) {
+  assert.ok(html.includes('id="' + id + '"'), "Missing accounting module control: " + id);
+}
+assert.match(html, /qrcode\(0,'M'\)/, "Invoice QR must be generated locally with a QR implementation.");
+assert.match(html, /invoiceQrPayload/, "Invoice QR payload builder must be present.");
+assert.match(html, /تولید QR ناموفق بود/, "QR errors should be visible rather than silently ignored.");
+assert.match(html, /ارسال رسمی تا تنظیم و اعتبارسنجی API/, "Moadian integration status must not imply that real invoices are sent.");
+assert.match(html, /دادهٔ حسابداری را به سرور ارسال نمی‌کند/, "Server configuration must not imply sync is active.");
+assert.match(html, /const renderCardex = \(\) =>/, "Kardex renderer must exist.");
+assert.match(html, /running\+=incoming\?v\.quantity:-v\.quantity/, "Kardex must show a running stock balance.");
+assert.match(html, /data-check-status/, "Check status updates must be available.");
+assert.doesNotMatch(html, /data-page="migration"/, "The client navigation must not expose unrelated/miscellaneous modules.");
+assert.match(html, /class="nav-btn" data-page="moadian"/, "Accounting navigation should expose taxpayer module.");
+assert.match(html, /class="nav-btn" data-page="companies"/, "Accounting navigation should expose company switching.");
+assert.match(html, /qrcode-generator by Kazuhiko Arase, MIT licensed/, "Offline QR library attribution and license notice must be included.");
 assert.match(html, /refreshInvoiceCustomerOptions\(customer\.id\)/, "Saved people should be offered in the open invoice.");
 assert.match(html, /refreshInvoiceProductOptions\(product\.id\)/, "Saved products should be offered in the open invoice.");
 assert.match(html, /state\.customers\.some\(x => String\(x\.code\)\.toLowerCase\(\) === code\.toLowerCase\(\)\)/, "Person codes should be checked for duplicates.");
