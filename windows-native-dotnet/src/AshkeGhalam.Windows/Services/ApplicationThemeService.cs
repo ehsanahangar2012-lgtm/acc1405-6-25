@@ -88,6 +88,21 @@ public static class ApplicationThemeService
             yield return Control.ForegroundProperty;
             yield return Control.BorderBrushProperty;
         }
+        if (element is TextBox)
+        {
+            // These were set locally in dark mode but were not previously included in the
+            // snapshot, leaving a pale caret/selection after switching back to light mode.
+            yield return TextBox.CaretBrushProperty;
+            yield return TextBox.SelectionBrushProperty;
+        }
+        if (element is DataGrid)
+        {
+            // Preserve the full DataGrid palette so toggling dark -> light restores defaults.
+            yield return DataGrid.RowBackgroundProperty;
+            yield return DataGrid.AlternatingRowBackgroundProperty;
+            yield return DataGrid.HorizontalGridLinesBrushProperty;
+            yield return DataGrid.VerticalGridLinesBrushProperty;
+        }
         if (element is TextBlock)
             yield return TextBlock.ForegroundProperty;
         if (element is TextElement)
