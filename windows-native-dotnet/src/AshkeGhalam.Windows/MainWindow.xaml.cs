@@ -400,4 +400,100 @@ public partial class MainWindow : Window
     }
 
     private static string CsvEscape(string? value) => "\"" + (value ?? "").Replace("\"", "\"\"") + "\"";
+
+    // Native navigation mirrors the existing Ashke Ghalam sidebar. Unported pages are
+    // deliberately marked as pending instead of being represented by fake functionality.
+    private sealed record NativeModuleLink(string Title, string Group, string OriginalRoute, int? NativeTabIndex);
+
+    private static readonly IReadOnlyDictionary<string, NativeModuleLink> NativeModuleLinks =
+        new Dictionary<string, NativeModuleLink>(StringComparer.Ordinal)
+        {
+            ["dashboard"] = new("پیشخوان", "منوی اصلی", "/", 0),
+            ["invoices"] = new("فاکتورها", "منوی اصلی", "/invoices", 3),
+            ["inventory"] = new("انبارداری", "منوی اصلی", "/inventory", 2),
+            ["checks"] = new("مدیریت چک", "منوی اصلی", "/checks", null),
+            ["finance"] = new("امور مالی", "منوی اصلی", "/finance", null),
+            ["customers"] = new("اشخاص", "منوی اصلی", "/customers", 1),
+            ["reports"] = new("گزارشات عمومی", "گزارشات و تحلیل", "/reports", 6),
+            ["users"] = new("کاربران و سطح دسترسی", "تنظیمات و سیستم", "/users", null),
+            ["payments"] = new("دریافت‌ها", "عملیات محلی موجود", "بخش دریافت‌های نسخه بومی", 4),
+            ["expenses"] = new("هزینه‌ها", "عملیات محلی موجود", "بخش هزینه‌های نسخه بومی", 5),
+            ["backup"] = new("پشتیبان‌گیری محلی", "عملیات محلی موجود", "پشتیبان محلی نسخه بومی", 7),
+            ["projects"] = new("پروژه‌ها", "مدیریت کسب‌وکار", "/projects", null),
+            ["contracts"] = new("قراردادها", "مدیریت کسب‌وکار", "/contracts", null),
+            ["assets"] = new("دارایی‌های ثابت", "مدیریت کسب‌وکار", "/assets", null),
+            ["budget"] = new("بودجه‌بندی", "مدیریت کسب‌وکار", "/budget", null),
+            ["marketing"] = new("بازاریابی و سئو", "مدیریت کسب‌وکار", "/marketing", null),
+            ["import-center"] = new("مرکز واردات اسناد", "مدیریت کسب‌وکار", "/import-center", null),
+            ["accounting"] = new("حسابداری دوبل", "حسابداری پیشرفته", "/accounting", null),
+            ["cashflow-predictor"] = new("پیش‌بینی جریان نقدینگی", "حسابداری پیشرفته", "/cashflow-predictor", null),
+            ["cashflow"] = new("جریان نقدینگی", "حسابداری پیشرفته", "/cashflow", null),
+            ["tax"] = new("مدیریت مالیات", "حسابداری پیشرفته", "/tax", null),
+            ["loans"] = new("وام‌ها", "حسابداری پیشرفته", "/loans", null),
+            ["due-calendar"] = new("تقویم سررسید و اقساط", "حسابداری پیشرفته", "/due-calendar", null),
+            ["bank-reconciliation"] = new("تطبیق بانکی", "حسابداری پیشرفته", "/bank-reconciliation", null),
+            ["currency"] = new("مدیریت چندارزی", "حسابداری پیشرفته", "/currency", null),
+            ["workflow-rules"] = new("قواعد گردش مالی", "حسابداری پیشرفته", "/workflow-rules", null),
+            ["financial-reports"] = new("گزارشات مالی پیشرفته", "گزارشات و تحلیل", "/financial-reports", null),
+            ["ai-assistant"] = new("دستیار هوشمند مالی", "گزارشات و تحلیل", "/ai-assistant", null),
+            ["signature-dashboard"] = new("داشبورد امضا", "امضای دیجیتال", "/signature-dashboard", null),
+            ["signature-management"] = new("مدیریت امضا", "امضای دیجیتال", "/signature-management", null),
+            ["moadian"] = new("سامانه مؤدیان مالیاتی", "خدمات تجاری و ابری", "/moadian", null),
+            ["pos-terminal"] = new("کارتخوان بانکی", "خدمات تجاری و ابری", "/pos-terminal", null),
+            ["cloud-vault"] = new("پشتیبان ابری", "خدمات تجاری و ابری", "/cloud-vault", null),
+            ["sms-center"] = new("پنل پیامک هوشمند", "خدمات تجاری و ابری", "/sms-center", null),
+            ["multi-user-lan"] = new("شبکه محلی چندکاربره", "خدمات تجاری و ابری", "/multi-user-lan", null),
+            ["client-broadcast"] = new("اطلاعیه‌ها", "خدمات تجاری و ابری", "/client-broadcast", null),
+            ["activation"] = new("اتصال سرور و فعال‌سازی لایسنس", "خدمات تجاری و ابری", "/install-android (فقط اتصال/فعال‌سازی کلاینت)", null),
+            ["mobile-catalog"] = new("کاتالوگ ویزیتوری همراه", "خدمات تجاری و ابری", "/mobile-catalog", null),
+            ["catalog"] = new("کاتالوگ محصول", "خدمات تجاری و ابری", "/catalog", null),
+            ["support-sla"] = new("پشتیبانی و تمدید", "خدمات تجاری و ابری", "/support-sla", null),
+            ["fiscal-year"] = new("سال مالی", "تنظیمات و سیستم", "/fiscal-year", null),
+            ["security"] = new("امنیت داده‌ها", "تنظیمات و سیستم", "/security", null),
+            ["data-sync"] = new("همگام‌سازی داده‌ها", "تنظیمات و سیستم", "/data-sync", null),
+            ["advanced-settings"] = new("تنظیمات پیشرفته", "تنظیمات و سیستم", "/advanced-settings", null),
+            ["settings"] = new("تنظیمات عمومی", "تنظیمات و سیستم", "/settings", null),
+            ["help"] = new("آموزش و راهنما", "تنظیمات و سیستم", "/help", null),
+            ["updates"] = new("مرکز به‌روزرسانی", "تنظیمات و سیستم", "/updates", null)
+        };
+
+    private void NavigateModule_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement source || source.Tag is not string key ||
+            !NativeModuleLinks.TryGetValue(key, out var module))
+            return;
+
+        // Resolve controls by name so this handler can be committed before the new XAML shell.
+        if (FindName("CurrentModuleText") is TextBlock currentModule)
+            currentModule.Text = module.Title + (module.NativeTabIndex.HasValue ? " • نسخهٔ بومی" : " • در حال مهاجرت");
+
+        var tabs = FindName("MainTabs") as TabControl;
+        var migrationPanel = FindName("MigrationPanel") as Border;
+        if (module.NativeTabIndex is int nativeTabIndex && tabs is not null && migrationPanel is not null)
+        {
+            migrationPanel.Visibility = Visibility.Collapsed;
+            tabs.Visibility = Visibility.Visible;
+            tabs.SelectedIndex = nativeTabIndex;
+            if (FindName("FooterStatus") is TextBlock footer)
+                footer.Text = "بخش بومی فعال: " + module.Title + "؛ دامنهٔ امکانات این صفحه هنوز باید با نسخهٔ اصلی تطبیق داده شود.";
+            return;
+        }
+
+        if (tabs is not null) tabs.Visibility = Visibility.Collapsed;
+        if (migrationPanel is not null) migrationPanel.Visibility = Visibility.Visible;
+        if (FindName("MigrationPageTitle") is TextBlock pageTitle) pageTitle.Text = module.Title;
+        if (FindName("MigrationPageGroup") is TextBlock pageGroup)
+            pageGroup.Text = "گروه: " + module.Group + "   •   مسیر نسخهٔ اصلی: " + module.OriginalRoute;
+        if (FindName("MigrationPageState") is TextBlock pageState)
+            pageState.Text = "وضعیت: هنوز به‌صورت بومی پیاده‌سازی و با نسخهٔ اصلی آزمون تطبیقی نشده است.";
+        if (FindName("FooterStatus") is TextBlock migrationFooter)
+            migrationFooter.Text = "این بخش هنوز برای استفادهٔ عملی آماده نیست؛ نسخهٔ فعلی وب/اندروید/الکترون دست‌نخورده باقی می‌ماند.";
+    }
+
+    private void ReturnToDashboard_Click(object sender, RoutedEventArgs e)
+    {
+        if (FindName("NavigationDashboardButton") is Button dashboardButton)
+            NavigateModule_Click(dashboardButton, e);
+    }
+
 }
