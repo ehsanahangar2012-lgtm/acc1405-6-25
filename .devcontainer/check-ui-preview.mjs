@@ -15,6 +15,10 @@ for (const id of ["saveForm","addDraftLine","invoiceOverlay","printInvoice","sea
 }
 assert.match(html, /const openInlineEntity = mode =>/, "Inline person/product editor should exist.");
 assert.match(html, /const saveInlineEntity = \(\) =>/, "Inline person/product save handler should exist.");
+assert.match(html, /const exportVisibleTableCsv = \(bodyId, filename, excludeOperations = false\) =>/, "Visible table CSV export should exist.");
+for (const id of ['customers','products','invoices','payments','expenses']) {
+  assert.ok(html.includes('data-export-csv="' + id + '"'), "Missing CSV export action for: " + id);
+}
 assert.match(html, /refreshInvoiceCustomerOptions\(customer\.id\)/, "Saved people should be offered in the open invoice.");
 assert.match(html, /refreshInvoiceProductOptions\(product\.id\)/, "Saved products should be offered in the open invoice.");
 assert.match(html, /state\.customers\.some\(x => String\(x\.code\)\.toLowerCase\(\) === code\.toLowerCase\(\)\)/, "Person codes should be checked for duplicates.");
