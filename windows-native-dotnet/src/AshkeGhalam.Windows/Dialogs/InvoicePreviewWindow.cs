@@ -289,7 +289,7 @@ public sealed class InvoicePreviewWindow : Window
     private static InvoicePalette GetPalette(string theme) => theme switch
     {
         "official" => new(Color.FromRgb(51, 65, 85), Color.FromRgb(241, 245, 249), Color.FromRgb(15, 23, 42)),
-        "premium" => new(Color.FromRgb(139, 106, 37), Color.FromRgb(248, 241, 223), Color.FromRgb(41, 37, 36)),
+        "premium" => new(Color.FromRgb(120, 90, 31), Color.FromRgb(248, 241, 223), Color.FromRgb(41, 37, 36)), // 5.68:1 contrast on the invoice's soft surface
         "thermal" => new(Color.FromRgb(17, 24, 39), Color.FromRgb(243, 244, 246), Color.FromRgb(17, 24, 39)),
         "minimal" => new(Color.FromRgb(100, 116, 139), Color.FromRgb(248, 250, 252), Color.FromRgb(30, 41, 59)),
         "classic" => new(Color.FromRgb(30, 64, 175), Color.FromRgb(239, 246, 255), Color.FromRgb(30, 41, 59)),
