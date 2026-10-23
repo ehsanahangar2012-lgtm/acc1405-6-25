@@ -112,20 +112,27 @@ public partial class MainWindow : Window
         RecentInvoicesGrid.ItemsSource = null;
         RecentInvoicesGrid.ItemsSource = _data.Invoices.OrderByDescending(i => i.Number).Take(10).ToList();
 
-        var sales = _data.Invoices.Where(i => i.Status != "لغو شده").Sum(i => i.Total);
+        var activeInvoices = _data.Invoices.Where(i => i.Status != "لغو شده").ToList();
+        var sales = activeInvoices.Where(i => i.Type == "SALE").Sum(i => i.Total);
+        var purchases = activeInvoices.Where(i => i.Type == "PURCHASE").Sum(i => i.Total);
         var paid = _data.Payments.Sum(p => p.Amount);
-        var receivables = _data.Invoices.Where(i => i.Status != "لغو شده").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
+        var receivables = activeInvoices.Where(i => i.Type == "SALE").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
+        var payables = activeInvoices.Where(i => i.Type == "PURCHASE").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
         var expenses = _data.Expenses.Sum(x => x.Amount);
         CustomerCount.Text = _data.Customers.Count.ToString("N0", CultureInfo.CurrentCulture);
         ProductCount.Text = _data.Products.Count.ToString("N0", CultureInfo.CurrentCulture);
         InvoiceCount.Text = _data.Invoices.Count(i => i.Status != "لغو شده").ToString("N0", CultureInfo.CurrentCulture);
         SalesTotal.Text = sales.ToString("N2", CultureInfo.CurrentCulture);
+        PurchasesTotal.Text = purchases.ToString("N2", CultureInfo.CurrentCulture);
         PaymentsTotal.Text = paid.ToString("N2", CultureInfo.CurrentCulture);
         ReceivablesTotal.Text = receivables.ToString("N2", CultureInfo.CurrentCulture);
+        PayablesTotal.Text = payables.ToString("N2", CultureInfo.CurrentCulture);
         ExpensesTotal.Text = expenses.ToString("N2", CultureInfo.CurrentCulture);
         ReportSales.Text = sales.ToString("N2", CultureInfo.CurrentCulture);
+        ReportPurchases.Text = purchases.ToString("N2", CultureInfo.CurrentCulture);
         ReportPayments.Text = paid.ToString("N2", CultureInfo.CurrentCulture);
         ReportReceivables.Text = receivables.ToString("N2", CultureInfo.CurrentCulture);
+        ReportPayables.Text = payables.ToString("N2", CultureInfo.CurrentCulture);
         ReportExpenses.Text = expenses.ToString("N2", CultureInfo.CurrentCulture);
         ReportCash.Text = (paid - expenses).ToString("N2", CultureInfo.CurrentCulture);
     }
@@ -274,9 +281,9 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable()) return;
         if (InvoicesGrid.SelectedItem is not InvoiceRecord invoice) { MessageBox.Show(this, "یک فاکتور را انتخاب کنید."); return; }
-        if (MessageBox.Show(this, $"فاکتور شماره {invoice.Number} لغو و موجودی اقلام برگشت داده شود؟ فقط فاکتور بدون دریافت قابل لغو است.",
-            "تأیید لغو فاکتور", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
-        Commit(data => AccountingOperations.CancelInvoice(data, invoice.Id), "فاکتور لغو و موجودی برگشت داده شد");
+        if (MessageBox.Show(this, $"سند {invoice.DisplayNumber} لغو و اثر موجودی آن برگردانده شود؟ فقط سند صادرشدهٔ بدون تسویه قابل لغو است.",
+            "تأیید لغو سند", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        Commit(data => AccountingOperations.CancelInvoice(data, invoice.Id), "سند لغو و اثر موجودی آن برگشت داده شد");
     }
 
     private void PrintInvoice_Click(object sender, RoutedEventArgs e)
@@ -348,7 +355,7 @@ public partial class MainWindow : Window
         if (!RequireWritable()) return;
         var dialog = new PaymentDialog(this, _data);
         if (dialog.ShowDialog() == true)
-            Commit(data => AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference), "دریافت ثبت شد");
+            Commit(data => AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference), "عملیات دریافت/پرداخت ثبت شد");
     }
 
     private void AddExpense_Click(object sender, RoutedEventArgs e)
