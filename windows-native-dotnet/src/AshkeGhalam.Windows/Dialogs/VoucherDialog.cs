@@ -214,7 +214,7 @@ public sealed class VoucherDialog : Window
     {
         if (!string.IsNullOrWhiteSpace(field.Text) &&
             PersianNumberParser.TryParseDecimal(field.Text, out var value))
-            field.Text = value.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"));
+            field.Text = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
     }
 
     private void AddLine()
