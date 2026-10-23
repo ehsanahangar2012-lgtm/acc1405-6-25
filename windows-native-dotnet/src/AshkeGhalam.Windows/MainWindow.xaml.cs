@@ -2341,9 +2341,6 @@ public partial class MainWindow : Window
         root.Children.Add(field);
     }
 
-    private string CurrencyUnitLabel() =>
-        string.Equals(_data.Preferences.Currency, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "تومان" : "ریال";
-
     private void ChangeCheckStatus_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
