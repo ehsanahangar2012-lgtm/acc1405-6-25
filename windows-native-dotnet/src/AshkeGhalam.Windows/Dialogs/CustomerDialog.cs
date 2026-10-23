@@ -22,7 +22,7 @@ public sealed class CustomerDialog : Window
 
     public CustomerRecord? Result { get; private set; }
 
-    public CustomerDialog(Window owner, CustomerRecord? existing = null)
+    public CustomerDialog(Window owner, CustomerRecord? existing = null, string suggestedCode = "")
     {
         _existing = existing;
         Owner = owner;
@@ -35,7 +35,7 @@ public sealed class CustomerDialog : Window
         FlowDirection = FlowDirection.RightToLeft;
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
 
-        _code.Text = existing?.Code ?? "";
+        _code.Text = existing?.Code ?? suggestedCode;
         _name.Text = existing?.Name ?? "";
         _phone.Text = existing?.Phone ?? "";
         _email.Text = existing?.Email ?? "";
@@ -64,7 +64,7 @@ public sealed class CustomerDialog : Window
             Margin = new Thickness(0, 0, 0, 12)
         });
 
-        AddField(root, "کد شخص (اختیاری؛ باید یکتا باشد)", _code);
+        AddField(root, "کد شخص (خودکار پیشنهاد شده؛ قابل ویرایش و باید یکتا باشد)", _code);
         AddField(root, "نام شخص / نام شرکت (الزامی)", _name);
         AddField(root, "گروه / دسته‌بندی", _category);
         root.Children.Add(_isCustomer);
