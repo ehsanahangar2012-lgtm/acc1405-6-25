@@ -31,7 +31,7 @@ function send(response, status, type, body) {
 const server = createServer(async (request, response) => {
   const pathname = new URL(request.url || "/", "http://127.0.0.1").pathname;
 
-  if (pathname === "/version.json") {
+  if (pathname === "/version.json" || pathname === "/native-windows-preview/version.json") {
     try {
       const details = await stat(indexPath);
       return send(response, 200, "application/json; charset=utf-8", JSON.stringify({
@@ -43,7 +43,7 @@ const server = createServer(async (request, response) => {
     }
   }
 
-  if (pathname !== "/" && pathname !== "/index.html") {
+  if (!["/", "/index.html", "/native-windows-preview", "/native-windows-preview/", "/native-windows-preview/index.html"].includes(pathname)) {
     return send(response, 404, "text/plain; charset=utf-8", "Not found");
   }
 
