@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+  <meta name="theme-color" content="#101a2d">
+  <title>پیش‌نمایش بومی ویندوز | اشک قلم</title>
+  <style>
+    :root{--navy:#101a2d;--navy2:#17243b;--teal:#0f766e;--teal2:#0a9187;--bg:#f2f5f9;--panel:#fff;--line:#e1e7ef;--text:#172235;--muted:#68778d;--red:#b42318;--amber:#a15c07;--green:#087f5b;--shadow:0 8px 24px #12213a0a}
+    *{box-sizing:border-box}html,body{margin:0;min-height:100%;background:var(--bg);font-family:Tahoma,"Segoe UI",sans-serif;color:var(--text);font-size:13px}button,input,select,textarea{font:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #14b8a6aa;outline-offset:1px}
+    .app{display:grid;grid-template-columns:minmax(0,1fr) 284px;grid-template-rows:72px minmax(0,1fr);min-height:100vh;direction:ltr}.topbar{grid-column:1/3;grid-row:1;background:var(--navy);color:#f8fafc;display:flex;align-items:center;justify-content:space-between;padding:0 24px;direction:rtl;border-bottom:1px solid #26354d}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;border-radius:12px;background:linear-gradient(145deg,#14b8a6,#0f766e);display:grid;place-items:center;font-size:20px;font-weight:bold;box-shadow:0 6px 15px #0f766e55}.brand-name{font-size:20px;font-weight:800;letter-spacing:-.4px}.brand-sub{font-size:11px;color:#aab7ca;margin-top:4px}.top-actions{display:flex;align-items:center;gap:10px}.pill{display:inline-flex;align-items:center;gap:7px;border:1px solid #36445b;border-radius:20px;padding:8px 12px;color:#d6e1ef;background:#1a2940;font-size:11px}.dot{width:7px;height:7px;border-radius:50%;background:#34d399}
+    .workspace{grid-column:1;grid-row:2;direction:rtl;min-width:0;padding:20px 20px 28px;overflow:auto;max-height:calc(100vh - 102px)}.sidebar{grid-column:2;grid-row:2;direction:rtl;background:var(--navy);padding:12px 11px 22px;overflow:auto;max-height:calc(100vh - 102px);border-left:1px solid #26354d}.side-card{border:1px solid #2a3951;background:#15233a;border-radius:14px;padding:14px;margin-bottom:8px}.side-title{color:white;font-weight:800;font-size:18px}.side-muted{font-size:11px;color:#98a8be;line-height:1.8;margin-top:4px}.nav-group{margin:14px 0 4px;color:#91a1b7;font-size:10px;font-weight:800;padding:0 8px}.nav-btn{display:flex;width:100%;justify-content:space-between;align-items:center;text-align:right;background:transparent;border:0;color:#d5deeb;border-radius:9px;padding:10px 11px;margin:3px 0;transition:.16s}.nav-btn:hover{background:#233550}.nav-btn.active{background:var(--teal);color:white;box-shadow:0 5px 15px #0f766e44}.nav-leading{display:flex;gap:10px;align-items:center}.nav-ico{display:inline-grid;place-items:center;width:21px;font-size:15px}.nav-badge{font-size:9px;color:#c6d6e7;background:#26364f;padding:3px 6px;border-radius:20px}
+    .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:2px 0 18px}.page-title{font-size:24px;font-weight:850;letter-spacing:-.5px}.page-sub{color:var(--muted);font-size:12px;line-height:1.9;margin-top:7px}.head-actions{display:flex;gap:8px;flex-wrap:wrap}.btn{border:1px solid #d3dce7;background:#fff;border-radius:9px;padding:9px 13px;min-height:36px;color:#25334a;font-weight:700;display:inline-flex;align-items:center;justify-content:center;gap:6px;box-shadow:0 1px 2px #17223508}.btn:hover{border-color:#9aabba;background:#f8fafc}.btn.primary{background:var(--teal);border-color:var(--teal);color:white}.btn.primary:hover{background:#0b645d}.btn.danger{background:#fff5f5;color:var(--red);border-color:#f2d1d1}.btn.small{min-height:29px;padding:6px 9px;font-size:11px}.btn.ghost{background:#eef4f8;border-color:#e2e8f0}.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:16px;margin-bottom:15px;min-width:0}.panel-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.panel-title{font-size:15px;font-weight:800}.panel-note{font-size:11px;line-height:1.8;color:var(--muted);margin-top:5px}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:15px}.stat{border:1px solid var(--line);background:#fff;border-radius:13px;padding:16px;min-width:0;box-shadow:var(--shadow)}.stat-top{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:11px;gap:8px}.stat-icon{width:32px;height:32px;border-radius:10px;display:grid;place-items:center;background:#e8f7f5;color:#0f766e;font-size:17px}.stat-value{font-size:24px;font-weight:850;margin-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.stat-foot{margin-top:7px;color:var(--muted);font-size:10px}.quick-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.quick-btn{display:flex;align-items:center;gap:11px;text-align:right;padding:13px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--text);min-width:0}.quick-btn:hover{border-color:#8ecbc4;background:#f6fffd;transform:translateY(-1px)}.quick-symbol{width:36px;height:36px;flex:0 0 36px;display:grid;place-items:center;background:#e8f7f5;color:#0f766e;border-radius:10px;font-size:18px}.quick-label{font-weight:800;font-size:12px}.quick-hint{font-size:10px;color:var(--muted);margin-top:4px}
+    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.search{min-width:220px;max-width:370px;flex:1;border:1px solid #d4dde8;border-radius:9px;background:white;padding:10px 12px;color:var(--text)}.select,.field{width:100%;min-height:38px;border:1px solid #cfd9e5;border-radius:8px;padding:8px 10px;background:#fff;color:var(--text)}textarea.field{min-height:75px;resize:vertical}.field-label{display:block;font-weight:700;font-size:11px;color:#49566b;margin:0 0 6px}.field-wrap{min-width:0}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}.form-grid .full{grid-column:1/-1}.table-wrap{width:100%;overflow:auto;border:1px solid var(--line);border-radius:10px;background:white}table{width:100%;border-collapse:separate;border-spacing:0;white-space:nowrap;font-size:11px}thead th{position:sticky;top:0;background:#f2f5f9;color:#536177;font-weight:800;text-align:right;padding:12px 13px;border-bottom:1px solid #dce3ec;z-index:1}tbody td{padding:11px 13px;border-bottom:1px solid #edf0f5;vertical-align:middle}tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#f7fbfc}tbody tr.selected{background:#e6f6f3}.number{font-variant-numeric:tabular-nums;direction:ltr;text-align:right}.status{display:inline-flex;border-radius:30px;padding:4px 8px;font-size:10px;background:#edf2f7;color:#4a596c}.status.good{background:#e6f8ef;color:#087f5b}.status.warn{background:#fff4de;color:#9a5c00}.status.bad{background:#fff0f0;color:#b42318}.code{font-family:Consolas,monospace;direction:ltr;display:inline-block;background:#eef2f7;border-radius:5px;padding:4px 6px;font-size:10px;color:#334155}.empty{text-align:center;color:var(--muted);padding:32px}.split{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(270px,.7fr);gap:14px}.metric-list{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#f7f9fc;border:1px solid var(--line);border-radius:10px;padding:13px}.metric-label{font-size:11px;color:var(--muted)}.metric-value{font-weight:800;font-size:19px;margin-top:7px}.bar-row{display:grid;grid-template-columns:115px 1fr 95px;gap:10px;align-items:center;margin:12px 0;font-size:11px}.bar-track{height:8px;border-radius:20px;background:#edf1f6;overflow:hidden}.bar-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,#14b8a6,#0f766e)}
+    .overlay{position:fixed;inset:0;background:#0c172dcc;z-index:20;display:none;align-items:center;justify-content:center;padding:18px;backdrop-filter:blur(3px)}.overlay.open{display:flex}.modal{background:#fff;width:min(760px,100%);max-height:calc(100vh - 36px);display:flex;flex-direction:column;border-radius:16px;box-shadow:0 24px 90px #0004;overflow:hidden}.modal.wide{width:min(1040px,100%)}.modal-head{display:flex;justify-content:space-between;align-items:center;padding:17px 20px;border-bottom:1px solid var(--line);flex:0 0 auto}.modal-title{font-size:17px;font-weight:850}.modal-body{padding:19px 20px;overflow:auto}.modal-foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:13px 20px;border-top:1px solid var(--line);background:#fafbfd;flex:0 0 auto}.toast{position:fixed;left:20px;bottom:20px;z-index:40;background:#142238;color:white;border-radius:10px;padding:13px 17px;box-shadow:0 12px 30px #11182733;max-width:min(440px,calc(100vw - 40px));opacity:0;transform:translateY(12px);pointer-events:none;transition:.2s}.toast.show{opacity:1;transform:translateY(0)}.invoice-header{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;background:#f6f8fb;border:1px solid var(--line);border-radius:10px;padding:13px;margin-bottom:14px;font-size:11px}.invoice-header div{min-width:0;overflow-wrap:anywhere}.invoice-total{display:flex;justify-content:flex-start;gap:32px;flex-wrap:wrap;padding:17px;background:#f7fafb;border:1px solid var(--line);border-radius:10px;margin-top:12px}.invoice-total strong{font-size:20px}.footnote{font-size:10px;color:var(--muted);margin-top:14px;line-height:1.9}.muted{color:var(--muted)}.badge{font-size:10px;font-weight:800;color:#0f766e;background:#e5f5f2;padding:5px 8px;border-radius:30px}.only-mobile{display:none}
+    @media(max-width:1180px){.app{grid-template-columns:minmax(0,1fr) 250px}.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.split{grid-template-columns:1fr}}
+    @media(max-width:850px){.app{grid-template-columns:1fr;grid-template-rows:64px auto auto}.topbar{grid-column:1;grid-row:1;padding:0 14px}.brand-name{font-size:17px}.pill.hide-small{display:none}.sidebar{grid-column:1;grid-row:3;max-height:280px;border-top:1px solid #26354d}.workspace{grid-column:1;grid-row:2;max-height:none;padding:14px 12px 24px}.page-head{flex-direction:column}.head-actions{width:100%}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr}.form-grid .full{grid-column:auto}.invoice-header{grid-template-columns:1fr}.only-mobile{display:block}}
+    @media(max-width:480px){.topbar{padding:0 10px}.logo{width:36px;height:36px}.brand-name{font-size:15px}.brand-sub{font-size:9px}.top-actions .pill{padding:6px 8px}.stats{gap:7px}.stat{padding:11px}.stat-value{font-size:20px}.quick-grid{gap:7px}.quick-btn{padding:10px 8px}.quick-label{font-size:11px}.panel{padding:11px}.page-title{font-size:21px}.search{min-width:100%}}
+    @media print{body{background:white}.app,.overlay,.toast{display:none!important}#printArea{display:block!important} }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">ا</div>
+      <div><div class="brand-name">اشک قلم</div><div class="brand-sub">پیش‌نمایش رابط بومی ویندوز · محیط آزمایشی ایزوله</div></div>
+    </div>
+    <div class="top-actions">
+      <span class="pill"><span class="dot"></span> داده‌ها فقط در همین مرورگر</span>
+      <span class="pill hide-small">نسخهٔ UI: <b id="buildId">Preview</b></span>
+      <button class="btn" id="resetDemo" type="button">بازنشانی داده‌های نمونه</button>
+    </div>
+  </header>
+  <aside class="sidebar" aria-label="منوی برنامه">
+    <div class="side-card"><div class="side-title">حسابداری اشک قلم</div><div class="side-muted">نسخهٔ بومی ویندوز · بازبینی چیدمان و گردش کار</div></div>
+    <div class="nav-group">منوی اصلی</div>
+    <button class="nav-btn active" data-page="dashboard"><span class="nav-leading"><span class="nav-ico">▦</span> پیشخوان</span><span class="nav-badge">خانه</span></button>
+    <button class="nav-btn" data-page="invoices"><span class="nav-leading"><span class="nav-ico">▤</span> فاکتورها</span></button>
+    <button class="nav-btn" data-page="products"><span class="nav-leading"><span class="nav-ico">▣</span> کالا و انبار</span></button>
+    <button class="nav-btn" data-page="customers"><span class="nav-leading"><span class="nav-ico">♙</span> اشخاص</span></button>
+    <button class="nav-btn" data-page="payments"><span class="nav-leading"><span class="nav-ico">⇄</span> دریافت‌ها</span></button>
+    <button class="nav-btn" data-page="expenses"><span class="nav-leading"><span class="nav-ico">−</span> هزینه‌ها</span></button>
+    <div class="nav-group">حسابداری پیشرفته</div>
+    <button class="nav-btn" data-page="forecast"><span class="nav-leading"><span class="nav-ico">↗</span> پیش‌بینی نقدینگی</span><span class="nav-badge">۳۰–۹۰ روز</span></button>
+    <button class="nav-btn" data-page="ledger"><span class="nav-leading"><span class="nav-ico">≡</span> حسابداری دوبل</span></button>
+    <button class="nav-btn" data-page="checks"><span class="nav-leading"><span class="nav-ico">▱</span> مدیریت چک</span></button>
+    <button class="nav-btn" data-page="reports"><span class="nav-leading"><span class="nav-ico">▥</span> گزارشات مالی</span></button>
+    <div class="nav-group">سیستم</div>
+    <button class="nav-btn" data-page="backup"><span class="nav-leading"><span class="nav-ico">⤓</span> پشتیبان‌گیری</span></button>
+    <button class="nav-btn" data-page="migration"><span class="nav-leading"><span class="nav-ico">⌘</span> سایر ماژول‌ها</span><span class="nav-badge">مهاجرت</span></button>
+    <div class="side-card" style="margin-top:16px"><div class="side-muted">این صفحه فقط برای ارزیابی UI است. داده‌ها به برنامهٔ ویندوزی یا سرور اصلی منتقل نمی‌شوند.</div></div>
+  </aside>
+  <main class="workspace" id="workspace">
+    <section class="page" id="page-dashboard">
+      <div class="page-head"><div><div class="page-title">پیشخوان کسب‌وکار</div><div class="page-sub">خلاصهٔ پرونده‌ها، انبار، اسناد و عملیات پرتکرار</div></div><div class="head-actions"><button class="btn primary" data-action="invoice">＋ فاکتور جدید</button><button class="btn" data-action="customer">＋ شخص جدید</button></div></div>
+      <div class="stats">
+        <div class="stat"><div class="stat-top"><span>اشخاص ثبت‌شده</span><span class="stat-icon">♙</span></div><div class="stat-value" id="statCustomers">0</div><div class="stat-foot">مشتری و تأمین‌کننده</div></div>
+        <div class="stat"><div class="stat-top"><span>کالاها</span><span class="stat-icon">▣</span></div><div class="stat-value" id="statProducts">0</div><div class="stat-foot">شناسه‌های اختصاصی و موجودی</div></div>
+        <div class="stat"><div class="stat-top"><span>فاکتورهای قطعی</span><span class="stat-icon">▤</span></div><div class="stat-value" id="statInvoices">0</div><div class="stat-foot">بدون احتساب پیش‌فاکتور</div></div>
+        <div class="stat"><div class="stat-top"><span>ارزش فروش</span><span class="stat-icon">↗</span></div><div class="stat-value" id="statSales">0</div><div class="stat-foot">بر اساس داده‌های نمونه</div></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div><div class="panel-title">ثبت سریع</div><div class="panel-note">ثبت اشخاص و کالا، صدور سند، ثبت دریافت و کنترل موجودی در چند کلیک</div></div><span class="badge">میان‌برها</span></div>
+        <div class="quick-grid">
+          <button class="quick-btn" data-action="customer"><span class="quick-symbol">＋</span><span><span class="quick-label">ثبت سریع شخص</span><br><span class="quick-hint">کد خودکار CUS-…</span></span></button>
+          <button class="quick-btn" data-action="product"><span class="quick-symbol">▣</span><span><span class="quick-label">ثبت سریع کالا</span><br><span class="quick-hint">کد خودکار SKU-…</span></span></button>
+          <button class="quick-btn" data-action="invoice"><span class="quick-symbol">▤</span><span><span class="quick-label">فاکتور فروش/خرید</span><br><span class="quick-hint">پیش‌نمایش پیش از ثبت</span></span></button>
+          <button class="quick-btn" data-action="payment"><span class="quick-symbol">⇄</span><span><span class="quick-label">دریافت / پرداخت</span><br><span class="quick-hint">نقدی، بانک یا چک</span></span></button>
+          <button class="quick-btn" data-action="expense"><span class="quick-symbol">−</span><span><span class="quick-label">ثبت هزینه</span><br><span class="quick-hint">دسته‌بندی هزینه</span></span></button>
+          <button class="quick-btn" data-action="stock"><span class="quick-symbol">↥</span><span><span class="quick-label">ورود موجودی</span><br><span class="quick-hint">به‌روزرسانی موجودی نمونه</span></span></button>
+          <button class="quick-btn" data-action="preview-last"><span class="quick-symbol">▧</span><span><span class="quick-label">پیش‌نمایش آخرین فاکتور</span><br><span class="quick-hint">جدول اقلام و جمع نهایی</span></span></button>
+          <button class="quick-btn" data-action="export"><span class="quick-symbol">⇩</span><span><span class="quick-label">خروجی داده‌های نمونه</span><br><span class="quick-hint">JSON برای سناریوی تست</span></span></button>
+        </div>
+      </div>
+      <div class="split">
+        <div class="panel"><div class="panel-head"><div><div class="panel-title">آخرین فاکتورها</div><div class="panel-note">برای باز کردن پیش‌نمایش، ردیف فاکتور را انتخاب کن</div></div><button class="btn small" data-page-link="invoices">مشاهدهٔ همه</button></div><div class="table-wrap"><table><thead><tr><th>شماره سند</th><th>طرف حساب</th><th>تاریخ</th><th>مبلغ نهایی</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="recentInvoices"></tbody></table></div></div>
+        <div class="panel"><div class="panel-head"><div><div class="panel-title">وضعیت مالی نمونه</div><div class="panel-note">مبالغ نمایشی و غیرحسابداری</div></div></div><div class="metric-list"><div class="metric"><div class="metric-label">دریافت ثبت‌شده</div><div class="metric-value" id="statReceipts">0</div></div><div class="metric"><div class="metric-label">مطالبات باز</div><div class="metric-value" id="statReceivables">0</div></div><div class="metric"><div class="metric-label">موجودی کم</div><div class="metric-value" id="statLowStock">0</div></div><div class="metric"><div class="metric-label">هزینه‌ها</div><div class="metric-value" id="statExpenses">0</div></div></div></div>
+      </div>
+    </section>
+    <section class="page" id="page-customers" hidden>
+      <div class="page-head"><div><div class="page-title">مدیریت اشخاص</div><div class="page-sub">کد یکتا، نقش مشتری/تأمین‌کننده، اطلاعات تماس، شناسه ملی و نشانی</div></div><div class="head-actions"><button class="btn primary" data-action="customer">＋ ثبت شخص</button><button class="btn" data-action="export">خروجی JSON</button></div></div>
+      <div class="panel"><div class="toolbar"><input class="search" id="searchCustomers" placeholder="جست‌وجو در کد، نام، تلفن یا نشانی…" aria-label="جست‌وجوی اشخاص"><select class="select" style="width:150px" id="filterCustomerRole"><option value="">همه نقش‌ها</option><option value="مشتری">مشتری</option><option value="تأمین‌کننده">تأمین‌کننده</option><option value="هر دو">هر دو نقش</option></select><span class="badge" id="customerCountLabel"></span></div><div class="table-wrap"><table><thead><tr><th>کد شخص</th><th>نام / شرکت</th><th>نقش</th><th>دسته‌بندی</th><th>تلفن</th><th>ایمیل</th><th>شناسه ملی</th><th>نشانی</th><th>تاریخ ثبت</th><th>عملیات</th></tr></thead><tbody id="customersBody"></tbody></table></div></div>
+    </section>
+    <section class="page" id="page-products" hidden>
+      <div class="page-head"><div><div class="page-title">کالا و انبار</div><div class="page-sub">کد کالا، سریال، واحد، دسته‌بندی، موجودی، آستانهٔ سفارش و قیمت‌ها</div></div><div class="head-actions"><button class="btn primary" data-action="product">＋ ثبت کالا</button><button class="btn" data-action="stock">↥ ورود موجودی</button></div></div>
+      <div class="panel"><div class="toolbar"><input class="search" id="searchProducts" placeholder="جست‌وجو در کد، نام، دسته، سریال یا قفسه…" aria-label="جست‌وجوی کالا"><select class="select" style="width:150px" id="filterStock"><option value="">همهٔ موجودی‌ها</option><option value="low">موجودی کم</option><option value="ok">موجودی مناسب</option></select><span class="badge" id="productCountLabel"></span></div><div class="table-wrap"><table><thead><tr><th>کد کالا</th><th>نام کالا</th><th>سریال</th><th>دسته‌بندی</th><th>واحد</th><th>موجودی</th><th>رزرو</th><th>حداقل</th><th>قیمت خرید</th><th>قیمت فروش</th><th>قفسه</th><th>عملیات</th></tr></thead><tbody id="productsBody"></tbody></table></div></div>
+    </section>
+    <section class="page" id="page-invoices" hidden>
+      <div class="page-head"><div><div class="page-title">فاکتورها و پیش‌فاکتورها</div><div class="page-sub">شماره‌گذاری خودکار، ردیف کالاها، مالیات و تخفیف، سررسید و پیش‌نمایش چاپ</div></div><div class="head-actions"><button class="btn primary" data-action="invoice">＋ سند جدید</button></div></div>
+      <div class="panel"><div class="toolbar"><input class="search" id="searchInvoices" placeholder="جست‌وجو در شماره، طرف حساب یا شرح…" aria-label="جست‌وجوی فاکتورها"><select class="select" style="width:160px" id="filterInvoiceType"><option value="">همهٔ انواع</option><option value="SALE">فروش</option><option value="PURCHASE">خرید</option><option value="PROFORMA">پیش‌فاکتور</option></select><span class="badge" id="invoiceCountLabel"></span></div><div class="table-wrap"><table><thead><tr><th>نوع</th><th>شماره سند</th><th>کد پیگیری</th><th>طرف حساب</th><th>شرح</th><th>جمع کالا</th><th>تخفیف</th><th>مالیات</th><th>مبلغ نهایی</th><th>سررسید</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="invoicesBody"></tbody></table></div></div>
+    </section>
+    <section class="page" id="page-payments" hidden>
+      <div class="page-head"><div><div class="page-title">دریافت‌ها و پرداخت‌ها</div><div class="page-sub">تراکنش‌های محلی نمونه برای گردش کار رابط</div></div><button class="btn primary" data-action="payment">＋ ثبت دریافت/پرداخت</button></div>
+      <div class="panel"><div class="panel-head"><div class="panel-title">تراکنش‌های ثبت‌شده</div><span class="badge">آزمایشی</span></div><div class="table-wrap"><table><thead><tr><th>تاریخ</th><th>نوع</th><th>شماره فاکتور</th><th>طرف حساب</th><th>روش</th><th>مبلغ</th><th>مرجع</th></tr></thead><tbody id="paymentsBody"></tbody></table></div></div>
+    </section>
+    <section class="page" id="page-expenses" hidden>
+      <div class="page-head"><div><div class="page-title">هزینه‌ها</div><div class="page-sub">ثبت مبلغ، دسته‌بندی، توضیحات و کنترل خروجی نقدی</div></div><button class="btn primary" data-action="expense">＋ ثبت هزینه</button></div>
+      <div class="panel"><div class="panel-head"><div class="panel-title">فهرست هزینه‌های نمونه</div></div><div class="table-wrap"><table><thead><tr><th>تاریخ</th><th>عنوان هزینه</th><th>دسته‌بندی</th><th>مبلغ</th><th>یادداشت</th></tr></thead><tbody id="expensesBody"></tbody></table></div></div>
+    </section>
+    <section class="page" id="page-forecast" hidden>
+      <div class="page-head"><div><div class="page-title">پیش‌بینی جریان نقدینگی</div><div class="page-sub">مدل نمایشی سررسیدهای دریافتی و پرداختی؛ برای تست ظاهر و تعامل، نه گزارش مالی معتبر</div></div><select class="select" id="forecastHorizon" style="width:150px"><option value="30">۳۰ روز آینده</option><option value="60">۶۰ روز آینده</option><option value="90">۹۰ روز آینده</option></select></div>
+      <div class="stats"><div class="stat"><div class="stat-top">ماندهٔ آغازین</div><div class="stat-value" id="forecastOpening">0</div></div><div class="stat"><div class="stat-top">ورودی مورد انتظار</div><div class="stat-value" id="forecastIn">0</div></div><div class="stat"><div class="stat-top">خروجی مورد انتظار</div><div class="stat-value" id="forecastOut">0</div></div><div class="stat"><div class="stat-top">ماندهٔ پیش‌بینی</div><div class="stat-value" id="forecastClosing">0</div></div></div>
+      <div class="panel"><div class="panel-head"><div class="panel-title">تعهدات لحاظ‌شده در افق انتخابی</div><span class="badge">نمونه</span></div><div class="table-wrap"><table><thead><tr><th>تاریخ</th><th>جهت</th><th>نوع</th><th>شماره</th><th>طرف حساب</th><th>مبلغ</th><th>روز تا سررسید</th></tr></thead><tbody id="forecastBody"></tbody></table></div></div>
+    </section>
+    <section class="page" id="page-ledger" hidden><div class="page-head"><div><div class="page-title">حسابداری دوبل</div><div class="page-sub">این نمای مرورگر صرفاً طرح رابط است؛ ثبت واقعی اسناد فقط در بیلد WPF انجام می‌شود.</div></div></div><div class="panel"><div class="panel-title">دفتر روزنامه (نمونهٔ نمایشی)</div><div class="table-wrap"><table><thead><tr><th>تاریخ</th><th>شماره</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th><th>مبلغ</th><th>وضعیت</th></tr></thead><tbody id="ledgerBody"></tbody></table></div></div></section>
+    <section class="page" id="page-checks" hidden><div class="page-head"><div><div class="page-title">مدیریت چک</div><div class="page-sub">چک‌های نمونه برای بررسی جدول، وضعیت و اسکرول افقی</div></div></div><div class="panel"><div class="table-wrap"><table><thead><tr><th>شماره چک</th><th>دریافتی/پرداختی</th><th>بانک</th><th>طرف حساب</th><th>سررسید</th><th>مبلغ</th><th>وضعیت</th></tr></thead><tbody id="checksBody"></tbody></table></div></div></section>
+    <section class="page" id="page-reports" hidden><div class="page-head"><div><div class="page-title">گزارشات مالی</div><div class="page-sub">خلاصهٔ محاسبات روی داده‌های نمونه در همین مرورگر</div></div><button class="btn" data-action="export">خروجی JSON آزمایشی</button></div><div class="panel"><div class="panel-title">خلاصهٔ فروش</div><div id="reportSummary"></div><div class="footnote">اعداد این صفحه صرفاً برای آزمودن چیدمان هستند و نباید برای تصمیم مالی استفاده شوند.</div></div></section>
+    <section class="page" id="page-backup" hidden><div class="page-head"><div><div class="page-title">پشتیبان داده‌های نمونه</div><div class="page-sub">پاک کردن یا خروجی گرفتن از داده‌های localStorage همین صفحه</div></div><button class="btn" data-action="export">خروجی JSON</button></div><div class="panel"><button class="btn danger" id="clearLocal">پاک‌کردن داده‌های ذخیره‌شدهٔ این پیش‌نمایش</button><div class="footnote">هیچ اطلاعاتی به اپ ویندوزی یا سرور اصلی ارسال نمی‌شود.</div></div></section>
+    <section class="page" id="page-migration" hidden><div class="page-head"><div><div class="page-title">سایر ماژول‌ها</div><div class="page-sub">ماژول‌هایی که هنوز باید به WPF بومی منتقل و با نسخه اصلی تطبیق شوند.</div></div></div><div class="panel"><div class="panel-title">در حال مهاجرت</div><div class="metric-list" id="migrationCards"></div><div class="footnote">این برگه صرفاً وضعیت مهاجرت را نمایش می‌دهد و جایگزین عملکرد واقعی ماژول‌ها نیست.</div></div></section>
+    <div class="footnote">پیش‌نمایش مستقل رابط · داده‌های نمونه در حافظهٔ همین مرورگر ذخیره می‌شوند · برنامهٔ نهایی همچنان WPF بومی است و این صفحه جایگزین EXE نیست.</div>
+  </main>
+</div>
+<div class="overlay" id="formOverlay" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="formTitle">فرم جدید</div><button class="btn small" data-close="formOverlay" aria-label="بستن">✕</button></div>
+    <div class="modal-body" id="formBody"></div>
+    <div class="modal-foot"><div class="muted" id="formHint">فیلدهای دارای * الزامی هستند.</div><div><button class="btn" data-close="formOverlay">انصراف</button> <button class="btn primary" id="saveForm">ذخیره آزمایشی</button></div></div>
+  </div>
+</div>
+<div class="overlay" id="invoiceOverlay" role="dialog" aria-modal="true" aria-labelledby="invoicePreviewTitle">
+  <div class="modal wide">
+    <div class="modal-head"><div><div class="modal-title" id="invoicePreviewTitle">پیش‌نمایش فاکتور</div><div class="panel-note">نمایشی برای کنترل جدول و جمع‌ها پیش از چاپ</div></div><button class="btn small" data-close="invoiceOverlay">✕ بستن</button></div>
+    <div class="modal-body" id="invoicePreviewBody"></div>
+    <div class="modal-foot"><div class="muted">پیش‌نمایش آزمایشی است.</div><div><button class="btn" data-close="invoiceOverlay">بازگشت</button><button class="btn primary" id="printInvoice">چاپ / ذخیره PDF</button></div></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const money = (n) => Number(n || 0).toLocaleString('fa-IR', {maximumFractionDigits:2});
+  const todayIso = () => new Date().toISOString().slice(0,10);
+  const dateFa = (date) => {
+    const value = new Date((date || todayIso()) + (String(date || todayIso()).length === 10 ? 'T12:00:00' : ''));
+    try { return new Intl.DateTimeFormat('fa-IR-u-ca-persian',{year:'numeric',month:'2-digit',day:'2-digit'}).format(value); }
+    catch { return String(date || '—'); }
+  };
+  const esc = (value) => String(value ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+  const defaultState = () => ({
+    customers:[
+      {id:'c1',code:'CUS-00001',name:'شرکت نمونه آریا',role:'هر دو',category:'شرکت‌ها',phone:'۰۲۱-۴۴۴۴۰۰۰۰',email:'info@example.test',nationalId:'',address:'تهران، نمونه',createdAt:todayIso()},
+      {id:'c2',code:'CUS-00002',name:'فروشگاه بهار',role:'مشتری',category:'خرده‌فروشی',phone:'۰۹۱۲۱۲۳۴۵۶۷',email:'',nationalId:'',address:'مشهد، نمونه',createdAt:todayIso()},
+      {id:'c3',code:'CUS-00003',name:'تأمین‌کننده نگین',role:'تأمین‌کننده',category:'تأمین‌کنندگان',phone:'۰۵۱-۳۳۳۳۰۰۰۰',email:'sales@example.test',nationalId:'',address:'مشهد، شهرک صنعتی',createdAt:todayIso()}
+    ],
+    products:[
+      {id:'p1',code:'SKU-00001',name:'کارتن سه‌لایه ۳۰×۲۰',serial:'',category:'کارتن / سه‌لایه',unit:'عدد',stock:1250,reserved:120,min:200,buy:18000,sell:26000,shelf:'A-01'},
+      {id:'p2',code:'SKU-00002',name:'جعبه لمینتی اختصاصی',serial:'BOX-LAM-02',category:'جعبه / لمینتی',unit:'عدد',stock:340,reserved:20,min:100,buy:42000,sell:57000,shelf:'B-03'},
+      {id:'p3',code:'SKU-00003',name:'ورق کارتن ۱۰۰×۷۰',serial:'',category:'ورق / کارتن',unit:'برگ',stock:85,reserved:0,min:100,buy:9500,sell:14000,shelf:'C-02'}
+    ],
+    invoices:[
+      {id:'i1',type:'SALE',number:1001,tracking:'INV-1001-DEMO',customerId:'c1',customer:'شرکت نمونه آریا',description:'سفارش کارتن بسته‌بندی',date:todayIso(),due:todayIso(),subtotal:5200000,discount:100000,tax:0,total:5100000,cash:1000000,status:'صادر شده',lines:[{productId:'p1',name:'کارتن سه‌لایه ۳۰×۲۰',qty:200,price:26000,total:5200000}]},
+      {id:'i2',type:'PURCHASE',number:3001,tracking:'PUR-3001-DEMO',customerId:'c3',customer:'تأمین‌کننده نگین',description:'خرید مواد اولیه',date:todayIso(),due:todayIso(),subtotal:1800000,discount:0,tax:0,total:1800000,cash:0,status:'ثبت‌شده',lines:[{productId:'p3',name:'ورق کارتن ۱۰۰×۷۰',qty:120,price:15000,total:1800000}]},
+      {id:'i3',type:'PROFORMA',number:2001,tracking:'PRO-2001-DEMO',customerId:'c2',customer:'فروشگاه بهار',description:'پیشنهاد قیمت جعبه',date:todayIso(),due:'',subtotal:1710000,discount:0,tax:0,total:1710000,cash:0,status:'پیش‌فاکتور',lines:[{productId:'p2',name:'جعبه لمینتی اختصاصی',qty:30,price:57000,total:1710000}]}
+    ],
+    payments:[{id:'pay1',date:todayIso(),type:'دریافت',invoice:'INV-1001-DEMO',customer:'شرکت نمونه آریا',method:'نقدی',amount:1000000,reference:'رسید نمونه'}],
+    expenses:[{id:'e1',date:todayIso(),title:'هزینه حمل',category:'حمل‌ونقل',amount:125000,notes:'نمونه'}],
+    checks:[{number:'CHK-1405-001',type:'دریافتی',bank:'بانک نمونه',contact:'شرکت نمونه آریا',due:todayIso(),amount:850000,status:'در انتظار'}],
+    ledger:[{date:dateFa(todayIso()),number:'JR-00001',description:'نمونهٔ درآمد فروش',debit:'حساب‌های دریافتنی',credit:'درآمد فروش',amount:5100000,status:'قطعی'},{date:dateFa(todayIso()),number:'JR-00002',description:'نمونهٔ دریافت نقدی',debit:'صندوق',credit:'حساب‌های دریافتنی',amount:1000000,status:'قطعی'}]
+  });
+  const storageKey = 'ashk-wpf-ui-preview-v1';
+  let state;
+  try { state = JSON.parse(localStorage.getItem(storageKey) || 'null') || defaultState(); }
+  catch { state = defaultState(); }
+  const persist = () => { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {} };
+  let currentPage = 'dashboard';
+  let formMode = null;
+  let selectedInvoiceId = null;
+  let draftLines = [];
+  let toastTimer;
+
+  const nextCode = (items, property, prefix) => {
+    const max = items.map(item => String(item[property] || '').match(new RegExp('^'+prefix+'(\\d+)$','i')))
+      .filter(Boolean).reduce((highest, match) => Math.max(highest, Number(match[1])),0);
+    return prefix + String(max + 1).padStart(5,'0');
+  };
+  const typeLabel = type => ({SALE:'فروش',PURCHASE:'خرید',PROFORMA:'پیش‌فاکتور'}[type] || type);
+  const statusClass = status => /لغو|برگشتی|معوق|کمبود/.test(status) ? 'bad' : /پیش‌فاکتور|در انتظار|ثبت‌شده/.test(status) ? 'warn' : 'good';
+  const statusTag = status => '<span class="status '+statusClass(status)+'">'+esc(status)+'</span>';
+  const toast = message => {
+    $('toast').textContent = message;
+    $('toast').classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => $('toast').classList.remove('show'),2600);
+  };
+  const go = page => {
+    currentPage = page;
+    document.querySelectorAll('.page').forEach(node => node.hidden = node.id !== 'page-'+page);
+    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.toggle('active',btn.dataset.page === page));
+    const active = document.querySelector('.nav-btn.active');
+    const label = active ? active.querySelector('.nav-leading').innerText.trim() : 'پیشخوان';
+    document.title = label + ' | پیش‌نمایش بومی اشک قلم';
+    if (window.innerWidth < 850) $('workspace').scrollTo({top:0,behavior:'smooth'});
+    renderAll();
+  };
+  const renderStats = () => {
+    $('statCustomers').textContent = money(state.customers.length);
+    $('statProducts').textContent = money(state.products.length);
+    $('statInvoices').textContent = money(state.invoices.filter(i => i.type !== 'PROFORMA' && i.status !== 'لغو شده').length);
+    $('statSales').textContent = money(state.invoices.filter(i => i.type === 'SALE' && i.status !== 'لغو شده').reduce((a,i)=>a+i.total,0));
+    $('statReceipts').textContent = money(state.payments.filter(p=>p.type==='دریافت').reduce((a,p)=>a+p.amount,0));
+    $('statReceivables').textContent = money(state.invoices.filter(i=>i.type==='SALE' && i.status!=='لغو شده').reduce((a,i)=>a+Math.max(0,i.total-state.payments.filter(p=>p.invoice===i.tracking).reduce((s,p)=>s+p.amount,0)),0));
+    $('statLowStock').textContent = money(state.products.filter(p=>p.stock < p.min).length);
+    $('statExpenses').textContent = money(state.expenses.reduce((a,e)=>a+e.amount,0));
+  };
+  const renderRecent = () => {
+    $('recentInvoices').innerHTML = [...state.invoices].slice(-5).reverse().map(i => '<tr><td><span class="code">'+esc(i.tracking)+'</span></td><td>'+esc(i.customer)+'</td><td>'+esc(dateFa(i.date))+'</td><td class="number">'+money(i.total)+'</td><td>'+statusTag(i.status)+'</td><td><button class="btn small" data-preview="'+esc(i.id)+'">پیش‌نمایش</button></td></tr>').join('') || '<tr><td class="empty" colspan="6">هنوز سندی ثبت نشده است.</td></tr>';
+  };
+  const renderCustomers = () => {
+    const q = ($('searchCustomers')?.value || '').toLocaleLowerCase();
+    const role = $('filterCustomerRole')?.value || '';
+    const items = state.customers.filter(x => (!role || x.role === role) && [x.code,x.name,x.phone,x.address,x.email].some(v => String(v||'').toLocaleLowerCase().includes(q)));
+    $('customerCountLabel').textContent = money(items.length)+' پرونده';
+    $('customersBody').innerHTML = items.map(x => '<tr><td><span class="code">'+esc(x.code)+'</span></td><td><b>'+esc(x.name)+'</b></td><td>'+esc(x.role)+'</td><td>'+esc(x.category||'—')+'</td><td>'+esc(x.phone||'—')+'</td><td>'+esc(x.email||'—')+'</td><td>'+esc(x.nationalId||'—')+'</td><td>'+esc(x.address||'—')+'</td><td>'+esc(dateFa(x.createdAt))+'</td><td><button class="btn small" data-edit-customer="'+esc(x.id)+'">ویرایش</button></td></tr>').join('') || '<tr><td class="empty" colspan="10">موردی مطابق جست‌وجو پیدا نشد.</td></tr>';
+  };
+  const renderProducts = () => {
+    const q = ($('searchProducts')?.value || '').toLocaleLowerCase();
+    const filter = $('filterStock')?.value || '';
+    const items = state.products.filter(x => (!filter || (filter==='low' ? x.stock<x.min : x.stock>=x.min)) && [x.code,x.name,x.serial,x.category,x.shelf].some(v => String(v||'').toLocaleLowerCase().includes(q)));
+    $('productCountLabel').textContent = money(items.length)+' کالا';
+    $('productsBody').innerHTML = items.map(x => '<tr><td><span class="code">'+esc(x.code)+'</span></td><td><b>'+esc(x.name)+'</b></td><td>'+esc(x.serial||'—')+'</td><td>'+esc(x.category||'—')+'</td><td>'+esc(x.unit||'عدد')+'</td><td class="number">'+money(x.stock)+'</td><td class="number">'+money(x.reserved||0)+'</td><td class="number">'+money(x.min||0)+'</td><td class="number">'+money(x.buy||0)+'</td><td class="number">'+money(x.sell||0)+'</td><td>'+esc(x.shelf||'—')+'</td><td><button class="btn small" data-edit-product="'+esc(x.id)+'">ویرایش</button></td></tr>').join('') || '<tr><td class="empty" colspan="12">موردی مطابق جست‌وجو پیدا نشد.</td></tr>';
+  };
+  const renderInvoices = () => {
+    const q = ($('searchInvoices')?.value || '').toLocaleLowerCase();
+    const type = $('filterInvoiceType')?.value || '';
+    const items = state.invoices.filter(x => (!type || x.type===type) && [x.tracking,x.customer,x.description,typeLabel(x.type)].some(v => String(v||'').toLocaleLowerCase().includes(q)));
+    $('invoiceCountLabel').textContent = money(items.length)+' سند';
+    $('invoicesBody').innerHTML = items.slice().reverse().map(x => '<tr><td>'+esc(typeLabel(x.type))+'</td><td><span class="code">'+esc(x.tracking)+'</span></td><td>'+esc(x.customer)+'</td><td>'+esc(x.description||'—')+'</td><td class="number">'+money(x.subtotal)+'</td><td class="number">'+money(x.discount)+'</td><td class="number">'+money(x.tax)+'</td><td class="number"><b>'+money(x.total)+'</b></td><td>'+esc(x.due?dateFa(x.due):'—')+'</td><td>'+statusTag(x.status)+'</td><td><button class="btn small" data-preview="'+esc(x.id)+'">پیش‌نمایش</button></td></tr>').join('') || '<tr><td class="empty" colspan="11">سندی برای نمایش وجود ندارد.</td></tr>';
+  };
+  const renderPayments = () => { $('paymentsBody').innerHTML = state.payments.slice().reverse().map(p=>'<tr><td>'+esc(dateFa(p.date))+'</td><td>'+esc(p.type)+'</td><td><span class="code">'+esc(p.invoice||'—')+'</span></td><td>'+esc(p.customer||'—')+'</td><td>'+esc(p.method||'—')+'</td><td class="number">'+money(p.amount)+'</td><td>'+esc(p.reference||'—')+'</td></tr>').join('')||'<tr><td class="empty" colspan="7">موردی ثبت نشده است.</td></tr>'; };
+  const renderExpenses = () => { $('expensesBody').innerHTML = state.expenses.slice().reverse().map(e=>'<tr><td>'+esc(dateFa(e.date))+'</td><td>'+esc(e.title)+'</td><td>'+esc(e.category)+'</td><td class="number">'+money(e.amount)+'</td><td>'+esc(e.notes||'—')+'</td></tr>').join('')||'<tr><td class="empty" colspan="5">هزینه‌ای ثبت نشده است.</td></tr>'; };
+  const renderChecks = () => { $('checksBody').innerHTML = state.checks.map(c=>'<tr><td><span class="code">'+esc(c.number)+'</span></td><td>'+esc(c.type)+'</td><td>'+esc(c.bank)+'</td><td>'+esc(c.contact)+'</td><td>'+esc(dateFa(c.due))+'</td><td class="number">'+money(c.amount)+'</td><td>'+statusTag(c.status)+'</td></tr>').join(''); };
+  const renderLedger = () => { $('ledgerBody').innerHTML = state.ledger.map(e=>'<tr><td>'+esc(e.date)+'</td><td><span class="code">'+esc(e.number)+'</span></td><td>'+esc(e.description)+'</td><td>'+esc(e.debit)+'</td><td>'+esc(e.credit)+'</td><td class="number">'+money(e.amount)+'</td><td>'+statusTag(e.status)+'</td></tr>').join(''); };
+  const renderForecast = () => {
+    const horizon = Number($('forecastHorizon').value || 30);
+    const today = new Date(todayIso()+'T12:00:00');
+    const dueInvoices = state.invoices.filter(i=>i.type!=='PROFORMA' && i.status!=='لغو شده' && i.due && Math.round((new Date(i.due+'T12:00:00')-today)/86400000)<=horizon);
+    const inflow = dueInvoices.filter(i=>i.type==='SALE').reduce((a,i)=>a+Math.max(0,i.total-state.payments.filter(p=>p.invoice===i.tracking).reduce((s,p)=>s+p.amount,0)),0);
+    const outflow = dueInvoices.filter(i=>i.type==='PURCHASE').reduce((a,i)=>a+Math.max(0,i.total-state.payments.filter(p=>p.invoice===i.tracking).reduce((s,p)=>s+p.amount,0)),0);
+    const opening = 2250000 + state.payments.filter(p=>p.type==='دریافت').reduce((a,p)=>a+p.amount,0)-state.payments.filter(p=>p.type==='پرداخت').reduce((a,p)=>a+p.amount,0)-state.expenses.reduce((a,p)=>a+p.amount,0);
+    $('forecastOpening').textContent=money(opening);$('forecastIn').textContent=money(inflow);$('forecastOut').textContent=money(outflow);$('forecastClosing').textContent=money(opening+inflow-outflow);
+    const rows = dueInvoices.flatMap(i=>[{date:i.due,direction:i.type==='SALE'?'ورود وجه':'خروج وجه',kind:i.type==='SALE'?'دریافت از مشتری':'پرداخت به تأمین‌کننده',invoice:i,amount:Math.max(0,i.total-state.payments.filter(p=>p.invoice===i.tracking).reduce((s,p)=>s+p.amount,0))}]).filter(x=>x.amount>0).sort((a,b)=>a.date.localeCompare(b.date));
+    $('forecastBody').innerHTML=rows.map(r=>'<tr><td>'+esc(dateFa(r.date))+'</td><td>'+esc(r.direction)+'</td><td>'+esc(r.kind)+'</td><td><span class="code">'+esc(r.invoice.tracking)+'</span></td><td>'+esc(r.invoice.customer)+'</td><td class="number">'+money(r.amount)+'</td><td>'+Math.round((new Date(r.date+'T12:00:00')-today)/86400000)+' روز</td></tr>').join('')||'<tr><td class="empty" colspan="7">در این بازه تعهد سررسیدداری وجود ندارد.</td></tr>';
+  };
+  const renderReports = () => {
+    const sales=state.invoices.filter(i=>i.type==='SALE'&&i.status!=='لغو شده').reduce((s,i)=>s+i.total,0);
+    const purchases=state.invoices.filter(i=>i.type==='PURCHASE'&&i.status!=='لغو شده').reduce((s,i)=>s+i.total,0);
+    const expenses=state.expenses.reduce((s,e)=>s+e.amount,0);
+    $('reportSummary').innerHTML='<div class="metric-list" style="margin-top:14px"><div class="metric"><div class="metric-label">جمع فروش نمونه</div><div class="metric-value">'+money(sales)+'</div></div><div class="metric"><div class="metric-label">جمع خرید نمونه</div><div class="metric-value">'+money(purchases)+'</div></div><div class="metric"><div class="metric-label">هزینه‌ها</div><div class="metric-value">'+money(expenses)+'</div></div><div class="metric"><div class="metric-label">خالص سادهٔ نمایشی</div><div class="metric-value">'+money(sales-purchases-expenses)+'</div></div></div>';
+  };
+  const renderMigration = () => {
+    const modules=[['پروژه‌ها','مدیریت قراردادها و مراحل کاری'],['دارایی‌های ثابت','استهلک و گردش دارایی'],['بودجه‌بندی','بودجه و انحراف از بودجه'],['مالیات و مؤدیان','قواعد و اتصال قانونی'],['تطبیق بانکی','تطبیق گردش حساب بانکی'],['چندکاربره و شبکه','نقش‌ها و مجوزها']];
+    $('migrationCards').innerHTML=modules.map(([name,desc])=>'<div class="metric"><div class="metric-label">'+esc(desc)+'</div><div class="metric-value" style="font-size:14px">'+esc(name)+'</div><span class="status warn">نیازمند مهاجرت</span></div>').join('');
+  };
+  const renderAll = () => {
+    renderStats();renderRecent();renderCustomers();renderProducts();renderInvoices();renderPayments();renderExpenses();renderChecks();renderLedger();renderForecast();renderReports();renderMigration();
+  };
+  const field = (label,name,value='',type='text',full=false,required=false) => '<div class="field-wrap '+(full?'full':'')+'"><label class="field-label" for="f_'+name+'">'+esc(label)+(required?' *':'')+'</label><input class="field" id="f_'+name+'" name="'+name+'" type="'+type+'" value="'+esc(value)+'" '+(required?'required':'')+'></div>';
+  const textarea = (label,name,value='',full=true) => '<div class="field-wrap '+(full?'full':'')+'"><label class="field-label" for="f_'+name+'">'+esc(label)+'</label><textarea class="field" id="f_'+name+'" name="'+name+'">'+esc(value)+'</textarea></div>';
+  const selectField = (label,name,options,selected='',full=false) => '<div class="field-wrap '+(full?'full':'')+'"><label class="field-label" for="f_'+name+'">'+esc(label)+'</label><select class="field" id="f_'+name+'" name="'+name+'">'+options.map(([v,l])=>'<option value="'+esc(v)+'" '+(v===selected?'selected':'')+'>'+esc(l)+'</option>').join('')+'</select></div>';
+  const openForm = mode => {
+    formMode=mode;draftLines=[];
+    const body=$('formBody');let title='',html='';
+    if(mode==='customer'){
+      title='ثبت سریع شخص';const code=nextCode(state.customers,'code','CUS-');
+      html='<div class="panel-note" style="margin-bottom:14px">کد پیشنهادی خودکار است؛ اگر تغییرش بدهی، باید یکتا بماند.</div><div class="form-grid">'+field('کد شخص','code',code,'text',false,true)+field('نام شخص / شرکت','name','','text',false,true)+selectField('نقش','role',[['مشتری','مشتری'],['تأمین‌کننده','تأمین‌کننده'],['هر دو','هر دو']],'مشتری')+field('دسته‌بندی','category','عمومی')+field('تلفن','phone')+field('ایمیل','email','', 'email')+field('شناسه ملی','nationalId')+field('نشانی','address','', 'text',true)+textarea('یادداشت','notes','',true)+'</div>';
+    }else if(mode==='product'){
+      title='ثبت سریع کالا';const code=nextCode(state.products,'code','SKU-');
+      html='<div class="panel-note" style="margin-bottom:14px">کد کالا هنگام بازشدن فرم پیشنهاد شده و هنگام ذخیره تکراری‌بودن آن کنترل می‌شود.</div><div class="form-grid">'+field('کد کالا','code',code,'text',false,true)+field('نام کالا','name','','text',false,true)+field('شماره سریال','serial')+field('واحد','unit','عدد')+field('دسته‌بندی','category')+field('قفسه / محل انبار','shelf')+field('موجودی اولیه','stock','0','number',false,true)+field('حداقل موجودی','min','0','number')+field('قیمت خرید','buy','0','number')+field('قیمت فروش','sell','0','number')+'</div>';
+    }else if(mode==='invoice'){
+      title='صدور سند جدید';if(!state.customers.length||!state.products.length){toast('برای فاکتور، ابتدا شخص و کالا ثبت کن.');return}
+      const customerOptions=state.customers.filter(c=>c.role!=='تأمین‌کننده').map(c=>[c.id,c.name]);
+      const prefix=(type)=>type==='SALE'?'INV-':type==='PURCHASE'?'PUR-':'PRO-';
+      const num=(type)=>String(Math.max(type==='SALE'?1000:type==='PURCHASE'?3000:2000,...state.invoices.filter(i=>i.type===type).map(i=>i.number||0))+1).padStart(4,'0');
+      html='<div class="form-grid">'+selectField('نوع سند','type',[['SALE','فاکتور فروش'],['PURCHASE','فاکتور خرید'],['PROFORMA','پیش‌فاکتور']],'SALE')+selectField('طرف حساب','customerId',customerOptions,customerOptions[0]?.[0]||'')+field('شماره پیشنهادی','numberPreview','INV-'+num('SALE'),'text',false,true)+field('تاریخ شمسی','date',dateFa(todayIso()))+field('سررسید شمسی (اختیاری)','due',dateFa(todayIso()))+field('تخفیف مبلغی','discount','0','number')+field('مالیات مبلغی','tax','0','number')+field('دریافت نقدی اولیه','cash','0','number')+field('شرح فاکتور','description','')+'</div><div class="panel-head" style="margin-top:18px"><div class="panel-title">اقلام فاکتور</div><span class="badge" id="draftLineCount">۰ قلم</span></div><div class="form-grid">'+selectField('کالا','lineProduct',state.products.map(p=>[p.id,p.name+' — '+p.code]),state.products[0]?.id||'')+field('تعداد','lineQty','1','number')+field('قیمت واحد','linePrice',String(state.products[0]?.sell||0),'number')+field('شرح قلم','lineDesc')+'</div><div class="toolbar" style="margin-top:10px"><button type="button" class="btn" id="addDraftLine">＋ افزودن قلم به فاکتور</button><span class="muted" id="draftSubtotal">جمع اقلام: ۰</span></div><div class="table-wrap"><table><thead><tr><th>کد</th><th>نام کالا</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th><th></th></tr></thead><tbody id="draftLinesBody"></tbody></table></div><div class="invoice-total"><div>جمع اقلام<br><strong id="draftSubtotalBig">۰</strong></div><div>مبلغ نهایی<br><strong id="draftTotalBig">۰</strong></div><div>مانده پس از نقدی<br><strong id="draftRemaining">۰</strong></div></div><div class="footnote">ثبت این فرم فقط در داده‌های نمونهٔ مرورگر انجام می‌شود؛ در WPF اصلی نیز شماره‌گذاری، موجودی و کنترل‌های مالی باید جداگانه آزمون شوند.</div>';
+    }else if(mode==='payment'){
+      title='ثبت دریافت / پرداخت';html='<div class="form-grid">'+selectField('جهت','direction',[['دریافت','دریافت'],['پرداخت','پرداخت']],'دریافت')+selectField('فاکتور مرتبط','invoice',state.invoices.map(i=>[i.tracking,i.tracking+' — '+i.customer]),state.invoices[0]?.tracking||'')+selectField('روش','method',[['نقدی','نقدی'],['بانک','انتقال بانکی'],['چک','چک']],'نقدی')+field('مبلغ','amount','0','number',false,true)+field('شماره مرجع / رسید','reference')+'</div>';
+    }else if(mode==='expense'){
+      title='ثبت هزینه';html='<div class="form-grid">'+field('عنوان هزینه','title','','text',false,true)+selectField('دسته‌بندی','category',[['عمومی','عمومی'],['اجاره','اجاره'],['حقوق و دستمزد','حقوق و دستمزد'],['حمل‌ونقل','حمل‌ونقل'],['اداری','اداری']],'عمومی')+field('مبلغ','amount','0','number',false,true)+textarea('یادداشت','notes','',true)+'</div>';
+    }else if(mode==='stock'){
+      title='ورود موجودی';html='<div class="form-grid">'+selectField('کالا','productId',state.products.map(p=>[p.id,p.name+' — '+p.code]),state.products[0]?.id||'')+field('مقدار ورودی','quantity','1','number',false,true)+'</div>';
+    }
+    $('formTitle').textContent=title;$('formBody').innerHTML=html;$('formHint').textContent='این عملیات فقط دادهٔ آزمایشی مرورگر را تغییر می‌دهد.';$('formOverlay').classList.add('open');
+    if(mode==='invoice'){wireDraftLines();refreshNumberPreview()}
+    const focus=$('formBody').querySelector('input:not([readonly])');if(focus){setTimeout(()=>focus.focus(),50)}
+  };
+  const wireDraftLines = () => {
+    const updatePrice=()=>{const p=state.products.find(p=>p.id===$('f_lineProduct').value);if(p)$('f_linePrice').value=$('f_type').value==='SALE'?p.sell:p.buy};
+    const onType=()=>{const type=$('f_type').value;$('f_numberPreview').value=({SALE:'INV-',PURCHASE:'PUR-',PROFORMA:'PRO-'}[type])+String(Math.max(type==='SALE'?1000:type==='PURCHASE'?3000:2000,...state.invoices.filter(i=>i.type===type).map(i=>i.number||0))+1).padStart(4,'0');updatePrice();refreshInvoiceDraftTotals()};
+    $('f_type').addEventListener('change',onType);$('f_lineProduct').addEventListener('change',updatePrice);
+    $('addDraftLine').addEventListener('click',()=>{
+      const p=state.products.find(p=>p.id===$('f_lineProduct').value);const qty=Number($('f_lineQty').value);const price=Number($('f_linePrice').value);
+      if(!p||!Number.isFinite(qty)||qty<=0||!Number.isFinite(price)||price<0){toast('کالا، تعداد و قیمت را بررسی کن.');return}
+      if($('f_type').value==='SALE'&&qty>p.stock-(p.reserved||0)){toast('موجودی آزاد برای این قلم کافی نیست.');return}
+      draftLines.push({productId:p.id,code:p.code,name:p.name,qty,price,total:Math.round(qty*price*100)/100,description:$('f_lineDesc').value});
+      $('f_lineQty').value='1';$('f_lineDesc').value='';renderDraftLines();refreshInvoiceDraftTotals();
+    });
+  };
+  const renderDraftLines=()=>{
+    const body=$('draftLinesBody');if(!body)return;
+    body.innerHTML=draftLines.map((l,i)=>'<tr><td><span class="code">'+esc(l.code)+'</span></td><td>'+esc(l.name)+'</td><td>'+money(l.qty)+'</td><td>'+money(l.price)+'</td><td><b>'+money(l.total)+'</b></td><td><button type="button" class="btn small danger" data-remove-line="'+i+'">حذف</button></td></tr>').join('')||'<tr><td colspan="6" class="empty">هنوز قلمی اضافه نشده است.</td></tr>';
+  };
+  const draftTotals = ()=>{
+    const subtotal=draftLines.reduce((s,l)=>s+l.total,0),discount=Math.max(0,Number($('f_discount')?.value||0)),tax=Math.max(0,Number($('f_tax')?.value||0)),cash=Math.max(0,Number($('f_cash')?.value||0));
+    return {subtotal,discount,tax,cash,total:Math.max(0,subtotal-discount+tax),remaining:Math.max(0,subtotal-discount+tax-cash)};
+  };
+  const refreshInvoiceDraftTotals = ()=>{
+    if(!$('draftSubtotal'))return;const t=draftTotals();$('draftLineCount').textContent=money(draftLines.length)+' قلم';$('draftSubtotal').textContent='جمع اقلام: '+money(t.subtotal);$('draftSubtotalBig').textContent=money(t.subtotal);$('draftTotalBig').textContent=money(t.total);$('draftRemaining').textContent=money(t.remaining);
+  };
+  const refreshNumberPreview=()=>{['f_discount','f_tax','f_cash'].forEach(id=>$(id)?.addEventListener('input',refreshInvoiceDraftTotals));refreshInvoiceDraftTotals()};
+  const saveForm = () => {
+    const body=$('formBody');const value=name=>$('f_'+name)?.value?.trim()||'';const n=name=>Number(value(name)||0);
+    if(formMode==='customer'){
+      if(value('name').length<2||!value('code')){toast('نام و کد شخص الزامی است.');return}
+      if(state.customers.some(x=>x.code.toLowerCase()===value('code').toLowerCase())){toast('کد شخص تکراری است.');return}
+      state.customers.push({id:crypto.randomUUID(),code:value('code'),name:value('name'),role:value('role'),category:value('category'),phone:value('phone'),email:value('email'),nationalId:value('nationalId'),address:value('address'),createdAt:todayIso()});
+    }else if(formMode==='product'){
+      if(value('name').length<2||!value('code')){toast('نام و کد کالا الزامی است.');return}
+      if(state.products.some(x=>x.code.toLowerCase()===value('code').toLowerCase())){toast('کد کالا تکراری است.');return}
+      if(n('stock')<0||n('sell')<0||n('buy')<0||n('min')<0){toast('موجودی و قیمت منفی مجاز نیست.');return}
+      state.products.push({id:crypto.randomUUID(),code:value('code'),name:value('name'),serial:value('serial'),unit:value('unit')||'عدد',category:value('category'),shelf:value('shelf'),stock:n('stock'),reserved:0,min:n('min'),buy:n('buy'),sell:n('sell')});
+    }else if(formMode==='invoice'){
+      if(!draftLines.length){toast('حداقل یک قلم کالا اضافه کن.');return}
+      const type=value('type'),customer=state.customers.find(c=>c.id===value('customerId'));const t=draftTotals();const number=Number(value('numberPreview').replace(/\D/g,''))||1001;const prefix=type==='SALE'?'INV-':type==='PURCHASE'?'PUR-':'PRO-';
+      if(state.invoices.some(i=>i.type===type&&i.number===number)){toast('شماره سند تکراری است؛ فرم را دوباره باز کن.');return}
+      if(t.discount>t.subtotal){toast('تخفیف از جمع اقلام بیشتر است.');return}
+      if(t.cash>t.total){toast('مبلغ نقدی از مبلغ نهایی بیشتر است.');return}
+      const inv={id:crypto.randomUUID(),type,number,tracking:prefix+String(number).padStart(4,'0')+'-'+Math.random().toString(36).slice(2,6).toUpperCase(),customerId:customer?.id||'',customer:customer?.name||'—',description:value('description'),date:todayIso(),due:value('due'),subtotal:t.subtotal,discount:t.discount,tax:t.tax,total:t.total,cash:t.cash,status:type==='PROFORMA'?'پیش‌فاکتور':'صادر شده',lines:draftLines.map(l=>({...l}))};
+      state.invoices.push(inv);
+      if(type==='SALE')draftLines.forEach(line=>{const p=state.products.find(p=>p.id===line.productId);if(p)p.stock=Math.max(0,p.stock-line.qty)});
+      if(type==='PURCHASE')draftLines.forEach(line=>{const p=state.products.find(p=>p.id===line.productId);if(p)p.stock+=line.qty});
+    }else if(formMode==='payment'){
+      if(n('amount')<=0){toast('مبلغ باید بزرگ‌تر از صفر باشد.');return}
+      const inv=state.invoices.find(i=>i.tracking===value('invoice'));state.payments.push({id:crypto.randomUUID(),date:todayIso(),type:value('direction'),invoice:value('invoice'),customer:inv?.customer||'—',method:value('method'),amount:n('amount'),reference:value('reference')});
+    }else if(formMode==='expense'){
+      if(value('title').length<2||n('amount')<=0){toast('عنوان و مبلغ معتبر وارد کن.');return}
+      state.expenses.push({id:crypto.randomUUID(),date:todayIso(),title:value('title'),category:value('category'),amount:n('amount'),notes:value('notes')});
+    }else if(formMode==='stock'){
+      if(n('quantity')<=0){toast('مقدار ورودی باید بزرگ‌تر از صفر باشد.');return}
+      const p=state.products.find(p=>p.id===value('productId'));if(!p){toast('کالا پیدا نشد.');return}p.stock+=n('quantity');
+    }
+    persist();$('formOverlay').classList.remove('open');toast('عملیات آزمایشی ذخیره شد.');renderAll();
+  };
+  const showInvoice = id => {
+    const i=state.invoices.find(x=>x.id===id);if(!i){toast('فاکتور پیدا نشد.');return}selectedInvoiceId=id;
+    const type=typeLabel(i.type);
+    $('invoicePreviewTitle').textContent='پیش‌نمایش '+type+' '+i.tracking;
+    $('invoicePreviewBody').innerHTML='<div id="printArea"><div style="display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:18px"><div><div style="font-size:25px;font-weight:900">اشک قلم</div><div class="muted" style="margin-top:4px">شرکت چاپ و کارتن‌سازی اشک قلم</div></div><div class="badge">'+esc(type)+'</div></div><div class="invoice-header"><div>شماره سند: <b>'+esc(i.tracking)+'</b></div><div>تاریخ: <b>'+esc(dateFa(i.date))+'</b></div><div>طرف حساب: <b>'+esc(i.customer)+'</b></div><div>سررسید: <b>'+esc(i.due?dateFa(i.due):'—')+'</b></div><div>شرح: <b>'+esc(i.description||'—')+'</b></div><div>وضعیت: '+statusTag(i.status)+'</div></div><div class="table-wrap"><table><thead><tr><th>ردیف</th><th>کد کالا</th><th>شرح کالا</th><th>تعداد</th><th>قیمت واحد</th><th>جمع</th></tr></thead><tbody>'+i.lines.map((l,n)=>'<tr><td>'+money(n+1)+'</td><td><span class="code">'+esc(l.code||state.products.find(p=>p.id===l.productId)?.code||'—')+'</span></td><td><b>'+esc(l.name)+'</b>'+(l.description?'<br><span class="muted">'+esc(l.description)+'</span>':'')+'</td><td class="number">'+money(l.qty)+'</td><td class="number">'+money(l.price)+'</td><td class="number">'+money(l.total)+'</td></tr>').join('')+'</tbody></table></div><div class="invoice-total"><div>جمع کالاها<br><strong>'+money(i.subtotal)+'</strong></div><div>تخفیف<br><strong>'+money(i.discount)+'</strong></div><div>مالیات<br><strong>'+money(i.tax)+'</strong></div><div>مبلغ نهایی<br><strong>'+money(i.total)+'</strong></div><div>نقدی<br><strong>'+money(i.cash)+'</strong></div><div>مانده<br><strong>'+money(Math.max(0,i.total-i.cash-state.payments.filter(p=>p.invoice===i.tracking).reduce((s,p)=>s+p.amount,0)))+'</strong></div></div></div>';
+    $('invoiceOverlay').classList.add('open');
+  };
+  const exportJson = () => {
+    const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='ashkeghalam-ui-preview-sample.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);toast('خروجی داده‌های نمونه آماده شد.');
+  };
+  const renderAll = () => {renderStats();renderRecent();renderCustomers();renderProducts();renderInvoices();renderPayments();renderExpenses();renderChecks();renderLedger();renderForecast();renderReports();renderMigration()};
+  document.addEventListener('click',e=>{
+    const nav=e.target.closest('[data-page]');if(nav){go(nav.dataset.page);return}
+    const link=e.target.closest('[data-page-link]');if(link){go(link.dataset.pageLink);return}
+    const action=e.target.closest('[data-action]');if(action){const what=action.dataset.action;if(what==='preview-last'){const last=state.invoices[state.invoices.length-1];if(last)showInvoice(last.id);else toast('هنوز فاکتوری ثبت نشده است.')}else if(what==='export')exportJson();else openForm(what);return}
+    const preview=e.target.closest('[data-preview]');if(preview){showInvoice(preview.dataset.preview);return}
+    const editC=e.target.closest('[data-edit-customer]');if(editC){toast('ویرایش کامل در نسخهٔ WPF پیاده‌سازی می‌شود؛ این پنجره برای آزمون چیدمان و ثبت نمونه است.');return}
+    const editP=e.target.closest('[data-edit-product]');if(editP){toast('ویرایش کامل در نسخهٔ WPF پیاده‌سازی می‌شود؛ این پنجره برای آزمون چیدمان و ثبت نمونه است.');return}
+    const remove=e.target.closest('[data-remove-line]');if(remove){draftLines.splice(Number(remove.dataset.removeLine),1);renderDraftLines();refreshInvoiceDraftTotals();return}
+    const close=e.target.closest('[data-close]');if(close){$(close.dataset.close).classList.remove('open');return}
+  });
+  $('saveForm').addEventListener('click',saveForm);
+  $('searchCustomers').addEventListener('input',renderCustomers);$('filterCustomerRole').addEventListener('change',renderCustomers);
+  $('searchProducts').addEventListener('input',renderProducts);$('filterStock').addEventListener('change',renderProducts);
+  $('searchInvoices').addEventListener('input',renderInvoices);$('filterInvoiceType').addEventListener('change',renderInvoices);
+  $('forecastHorizon').addEventListener('change',renderForecast);
+  $('printInvoice').addEventListener('click',()=>{
+    const i=state.invoices.find(x=>x.id===selectedInvoiceId);if(!i)return;
+    const originalTitle=document.title;document.title='AshkeGhalam-'+i.tracking;window.print();document.title=originalTitle;
+  });
+  const reset=()=>{if(!confirm('داده‌های همین پیش‌نمایش از نو با نمونه‌های اولیه جایگزین شود؟'))return;state=defaultState();persist();renderAll();toast('داده‌های نمونه بازنشانی شد.')};
+  $('resetDemo').addEventListener('click',reset);$('clearLocal').addEventListener('click',()=>{if(confirm('تمام داده‌های محلی همین صفحه پاک شود؟')){localStorage.removeItem(storageKey);state=defaultState();persist();renderAll();toast('داده‌های محلی پاک شد.')}});
+  window.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.overlay.open').forEach(el=>el.classList.remove('open'))});
+  // Auto-reload the browser UI when a new preview build is published to this same path.
+  fetch('./version.json?check='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(v=>{if(v?.build)$('buildId').textContent=v.build}).catch(()=>{});
+  let buildSnapshot='';setInterval(async()=>{try{const r=await fetch('./version.json?check='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();if(v?.build&&buildSnapshot&&v.build!==buildSnapshot)location.reload();if(v?.build)buildSnapshot=v.build;}catch{}},20000);
+  renderAll();
+})();
+</script>
+</body>
+</html>
