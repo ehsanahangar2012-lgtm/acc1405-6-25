@@ -344,7 +344,7 @@ public sealed class InvoicePreviewWindow : Window
         var roundHeader = theme is not ("official" or "thermal" or "minimal");
         var headerLayout = new Grid
         {
-            Width = 660,
+            Width = 624,
             FlowDirection = FlowDirection.RightToLeft
         };
         headerLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -401,6 +401,12 @@ public sealed class InvoicePreviewWindow : Window
             Child = headerLayout
         }));
 
+        var detailsColumn = new StackPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            Width = showQr ? 520 : 660
+        };
+
         if (company is not null &&
             (!string.IsNullOrWhiteSpace(company.Address) ||
              !string.IsNullOrWhiteSpace(company.Phone) ||
@@ -431,20 +437,19 @@ public sealed class InvoicePreviewWindow : Window
                     Text = identifiers, FontSize = 9, Foreground = ink,
                     TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0)
                 });
-            document.Blocks.Add(new BlockUIContainer(new Border
+            detailsColumn.Children.Add(new Border
             {
-                Width = 660,
                 Background = soft,
                 BorderBrush = accent,
                 BorderThickness = new Thickness(0, 0, 4, 0),
                 CornerRadius = new CornerRadius(theme == "official" ? 2 : 8),
-                Padding = new Thickness(12),
-                Margin = new Thickness(0, 0, 0, 12),
+                Padding = new Thickness(10),
+                Margin = new Thickness(0, 0, 0, 8),
                 Child = identity
-            }));
+            });
         }
 
-        Border MakeInfoCard(string label, string value, double minWidth = 190)
+        Border MakeInfoCard(string label, string value, double minWidth = 160)
         {
             var stack = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
             stack.Children.Add(new TextBlock
@@ -461,13 +466,13 @@ public sealed class InvoicePreviewWindow : Window
             return new Border
             {
                 MinWidth = minWidth,
-                MaxWidth = 310,
+                MaxWidth = 270,
                 Background = soft,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(220, 226, 234)),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(theme == "official" ? 2 : 8),
-                Padding = new Thickness(10),
-                Margin = new Thickness(0, 0, 8, 8),
+                Padding = new Thickness(8),
+                Margin = new Thickness(0, 0, 6, 6),
                 Child = stack
             };
         }
@@ -475,71 +480,101 @@ public sealed class InvoicePreviewWindow : Window
         var invoiceFacts = new WrapPanel
         {
             FlowDirection = FlowDirection.RightToLeft,
-            Width = 660,
-            Margin = new Thickness(0, 0, 0, 10)
+            Width = showQr ? 520 : 660,
+            Margin = new Thickness(0)
         };
-        invoiceFacts.Children.Add(MakeInfoCard("طرف حساب", invoice.CustomerName, 245));
-        invoiceFacts.Children.Add(MakeInfoCard("کد پیگیری", invoice.TrackingCode, 185));
+        invoiceFacts.Children.Add(MakeInfoCard("طرف حساب", invoice.CustomerName, 210));
+        invoiceFacts.Children.Add(MakeInfoCard("کد پیگیری", invoice.TrackingCode, 165));
         if (invoice.DueDate is DateTimeOffset dueDate)
-            invoiceFacts.Children.Add(MakeInfoCard("سررسید شمسی", FormatDate(dueDate), 150));
+            invoiceFacts.Children.Add(MakeInfoCard("سررسید شمسی", FormatDate(dueDate), 145));
         if (!string.IsNullOrWhiteSpace(invoice.TaxId))
-            invoiceFacts.Children.Add(MakeInfoCard("شناسه مالیاتی فاکتور", invoice.TaxId, 200));
+            invoiceFacts.Children.Add(MakeInfoCard("شناسه مالیاتی فاکتور", invoice.TaxId, 175));
         if (!string.IsNullOrWhiteSpace(invoice.DriverName) ||
             !string.IsNullOrWhiteSpace(invoice.VehiclePlate) ||
             !string.IsNullOrWhiteSpace(invoice.DriverPhone))
             invoiceFacts.Children.Add(MakeInfoCard("حمل و تحویل",
-                $"راننده: {invoice.DriverName}   •   تلفن: {invoice.DriverPhone}   •   خودرو: {invoice.VehiclePlate}", 300));
+                $"راننده: {invoice.DriverName}   •   تلفن: {invoice.DriverPhone}   •   خودرو: {invoice.VehiclePlate}", 230));
         if (!string.IsNullOrWhiteSpace(invoice.Description))
-            invoiceFacts.Children.Add(MakeInfoCard("شرح سند", invoice.Description, 300));
+            invoiceFacts.Children.Add(MakeInfoCard("شرح سند", invoice.Description, 230));
         if (!string.IsNullOrWhiteSpace(invoice.Notes))
-            invoiceFacts.Children.Add(MakeInfoCard("یادداشت", invoice.Notes, 300));
-        document.Blocks.Add(new BlockUIContainer(invoiceFacts));
+            invoiceFacts.Children.Add(MakeInfoCard("یادداشت", invoice.Notes, 230));
+        detailsColumn.Children.Add(invoiceFacts);
 
+        var invoiceTopLayout = new Grid
+        {
+            Width = 660,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
         if (showQr)
         {
+            invoiceTopLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(128) });
+            invoiceTopLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             try
             {
                 var qrCompanyName = company?.Name ?? "اشک قلم";
                 var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CURRENCY|{currencyLabel}|CUSTOMER|{invoice.CustomerName}|COMPANY|{qrCompanyName}";
-                var qr = CreateQrImage(payload);
                 var qrCard = new Border
                 {
+                    Width = 120,
                     BorderBrush = accent,
                     BorderThickness = new Thickness(1),
                     Background = soft,
                     CornerRadius = new CornerRadius(8),
-                    Padding = new Thickness(10),
-                    Margin = new Thickness(0, 18, 0, 6),
-                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Padding = new Thickness(5),
+                    Margin = new Thickness(0, 0, 8, 0),
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    VerticalAlignment = VerticalAlignment.Top,
                     Child = new StackPanel
                     {
                         HorizontalAlignment = HorizontalAlignment.Center,
                         Children =
                         {
-                            qr,
+                            CreateQrImage(payload),
                             new TextBlock
                             {
-                                Text = "QR فاکتور — کد پیگیری و مبلغ",
-                                FontSize = 9,
+                                Text = "QR فاکتور",
+                                FontSize = 8,
                                 Foreground = ink,
                                 TextAlignment = TextAlignment.Center,
-                                Margin = new Thickness(0, 6, 0, 0)
+                                TextWrapping = TextWrapping.Wrap,
+                                Margin = new Thickness(0, 3, 0, 0)
                             }
                         }
                     }
                 };
-                document.Blocks.Add(new BlockUIContainer(qrCard));
+                Grid.SetColumn(qrCard, 0);
+                invoiceTopLayout.Children.Add(qrCard);
             }
             catch (Exception qrError)
             {
-                document.Blocks.Add(new Paragraph(new Run("تولید QR این سند انجام نشد: " + qrError.Message))
+                var qrErrorCard = new Border
                 {
-                    Foreground = Brushes.DarkRed,
-                    Margin = new Thickness(0, 8, 0, 8)
-                });
+                    Width = 120,
+                    Background = soft,
+                    BorderBrush = accent,
+                    BorderThickness = new Thickness(1),
+                    Padding = new Thickness(6),
+                    Child = new TextBlock
+                    {
+                        Text = "QR ساخته نشد: " + qrError.Message,
+                        FontSize = 8,
+                        Foreground = Brushes.DarkRed,
+                        TextWrapping = TextWrapping.Wrap
+                    }
+                };
+                Grid.SetColumn(qrErrorCard, 0);
+                invoiceTopLayout.Children.Add(qrErrorCard);
             }
         }
+        else
+        {
+            invoiceTopLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        }
 
+        Grid.SetColumn(detailsColumn, showQr ? 1 : 0);
+        invoiceTopLayout.Children.Add(detailsColumn);
+        document.Blocks.Add(new BlockUIContainer(invoiceTopLayout));
 
         var table = new Table { CellSpacing = 0 };
         table.Columns.Add(new TableColumn { Width = new GridLength(5, GridUnitType.Star) });
@@ -738,8 +773,8 @@ public sealed class InvoicePreviewWindow : Window
         return new Image
         {
             Source = bitmap,
-            Width = 132,
-            Height = 132,
+            Width = 108,
+            Height = 108,
             Stretch = Stretch.Uniform,
             SnapsToDevicePixels = true
         };
