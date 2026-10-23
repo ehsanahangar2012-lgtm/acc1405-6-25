@@ -53,11 +53,28 @@ jobs:
           if (-not (Test-Path -LiteralPath $exePath)) {
             throw "Published WPF executable was not found: $exePath"
           }
+          $startupLog = Join-Path $env:LOCALAPPDATA "AshkeGhalam\WindowsNative\startup-error.log"
+          if (Test-Path -LiteralPath $startupLog) { Remove-Item -LiteralPath $startupLog -Force }
+          $startedAt = Get-Date
           $process = Start-Process -FilePath $exePath -PassThru
           Start-Sleep -Seconds 5
           $process.Refresh()
           if ($process.HasExited) {
-            throw "Published WPF executable exited unexpectedly with code $($process.ExitCode)."
+            $diagnostics = @()
+            if (Test-Path -LiteralPath $startupLog) {
+              $diagnostics += "Application exception log:"
+              $diagnostics += Get-Content -LiteralPath $startupLog -Raw
+            }
+            try {
+              $events = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $startedAt.AddSeconds(-2) } -ErrorAction SilentlyContinue |
+                Where-Object { $_.ProviderName -in @('.NET Runtime', 'Application Error', 'Windows Error Reporting') } |
+                Select-Object -First 4
+              foreach ($event in $events) {
+                $diagnostics += "Event $($event.Id) / $($event.ProviderName):"
+                $diagnostics += $event.Message
+              }
+            } catch {}
+            throw "Published WPF executable exited unexpectedly with code $($process.ExitCode). $($diagnostics -join [Environment]::NewLine)"
           }
           Stop-Process -Id $process.Id -Force
 
