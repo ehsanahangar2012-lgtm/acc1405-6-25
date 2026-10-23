@@ -16,7 +16,9 @@ public sealed class BackupPasswordDialog : Window
         Owner = owner;
         Title = title;
         Width = 440;
-        Height = confirmPassword ? 340 : 290;\n        MinHeight = 250;\n        MinWidth = 400;
+        Height = confirmPassword ? 340 : 290;
+        MinHeight = 250;
+        MinWidth = 400;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
