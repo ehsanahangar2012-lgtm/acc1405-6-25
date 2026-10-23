@@ -131,10 +131,13 @@
                                 <TextBlock Text="عملیات سریع" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
                                 <TextBlock Text="ثبت اطلاعات پایه و انجام کارهای پرتکرار، بدون جست‌وجو در منوها" Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
                                 <WrapPanel Margin="0,12,0,0">
-                                    <Button Content="＋ ثبت سریع شخص" Click="AddCustomer_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                                    <Button Content="＋ ثبت سریع شخص / مشتری" Click="AddCustomer_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                                    <Button Content="＋ ثبت تأمین‌کننده" Click="AddSupplier_Click" Margin="0,0,8,8"/>
                                     <Button Content="＋ ثبت سریع کالا" Click="AddProduct_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
                                     <Button Content="＋ فاکتور جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
-                                    <Button Content="ثبت دریافت / پرداخت" Click="AddPayment_Click" Margin="0,0,8,8"/>
+                                    <Button Content="ثبت دریافت از مشتری" Click="AddReceipt_Click" Margin="0,0,8,8"/>
+                                    <Button Content="پرداخت به تأمین‌کننده" Click="AddSupplierPayment_Click" Margin="0,0,8,8"/>
+                                    <Button Content="ثبت دریافت / پرداخت (همه)" Click="AddPayment_Click" Margin="0,0,8,8"/>
                                     <Button Content="ثبت هزینه" Click="AddExpense_Click" Margin="0,0,8,8"/>
                                     <Button Content="ورود موجودی" Click="AddStock_Click" Margin="0,0,8,8"/>
                                     <Button Content="حواله انبار" Click="AddVoucher_Click" Margin="0,0,8,8"/>
