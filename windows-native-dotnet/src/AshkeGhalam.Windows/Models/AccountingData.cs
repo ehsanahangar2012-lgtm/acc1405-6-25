@@ -6,17 +6,21 @@ public sealed class AccountingData
 {
     public int SchemaVersion { get; set; } = 1;
     public int NextInvoiceNumber { get; set; } = 1;
+    public int NextVoucherNumber { get; set; } = 1;
     public List<CustomerRecord> Customers { get; set; } = [];
     public List<ProductRecord> Products { get; set; } = [];
     public List<InvoiceRecord> Invoices { get; set; } = [];
     public List<PaymentRecord> Payments { get; set; } = [];
     public List<ExpenseRecord> Expenses { get; set; } = [];
     public List<CheckRecord> Checks { get; set; } = [];
+    public List<VoucherRecord> Vouchers { get; set; } = [];
+    public List<InventoryMovementRecord> InventoryMovements { get; set; } = [];
 
     public AccountingData DeepCopy() => new()
     {
         SchemaVersion = SchemaVersion,
         NextInvoiceNumber = NextInvoiceNumber,
+        NextVoucherNumber = NextVoucherNumber,
         Customers = Customers.Select(c => new CustomerRecord
         {
             Id=c.Id, Code=c.Code, Name=c.Name, Phone=c.Phone, Email=c.Email, Balance=c.Balance,
@@ -51,6 +55,28 @@ public sealed class AccountingData
             ImagePath=c.ImagePath, IsHighPriority=c.IsHighPriority, Description=c.Description,
             CheckType=c.CheckType, CreatedAt=c.CreatedAt,
             History=c.History.Select(h => new CheckHistoryRecord { ChangedAt=h.ChangedAt, Status=h.Status, Note=h.Note }).ToList()
+        }).ToList(),
+        Vouchers = Vouchers.Select(v => new VoucherRecord
+        {
+            Id=v.Id, Number=v.Number, TrackingCode=v.TrackingCode, Date=v.Date, Type=v.Type,
+            PersonId=v.PersonId, PersonName=v.PersonName, RelatedInvoiceId=v.RelatedInvoiceId,
+            RelatedVoucherId=v.RelatedVoucherId, ReturnReason=v.ReturnReason, Supervisor=v.Supervisor,
+            VehicleNumber=v.VehicleNumber, ReceiverPhone=v.ReceiverPhone, TotalWeight=v.TotalWeight,
+            EstimatedValue=v.EstimatedValue, Signature=v.Signature, CompanySignature=v.CompanySignature,
+            SupervisorSignature=v.SupervisorSignature, LoadingPhotos=[..v.LoadingPhotos], Notes=v.Notes,
+            Status=v.Status, DeliveryTime=v.DeliveryTime, QrCode=v.QrCode, MovementType=v.MovementType,
+            SourceWarehouseId=v.SourceWarehouseId, DestinationWarehouseId=v.DestinationWarehouseId,
+            WarehouseId=v.WarehouseId, Items=v.Items.Select(i => new VoucherItemRecord
+            {
+                ProductId=i.ProductId, ProductName=i.ProductName, Quantity=i.Quantity, Unit=i.Unit,
+                Weight=i.Weight, ShelfLocation=i.ShelfLocation, Description=i.Description, ImageUrl=i.ImageUrl
+            }).ToList()
+        }).ToList(),
+        InventoryMovements = InventoryMovements.Select(m => new InventoryMovementRecord
+        {
+            Id=m.Id, ProductId=m.ProductId, VoucherId=m.VoucherId, MovementType=m.MovementType,
+            SignedQuantity=m.SignedQuantity, Date=m.Date, ReferenceType=m.ReferenceType,
+            Description=m.Description, Timestamp=m.Timestamp
         }).ToList()
     };
 }
@@ -194,6 +220,63 @@ public sealed class CheckHistoryRecord
     public DateTimeOffset ChangedAt { get; set; } = DateTimeOffset.Now;
     public string Status { get; set; } = "PENDING";
     public string Note { get; set; } = "";
+}
+
+public sealed class VoucherItemRecord
+{
+    public string ProductId { get; set; } = "";
+    public string ProductName { get; set; } = "";
+    public decimal Quantity { get; set; }
+    public string Unit { get; set; } = "عدد";
+    public decimal? Weight { get; set; }
+    public string ShelfLocation { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string ImageUrl { get; set; } = "";
+}
+
+public sealed class VoucherRecord
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public int Number { get; set; }
+    public string TrackingCode { get; set; } = "";
+    public DateTimeOffset Date { get; set; } = DateTimeOffset.Now;
+    public string Type { get; set; } = "OUT";
+    public string PersonId { get; set; } = "";
+    public string PersonName { get; set; } = "";
+    public string RelatedInvoiceId { get; set; } = "";
+    public string RelatedVoucherId { get; set; } = "";
+    public string ReturnReason { get; set; } = "";
+    public string Supervisor { get; set; } = "";
+    public string VehicleNumber { get; set; } = "";
+    public string ReceiverPhone { get; set; } = "";
+    public List<VoucherItemRecord> Items { get; set; } = [];
+    public decimal TotalWeight { get; set; }
+    public decimal EstimatedValue { get; set; }
+    public string Signature { get; set; } = "";
+    public string CompanySignature { get; set; } = "";
+    public string SupervisorSignature { get; set; } = "";
+    public List<string> LoadingPhotos { get; set; } = [];
+    public string Notes { get; set; } = "";
+    public string Status { get; set; } = "PENDING";
+    public DateTimeOffset? DeliveryTime { get; set; }
+    public string QrCode { get; set; } = "";
+    public string MovementType { get; set; } = "GOODS_ISSUE";
+    public string SourceWarehouseId { get; set; } = "";
+    public string DestinationWarehouseId { get; set; } = "";
+    public string WarehouseId { get; set; } = "";
+}
+
+public sealed class InventoryMovementRecord
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string ProductId { get; set; } = "";
+    public string VoucherId { get; set; } = "";
+    public string MovementType { get; set; } = "";
+    public decimal SignedQuantity { get; set; }
+    public DateTimeOffset Date { get; set; } = DateTimeOffset.Now;
+    public string ReferenceType { get; set; } = "VOUCHER";
+    public string Description { get; set; } = "";
+    public long Timestamp { get; set; } = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 }
 
 public sealed class InvoiceDraft
@@ -348,6 +431,125 @@ public static class AccountingOperations
         product.StockQuantity += quantity;
     }
 
+    public static VoucherRecord CreateVoucher(AccountingData data, VoucherRecord draft)
+    {
+        if (draft.Items is null || draft.Items.Count == 0)
+            throw new InvalidOperationException("برای حواله حداقل یک قلم کالا لازم است.");
+        var validTypes = new[] { "IN", "OUT", "RETURN" };
+        if (!validTypes.Contains(draft.Type, StringComparer.Ordinal))
+            throw new InvalidOperationException("نوع حواله معتبر نیست.");
+        var validMovementTypes = new[] { "GOODS_RECEIPT", "GOODS_ISSUE", "INVENTORY_ADJUSTMENT", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT", "RETURN_RECEIPT", "RETURN_ISSUE" };
+        if (!validMovementTypes.Contains(draft.MovementType, StringComparer.Ordinal))
+            throw new InvalidOperationException("نوع گردش موجودی معتبر نیست یا هنوز پشتیبانی نمی‌شود.");
+        if (!string.IsNullOrWhiteSpace(draft.PersonId) && !data.Customers.Any(p => p.Id == draft.PersonId))
+            throw new InvalidOperationException("شخص مرتبط با حواله پیدا نشد.");
+        if (!string.IsNullOrWhiteSpace(draft.RelatedInvoiceId) && !data.Invoices.Any(i => i.Id == draft.RelatedInvoiceId))
+            throw new InvalidOperationException("فاکتور مرتبط با حواله پیدا نشد.");
+        var resolved = new List<(ProductRecord Product, VoucherItemRecord Item, decimal Delta)>();
+        foreach (var group in draft.Items.GroupBy(i => i.ProductId, StringComparer.Ordinal))
+        {
+            var product = data.Products.SingleOrDefault(p => p.Id == group.Key)
+                ?? throw new InvalidOperationException("یکی از کالاهای حواله پیدا نشد.");
+            if (group.Any(i => i.Quantity <= 0m))
+                throw new InvalidOperationException("تعداد هر قلم باید بیشتر از صفر باشد.");
+            var deltaPerUnit = VoucherStockDelta(draft.Type, draft.MovementType, 1m);
+            var resultingStock = product.StockQuantity + group.Sum(i => VoucherStockDelta(draft.Type, draft.MovementType, i.Quantity));
+            if (resultingStock < 0m)
+                throw new InvalidOperationException($"موجودی کالای «{product.Name}» برای این حواله کافی نیست. موجودی فعلی: {product.StockQuantity:N2}");
+            foreach (var line in group)
+            {
+                var resolvedProduct = product;
+                resolved.Add((resolvedProduct, new VoucherItemRecord
+                {
+                    ProductId = product.Id, ProductName = product.Name, Quantity = line.Quantity,
+                    Unit = string.IsNullOrWhiteSpace(line.Unit) ? product.Unit : line.Unit,
+                    Weight = line.Weight ?? product.Weight,
+                    ShelfLocation = string.IsNullOrWhiteSpace(line.ShelfLocation) ? product.ShelfLocation : line.ShelfLocation,
+                    Description = line.Description, ImageUrl = string.IsNullOrWhiteSpace(line.ImageUrl) ? product.ImageUrl : line.ImageUrl
+                }, VoucherStockDelta(draft.Type, draft.MovementType, line.Quantity)));
+            }
+        }
+
+        // Internal transfers require a per-warehouse stock ledger; prevent a false single-quantity transfer.
+        if (string.Equals(draft.MovementType, "INTERNAL_TRANSFER", StringComparison.Ordinal))
+            throw new InvalidOperationException("انتقال بین دو انبار تا زمان تکمیل دفتر موجودی تفکیک‌شدهٔ انبارها قابل ثبت نیست.");
+
+        var created = new VoucherRecord
+        {
+            Id = string.IsNullOrWhiteSpace(draft.Id) ? Guid.NewGuid().ToString("N") : draft.Id,
+            Number = data.NextVoucherNumber,
+            TrackingCode = $"VCH-{DateTime.Now:yyyyMMdd}-{data.NextVoucherNumber:D6}",
+            Date = draft.Date == default ? DateTimeOffset.Now : draft.Date,
+            Type = draft.Type, PersonId = draft.PersonId,
+            PersonName = string.IsNullOrWhiteSpace(draft.PersonId) ? draft.PersonName : data.Customers.Single(p => p.Id == draft.PersonId).Name,
+            RelatedInvoiceId = draft.RelatedInvoiceId, RelatedVoucherId = draft.RelatedVoucherId, ReturnReason = draft.ReturnReason,
+            Supervisor = draft.Supervisor, VehicleNumber = draft.VehicleNumber, ReceiverPhone = draft.ReceiverPhone,
+            Items = resolved.Select(x => x.Item).ToList(),
+            TotalWeight = AccountingRules.Money(resolved.Sum(x => x.Item.Weight.GetValueOrDefault() * x.Item.Quantity)),
+            EstimatedValue = AccountingRules.Money(resolved.Sum(x => x.Item.Quantity * (x.Product.BuyPrice ?? x.Product.SellPrice))),
+            Signature = draft.Signature, CompanySignature = draft.CompanySignature, SupervisorSignature = draft.SupervisorSignature,
+            LoadingPhotos = [..draft.LoadingPhotos], Notes = draft.Notes, Status = "PENDING", QrCode = draft.QrCode,
+            MovementType = draft.MovementType, SourceWarehouseId = draft.SourceWarehouseId,
+            DestinationWarehouseId = draft.DestinationWarehouseId, WarehouseId = draft.WarehouseId
+        };
+
+        // All lines are validated before stock changes so a failed voucher never partially mutates inventory.
+        foreach (var entry in resolved)
+        {
+            entry.Product.StockQuantity += entry.Delta;
+            data.InventoryMovements.Add(new InventoryMovementRecord
+            {
+                ProductId = entry.Product.Id, VoucherId = created.Id, MovementType = created.MovementType,
+                SignedQuantity = entry.Delta, Date = created.Date, ReferenceType = "VOUCHER",
+                Description = $"حواله {created.Number} — {created.TrackingCode}"
+            });
+        }
+        data.Vouchers.Add(created);
+        data.NextVoucherNumber++;
+        return created;
+    }
+
+    public static void DeleteVoucher(AccountingData data, string voucherId)
+    {
+        var voucher = data.Vouchers.SingleOrDefault(v => v.Id == voucherId)
+            ?? throw new InvalidOperationException("حواله پیدا نشد.");
+        var reversed = new List<(ProductRecord Product, decimal Delta)>();
+        foreach (var group in voucher.Items.GroupBy(i => i.ProductId, StringComparer.Ordinal))
+        {
+            var product = data.Products.SingleOrDefault(p => p.Id == group.Key)
+                ?? throw new InvalidOperationException("یکی از کالاهای این حواله برای برگشت موجودی پیدا نشد.");
+            var reverseDelta = group.Sum(item => -VoucherStockDelta(voucher.Type, voucher.MovementType, item.Quantity));
+            if (product.StockQuantity + reverseDelta < 0m)
+                throw new InvalidOperationException($"حذف حواله، موجودی کالای «{product.Name}» را منفی می‌کند؛ حذف انجام نشد.");
+            reversed.Add((product, reverseDelta));
+        }
+        foreach (var entry in reversed)
+        {
+            entry.Product.StockQuantity += entry.Delta;
+        }
+        data.InventoryMovements.RemoveAll(m => m.VoucherId == voucher.Id);
+        data.Vouchers.Remove(voucher);
+    }
+
+    public static void ChangeVoucherStatus(AccountingData data, string voucherId, string status)
+    {
+        var voucher = data.Vouchers.SingleOrDefault(v => v.Id == voucherId)
+            ?? throw new InvalidOperationException("حواله پیدا نشد.");
+        if (!new[] { "PENDING", "IN_TRANSIT", "DELIVERED" }.Contains(status, StringComparer.Ordinal))
+            throw new InvalidOperationException("وضعیت تحویل حواله معتبر نیست.");
+        voucher.Status = status;
+        voucher.DeliveryTime = status == "DELIVERED" ? DateTimeOffset.Now : null;
+    }
+
+    public static decimal VoucherStockDelta(string type, string movementType, decimal quantity)
+    {
+        if (quantity < 0m) throw new ArgumentOutOfRangeException(nameof(quantity), "مقدار حواله نباید منفی باشد.");
+        if (type == "IN") return quantity;
+        if (type == "OUT") return -quantity;
+        if (type == "RETURN") return movementType == "RETURN_RECEIPT" ? quantity : -quantity;
+        throw new InvalidOperationException("نوع حواله برای محاسبه موجودی معتبر نیست.");
+    }
+
     public static void CancelInvoice(AccountingData data, string invoiceId)
     {
         var invoice = data.Invoices.SingleOrDefault(i => i.Id == invoiceId)
@@ -382,9 +584,11 @@ public static class AccountingDataValidator
             throw new InvalidDataException("نسخهٔ ساختار داده پشتیبانی نمی‌شود.");
         if (data.Customers is null || data.Products is null || data.Invoices is null ||
             data.Payments is null || data.Expenses is null || data.Checks is null ||
+            data.Vouchers is null || data.InventoryMovements is null ||
             data.Customers.Count > 100_000 || data.Products.Count > 100_000 ||
             data.Invoices.Count > 500_000 || data.Payments.Count > 1_000_000 ||
-            data.Expenses.Count > 1_000_000 || data.Checks.Count > 1_000_000)
+            data.Expenses.Count > 1_000_000 || data.Checks.Count > 1_000_000 ||
+            data.Vouchers.Count > 1_000_000 || data.InventoryMovements.Count > 2_000_000)
             throw new InvalidDataException("ساختار یا اندازهٔ دادهٔ حسابداری معتبر نیست.");
 
         var customerIds = UniqueIds(data.Customers.Select(c => c?.Id), "شخص");
@@ -480,6 +684,39 @@ public static class AccountingDataValidator
             if (!string.IsNullOrWhiteSpace(check.RelatedInvoiceId) && !invoiceIds.Contains(check.RelatedInvoiceId))
                 throw new InvalidDataException("چک به فاکتور ناموجود پیوند داده شده است.");
         }
+
+        UniqueIds(data.Vouchers.Select(v => v?.Id), "حواله");
+        var voucherNumbers = new HashSet<int>();
+        var trackingCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var validVoucherTypes = new[] { "IN", "OUT", "RETURN" };
+        var validMovementTypes = new[] { "GOODS_RECEIPT", "GOODS_ISSUE", "INTERNAL_TRANSFER", "INVENTORY_ADJUSTMENT", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT", "RETURN_RECEIPT", "RETURN_ISSUE" };
+        var validVoucherStatuses = new[] { "PENDING", "IN_TRANSIT", "DELIVERED" };
+        foreach (var voucher in data.Vouchers)
+        {
+            if (voucher is null || voucher.Number < 1 || !voucherNumbers.Add(voucher.Number) ||
+                string.IsNullOrWhiteSpace(voucher.TrackingCode) || !trackingCodes.Add(voucher.TrackingCode.Trim()) ||
+                !validVoucherTypes.Contains(voucher.Type, StringComparer.Ordinal) ||
+                !validMovementTypes.Contains(voucher.MovementType, StringComparer.Ordinal) ||
+                !validVoucherStatuses.Contains(voucher.Status, StringComparer.Ordinal) ||
+                voucher.Date == default || voucher.Items is null || voucher.Items.Count == 0 || voucher.Items.Count > 100_000 ||
+                voucher.Items.Any(i => i is null || string.IsNullOrWhiteSpace(i.ProductId) || string.IsNullOrWhiteSpace(i.ProductName) || i.Quantity <= 0m || (i.Weight.HasValue && i.Weight.Value < 0m)))
+                throw new InvalidDataException("حواله ناقص یا نامعتبر است.");
+            if (!string.IsNullOrWhiteSpace(voucher.PersonId) && !customerIds.Contains(voucher.PersonId))
+                throw new InvalidDataException("شخص مرتبط با حواله وجود ندارد.");
+            if (!string.IsNullOrWhiteSpace(voucher.RelatedInvoiceId) && !invoiceIds.Contains(voucher.RelatedInvoiceId))
+                throw new InvalidDataException("فاکتور مرتبط با حواله وجود ندارد.");
+            if (voucher.Items.Any(i => !productIds.Contains(i.ProductId)))
+                throw new InvalidDataException("یکی از کالاهای حواله در فهرست کالاها وجود ندارد.");
+        }
+        if (data.NextVoucherNumber < 1 || (voucherNumbers.Count > 0 && data.NextVoucherNumber <= voucherNumbers.Max()))
+            throw new InvalidDataException("شمارندهٔ شماره حواله معتبر نیست.");
+
+        UniqueIds(data.InventoryMovements.Select(m => m?.Id), "گردش موجودی");
+        var validLedgerMovementTypes = new[] { "GOODS_RECEIPT", "GOODS_ISSUE", "INTERNAL_TRANSFER", "INVENTORY_ADJUSTMENT", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT", "RETURN_RECEIPT", "RETURN_ISSUE" };
+        foreach (var movement in data.InventoryMovements)
+            if (movement is null || !productIds.Contains(movement.ProductId) || !data.Vouchers.Any(v => v.Id == movement.VoucherId) ||
+                !validLedgerMovementTypes.Contains(movement.MovementType, StringComparer.Ordinal) || movement.SignedQuantity == 0m || movement.Date == default)
+                throw new InvalidDataException("گردش موجودی ناقص یا ناسازگار است.");
 
         return data;
     }
