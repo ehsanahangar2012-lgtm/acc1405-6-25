@@ -25,23 +25,23 @@ public sealed class PaymentDialog : Window
 
     public PaymentDialog(Window owner,AccountingData data)
     {
-        Owner=owner;Title="ثبت دریافت از مشتری";Width=500;Height=430;WindowStartupLocation=WindowStartupLocation.CenterOwner;
+        Owner=owner;Title="ثبت دریافت/پرداخت طرف حساب";Width=530;Height=450;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FlowDirection=FlowDirection.RightToLeft;Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
         _invoice.DisplayMemberPath=nameof(InvoiceOption.Label);
-        _invoice.ItemsSource=data.Invoices.Where(i=>i.Status!="لغو شده"&&AccountingRules.RemainingForInvoice(data,i)>0)
-            .Select(i=>new InvoiceOption{Invoice=i,Label=$"فاکتور {i.Number} — {i.CustomerName} — مانده {AccountingRules.RemainingForInvoice(data,i):N2}"}).ToList();
+        _invoice.ItemsSource=data.Invoices.Where(i=>i.Status!="لغو شده"&&i.Type!="PROFORMA"&&AccountingRules.RemainingForInvoice(data,i)>0)
+            .Select(i=>new InvoiceOption{Invoice=i,Label=$"{i.TypeLabel} {i.DisplayNumber} — {i.CustomerName} — مانده {AccountingRules.RemainingForInvoice(data,i):N2}"}).ToList();
         var root=new StackPanel{Margin=new Thickness(22)};
-        root.Children.Add(new TextBlock{Text="ثبت دریافت",FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
+        root.Children.Add(new TextBlock{Text="ثبت دریافت یا پرداخت",FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
         Add(root,"فاکتور و مانده",_invoice);Add(root,"مبلغ دریافت",_amount);Add(root,"روش دریافت",_method);Add(root,"شماره پیگیری / توضیح",_reference);
         var buttons=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,18,0,0)};
-        var ok=new Button{Content="ثبت دریافت",Width=110,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
+        var ok=new Button{Content="ثبت عملیات نقدی/مالی",Width=110,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
         buttons.Children.Add(ok);buttons.Children.Add(new Button{Content="انصراف",Width=90,Height=36,IsCancel=true});root.Children.Add(buttons);Content=root;
         if(_invoice.Items.Count>0)_invoice.SelectedIndex=0;
         ok.Click+=(_,_) =>
         {
             try
             {
-                if(_invoice.SelectedItem is not InvoiceOption option)throw new InvalidOperationException("فاکتور تسویه‌نشده‌ای برای انتخاب وجود ندارد.");
+                if(_invoice.SelectedItem is not InvoiceOption option)throw new InvalidOperationException("سند قطعی دارای مانده‌ای برای انتخاب وجود ندارد.");
                 var amount=PersianNumberParser.ParseDecimal(_amount.Text,"مبلغ");
                 if(amount<=0)throw new InvalidOperationException("مبلغ باید بیشتر از صفر باشد.");
                 InvoiceId=option.Invoice.Id;Amount=AccountingRules.Money(amount);
