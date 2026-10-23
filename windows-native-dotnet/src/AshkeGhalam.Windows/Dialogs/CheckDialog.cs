@@ -91,6 +91,7 @@ public sealed class CheckDialog : Window
         DisplayMemberPath = nameof(CustomerRecord.Name)
     };
     private IReadOnlyList<CustomerRecord> _people = [];
+    private readonly string _currencyLabel;
     private bool _formattingAmount;
     private readonly TextBox _description = new()
     {
@@ -114,10 +115,11 @@ public sealed class CheckDialog : Window
 
     public CheckRecord? Result { get; private set; }
 
-    public CheckDialog(Window owner, CheckRecord? existing = null, IReadOnlyList<CustomerRecord>? people = null)
+    public CheckDialog(Window owner, CheckRecord? existing = null, IReadOnlyList<CustomerRecord>? people = null, string? currency = "RIAL")
     {
         _existing = existing;
         _people = people ?? [];
+        _currencyLabel = string.Equals(currency, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "تومان" : "ریال";
         _dueDate = new PersianDateSelector(existing?.DueDate ?? DateTimeOffset.Now.AddDays(30));
         _issueDate = new PersianDateSelector(existing?.IssueDate, optional: true);
 
@@ -177,7 +179,7 @@ public sealed class CheckDialog : Window
         var stepOne = new StackPanel { Margin = new Thickness(2, 4, 2, 12) };
         AddField(stepOne, "نوع چک", _checkType);
         AddField(stepOne, "بانک (از فهرست انتخاب کنید یا نام دیگری بنویسید)", _bankName);
-        AddField(stepOne, "مبلغ چک", _amount);
+        AddField(stepOne, $"مبلغ چک ({_currencyLabel})", _amount);
         AddField(stepOne, "تاریخ سررسید شمسی (الزامی)", _dueDate);
         stepOne.Children.Add(new TextBlock
         {
