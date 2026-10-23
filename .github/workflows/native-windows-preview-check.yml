@@ -1,0 +1,54 @@
+name: Native Windows browser preview checks
+
+on:
+  push:
+    branches:
+      - feature/windows-native-dotnet
+    paths:
+      - "public/native-windows-preview/**"
+      - ".devcontainer/**"
+      - ".github/workflows/native-windows-preview-check.yml"
+  pull_request:
+    branches:
+      - feature/windows-native-dotnet
+    paths:
+      - "public/native-windows-preview/**"
+      - ".devcontainer/**"
+      - ".github/workflows/native-windows-preview-check.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-windows-preview-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-private-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validate preview source and JavaScript syntax
+        run: |
+          node --check .devcontainer/preview-server.mjs
+          node .devcontainer/check-ui-preview.mjs
+      - name: Smoke-test root and stable subpath
+        shell: bash
+        run: |
+          set -euo pipefail
+          node .devcontainer/preview-server.mjs > /tmp/ashk-preview-server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for _ in $(seq 1 20); do
+            if curl --silent --fail http://127.0.0.1:4173/version.json >/dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:4173/ | grep -q 'اشک قلم'
+          curl --fail --silent http://127.0.0.1:4173/native-windows-preview/ | grep -q 'اشک قلم'
+          curl --fail --silent http://127.0.0.1:4173/native-windows-preview/version.json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const v=JSON.parse(s);if(!v.build)process.exit(1)})"
+          echo "Preview routes and version polling endpoint responded successfully."
