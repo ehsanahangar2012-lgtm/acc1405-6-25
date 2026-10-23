@@ -55,9 +55,12 @@ public sealed class AccountingBehaviorTests
     }
 
     [TestMethod]
-    public void SlashDecimalAndThousandsSeparatorsAreParsed()
+    public void StandardDecimalAndThousandsSeparatorsAreParsedAndSlashIsRejected()
     {
-        Assert.AreEqual(123456.75m, PersianNumberParser.ParseDecimal("۱۲۳٬۴۵۶/۷۵", "مبلغ"));
+        Assert.AreEqual(123456.75m, PersianNumberParser.ParseDecimal("۱۲۳٬۴۵۶.۷۵", "مبلغ"));
+        Assert.AreEqual(123456.75m, PersianNumberParser.ParseDecimal("۱۲۳٬۴۵۶٫۷۵", "مبلغ"));
+        Assert.ThrowsException<InvalidOperationException>(() => PersianNumberParser.ParseDecimal("۱۲۳٬۴۵۶/۷۵", "مبلغ"));
+        Assert.ThrowsException<InvalidOperationException>(() => PersianNumberParser.ParseDecimal("100/00", "مبلغ"));
     }
 
     [TestMethod]
@@ -66,7 +69,9 @@ public sealed class AccountingBehaviorTests
         var whole = NumericTextBoxFormatter.Format(100m);
         Assert.IsFalse(whole.Contains('/'));
         Assert.IsFalse(whole.Contains('.'));
-        Assert.AreEqual("1,234/5", NumericTextBoxFormatter.Format(1234.50m));
+        Assert.AreEqual("100", NumericTextBoxFormatter.Format(100m));
+        Assert.AreEqual("100.5", NumericTextBoxFormatter.Format(100.50m));
+        Assert.AreEqual("1,234.5", NumericTextBoxFormatter.Format(1234.50m));
     }
 
     [TestMethod]
