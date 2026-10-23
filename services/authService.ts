@@ -1,9 +1,6 @@
-import CryptoJS from 'crypto-js';
 import { generateId, generateUUID } from '../utils';
 import { AppUser } from '../types';
 import { securityService } from './securityService';
-
-const SECRET_KEY = 'ashke-ghalam-secure-key-2024';
 
 export class AuthService {
   static validateCredentials(username: string, password: string, users: AppUser[]): AppUser | null {
@@ -30,12 +27,4 @@ export class AuthService {
     };
   }
 
-  static encryptSensitiveData(data: any): string {
-    return CryptoJS.AES.encrypt(JSON.stringify(data), SECRET_KEY).toString();
-  }
-
-  static decryptSensitiveData(encryptedData: string): any {
-    const bytes = CryptoJS.AES.decrypt(encryptedData, SECRET_KEY);
-    return JSON.parse(bytes.toString(CryptoJS.enc.Utf8));
-  }
 }

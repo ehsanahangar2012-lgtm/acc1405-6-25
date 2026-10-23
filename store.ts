@@ -2106,7 +2106,7 @@ export const useStore = create<AppState>()(
     },
     {
       name: 'ashke-ghalam-rbac-v15-accounting',
-      version: 1,
+      version: 2,
       migrate: (persistedState: any) => {
           if (!persistedState || typeof persistedState !== 'object') return persistedState;
           const migrated: any = { ...persistedState };
