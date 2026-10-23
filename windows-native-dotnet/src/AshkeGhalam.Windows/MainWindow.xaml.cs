@@ -2731,6 +2731,18 @@ public partial class MainWindow : Window
             migrationPanel.Visibility = Visibility.Collapsed;
             tabs.Visibility = Visibility.Visible;
             tabs.SelectedIndex = nativeTabIndex;
+            if (nativeTabIndex == 15)
+            {
+                // The company profile and invoice/accounting preferences share one native page.
+                // Direct menu navigation should bring the requested section into view even when
+                // the same tab was already selected.
+                Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+                {
+                    if (!IsLoaded) return;
+                    FrameworkElement target = key == "companies" ? CompanyProfileSelector : SettingsTaxRate;
+                    target.BringIntoView();
+                }));
+            }
             if (FindName("FooterStatus") is TextBlock footer)
                 footer.Text = "بخش بومی فعال: " + module.Title + "؛ دامنهٔ امکانات این صفحه هنوز باید با نسخهٔ اصلی تطبیق داده شود.";
             return;
