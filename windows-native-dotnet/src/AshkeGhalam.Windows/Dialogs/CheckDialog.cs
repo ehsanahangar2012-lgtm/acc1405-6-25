@@ -92,6 +92,11 @@ public sealed class CheckDialog : Window
     };
     private IReadOnlyList<CustomerRecord> _people = [];
     private readonly string _currencyLabel;
+    private readonly decimal? _prefillAmount;
+    private readonly string _prefillType;
+    private readonly string _relatedInvoiceId;
+    private readonly string _prefillPersonId;
+    private readonly string _prefillPersonName;
     private bool _formattingAmount;
     private readonly TextBox _description = new()
     {
@@ -115,11 +120,16 @@ public sealed class CheckDialog : Window
 
     public CheckRecord? Result { get; private set; }
 
-    public CheckDialog(Window owner, CheckRecord? existing = null, IReadOnlyList<CustomerRecord>? people = null, string? currency = "RIAL")
+    public CheckDialog(Window owner, CheckRecord? existing = null, IReadOnlyList<CustomerRecord>? people = null, string? currency = "RIAL", decimal? prefillAmount = null, string? prefillType = null, string? relatedInvoiceId = null, string? personId = null, string? personName = null)
     {
         _existing = existing;
         _people = people ?? [];
         _currencyLabel = string.Equals(currency, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "تومان" : "ریال";
+        _prefillAmount = prefillAmount;
+        _prefillType = prefillType ?? "RECEIVED";
+        _relatedInvoiceId = relatedInvoiceId ?? "";
+        _prefillPersonId = personId ?? "";
+        _prefillPersonName = personName ?? "";
         _dueDate = new PersianDateSelector(existing?.DueDate ?? DateTimeOffset.Now.AddDays(30));
         _issueDate = new PersianDateSelector(existing?.IssueDate, optional: true);
 
@@ -136,14 +146,14 @@ public sealed class CheckDialog : Window
         FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
 
         _bankName.Text = existing?.BankName ?? "";
-        _amount.Text = existing?.Amount.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")) ?? "";
+        _amount.Text = (existing?.Amount ?? _prefillAmount)?.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")) ?? "";
         _sayadId.Text = existing?.SayadId ?? "";
         _checkNumber.Text = existing?.CheckNumber ?? "";
         _holderName.ItemsSource = _people.Select(person => person.Name).Where(name => !string.IsNullOrWhiteSpace(name))
             .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(name => name).ToList();
-        _holderName.Text = existing?.HolderName ?? "";
+        _holderName.Text = existing?.HolderName ?? _prefillPersonName;
         _personName.ItemsSource = _people.Where(person => person.IsCustomer || person.IsSupplier).OrderBy(person => person.Name).ToList();
-        _personName.Text = existing?.PersonName ?? "";
+        _personName.Text = existing?.PersonName ?? _prefillPersonName;
         if (existing is not null)
         {
             var linkedPerson = _people.FirstOrDefault(person => person.Id == existing.PersonId)
@@ -151,7 +161,7 @@ public sealed class CheckDialog : Window
             if (linkedPerson is not null) _personName.SelectedItem = linkedPerson;
         }
         _description.Text = existing?.Description ?? "";
-        _checkType.SelectedItem = CheckTypes.First(item => item.Value == (existing?.CheckType ?? "RECEIVED"));
+        _checkType.SelectedItem = CheckTypes.First(item => item.Value == (existing?.CheckType ?? _prefillType));
         _status.SelectedItem = CheckStatuses.First(item => item.Value == (existing?.Status ?? "PENDING"));
         _highPriority.IsChecked = existing?.IsHighPriority ?? false;
         _amount.LostFocus += (_, _) => FormatAmount();
@@ -385,9 +395,9 @@ public sealed class CheckDialog : Window
                 SayadId = _sayadId.Text.Trim(),
                 CheckNumber = _checkNumber.Text.Trim(),
                 HolderName = holder,
-                PersonId = linkedPerson?.Id ?? "",
+                PersonId = linkedPerson?.Id ?? (_existing?.PersonId ?? _prefillPersonId),
                 PersonName = _personName.Text.Trim(),
-                RelatedInvoiceId = _existing?.RelatedInvoiceId ?? "",
+                RelatedInvoiceId = _existing?.RelatedInvoiceId ?? _relatedInvoiceId,
                 ImagePath = _existing?.ImagePath ?? "",
                 IsHighPriority = _highPriority.IsChecked == true,
                 Description = _description.Text.Trim(),
