@@ -27,9 +27,9 @@ public sealed class NativeLedgerServiceTests
         NativeLedgerService.SeedDefaultChart(data);
 
         Assert.ThrowsException<InvalidOperationException>(() =>
-            NativeLedgerService.AddAccount(data, "1000", "صندوق تکراری", "ASSET", "MAIN", null));
+            NativeLedgerService.AddAccount(data, "1110", "صندوق تکراری", "ASSET", "MAIN", null));
 
-        var mainAsset = data.LedgerAccounts.Single(a => a.Code == "1000");
+        var mainAsset = data.LedgerAccounts.Single(a => a.Code == "1110");
         var liabilityDetail = new ChartOfAccountRecord
         {
             Code = "2001", Name = "زیرحساب نامعتبر", Type = "LIABILITY", Level = "DETAIL", ParentId = mainAsset.Id
@@ -46,8 +46,8 @@ public sealed class NativeLedgerServiceTests
     {
         var data = new AccountingData();
         NativeLedgerService.SeedDefaultChart(data);
-        var cash = data.LedgerAccounts.Single(a => a.Code == "1000");
-        var sales = data.LedgerAccounts.Single(a => a.Code == "4000");
+        var cash = data.LedgerAccounts.Single(a => a.Code == "1110");
+        var sales = data.LedgerAccounts.Single(a => a.Code == "4110");
         var draft = new AccountingEntryRecord
         {
             Date = "۱۴۰۵/۰۷/۰۱",
@@ -106,8 +106,8 @@ public sealed class NativeLedgerServiceTests
     {
         var data = new AccountingData();
         NativeLedgerService.SeedDefaultChart(data);
-        var debit = data.LedgerAccounts.Single(a => a.Code == "1000");
-        var credit = data.LedgerAccounts.Single(a => a.Code == "4000");
+        var debit = data.LedgerAccounts.Single(a => a.Code == "1110");
+        var credit = data.LedgerAccounts.Single(a => a.Code == "4110");
         NativeLedgerService.PostEntry(data, new AccountingEntryRecord
         {
             Date = "1405/07/01", Description = "سند آزمایشی", DebitAccountId = debit.Id,
