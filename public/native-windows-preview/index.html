@@ -192,7 +192,19 @@
       <div class="panel"><div class="panel-head"><div class="panel-title">تعهدات لحاظ‌شده در افق انتخابی</div><span class="badge">نمونه</span></div><div class="table-wrap"><table><thead><tr><th>تاریخ</th><th>جهت</th><th>نوع</th><th>شماره</th><th>طرف حساب</th><th>مبلغ</th><th>روز تا سررسید</th></tr></thead><tbody id="forecastBody"></tbody></table></div></div>
     </section>
     <section class="page" id="page-ledger" hidden><div class="page-head"><div><div class="page-title">حسابداری دوبل</div><div class="page-sub">این نمای مرورگر صرفاً طرح رابط است؛ ثبت واقعی اسناد فقط در بیلد WPF انجام می‌شود.</div></div></div><div class="panel"><div class="panel-title">دفتر روزنامه (نمونهٔ نمایشی)</div><div class="table-wrap"><table><thead><tr><th>تاریخ</th><th>شماره</th><th>شرح</th><th>بدهکار</th><th>بستانکار</th><th>مبلغ</th><th>وضعیت</th></tr></thead><tbody id="ledgerBody"></tbody></table></div></div></section>
-    <section class="page" id="page-checks" hidden><div class="page-head"><div><div class="page-title">مدیریت چک</div><div class="page-sub">چک‌های نمونه برای بررسی جدول، وضعیت و اسکرول افقی</div></div></div><div class="panel"><div class="table-wrap"><table><thead><tr><th>شماره چک</th><th>دریافتی/پرداختی</th><th>بانک</th><th>طرف حساب</th><th>سررسید</th><th>مبلغ</th><th>وضعیت</th></tr></thead><tbody id="checksBody"></tbody></table></div></div></section>
+    <section class="page" id="page-checks" hidden>
+      <div class="page-head"><div><div class="page-title">مدیریت چک</div><div class="page-sub">ثبت چک دریافتی/پرداختی، تغییر وضعیت و مشاهدهٔ سررسیدها؛ بدون ادعای استعلام بانکی</div></div><span class="badge" id="checksCount">۰ فقره</span></div>
+      <div class="module-notice warn">اطلاعات صرفاً نمونه است. شناسهٔ صیادی یا وضعیت بانکی از بانک استعلام نمی‌شود و در سرویس واقعی باید اتصال رسمی پیاده‌سازی شود.</div>
+      <div class="panel"><div class="form-section-title">ثبت چک جدید</div><div class="inline-form">
+        <div class="field-wrap"><label class="field-label" for="checkNumber">شماره چک *</label><input class="field" id="checkNumber" required placeholder="شماره / شناسه داخلی"></div>
+        <div class="field-wrap"><label class="field-label" for="checkType">جهت چک</label><select class="field" id="checkType"><option>دریافتی</option><option>پرداختی</option></select></div>
+        <div class="field-wrap"><label class="field-label" for="checkBank">بانک</label><input class="field" id="checkBank"></div>
+        <div class="field-wrap"><label class="field-label" for="checkContact">طرف حساب</label><input class="field" id="checkContact"></div>
+        <div class="field-wrap"><label class="field-label" for="checkDue">تاریخ سررسید</label><input class="field" id="checkDue" type="date" value="2026-10-23"></div>
+        <div class="field-wrap"><label class="field-label" for="checkAmount">مبلغ *</label><input class="field" id="checkAmount" type="number" min="1" step="1" required></div>
+      </div><div class="head-actions" style="margin-top:13px"><button class="btn primary" id="saveCheck">ثبت چک نمونه</button></div></div>
+      <div class="panel"><div class="panel-head"><div class="panel-title">دفتر چک</div><span class="muted">برای تغییر گردش، وضعیت هر ردیف را انتخاب کن.</span></div><div class="table-wrap"><table><thead><tr><th>شماره چک</th><th>دریافتی/پرداختی</th><th>بانک</th><th>طرف حساب</th><th>سررسید</th><th>مبلغ</th><th>وضعیت</th><th>عملیات</th></tr></thead><tbody id="checksBody"></tbody></table></div></div>
+    </section>
     <section class="page" id="page-vouchers" hidden>
       <div class="page-head"><div><div class="page-title">رسید و حوالهٔ انبار</div><div class="page-sub">ثبت رسید ورود، حوالهٔ خروج و برگشت کالا؛ تغییر موجودی در همین داده‌های نمونه انجام می‌شود.</div></div></div>
       <div class="module-notice">گردش ثبت‌شده از صفحهٔ کالا و انبار قابل پیگیری است. این محیط هنوز به پایگاه دادهٔ واقعی نسخهٔ اصلی یا چند انبار متصل نیست.</div>
@@ -2731,7 +2743,11 @@ var qrcode = function() {
   };
   const renderPayments = () => { $('paymentsBody').innerHTML = state.payments.slice().reverse().map(p=>'<tr><td>'+esc(dateFa(p.date))+'</td><td>'+esc(p.type)+'</td><td><span class="code">'+esc(p.invoice||'—')+'</span></td><td>'+esc(p.customer||'—')+'</td><td>'+esc(p.method||'—')+'</td><td class="number">'+money(p.amount)+'</td><td>'+esc(p.reference||'—')+'</td></tr>').join('')||'<tr><td class="empty" colspan="7">موردی ثبت نشده است.</td></tr>'; };
   const renderExpenses = () => { $('expensesBody').innerHTML = state.expenses.slice().reverse().map(e=>'<tr><td>'+esc(dateFa(e.date))+'</td><td>'+esc(e.title)+'</td><td>'+esc(e.category)+'</td><td class="number">'+money(e.amount)+'</td><td>'+esc(e.notes||'—')+'</td></tr>').join('')||'<tr><td class="empty" colspan="5">هزینه‌ای ثبت نشده است.</td></tr>'; };
-  const renderChecks = () => { $('checksBody').innerHTML = state.checks.map(c=>'<tr><td><span class="code">'+esc(c.number)+'</span></td><td>'+esc(c.type)+'</td><td>'+esc(c.bank)+'</td><td>'+esc(c.contact)+'</td><td>'+esc(dateFa(c.due))+'</td><td class="number">'+money(c.amount)+'</td><td>'+statusTag(c.status)+'</td></tr>').join(''); };
+  const renderChecks = () => {
+    const body=$('checksBody');if(!body)return;
+    $('checksCount').textContent=money(state.checks.length)+' فقره';
+    body.innerHTML = state.checks.length ? state.checks.map((c,index)=>'<tr><td><span class="code">'+esc(c.number)+'</span></td><td>'+esc(c.type)+'</td><td>'+esc(c.bank||'—')+'</td><td>'+esc(c.contact||'—')+'</td><td>'+esc(dateFa(c.due))+'</td><td class="number">'+money(c.amount)+'</td><td>'+statusTag(c.status)+'</td><td><button class="btn small" data-check-status="'+index+'">تغییر وضعیت</button></td></tr>').join('') : '<tr><td class="empty" colspan="8">چکی ثبت نشده است.</td></tr>';
+  };
   const renderVouchers = () => {
     const body = $('vouchersBody'); if (!body) return;
     const productById = id => state.products.find(p => p.id === id);
@@ -2750,7 +2766,10 @@ var qrcode = function() {
     if (!product) { body.innerHTML='<tr><td class="empty" colspan="7">ابتدا کالا تعریف کن.</td></tr>'; $('cardexCurrentStock').textContent='—'; return; }
     $('cardexCurrentStock').textContent='موجودی فعلی: '+money(product.stock)+' '+(product.unit || 'عدد');
     const items = state.vouchers.filter(v=>v.productId===productId).slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-    body.innerHTML = items.length ? items.map(v=>{const incoming=['رسید انبار','برگشت از فروش'].includes(v.type);return '<tr><td>'+esc(dateFa(v.date))+'</td><td><span class="code">'+esc(v.reference)+'</span></td><td>'+esc(v.type)+'</td><td class="number">'+(incoming?money(v.quantity):'—')+'</td><td class="number">'+(!incoming?money(v.quantity):'—')+'</td><td class="number">'+money(product.stock)+'</td><td>'+esc(v.note || '—')+'</td></tr>';}).join('') : '<tr><td class="empty" colspan="7">برای این کالا گردش ثبت‌شده‌ای وجود ندارد. از «رسید و حوالهٔ انبار» اولین گردش را ثبت کن.</td></tr>';
+    if (!items.length) {body.innerHTML='<tr><td class="empty" colspan="7">برای این کالا گردش ثبت‌شده‌ای وجود ندارد. از «رسید و حوالهٔ انبار» اولین گردش را ثبت کن.</td></tr>';return;}
+    const net=items.reduce((sum,v)=>sum+(['رسید انبار','برگشت از فروش'].includes(v.type)?v.quantity:-v.quantity),0);
+    let running=product.stock-net;
+    body.innerHTML = items.map(v=>{const incoming=['رسید انبار','برگشت از فروش'].includes(v.type);running+=incoming?v.quantity:-v.quantity;return '<tr><td>'+esc(dateFa(v.date))+'</td><td><span class="code">'+esc(v.reference)+'</span></td><td>'+esc(v.type)+'</td><td class="number">'+(incoming?money(v.quantity):'—')+'</td><td class="number">'+(!incoming?money(v.quantity):'—')+'</td><td class="number">'+money(running)+'</td><td>'+esc(v.note || '—')+'</td></tr>';}).join('');
   };
   const activeCompany = () => state.companies.find(c=>c.id===state.activeCompanyId) || state.companies[0] || {name:'اشک قلم'};
   const renderCompanies = () => {
@@ -3048,6 +3067,16 @@ var qrcode = function() {
     if(e.target.id==='cardexProductSelect'){renderCardex();return;}
   });
   document.addEventListener('click',e=>{
+    if(e.target.closest('#saveCheck')){
+      const number=$('checkNumber').value.trim(), amount=Number($('checkAmount').value||0);
+      if(!number||!Number.isFinite(amount)||amount<=0){toast('شماره چک و مبلغ مثبت الزامی است.');return;}
+      if(state.checks.some(c=>String(c.number).toLowerCase()===number.toLowerCase())){toast('شماره چک تکراری است.');return;}
+      state.checks.push({number,type:$('checkType').value,bank:$('checkBank').value.trim(),contact:$('checkContact').value.trim(),due:$('checkDue').value||todayIso(),amount,status:'ثبت‌شده'});
+      ['checkNumber','checkBank','checkContact','checkAmount'].forEach(id=>$(id).value='');
+      persist();renderAll();toast('چک نمونه ثبت شد.');return;
+    }
+    const checkStatus=e.target.closest('[data-check-status]');
+    if(checkStatus){const c=state.checks[Number(checkStatus.dataset.checkStatus)];if(!c)return;const statuses=['ثبت‌شده','در انتظار وصول','وصول‌شده','برگشت‌خورده','باطل'];const idx=statuses.indexOf(c.status);c.status=statuses[(idx+1)%statuses.length];persist();renderChecks();toast('وضعیت محلی چک تغییر کرد؛ وضعیت بانکی استعلام نشده است.');return;}
     if(e.target.closest('#saveVoucher')){
       const product=state.products.find(p=>p.id===$('voucherProduct').value);
       const type=$('voucherType').value, quantity=Number($('voucherQty').value||0);
