@@ -24,7 +24,13 @@ public sealed class AccountingData
             Address=c.Address, NationalId=c.NationalId, Notes=c.Notes, CreatedAt=c.CreatedAt
         }).ToList(),
         Products = Products.Select(p => new ProductRecord
-        { Id=p.Id, Name=p.Name, Sku=p.Sku, Unit=p.Unit, StockQuantity=p.StockQuantity, UnitPrice=p.UnitPrice, CreatedAt=p.CreatedAt }).ToList(),
+        {
+            Id=p.Id, Name=p.Name, Sku=p.Sku, Unit=p.Unit, StockQuantity=p.StockQuantity, UnitPrice=p.UnitPrice,
+            SerialNumber=p.SerialNumber, BuyPrice=p.BuyPrice, ReservedStock=p.ReservedStock, MinStock=p.MinStock,
+            Weight=p.Weight, ShelfLocation=p.ShelfLocation, Category=p.Category, SubCategory=p.SubCategory,
+            SubSubCategory=p.SubSubCategory, CategoryPath=p.CategoryPath, Description=p.Description, ImageUrl=p.ImageUrl,
+            CreatedAt=p.CreatedAt
+        }).ToList(),
         Invoices = Invoices.Select(i => new InvoiceRecord
         {
             Id=i.Id, Number=i.Number, CustomerId=i.CustomerId, CustomerName=i.CustomerName,
@@ -80,10 +86,35 @@ public sealed class ProductRecord
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string Name { get; set; } = "";
+    // Compatibility fields retained for existing local WPF data.
     public string Sku { get; set; } = "";
     public string Unit { get; set; } = "عدد";
     public decimal StockQuantity { get; set; }
     public decimal UnitPrice { get; set; }
+
+    // Fields aligned with the real application Product model.
+    public string SerialNumber { get; set; } = "";
+    public decimal? BuyPrice { get; set; }
+    public decimal ReservedStock { get; set; }
+    public decimal? MinStock { get; set; }
+    public decimal? Weight { get; set; }
+    public string ShelfLocation { get; set; } = "";
+    public string Category { get; set; } = "";
+    public string SubCategory { get; set; } = "";
+    public string SubSubCategory { get; set; } = "";
+    public string CategoryPath { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string ImageUrl { get; set; } = "";
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string Code { get => Sku; set => Sku = value; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public decimal SellPrice { get => UnitPrice; set => UnitPrice = value; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public decimal Stock { get => StockQuantity; set => StockQuantity = value; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
 }
 
@@ -375,7 +406,10 @@ public static class AccountingDataValidator
         foreach (var p in data.Products)
         {
             if (p is null || string.IsNullOrWhiteSpace(p.Name) || p.Name.Trim().Length < 2 ||
-                p.StockQuantity < 0m || p.UnitPrice < 0m)
+                p.StockQuantity < 0m || p.UnitPrice < 0m || p.ReservedStock < 0m ||
+                (p.BuyPrice.HasValue && p.BuyPrice.Value < 0m) ||
+                (p.MinStock.HasValue && p.MinStock.Value < 0m) ||
+                (p.Weight.HasValue && p.Weight.Value < 0m))
                 throw new InvalidDataException("رکورد کالا ناقص یا نامعتبر است.");
             if (!string.IsNullOrWhiteSpace(p.Sku) && !skuValues.Add(p.Sku.Trim()))
                 throw new InvalidDataException("کد کالای تکراری در داده‌ها وجود دارد.");
