@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -23,9 +24,9 @@ public sealed class PaymentDialog : Window
         public string Label{get;init;}="";
     }
 
-    public PaymentDialog(Window owner, AccountingData data, string? invoiceTypeFilter = null)
+    public PaymentDialog(Window owner, AccountingData data, string? invoiceTypeFilter = null, PaymentRecord? existingPayment = null)
     {
-        var title = invoiceTypeFilter switch
+        var title = existingPayment is not null ? "ویرایش دریافت/پرداخت" : invoiceTypeFilter switch
         {
             "SALE" => "ثبت دریافت از مشتری",
             "PURCHASE" => "ثبت پرداخت به تأمین‌کننده",
@@ -37,8 +38,12 @@ public sealed class PaymentDialog : Window
         _invoice.DisplayMemberPath=nameof(InvoiceOption.Label);
         _invoice.ItemsSource=data.Invoices.Where(i=>i.Status!="لغو شده"&&i.Type!="PROFORMA"&&
                 (string.IsNullOrWhiteSpace(invoiceTypeFilter) || i.Type == invoiceTypeFilter) &&
-                AccountingRules.RemainingForInvoice(data,i)>0)
-            .Select(i=>new InvoiceOption{Invoice=i,Label=$"{i.TypeLabel} {i.DisplayNumber} — {i.CustomerName} — مانده {AccountingRules.RemainingForInvoice(data,i):N2}"}).ToList();
+                (AccountingRules.RemainingForInvoice(data,i)>0 || i.Id == existingPayment?.InvoiceId))
+            .Select(i=>new InvoiceOption
+            {
+                Invoice=i,
+                Label=$"{i.TypeLabel} {i.DisplayNumber} — {i.CustomerName} — مانده {(AccountingRules.RemainingForInvoice(data,i) + (i.Id == existingPayment?.InvoiceId ? existingPayment.Amount : 0m)):N2}"
+            }).ToList();
         var root=new StackPanel{Margin=new Thickness(22)};
         root.Children.Add(new TextBlock{Text=title,FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
         if (_invoice.Items.Count == 0)
@@ -57,17 +62,31 @@ public sealed class PaymentDialog : Window
         }
         Add(root,"سند قطعی و مانده",_invoice);Add(root,"مبلغ تسویه",_amount);Add(root,"روش دریافت / پرداخت",_method);Add(root,"شماره پیگیری / توضیح",_reference);
         var buttons=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,18,0,0)};
-        var ok=new Button{Content="ثبت عملیات نقدی/مالی",Width=110,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
+        var ok=new Button{Content=existingPayment is null ? "ثبت عملیات نقدی/مالی" : "ذخیره تغییرات",Width=140,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
         buttons.Children.Add(ok);buttons.Children.Add(new Button{Content="انصراف",Width=90,Height=36,IsCancel=true});root.Children.Add(buttons);Content=root;
-        if(_invoice.Items.Count>0)_invoice.SelectedIndex=0;
+        var invoiceOptions = _invoice.Items.Cast<InvoiceOption>().ToList();
+        if (invoiceOptions.Count > 0)
+            _invoice.SelectedItem = invoiceOptions.FirstOrDefault(option => option.Invoice.Id == existingPayment?.InvoiceId) ?? invoiceOptions[0];
+        if (existingPayment is not null)
+        {
+            _amount.Text = existingPayment.Amount.ToString("0.##", CultureInfo.InvariantCulture);
+            _reference.Text = existingPayment.Reference;
+            var methods = _method.Items.Cast<string>().ToList();
+            if (!methods.Contains(existingPayment.Method, StringComparer.Ordinal)) methods.Add(existingPayment.Method);
+            _method.ItemsSource = methods;
+            _method.SelectedItem = existingPayment.Method;
+        }
         ok.Click+=(_,_) =>
         {
             try
             {
                 if(_invoice.SelectedItem is not InvoiceOption option)throw new InvalidOperationException("سند قطعی دارای مانده‌ای برای انتخاب وجود ندارد.");
-                var amount=PersianNumberParser.ParseDecimal(_amount.Text,"مبلغ");
+                var amount=AccountingRules.Money(PersianNumberParser.ParseDecimal(_amount.Text,"مبلغ"));
                 if(amount<=0)throw new InvalidOperationException("مبلغ باید بیشتر از صفر باشد.");
-                InvoiceId=option.Invoice.Id;Amount=AccountingRules.Money(amount);
+                var available = AccountingRules.RemainingForInvoice(data, option.Invoice);
+                if (existingPayment?.InvoiceId == option.Invoice.Id) available = AccountingRules.Money(available + existingPayment.Amount);
+                if (amount > available) throw new InvalidOperationException($"مبلغ از ماندهٔ قابل تسویه بیشتر است. ماندهٔ مجاز: {available:N2}");
+                InvoiceId=option.Invoice.Id;Amount=amount;
                 Method=_method.SelectedItem?.ToString()??"نقدی";Reference=_reference.Text.Trim();DialogResult=true;
             }
             catch(Exception ex){MessageBox.Show(this,ex.Message,"بررسی عملیات مالی",MessageBoxButton.OK,MessageBoxImage.Warning);}

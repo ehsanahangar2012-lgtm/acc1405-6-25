@@ -17,16 +17,23 @@ public sealed class ExpenseDialog : Window
     public decimal Amount{get;private set;}
     public string Notes{get;private set;}="";
 
-    public ExpenseDialog(Window owner)
+    public ExpenseDialog(Window owner, ExpenseRecord? existing = null)
     {
-        Owner=owner;Title="ثبت هزینه";Width=450;Height=460;WindowStartupLocation=WindowStartupLocation.CenterOwner;
+        Owner=owner;Title=existing is null ? "ثبت هزینه" : "ویرایش هزینه";Width=450;Height=460;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
         _amount.LostFocus += (_, _) => FormatNumericField(_amount);
+        if (existing is not null)
+        {
+            _title.Text = existing.Title;
+            _category.Text = existing.Category;
+            _amount.Text = existing.Amount.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            _notes.Text = existing.Notes;
+        }
         var root=new StackPanel{Margin=new Thickness(22)};
-        root.Children.Add(new TextBlock{Text="هزینهٔ جدید",FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
+        root.Children.Add(new TextBlock{Text=existing is null ? "هزینهٔ جدید" : "ویرایش مشخصات هزینه",FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
         Add(root,"عنوان هزینه",_title);Add(root,"دسته‌بندی",_category);Add(root,"مبلغ",_amount);Add(root,"توضیحات",_notes);
         var buttons=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,18,0,0)};
-        var ok=new Button{Content="ثبت هزینه",Width=110,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
+        var ok=new Button{Content=existing is null ? "ثبت هزینه" : "ذخیره تغییرات",Width=125,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
         buttons.Children.Add(ok);buttons.Children.Add(new Button{Content="انصراف",Width=90,Height=36,IsCancel=true});root.Children.Add(buttons);Content=root;
         ok.Click+=(_,_) =>
         {

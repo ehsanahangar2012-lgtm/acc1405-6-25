@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -16,7 +17,8 @@ public sealed class StockDialog:Window
     public StockDialog(Window owner,IReadOnlyList<ProductRecord> products)
     {
         Owner=owner;Title="افزایش موجودی کالا";Width=450;Height=300;WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        FlowDirection=FlowDirection.RightToLeft;Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
+        FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
+        _quantity.LostFocus += (_, _) => FormatNumericField(_quantity);
         _product.ItemsSource=products.ToList();if(_product.Items.Count>0)_product.SelectedIndex=0;
         var root=new StackPanel{Margin=new Thickness(22)};
         root.Children.Add(new TextBlock{Text="ورود موجودی",FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
@@ -35,5 +37,12 @@ public sealed class StockDialog:Window
                 ProductId=product.Id;Quantity=qty;DialogResult=true;
             }catch(Exception ex){MessageBox.Show(this,ex.Message,"بررسی موجودی",MessageBoxButton.OK,MessageBoxImage.Warning);}
         };
+    }
+
+    private static void FormatNumericField(TextBox field)
+    {
+        if (string.IsNullOrWhiteSpace(field.Text)) return;
+        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "مقدار").ToString("N2", CultureInfo.GetCultureInfo("fa-IR")); }
+        catch (InvalidOperationException) { }
     }
 }

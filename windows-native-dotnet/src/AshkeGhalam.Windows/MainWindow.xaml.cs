@@ -340,6 +340,7 @@ public partial class MainWindow : Window
         RefreshDueCalendar();
         RefreshCashFlowForecast();
         RefreshAccountingConfigurationPanels();
+        RefreshKardexModule();
     }
 
     private void RefreshLedger()
@@ -1155,6 +1156,72 @@ public partial class MainWindow : Window
         Commit(data => data.Products.RemoveAll(p => p.Id == selected.Id), "کالا حذف شد");
     }
 
+    private sealed record KardexModuleRow(string Date, string Movement, string Document, string Description, decimal Incoming, decimal Outgoing, decimal Balance);
+
+    private void RefreshKardexModule()
+    {
+        var selectedId = (KardexModuleProductSelector.SelectedItem as ProductRecord)?.Id;
+        var products = _data.Products.OrderBy(product => product.Name).ToList();
+        KardexModuleProductSelector.ItemsSource = null;
+        KardexModuleProductSelector.ItemsSource = products;
+        if (!string.IsNullOrWhiteSpace(selectedId))
+            KardexModuleProductSelector.SelectedItem = products.FirstOrDefault(product => product.Id == selectedId);
+        if (KardexModuleProductSelector.SelectedItem is null && products.Count > 0)
+            KardexModuleProductSelector.SelectedIndex = 0;
+        RefreshKardexModuleGrid();
+    }
+
+    private void KardexModuleProductSelector_SelectionChanged(object sender, SelectionChangedEventArgs e) =>
+        RefreshKardexModuleGrid();
+
+    private void RefreshKardexModuleGrid()
+    {
+        if (KardexModuleProductSelector.SelectedItem is not ProductRecord product)
+        {
+            KardexModuleSummary.Text = "برای مشاهدهٔ گردش، ابتدا یک کالا ثبت و انتخاب کنید.";
+            KardexModuleGrid.ItemsSource = null;
+            return;
+        }
+
+        var history = _data.InventoryMovements.Where(item => item.ProductId == product.Id)
+            .OrderBy(item => item.Date).ThenBy(item => item.Timestamp).ToList();
+        var balance = product.StockQuantity - history.Sum(item => item.SignedQuantity);
+        var rows = new List<KardexModuleRow>
+        {
+            new("—", "ماندهٔ ابتدای گردش", "—", "موجودی پایه استخراج‌شده از سوابق ذخیره‌شده", 0m, 0m, balance)
+        };
+        foreach (var movement in history)
+        {
+            balance += movement.SignedQuantity;
+            var reference = string.IsNullOrWhiteSpace(movement.ReferenceId) ? movement.VoucherId : movement.ReferenceId;
+            var document = movement.ReferenceType == "INVOICE"
+                ? _data.Invoices.FirstOrDefault(item => item.Id == reference)?.DisplayNumber ?? reference
+                : _data.Vouchers.FirstOrDefault(item => item.Id == reference)?.TrackingCode ?? reference;
+            rows.Add(new KardexModuleRow(FormatPersianDate(movement.Date), KardexMovementLabel(movement.MovementType),
+                document, movement.Description, Math.Max(0m, movement.SignedQuantity),
+                Math.Abs(Math.Min(0m, movement.SignedQuantity)), balance));
+        }
+        KardexModuleSummary.Text = $"کالا: {product.Name}   |   کد: {product.Code}   |   موجودی فعلی: {product.StockQuantity.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))} {product.Unit}";
+        KardexModuleGrid.ItemsSource = rows;
+    }
+
+    private void ShowKardexFromModule_Click(object sender, RoutedEventArgs e)
+    {
+        if (KardexModuleProductSelector.SelectedItem is not ProductRecord product)
+        {
+            MessageBox.Show(this, "ابتدا یک کالا را انتخاب کنید.", "کارتکس کالا", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        new KardexWindow(this, product, _data.InventoryMovements, _data.Invoices, _data.Vouchers).ShowDialog();
+    }
+
+    private static string KardexMovementLabel(string value) => value switch
+    {
+        "GOODS_RECEIPT" => "رسید ورود کالا", "GOODS_ISSUE" => "حواله خروج کالا", "INVENTORY_ADJUSTMENT" => "تعدیل موجودی",
+        "PRODUCTION_CONSUMPTION" => "مصرف تولید", "PRODUCTION_OUTPUT" => "خروجی تولید", "RETURN_RECEIPT" => "برگشت از فروش",
+        "RETURN_ISSUE" => "برگشت از خرید", "INTERNAL_TRANSFER" => "انتقال بین انبار", _ => value
+    };
+
     private void ShowKardex_Click(object sender, RoutedEventArgs e)
     {
         if (ProductsGrid.SelectedItem is not ProductRecord product)
@@ -1436,6 +1503,147 @@ public partial class MainWindow : Window
             };
             Commit(data => AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference), message);
         }
+    }
+
+    private void EditExpense_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (ExpensesGrid.SelectedItem is not ExpenseRecord selected)
+        {
+            MessageBox.Show(this, "ابتدا یک هزینه را از جدول انتخاب کنید.", "ویرایش هزینه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (_data.JournalEntries.Any(entry => entry.ReferenceId == selected.Id && entry.ReferenceType != "AUTO_EXPENSE"))
+        {
+            MessageBox.Show(this, "برای این هزینه سند دستی دفترکل ثبت شده است؛ ویرایش مستقیم برای حفظ سابقه مالی مسدود شد.",
+                "ویرایش ایمن هزینه", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new ExpenseDialog(this, selected);
+        if (dialog.ShowDialog() != true) return;
+        Commit(data =>
+        {
+            var current = data.Expenses.SingleOrDefault(item => item.Id == selected.Id)
+                ?? throw new InvalidOperationException("هزینه پیدا نشد.");
+            if (data.JournalEntries.Any(entry => entry.ReferenceId == current.Id && entry.ReferenceType != "AUTO_EXPENSE"))
+                throw new InvalidOperationException("برای این هزینه سند دستی دفترکل ثبت شده؛ ویرایش انجام نشد.");
+            current.Title = dialog.ExpenseTitle;
+            current.Category = dialog.Category;
+            current.Amount = dialog.Amount;
+            current.Notes = dialog.Notes;
+            data.JournalEntries.RemoveAll(entry => entry.ReferenceId == current.Id && entry.ReferenceType == "AUTO_EXPENSE");
+        }, "هزینه ویرایش شد و ثبت خودکار دفترکل بازسازی شد.");
+    }
+
+    private void DeleteExpense_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (ExpensesGrid.SelectedItem is not ExpenseRecord selected)
+        {
+            MessageBox.Show(this, "ابتدا یک هزینه را از جدول انتخاب کنید.", "حذف هزینه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (_data.JournalEntries.Any(entry => entry.ReferenceId == selected.Id && entry.ReferenceType != "AUTO_EXPENSE"))
+        {
+            MessageBox.Show(this, "برای این هزینه سند دستی دفترکل ثبت شده است؛ ابتدا سند اصلاحی ثبت کنید.",
+                "حذف ایمن هزینه", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (MessageBox.Show(this, $"هزینه «{selected.Title}» با مبلغ {selected.Amount:N2} حذف شود؟",
+            "تأیید حذف هزینه", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        Commit(data =>
+        {
+            var current = data.Expenses.SingleOrDefault(item => item.Id == selected.Id)
+                ?? throw new InvalidOperationException("هزینه پیدا نشد.");
+            if (data.JournalEntries.Any(entry => entry.ReferenceId == current.Id && entry.ReferenceType != "AUTO_EXPENSE"))
+                throw new InvalidOperationException("برای این هزینه سند دستی دفترکل ثبت شده؛ حذف انجام نشد.");
+            data.JournalEntries.RemoveAll(entry => entry.ReferenceId == current.Id && entry.ReferenceType == "AUTO_EXPENSE");
+            data.Expenses.Remove(current);
+        }, "هزینه حذف شد و ثبت خودکار دفترکل آن اصلاح شد.");
+    }
+
+    private void EditPayment_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (PaymentsGrid.SelectedItem is not PaymentRecord selected)
+        {
+            MessageBox.Show(this, "ابتدا یک دریافت/پرداخت را از جدول انتخاب کنید.", "ویرایش دریافت/پرداخت",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (_data.JournalEntries.Any(entry => entry.ReferenceId == selected.Id && entry.ReferenceType != "AUTO_PAYMENT"))
+        {
+            MessageBox.Show(this, "برای این عملیات سند دستی دفترکل وجود دارد؛ ویرایش مستقیم برای حفظ سابقه مالی مسدود شد.",
+                "ویرایش ایمن دریافت/پرداخت", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var dialog = new PaymentDialog(this, _data, existingPayment: selected);
+        if (dialog.ShowDialog() != true) return;
+        Commit(data =>
+        {
+            var current = data.Payments.SingleOrDefault(item => item.Id == selected.Id)
+                ?? throw new InvalidOperationException("دریافت/پرداخت پیدا نشد.");
+            if (data.JournalEntries.Any(entry => entry.ReferenceId == current.Id && entry.ReferenceType != "AUTO_PAYMENT"))
+                throw new InvalidOperationException("برای این عملیات سند دستی دفترکل ثبت شده؛ ویرایش انجام نشد.");
+            if (current.Method == "چک" && data.Checks.Any(check => check.RelatedInvoiceId == current.InvoiceId))
+                throw new InvalidOperationException("این عملیات به چک‌های ثبت‌شده مرتبط است؛ برای جلوگیری از ناهماهنگی، ابتدا چک مرتبط را تعیین تکلیف کنید.");
+
+            RemovePaymentWithAutomaticPosting(data, current);
+            var replacement = AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference);
+            replacement.Id = current.Id;
+            replacement.CreatedAt = current.CreatedAt;
+        }, "دریافت/پرداخت ویرایش شد؛ مانده‌ها و دفترکل خودکار بازسازی شدند.");
+    }
+
+    private void DeletePayment_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (PaymentsGrid.SelectedItem is not PaymentRecord selected)
+        {
+            MessageBox.Show(this, "ابتدا یک دریافت/پرداخت را از جدول انتخاب کنید.", "حذف دریافت/پرداخت",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (_data.JournalEntries.Any(entry => entry.ReferenceId == selected.Id && entry.ReferenceType != "AUTO_PAYMENT"))
+        {
+            MessageBox.Show(this, "برای این عملیات سند دستی دفترکل وجود دارد؛ ابتدا سند اصلاحی ثبت کنید.",
+                "حذف ایمن دریافت/پرداخت", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (selected.Method == "چک" && _data.Checks.Any(check => check.RelatedInvoiceId == selected.InvoiceId))
+        {
+            MessageBox.Show(this, "این عملیات به چک‌های ثبت‌شده مرتبط است؛ ابتدا چک مرتبط را تعیین تکلیف کنید.",
+                "حذف ایمن دریافت/پرداخت", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (MessageBox.Show(this, $"عملیات {selected.Amount:N2} مربوط به فاکتور {selected.InvoiceNumber} حذف شود؟",
+            "تأیید حذف دریافت/پرداخت", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        Commit(data =>
+        {
+            var current = data.Payments.SingleOrDefault(item => item.Id == selected.Id)
+                ?? throw new InvalidOperationException("دریافت/پرداخت پیدا نشد.");
+            if (data.JournalEntries.Any(entry => entry.ReferenceId == current.Id && entry.ReferenceType != "AUTO_PAYMENT"))
+                throw new InvalidOperationException("برای این عملیات سند دستی دفترکل ثبت شده؛ حذف انجام نشد.");
+            if (current.Method == "چک" && data.Checks.Any(check => check.RelatedInvoiceId == current.InvoiceId))
+                throw new InvalidOperationException("چک مرتبط وجود دارد؛ حذف انجام نشد.");
+            RemovePaymentWithAutomaticPosting(data, current);
+        }, "دریافت/پرداخت حذف شد؛ مانده و دفترکل خودکار اصلاح شدند.");
+    }
+
+    private static void RemovePaymentWithAutomaticPosting(AccountingData data, PaymentRecord payment)
+    {
+        var invoice = data.Invoices.SingleOrDefault(item => item.Id == payment.InvoiceId)
+            ?? throw new InvalidOperationException("فاکتور مرتبط با این دریافت/پرداخت پیدا نشد.");
+        if (payment.Method == "نقدی")
+            invoice.CashAmount = AccountingRules.Money(Math.Max(0m, invoice.CashAmount - payment.Amount));
+        else if (payment.Method == "چک")
+            invoice.CheckAmount = AccountingRules.Money(Math.Max(0m, invoice.CheckAmount - payment.Amount));
+
+        data.Payments.RemoveAll(item => item.Id == payment.Id);
+        data.JournalEntries.RemoveAll(entry => entry.ReferenceId == payment.Id && entry.ReferenceType == "AUTO_PAYMENT");
+        if (invoice.Status == "تسویه شده" && AccountingRules.RemainingForInvoice(data, invoice) > 0m)
+            invoice.Status = "ثبت شده";
     }
 
     private void AddExpense_Click(object sender, RoutedEventArgs e)
@@ -2247,6 +2455,7 @@ public partial class MainWindow : Window
             ["dashboard"] = new("پیشخوان", "منوی اصلی", "/", 0),
             ["invoices"] = new("فاکتورها", "منوی اصلی", "/invoices", 3),
             ["inventory"] = new("انبارداری", "منوی اصلی", "/inventory", 2),
+            ["kardex"] = new("کارتکس کالا", "عملیات محلی موجود", "/inventory/kardex", 21),
             ["checks"] = new("مدیریت چک", "منوی اصلی", "/checks", 10),
             ["vouchers"] = new("حواله‌های انبار", "عملیات محلی موجود", "/inventory (حواله‌های انبار)", 11),
             ["finance"] = new("امور مالی", "منوی اصلی", "/finance", 12),

@@ -270,7 +270,7 @@
                             <TextBlock x:Name="InvoicesPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
                             <Button x:Name="InvoicesNextPage" Tag="invoices" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
                             <Button Content="صدور سند جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
-                            <Button Content="ویرایش پیش‌فاکتور انتخابی" Click="EditInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش سند انتخابی" Click="EditInvoice_Click" Margin="0,0,8,8"/>
                             <Button Content="حذف پیش‌فاکتور انتخابی" Click="DeleteInvoice_Click" Margin="0,0,8,8"/>
                             <Button Content="تبدیل پیش‌فاکتور به فروش" Click="ConvertProformaToSale_Click" Margin="0,0,8,8"/>
                             <Button Content="ثبت دریافت/پرداخت" Click="AddPayment_Click" Margin="0,0,8,8"/>
@@ -318,6 +318,8 @@
                             <TextBlock x:Name="PaymentsPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
                             <Button x:Name="PaymentsNextPage" Tag="payments" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
                             <Button Content="ثبت دریافت / پرداخت جدید" Click="AddPayment_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش دریافت / پرداخت" Click="EditPayment_Click" Margin="0,0,8,8"/>
+                            <Button Content="حذف دریافت / پرداخت" Click="DeletePayment_Click" Margin="0,0,8,8"/>
                             <Button Content="خروجی CSV" Click="ExportPayments_Click" Margin="0,0,8,8"/>
                         </WrapPanel>
                     </StackPanel>
@@ -348,6 +350,8 @@
                             <TextBlock x:Name="ExpensesPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
                             <Button x:Name="ExpensesNextPage" Tag="expenses" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
                             <Button Content="ثبت هزینه" Click="AddExpense_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش هزینه انتخابی" Click="EditExpense_Click" Margin="0,0,8,8"/>
+                            <Button Content="حذف هزینه انتخابی" Click="DeleteExpense_Click" Margin="0,0,8,8"/>
                             <Button Content="خروجی CSV" Click="ExportExpenses_Click" Margin="0,0,8,8"/>
                         </WrapPanel>
                     </StackPanel>
@@ -829,7 +833,38 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
-                </TabControl>
+                            <TabItem Header="کارتکس کالا">
+                <Grid Margin="18">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="کارتکس و گردش ریز موجودی کالا" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="گردش ثبت‌شدهٔ ورود، خروج، تعدیل و اسناد مرتبط با هر کالا را به‌ترتیب تاریخ مشاهده کنید." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <WrapPanel Grid.Row="1" Margin="0,14,0,0">
+                        <ComboBox x:Name="KardexModuleProductSelector" MinWidth="320" Height="36" Padding="8,4" DisplayMemberPath="Name" SelectionChanged="KardexModuleProductSelector_SelectionChanged" Margin="0,0,8,8"/>
+                        <Button Content="بازکردن کارتکس کامل" Click="ShowKardexFromModule_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                    </WrapPanel>
+                    <StackPanel Grid.Row="2">
+                        <TextBlock x:Name="KardexModuleSummary" Text="برای مشاهدهٔ گردش، کالا را انتخاب کنید." Foreground="#334155" FontWeight="SemiBold" Margin="0,4,0,4"/>
+                        <DataGrid x:Name="KardexModuleGrid" MinHeight="280" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="110"/>
+                                <DataGridTextColumn Header="نوع گردش" Binding="{Binding Movement}" Width="155"/>
+                                <DataGridTextColumn Header="سند مرجع" Binding="{Binding Document}" Width="160"/>
+                                <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="*"/>
+                                <DataGridTextColumn Header="ورودی" Binding="{Binding Incoming, StringFormat={}{0:N2}}" Width="110"/>
+                                <DataGridTextColumn Header="خروجی" Binding="{Binding Outgoing, StringFormat={}{0:N2}}" Width="110"/>
+                                <DataGridTextColumn Header="مانده" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="120"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+</TabControl>
                 <Border x:Name="MigrationPanel" Visibility="Collapsed" Background="#F1F5F9" CornerRadius="14" Padding="28">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel VerticalAlignment="Top" MaxWidth="850" HorizontalAlignment="Right">
@@ -867,6 +902,7 @@
                         <Button x:Name="NavigationDashboardButton" Tag="dashboard" Content="پیشخوان" Style="{StaticResource NavButton}" Background="#0F766E" Click="NavigateModule_Click"/>
                         <Button Tag="invoices" Content="فاکتورها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="inventory" Content="انبارداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="kardex" Content="کارتکس کالا" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="checks" Content="مدیریت چک" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="finance" Content="امور مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="customers" Content="اشخاص" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
