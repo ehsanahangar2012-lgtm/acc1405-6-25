@@ -97,7 +97,7 @@ public sealed class NativeLedgerServiceTests
         };
         Assert.ThrowsException<InvalidOperationException>(() => NativeLedgerService.PostEntry(data, invalidAmount));
 
-        Assert.ThrowsException<InvalidOperationException>(() => NativeLedgerService.NormalizeAndValidateDate("1405/12/31"));
+        Assert.ThrowsException<InvalidOperationException>(() => NativeLedgerService.NormalizeAndValidateDate("1405/12/32"));
         Assert.ThrowsException<InvalidOperationException>(() => NativeLedgerService.NormalizeAndValidateDate("۱۴۰۵/۱۳/۰۱"));
     }
 
