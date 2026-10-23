@@ -101,6 +101,7 @@ public partial class MainWindow : Window
                 : _startupAccountingWarning;
             RefreshAll();
             RefreshLicensePanel();
+            ApplicationThemeService.Apply(this, _data.Preferences.ApplicationTheme);
             _ = RefreshSavedLicenseOnlineAsync();
         }
         catch (Exception ex)
@@ -1463,9 +1464,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        new InvoicePreviewWindow(this, invoice, _data.Preferences.InvoiceTheme,
-            _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
-            _data.Preferences.Currency, ConfiguredInvoiceFooter()).ShowDialog();
+        OpenInvoicePreview(invoice);
     }
 
     private void PrintInvoice_Click(object sender, RoutedEventArgs e)
@@ -1477,10 +1476,76 @@ public partial class MainWindow : Window
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
+
         // Preview and print share the same theme and QR output.
-        new InvoicePreviewWindow(this, invoice, _data.Preferences.InvoiceTheme,
-            _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
-            _data.Preferences.Currency, ConfiguredInvoiceFooter()).ShowDialog();
+        OpenInvoicePreview(invoice);
+    }
+
+    private static string InvoicePreviewErrorLogPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "AshkeGhalam", "WindowsNative", "invoice-preview-error.log");
+
+    private static void WriteInvoicePreviewError(Exception exception)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(InvoicePreviewErrorLogPath);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
+            File.AppendAllText(InvoicePreviewErrorLogPath,
+                $"[{DateTimeOffset.Now:O}] Invoice preview error{Environment.NewLine}{exception}{Environment.NewLine}{new string('-', 72)}{Environment.NewLine}",
+                new UTF8Encoding(false));
+        }
+        catch
+        {
+            // Diagnostic failures must not trigger a second UI failure.
+        }
+    }
+
+    private void OpenInvoicePreview(InvoiceRecord invoice)
+    {
+        InvoicePreviewWindow? preview = null;
+        DispatcherUnhandledExceptionEventHandler? dispatcherHandler = null;
+        try
+        {
+            preview = new InvoicePreviewWindow(this, invoice, _data.Preferences.InvoiceTheme,
+                _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
+                _data.Preferences.Currency, ConfiguredInvoiceFooter());
+
+            dispatcherHandler = (_, args) =>
+            {
+                // Contain an exception raised while WPF renders the modal preview instead
+                // of terminating the entire accounting application.
+                if (preview is null || !preview.IsVisible)
+                    return;
+
+                var exception = args.Exception;
+                args.Handled = true;
+                WriteInvoicePreviewError(exception);
+                preview.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+                {
+                    try { if (preview.IsVisible) preview.Close(); } catch { }
+                    MessageBox.Show(this,
+                        $"پیش‌نمایش فاکتور باز نشد و برای جلوگیری از بسته‌شدن حسابداری متوقف شد.\n{exception.Message}\n\nگزارش فنی: {InvoicePreviewErrorLogPath}",
+                        "خطا در پیش‌نمایش فاکتور", MessageBoxButton.OK, MessageBoxImage.Error);
+                }));
+            };
+
+            Application.Current.DispatcherUnhandledException += dispatcherHandler;
+            preview.ShowDialog();
+        }
+        catch (Exception exception)
+        {
+            WriteInvoicePreviewError(exception);
+            MessageBox.Show(this,
+                $"پیش‌نمایش فاکتور باز نشد.\n{exception.Message}\n\nگزارش فنی: {InvoicePreviewErrorLogPath}",
+                "خطا در پیش‌نمایش فاکتور", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            if (dispatcherHandler is not null)
+                Application.Current.DispatcherUnhandledException -= dispatcherHandler;
+        }
     }
 
     private void AddPayment_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType(null);
@@ -2093,6 +2158,9 @@ public partial class MainWindow : Window
         SettingsFooterPaymentTerms.IsChecked = (_data.Preferences.SelectedInvoiceFootnotes ?? []).Contains(FooterNotePaymentTerms, StringComparer.Ordinal);
         SettingsFooterDeliveryTerms.IsChecked = (_data.Preferences.SelectedInvoiceFootnotes ?? []).Contains(FooterNoteDeliveryTerms, StringComparer.Ordinal);
 
+        ApplicationThemeSelector.SelectedItem = ApplicationThemeSelector.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), ApplicationThemeService.Normalize(_data.Preferences.ApplicationTheme), StringComparison.Ordinal))
+            ?? ApplicationThemeSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "light", StringComparison.Ordinal));
         InvoiceThemeSelector.SelectedItem = InvoiceThemeSelector.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.Preferences.InvoiceTheme, StringComparison.Ordinal))
             ?? InvoiceThemeSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "modern", StringComparison.Ordinal));
@@ -2325,12 +2393,14 @@ public partial class MainWindow : Window
             return;
         }
         var theme = (InvoiceThemeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "modern";
+        var applicationTheme = ApplicationThemeService.Normalize((ApplicationThemeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString());
         var currency = (SettingsCurrencySelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "RIAL";
         Commit(data =>
         {
             data.Preferences = new AccountingPreferences
             {
                 InvoiceTheme = theme,
+                ApplicationTheme = applicationTheme,
                 ShowInvoiceQr = SettingsShowInvoiceQr.IsChecked == true,
                 Currency = currency,
                 DefaultTaxRatePercent = taxRate,
@@ -2339,7 +2409,8 @@ public partial class MainWindow : Window
                 SelectedInvoiceFootnotes = GetSelectedInvoiceFootnotes(),
                 CustomInvoiceFootnoteOptions = ParseCustomInvoiceFootnoteOptions(SettingsCustomFootnoteOptions.Text)
             };
-        }, "تنظیمات حسابداری ذخیره شد؛ در پیش‌نمایش‌های بعدی اعمال می‌شود.");
+        }, "تنظیمات حسابداری ذخیره شد؛ تم رابط کاربری اعمال شد.");
+        ApplicationThemeService.Apply(this, _data.Preferences.ApplicationTheme);
     }
 
     private void SaveMoadianSettings_Click(object sender, RoutedEventArgs e)
