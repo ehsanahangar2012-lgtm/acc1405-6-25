@@ -75,7 +75,7 @@
             </Setter>
         </Style>
         <Style x:Key="NavSectionLabel" TargetType="{x:Type TextBlock}">
-            <Setter Property="Foreground" Value="#94A3B8"/>
+            <Setter Property="Foreground" Value="#64748B"/>
             <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Margin" Value="7,15,7,5"/>
