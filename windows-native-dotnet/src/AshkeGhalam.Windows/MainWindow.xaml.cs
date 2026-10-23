@@ -1132,7 +1132,7 @@ public partial class MainWindow : Window
         }
 
         var suggestedCode = NextCode(_data.Products.Select(product => product.Code), "SKU-");
-        var dialog = new ProductDialog(dialogOwner, suggestedCode: suggestedCode);
+        var dialog = new ProductDialog(dialogOwner, suggestedCode: suggestedCode, knownProducts: _data.Products);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not ProductRecord product)
             return null;
@@ -1215,7 +1215,7 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable()) return;
         var suggestedCode = NextCode(_data.Products.Select(product => product.Code), "SKU-");
-        var dialog = new ProductDialog(this, suggestedCode: suggestedCode);
+        var dialog = new ProductDialog(this, suggestedCode: suggestedCode, knownProducts: _data.Products);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is ProductRecord product)
             Commit(data =>
@@ -1232,7 +1232,7 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable()) return;
         if (ProductsGrid.SelectedItem is not ProductRecord selected) { MessageBox.Show(this, "یک کالا را انتخاب کنید."); return; }
-        var dialog = new ProductDialog(this, selected);
+        var dialog = new ProductDialog(this, selected, knownProducts: _data.Products);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is ProductRecord changed)
             Commit(data =>
