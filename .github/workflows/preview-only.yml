@@ -45,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf '{"sha":"%s"}\\n' "$GITHUB_SHA" > dist/version.json
+          printf '{"sha":"%s"}\n' "$GITHUB_SHA" > dist/version.json
           node scripts/sanitize-client-build.js dist --verify-only
 
       - name: Configure GitHub Pages
