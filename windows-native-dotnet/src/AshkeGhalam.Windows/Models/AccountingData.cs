@@ -547,6 +547,7 @@ public static class AccountingOperations
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
+                Unit = string.IsNullOrWhiteSpace(item.Unit) ? product.Unit : item.Unit.Trim(),
                 SerialNumber = string.IsNullOrWhiteSpace(item.SerialNumber) ? product.SerialNumber : item.SerialNumber.Trim(),
                 Quantity = item.Quantity,
                 BuyPrice = buyPrice,
