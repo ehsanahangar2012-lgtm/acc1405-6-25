@@ -271,6 +271,7 @@
                             <Button x:Name="InvoicesNextPage" Tag="invoices" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
                             <Button Content="صدور سند جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
                             <Button Content="ویرایش پیش‌فاکتور انتخابی" Click="EditInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="حذف پیش‌فاکتور انتخابی" Click="DeleteInvoice_Click" Margin="0,0,8,8"/>
                             <Button Content="تبدیل پیش‌فاکتور به فروش" Click="ConvertProformaToSale_Click" Margin="0,0,8,8"/>
                             <Button Content="ثبت دریافت/پرداخت" Click="AddPayment_Click" Margin="0,0,8,8"/>
                             <Button Content="لغو سند انتخابی" Click="CancelInvoice_Click" Margin="0,0,8,8"/>
@@ -769,7 +770,12 @@
                                     <CheckBox x:Name="SettingsFooterPaymentTerms" Content="لطفاً هنگام پرداخت شماره فاکتور را ذکر کنید" Margin="0,0,14,8"/>
                                     <CheckBox x:Name="SettingsFooterDeliveryTerms" Content="تحویل طبق توافق طرفین انجام می‌شود" Margin="0,0,14,8"/>
                                 </WrapPanel>
-                                <TextBlock Text="پانویس سفارشی" Margin="0,0,0,5"/><TextBox x:Name="SettingsInvoiceFooter" MinHeight="54" Padding="8" AcceptsReturn="True" TextWrapping="Wrap"/>
+                                <TextBlock Text="پانویس ثابت سفارشی (در صورت نیاز، چند خط وارد کنید)" Margin="0,0,0,5"/>
+                                <TextBox x:Name="SettingsInvoiceFooter" MinHeight="54" Padding="8" AcceptsReturn="True" TextWrapping="Wrap"/>
+                                <TextBlock Text="گزینه‌های پانویس سفارشی (هر خط یک گزینه؛ گزینه‌ها را بارگذاری و سپس انتخاب کنید)" Margin="0,12,0,5" FontWeight="SemiBold"/>
+                                <TextBox x:Name="SettingsCustomFootnoteOptions" MinHeight="70" Padding="8" AcceptsReturn="True" TextWrapping="Wrap" ToolTip="هر خط به‌عنوان گزینهٔ جداگانه نمایش داده می‌شود."/>
+                                <Button Content="بارگذاری گزینه‌های پانویس" Click="LoadCustomInvoiceFootnotes_Click" HorizontalAlignment="Right" Margin="0,6,0,6"/>
+                                <ListBox x:Name="CustomInvoiceFootnoteSelector" SelectionMode="Extended" MinHeight="90" MaxHeight="160" BorderBrush="#CBD5E1" BorderThickness="1" Padding="6" ToolTip="برای انتخاب چند گزینه از Ctrl یا Shift استفاده کنید."/>
                                 <Button Content="ذخیره تنظیمات حسابداری" Click="SaveAccountingPreferences_Click" HorizontalAlignment="Right" Margin="0,12,0,0" Background="#0F766E" Foreground="White"/>
                             </StackPanel>
                         </Border>
