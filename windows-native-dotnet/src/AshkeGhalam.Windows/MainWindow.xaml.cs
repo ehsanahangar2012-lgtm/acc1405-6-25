@@ -1821,7 +1821,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        new PaymentReceiptPreviewWindow(this, payment, invoice, ActiveCompanyProfile(), _data.Preferences.Currency).ShowDialog();
+        var relatedChecks = string.Equals(payment.Method, "چک", StringComparison.Ordinal)
+            ? _data.Checks.Where(check =>
+                string.Equals(check.RelatedInvoiceId, invoice.Id, StringComparison.Ordinal) &&
+                check.Amount == payment.Amount &&
+                string.Equals(check.CheckType, invoice.Type == "SALE" ? "RECEIVED" : "ISSUED", StringComparison.Ordinal)).ToList()
+            : [];
+        new PaymentReceiptPreviewWindow(this, payment, invoice, ActiveCompanyProfile(),
+            _data.Preferences.Currency, relatedChecks).ShowDialog();
     }
 
     private void AddPayment_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType(null);

@@ -344,14 +344,14 @@ public sealed class CheckDialog : Window
             : 0;
 
         var formatted = NumericTextBoxFormatter.Format(value);
-        if (endsWithDecimal && !formatted.Contains('٫') && !formatted.Contains('.')) formatted += "٫";
+        if (endsWithDecimal && !formatted.Contains('٫') && !formatted.Contains('.') && !formatted.Contains('/')) formatted += "/";
         if (formatted == current) return;
 
         _formattingAmount = true;
         try
         {
             _amount.Text = formatted;
-            var decimalIndex = formatted.IndexOfAny(['٫', '.']);
+            var decimalIndex = formatted.IndexOfAny(['٫', '.', '/']);
             var caret = formatted.Length;
             if (decimalInPrefix >= 0)
             {

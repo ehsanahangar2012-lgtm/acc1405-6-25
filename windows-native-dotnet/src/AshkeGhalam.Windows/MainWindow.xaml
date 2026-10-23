@@ -461,9 +461,9 @@
                                 <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="0.9*"/>
                                 <DataGridTextColumn Header="نام حساب" Binding="{Binding Name}" Width="*"/>
                                 <DataGridTextColumn Header="نوع" Binding="{Binding Type}" Width="1.3*"/>
-                                <DataGridTextColumn Header="بدهکار" Binding="{Binding Debit, StringFormat=#,##0.##}" Width="1.3*"/>
-                                <DataGridTextColumn Header="بستانکار" Binding="{Binding Credit, StringFormat=#,##0.##}" Width="1.3*"/>
-                                <DataGridTextColumn Header="مانده (بدهکار - بستانکار)" Binding="{Binding Balance, StringFormat=#,##0.##}" Width="1.9*"/>
+                                <DataGridTextColumn Header="بدهکار" Binding="{Binding Debit, StringFormat={}{0:#,##0.##}}" Width="1.3*"/>
+                                <DataGridTextColumn Header="بستانکار" Binding="{Binding Credit, StringFormat={}{0:#,##0.##}}" Width="1.3*"/>
+                                <DataGridTextColumn Header="مانده (بدهکار - بستانکار)" Binding="{Binding Balance, StringFormat={}{0:#,##0.##}}" Width="1.9*"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <Button Content="خروجی CSV گزارش مالی کامل" Click="ExportFinancialReports_Click" HorizontalAlignment="Right" Margin="0,12,0,0"/>
@@ -489,7 +489,7 @@
                             <DataGridTextColumn Header="نوع تعهد" Binding="{Binding Kind}" Width="1.7*"/>
                             <DataGridTextColumn Header="شماره سند/چک" Binding="{Binding DocumentNumber}" Width="1.35*"/>
                             <DataGridTextColumn Header="طرف حساب" Binding="{Binding Contact}" Width="*"/>
-                            <DataGridTextColumn Header="مبلغ باز" Binding="{Binding Amount, StringFormat=#,##0.##}" Width="1.35*"/>
+                            <DataGridTextColumn Header="مبلغ باز" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" Width="1.35*"/>
                             <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.7*"/>
                             <DataGridTextColumn Header="مانده تا سررسید" Binding="{Binding Days}" Width="1.45*"/>
                             <DataGridTextColumn Header="اولویت" Binding="{Binding Priority}" Width="1.2*"/>
@@ -714,10 +714,10 @@
                         <DataGrid x:Name="CashFlowProjectionGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MinHeight="130" MaxHeight="290">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="1.3*"/>
-                                <DataGridTextColumn Header="ورودی" Binding="{Binding Inflows, StringFormat=#,##0.##}" Width="1.45*"/>
-                                <DataGridTextColumn Header="خروجی" Binding="{Binding Outflows, StringFormat=#,##0.##}" Width="1.45*"/>
-                                <DataGridTextColumn Header="تغییر خالص" Binding="{Binding NetChange, StringFormat=#,##0.##}" Width="1.45*"/>
-                                <DataGridTextColumn Header="مانده پس از رخدادها" Binding="{Binding ProjectedBalance, StringFormat=#,##0.##}" Width="1.9*"/>
+                                <DataGridTextColumn Header="ورودی" Binding="{Binding Inflows, StringFormat={}{0:#,##0.##}}" Width="1.45*"/>
+                                <DataGridTextColumn Header="خروجی" Binding="{Binding Outflows, StringFormat={}{0:#,##0.##}}" Width="1.45*"/>
+                                <DataGridTextColumn Header="تغییر خالص" Binding="{Binding NetChange, StringFormat={}{0:#,##0.##}}" Width="1.45*"/>
+                                <DataGridTextColumn Header="مانده پس از رخدادها" Binding="{Binding ProjectedBalance, StringFormat={}{0:#,##0.##}}" Width="1.9*"/>
                                 <DataGridTextColumn Header="تعداد تعهدها" Binding="{Binding MovementCount}" Width="1.2*"/>
                                 <DataGridTextColumn Header="موارد سررسیدگذشته" Binding="{Binding OverdueCount}" Width="1.5*"/>
                             </DataGrid.Columns>
@@ -730,7 +730,7 @@
                                 <DataGridTextColumn Header="نوع تعهد" Binding="{Binding Kind}" Width="1.7*"/>
                                 <DataGridTextColumn Header="شماره" Binding="{Binding DocumentNumber}" Width="1.3*"/>
                                 <DataGridTextColumn Header="طرف حساب" Binding="{Binding Counterparty}" Width="*"/>
-                                <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat=#,##0.##}" Width="1.4*"/>
+                                <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" Width="1.4*"/>
                                 <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.3*"/>
                                 <DataGridTextColumn Header="سررسید" Binding="{Binding DueStatus}" Width="1.3*"/>
                             </DataGrid.Columns>
