@@ -17,9 +17,9 @@ public sealed class JournalEntryDialog : Window
     private readonly TextBox _fiscalYear = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _referenceId = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _referenceType = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly ComboBox _debit = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label) };
-    private readonly ComboBox _credit = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label) };
-    private readonly ComboBox _documentType = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label) };
+    private readonly ComboBox _debit = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsEditable = true, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _credit = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsEditable = true, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _documentType = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };\n    private IReadOnlyList<Choice> _accountChoices = [];\n    private bool _refreshingCreditChoices;
 
     public AccountingEntryRecord? Result { get; private set; }
 
@@ -40,6 +40,7 @@ public sealed class JournalEntryDialog : Window
             .OrderBy(a => a.Code, StringComparer.OrdinalIgnoreCase)
             .Select(a => new Choice(a.Id, $"{a.Code} — {a.Name}"))
             .ToList();
+        _accountChoices = choices;
         _debit.ItemsSource = choices;
         _credit.ItemsSource = choices;
         if (choices.Count > 0) _debit.SelectedIndex = 0;
@@ -52,6 +53,8 @@ public sealed class JournalEntryDialog : Window
             new Choice("ADJUSTMENT", "سند اصلاحی")
         };
         _documentType.SelectedIndex = 0;
+        _debit.SelectionChanged += (_, _) => RefreshCreditChoices();
+        RefreshCreditChoices();
 
         var calendar = new PersianCalendar();
         var now = DateTime.Now;
@@ -88,13 +91,19 @@ public sealed class JournalEntryDialog : Window
         AddField(root, "شناسه مرجع (اختیاری)", _referenceId);
         AddField(root, "نوع مرجع (اختیاری)", _referenceType);
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 20, 0, 10) };
-        var save = new Button { Content = "ثبت قطعی سند", Width = 125, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 10, 22, 18) };
+        var save = new Button { Content = "ثبت قطعی سند", Width = 135, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
         buttons.Children.Add(save);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
-        root.Children.Add(buttons);
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         scroll.Content = root;
-        Content = scroll;
+        Grid.SetRow(scroll, 0);
+        Grid.SetRow(buttons, 1);
+        layout.Children.Add(scroll);
+        layout.Children.Add(buttons);
+        Content = layout;
 
         save.Click += (_, _) =>
         {
@@ -128,6 +137,19 @@ public sealed class JournalEntryDialog : Window
                 MessageBox.Show(this, ex.Message, "بررسی سند حسابداری", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         };
+    }
+
+    private void RefreshCreditChoices()
+    {
+        if (_refreshingCreditChoices) return;
+        var debitId = (_debit.SelectedItem as Choice)?.Value;
+        var previousCreditId = (_credit.SelectedItem as Choice)?.Value;
+        var allowed = _accountChoices.Where(choice => !string.Equals(choice.Value, debitId, StringComparison.Ordinal)).ToList();
+        _refreshingCreditChoices = true;
+        _credit.ItemsSource = allowed;
+        _credit.SelectedItem = allowed.FirstOrDefault(choice => choice.Value == previousCreditId)
+            ?? allowed.FirstOrDefault();
+        _refreshingCreditChoices = false;
     }
 
     private static void AddField(Panel root, string label, Control field)
