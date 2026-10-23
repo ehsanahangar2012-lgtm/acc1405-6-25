@@ -82,9 +82,9 @@ public sealed class AccountingData
         }).ToList(),
         InventoryMovements = InventoryMovements.Select(m => new InventoryMovementRecord
         {
-            Id=m.Id, ProductId=m.ProductId, VoucherId=m.VoucherId, MovementType=m.MovementType,
-            SignedQuantity=m.SignedQuantity, Date=m.Date, ReferenceType=m.ReferenceType,
-            Description=m.Description, Timestamp=m.Timestamp
+            Id=m.Id, ProductId=m.ProductId, VoucherId=m.VoucherId, ReferenceId=m.ReferenceId,
+            MovementType=m.MovementType, SignedQuantity=m.SignedQuantity, Date=m.Date,
+            ReferenceType=m.ReferenceType, Description=m.Description, Timestamp=m.Timestamp
         }).ToList()
     };
 }
@@ -310,6 +310,7 @@ public sealed class InventoryMovementRecord
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string ProductId { get; set; } = "";
     public string VoucherId { get; set; } = "";
+    public string ReferenceId { get; set; } = "";
     public string MovementType { get; set; } = "";
     public decimal SignedQuantity { get; set; }
     public DateTimeOffset Date { get; set; } = DateTimeOffset.Now;
@@ -495,6 +496,23 @@ public static class AccountingOperations
 
         data.Invoices.Add(invoice);
         data.NextInvoiceNumber = Math.Max(data.NextInvoiceNumber, number + 1);
+        if (draft.Type is "SALE" or "PURCHASE")
+        {
+            foreach (var entry in resolved)
+            {
+                var isSale = draft.Type == "SALE";
+                data.InventoryMovements.Add(new InventoryMovementRecord
+                {
+                    ProductId = entry.Product.Id,
+                    ReferenceId = invoice.Id,
+                    MovementType = isSale ? "GOODS_ISSUE" : "GOODS_RECEIPT",
+                    SignedQuantity = isSale ? -entry.Line.Quantity : entry.Line.Quantity,
+                    Date = createdAt,
+                    ReferenceType = "INVOICE",
+                    Description = $"{invoice.TypeLabel} {invoice.DisplayNumber} — {entry.Line.ProductName}"
+                });
+            }
+        }
         if (invoice.CashAmount > 0m)
         {
             data.Payments.Add(new PaymentRecord
@@ -540,7 +558,20 @@ public static class AccountingOperations
             if (available < item.Quantity)
                 throw new InvalidOperationException($"موجودی آزاد کالای «{item.Product.Name}» برای تبدیل کافی نیست. آزاد: {available:N2}");
         }
-        foreach (var item in requirements) item.Product!.StockQuantity -= item.Quantity;
+        foreach (var item in requirements)
+        {
+            item.Product!.StockQuantity -= item.Quantity;
+            data.InventoryMovements.Add(new InventoryMovementRecord
+            {
+                ProductId = item.Product.Id,
+                ReferenceId = invoice.Id,
+                MovementType = "GOODS_ISSUE",
+                SignedQuantity = -item.Quantity,
+                Date = DateTimeOffset.Now,
+                ReferenceType = "INVOICE",
+                Description = $"تبدیل پیش‌فاکتور {invoice.DisplayNumber} به فروش"
+            });
+        }
         invoice.Type = "SALE";
         // Preserve the original number/tracking history just like the source app's type update.
         return invoice;
@@ -677,8 +708,8 @@ public static class AccountingOperations
             entry.Product.StockQuantity += entry.Delta;
             data.InventoryMovements.Add(new InventoryMovementRecord
             {
-                ProductId = entry.Product.Id, VoucherId = created.Id, MovementType = created.MovementType,
-                SignedQuantity = entry.Delta, Date = created.Date, ReferenceType = "VOUCHER",
+                ProductId = entry.Product.Id, VoucherId = created.Id, ReferenceId = created.Id,
+                MovementType = created.MovementType, SignedQuantity = entry.Delta, Date = created.Date, ReferenceType = "VOUCHER",
                 Description = $"حواله {created.Number} — {created.TrackingCode}"
             });
         }
@@ -705,7 +736,7 @@ public static class AccountingOperations
         {
             entry.Product.StockQuantity += entry.Delta;
         }
-        data.InventoryMovements.RemoveAll(m => m.VoucherId == voucher.Id);
+        data.InventoryMovements.RemoveAll(m => m.VoucherId == voucher.Id || (m.ReferenceType == "VOUCHER" && m.ReferenceId == voucher.Id));
         data.Vouchers.Remove(voucher);
     }
 
@@ -749,9 +780,31 @@ public static class AccountingOperations
             throw new InvalidOperationException("موجودی خرید قبلاً مصرف شده است؛ ابتدا سند برگشت/تعدیل ثبت کنید.");
 
         if (invoice.Type == "SALE")
-            foreach (var item in products) item.Product!.StockQuantity += item.Quantity;
+        {
+            foreach (var item in products)
+            {
+                item.Product!.StockQuantity += item.Quantity;
+                data.InventoryMovements.Add(new InventoryMovementRecord
+                {
+                    ProductId = item.Product.Id, ReferenceId = invoice.Id, MovementType = "GOODS_RECEIPT",
+                    SignedQuantity = item.Quantity, Date = DateTimeOffset.Now, ReferenceType = "INVOICE",
+                    Description = $"برگشت موجودی ناشی از لغو فروش {invoice.DisplayNumber}"
+                });
+            }
+        }
         else if (invoice.Type == "PURCHASE")
-            foreach (var item in products) item.Product!.StockQuantity -= item.Quantity;
+        {
+            foreach (var item in products)
+            {
+                item.Product!.StockQuantity -= item.Quantity;
+                data.InventoryMovements.Add(new InventoryMovementRecord
+                {
+                    ProductId = item.Product.Id, ReferenceId = invoice.Id, MovementType = "GOODS_ISSUE",
+                    SignedQuantity = -item.Quantity, Date = DateTimeOffset.Now, ReferenceType = "INVOICE",
+                    Description = $"برگشت موجودی ناشی از لغو خرید {invoice.DisplayNumber}"
+                });
+            }
+        }
         // A proforma has no inventory posting to reverse.
         invoice.Status = "لغو شده";
     }
@@ -919,9 +972,19 @@ public static class AccountingDataValidator
         UniqueIds(data.InventoryMovements.Select(m => m?.Id), "گردش موجودی");
         var validLedgerMovementTypes = new[] { "GOODS_RECEIPT", "GOODS_ISSUE", "INTERNAL_TRANSFER", "INVENTORY_ADJUSTMENT", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT", "RETURN_RECEIPT", "RETURN_ISSUE" };
         foreach (var movement in data.InventoryMovements)
-            if (movement is null || !productIds.Contains(movement.ProductId) || !data.Vouchers.Any(v => v.Id == movement.VoucherId) ||
-                !validLedgerMovementTypes.Contains(movement.MovementType, StringComparer.Ordinal) || movement.SignedQuantity == 0m || movement.Date == default)
+        {
+            if (movement is null || !productIds.Contains(movement.ProductId) ||
+                !validLedgerMovementTypes.Contains(movement.MovementType, StringComparer.Ordinal) ||
+                movement.SignedQuantity == 0m || movement.Date == default ||
+                !new[] { "VOUCHER", "INVOICE" }.Contains(movement.ReferenceType, StringComparer.Ordinal))
                 throw new InvalidDataException("گردش موجودی ناقص یا ناسازگار است.");
+            var referenceId = string.IsNullOrWhiteSpace(movement.ReferenceId) ? movement.VoucherId : movement.ReferenceId;
+            var referenceExists = movement.ReferenceType == "VOUCHER"
+                ? data.Vouchers.Any(v => v.Id == referenceId)
+                : invoiceIds.Contains(referenceId);
+            if (!referenceExists)
+                throw new InvalidDataException("سند مرجع گردش موجودی پیدا نشد.");
+        }
 
         return data;
     }
