@@ -102,7 +102,9 @@ public sealed class InvoiceDialog : Window
         AddField(duePanel, "تاریخ سررسید شمسی (اختیاری)", _dueDate);
         Grid.SetColumn(duePanel, 2);
         dates.Children.Add(datePanel);
-        dates.Children.Add(new Border());
+        var dateSpacer = new Border();
+        Grid.SetColumn(dateSpacer, 1);
+        dates.Children.Add(dateSpacer);
         dates.Children.Add(duePanel);
         root.Children.Add(dates);
 
@@ -137,7 +139,9 @@ public sealed class InvoiceDialog : Window
         AddField(taxPanel, "مالیات (مبلغ)", _tax);
         Grid.SetColumn(taxPanel, 2);
         pricing.Children.Add(discountPanel);
-        pricing.Children.Add(new Border());
+        var pricingSpacer = new Border();
+        Grid.SetColumn(pricingSpacer, 1);
+        pricing.Children.Add(pricingSpacer);
         pricing.Children.Add(taxPanel);
         root.Children.Add(pricing);
         root.Children.Add(_totals);
@@ -156,7 +160,9 @@ public sealed class InvoiceDialog : Window
         AddField(phonePanel, "تلفن راننده", _driverPhone);
         Grid.SetColumn(phonePanel, 2);
         logistics.Children.Add(driverPanel);
-        logistics.Children.Add(new Border());
+        var logisticsSpacer = new Border();
+        Grid.SetColumn(logisticsSpacer, 1);
+        logistics.Children.Add(logisticsSpacer);
         logistics.Children.Add(phonePanel);
         root.Children.Add(logistics);
         AddField(root, "شماره پلاک / خودرو", _vehiclePlate);
