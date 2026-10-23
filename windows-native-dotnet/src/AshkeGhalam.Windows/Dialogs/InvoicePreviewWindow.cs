@@ -286,7 +286,7 @@ public sealed class InvoicePreviewWindow : Window
 
         var document = new FlowDocument
         {
-            FontFamily = new FontFamily("Segoe UI"),
+            FontFamily = new FontFamily("Vazirmatn, Tahoma, Segoe UI"),
             FontSize = 12,
             FlowDirection = FlowDirection.RightToLeft,
             PagePadding = new Thickness(36),
@@ -301,8 +301,16 @@ public sealed class InvoicePreviewWindow : Window
             FontWeight = FontWeights.Bold,
             Foreground = accent,
             TextAlignment = TextAlignment.Center,
-            Margin = new Thickness(0, 0, 0, 18)
+            Margin = new Thickness(0, 0, 0, 10)
         });
+
+        var logoImage = CreateCompanyImage(company?.LogoDataBase64, 112, 84);
+        if (logoImage is not null)
+            document.Blocks.Add(new BlockUIContainer(new Border
+            {
+                Child = logoImage, HorizontalAlignment = HorizontalAlignment.Center,
+                Padding = new Thickness(4), Margin = new Thickness(0, 0, 0, 10)
+            }));
 
         if (company is not null)
         {
@@ -354,6 +362,52 @@ public sealed class InvoicePreviewWindow : Window
             document.Blocks.Add(new Paragraph(new Run($"شرح: {invoice.Description}")) { TextAlignment = TextAlignment.Right });
         if (!string.IsNullOrWhiteSpace(invoice.Notes))
             document.Blocks.Add(new Paragraph(new Run($"یادداشت: {invoice.Notes}")) { TextAlignment = TextAlignment.Right });
+
+        if (showQr)
+        {
+            try
+            {
+                var companyName = company?.Name ?? "اشک قلم";
+                var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CURRENCY|{currencyLabel}|CUSTOMER|{invoice.CustomerName}|COMPANY|{companyName}";
+                var qr = CreateQrImage(payload);
+                var qrCard = new Border
+                {
+                    BorderBrush = accent,
+                    BorderThickness = new Thickness(1),
+                    Background = soft,
+                    CornerRadius = new CornerRadius(8),
+                    Padding = new Thickness(10),
+                    Margin = new Thickness(0, 18, 0, 6),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Child = new StackPanel
+                    {
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Children =
+                        {
+                            qr,
+                            new TextBlock
+                            {
+                                Text = "QR فاکتور — کد پیگیری و مبلغ",
+                                FontSize = 9,
+                                Foreground = ink,
+                                TextAlignment = TextAlignment.Center,
+                                Margin = new Thickness(0, 6, 0, 0)
+                            }
+                        }
+                    }
+                };
+                document.Blocks.Add(new BlockUIContainer(qrCard));
+            }
+            catch (Exception qrError)
+            {
+                document.Blocks.Add(new Paragraph(new Run("تولید QR این سند انجام نشد: " + qrError.Message))
+                {
+                    Foreground = Brushes.DarkRed,
+                    Margin = new Thickness(0, 8, 0, 8)
+                });
+            }
+        }
+
 
         var table = new Table { CellSpacing = 0 };
         table.Columns.Add(new TableColumn { Width = new GridLength(5, GridUnitType.Star) });
@@ -453,50 +507,27 @@ public sealed class InvoicePreviewWindow : Window
                 TextAlignment = TextAlignment.Right
             });
 
-        if (showQr)
+        var brandMarks = new StackPanel
         {
-            try
+            Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.RightToLeft,
+            HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 12, 0, 2)
+        };
+        var companySignature = CreateCompanyImage(company?.SignatureDataBase64, 125, 58);
+        if (companySignature is not null)
+            brandMarks.Children.Add(new StackPanel
             {
-                var companyName = company?.Name ?? "اشک قلم";
-                var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CURRENCY|{currencyLabel}|CUSTOMER|{invoice.CustomerName}|COMPANY|{companyName}";
-                var qr = CreateQrImage(payload);
-                var qrCard = new Border
-                {
-                    BorderBrush = accent,
-                    BorderThickness = new Thickness(1),
-                    Background = soft,
-                    CornerRadius = new CornerRadius(8),
-                    Padding = new Thickness(10),
-                    Margin = new Thickness(0, 18, 0, 6),
-                    HorizontalAlignment = HorizontalAlignment.Left,
-                    Child = new StackPanel
-                    {
-                        HorizontalAlignment = HorizontalAlignment.Center,
-                        Children =
-                        {
-                            qr,
-                            new TextBlock
-                            {
-                                Text = "QR فاکتور — کد پیگیری و مبلغ",
-                                FontSize = 9,
-                                Foreground = ink,
-                                TextAlignment = TextAlignment.Center,
-                                Margin = new Thickness(0, 6, 0, 0)
-                            }
-                        }
-                    }
-                };
-                document.Blocks.Add(new BlockUIContainer(qrCard));
-            }
-            catch (Exception qrError)
+                Margin = new Thickness(12, 0, 12, 0),
+                Children = { companySignature, new TextBlock { Text = "امضای شرکت", FontSize = 9, TextAlignment = TextAlignment.Center } }
+            });
+        var companyStamp = CreateCompanyImage(company?.StampDataBase64, 80, 80);
+        if (companyStamp is not null)
+            brandMarks.Children.Add(new StackPanel
             {
-                document.Blocks.Add(new Paragraph(new Run("تولید QR این سند انجام نشد: " + qrError.Message))
-                {
-                    Foreground = Brushes.DarkRed,
-                    Margin = new Thickness(0, 8, 0, 8)
-                });
-            }
-        }
+                Margin = new Thickness(12, 0, 12, 0),
+                Children = { companyStamp, new TextBlock { Text = "مهر شرکت", FontSize = 9, TextAlignment = TextAlignment.Center } }
+            });
+        if (brandMarks.Children.Count > 0)
+            document.Blocks.Add(new BlockUIContainer(brandMarks));
 
         document.Blocks.Add(new Paragraph(new Run(
             "امضای صادرکننده: ................................       تحویل‌گیرنده: ................................       مهر و امضا: ................................"))
@@ -524,11 +555,27 @@ public sealed class InvoicePreviewWindow : Window
         return new Image
         {
             Source = bitmap,
-            Width = 108,
-            Height = 108,
+            Width = 132,
+            Height = 132,
             Stretch = Stretch.Uniform,
             SnapsToDevicePixels = true
         };
+    }
+
+    private static Image? CreateCompanyImage(string? encoded, double width, double height)
+    {
+        if (string.IsNullOrWhiteSpace(encoded)) return null;
+        try
+        {
+            var bytes = Convert.FromBase64String(encoded);
+            using var stream = new MemoryStream(bytes);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = stream; bitmap.DecodePixelWidth = (int)Math.Max(width * 2, 100);
+            bitmap.EndInit(); bitmap.Freeze();
+            return new Image { Source = bitmap, Width = width, Height = height, Stretch = Stretch.Uniform };
+        }
+        catch { return null; }
     }
 
     private void Print_Click(object sender, RoutedEventArgs e)

@@ -4,13 +4,21 @@
         Title="حسابداری اشک قلم — نسخه بومی ویندوز"
         Width="1360" Height="880" MinWidth="1040" MinHeight="680"
         WindowStartupLocation="CenterScreen" Background="#F1F5F9"
-        FlowDirection="RightToLeft" FontFamily="Segoe UI" UseLayoutRounding="True" SnapsToDevicePixels="True">
+        FlowDirection="RightToLeft" FontFamily="Vazirmatn, Tahoma, Segoe UI" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Window.Resources>
         <Style TargetType="Button">
-            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="Padding" Value="12,7"/> 
+            <Setter Property="FontFamily" Value="Vazirmatn, Tahoma, Segoe UI"/>
             <Setter Property="Margin" Value="0,0,8,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="MinHeight" Value="32"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="FontFamily" Value="Vazirmatn, Tahoma, Segoe UI"/>
+            <Setter Property="MinHeight" Value="32"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="FontFamily" Value="Vazirmatn, Tahoma, Segoe UI"/>
         </Style>
         <Style TargetType="DataGrid">
             <Setter Property="AutoGenerateColumns" Value="False"/>
@@ -217,6 +225,8 @@
                             <Button Content="ثبت کالا" Click="AddProduct_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
                             <Button Content="ویرایش کالای انتخابی" Click="EditProduct_Click" Margin="0,0,8,8"/>
                             <Button Content="حذف کالای انتخابی" Click="DeleteProduct_Click" Margin="0,0,8,8"/>
+                            <Button Content="کارتکس کالای انتخابی" Click="ShowKardex_Click" Margin="0,0,8,8"/>
+                            <TextBox x:Name="ProductsBarcodeSearchBox" Width="185" Height="34" Padding="8,4" ToolTip="بارکد را اسکن کنید؛ سپس Enter بزنید" KeyDown="ProductsBarcodeSearchBox_KeyDown" Margin="0,0,8,8"/>
                             <Button Content="ورود موجودی" Click="AddStock_Click" Margin="0,0,8,8"/>
                             <Button Content="خروجی CSV" Click="ExportProducts_Click" Margin="0,0,8,8"/>
                         </WrapPanel>
@@ -259,6 +269,7 @@
                             <TextBlock x:Name="InvoicesPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
                             <Button x:Name="InvoicesNextPage" Tag="invoices" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
                             <Button Content="صدور سند جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش پیش‌فاکتور انتخابی" Click="EditInvoice_Click" Margin="0,0,8,8"/>
                             <Button Content="تبدیل پیش‌فاکتور به فروش" Click="ConvertProformaToSale_Click" Margin="0,0,8,8"/>
                             <Button Content="ثبت دریافت/پرداخت" Click="AddPayment_Click" Margin="0,0,8,8"/>
                             <Button Content="لغو سند انتخابی" Click="CancelInvoice_Click" Margin="0,0,8,8"/>
@@ -267,7 +278,7 @@
                             <Button Content="خروجی CSV کامل" Click="ExportInvoices_Click" Margin="0,0,8,8"/>
                         </WrapPanel>
                     </StackPanel>
-                    <DataGrid x:Name="InvoicesGrid" Grid.Row="1"
+                    <DataGrid x:Name="InvoicesGrid" Grid.Row="1" MouseDoubleClick="InvoicesGrid_MouseDoubleClick"
                               HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Auto"
                               CanUserResizeColumns="True">
@@ -527,12 +538,14 @@
                         <TextBlock Text="رسید ورود، حواله خروج، برگشت از فروش/خرید و تعدیل با ثبت گردش موجودی؛ انتقال بین چند انبار تا تکمیل موجودی تفکیک‌شده فعال نیست." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
                         <WrapPanel Margin="0,14,0,0">
                             <Button Content="ثبت حواله / رسید" Click="AddVoucher_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="پیش‌نمایش حواله انتخابی" Click="PreviewVoucher_Click"/>
+                            <Button Content="ویرایش حوالهٔ در انتظار" Click="EditVoucher_Click"/>
                             <Button Content="تغییر مرحله تحویل" Click="AdvanceVoucherStatus_Click"/>
                             <Button Content="حذف حواله در انتظار و برگشت موجودی" Click="DeleteVoucher_Click"/>
                             <Button Content="خروجی CSV" Click="ExportVouchers_Click"/>
                         </WrapPanel>
                     </StackPanel>
-                    <DataGrid x:Name="VouchersGrid" Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <DataGrid x:Name="VouchersGrid" Grid.Row="1" MouseDoubleClick="VouchersGrid_MouseDoubleClick" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="شماره" Binding="{Binding Number}" Width="75"/>
                             <DataGridTextColumn Header="کد پیگیری" Binding="{Binding TrackingCode}" Width="175"/>
@@ -728,6 +741,12 @@
                                     <StackPanel Margin="0,0,0,10"><TextBlock Text="شعبه" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileBranch" MinHeight="34" Padding="8" Text="مرکزی"/></StackPanel>
                                 </UniformGrid>
                                 <TextBlock Text="نشانی" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileAddress" MinHeight="64" Padding="8" AcceptsReturn="True" TextWrapping="Wrap"/>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button Content="انتخاب لوگوی شرکت" Click="ChooseCompanyImage_Click" Tag="LogoDataBase64" Margin="0,0,8,8"/>
+                                    <Button Content="انتخاب مهر شرکت" Click="ChooseCompanyImage_Click" Tag="StampDataBase64" Margin="0,0,8,8"/>
+                                    <Button Content="انتخاب امضای شرکت" Click="ChooseCompanyImage_Click" Tag="SignatureDataBase64" Margin="0,0,8,8"/>
+                                </WrapPanel>
+                                <TextBlock Text="فایل PNG یا JPG؛ هر تصویر حداکثر ۲ مگابایت و داخل دادهٔ محلی ذخیره می‌شود." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
                                 <Button Content="ذخیره مشخصات شرکت" Click="SaveCompanyProfile_Click" HorizontalAlignment="Right" Margin="0,12,0,0" Background="#0F766E" Foreground="White"/>
                             </StackPanel>
                         </Border>
@@ -743,7 +762,13 @@
                                     <StackPanel Margin="0,0,0,10"><TextBlock Text="پیشوند فاکتور فروش" Margin="0,0,0,5"/><TextBox x:Name="SettingsInvoicePrefix" MinHeight="34" Padding="8" Text="INV-"/></StackPanel>
                                 </UniformGrid>
                                 <CheckBox x:Name="SettingsShowInvoiceQr" Content="درج خودکار QR در پیش‌نمایش و چاپ فاکتور" Margin="0,2,0,10" IsChecked="True"/>
-                                <TextBlock Text="متن پایانی فاکتور" Margin="0,0,0,5"/><TextBox x:Name="SettingsInvoiceFooter" MinHeight="54" Padding="8" AcceptsReturn="True" TextWrapping="Wrap"/>
+                                <TextBlock Text="پانویس‌های آماده (هر مورد را جداگانه انتخاب کنید)" Margin="0,12,0,5" FontWeight="SemiBold"/>
+                                <WrapPanel Margin="0,0,0,8">
+                                    <CheckBox x:Name="SettingsFooterNoReturns" Content="کالای فروخته‌شده پس گرفته نمی‌شود" Margin="0,0,14,8"/>
+                                    <CheckBox x:Name="SettingsFooterPaymentTerms" Content="لطفاً هنگام پرداخت شماره فاکتور را ذکر کنید" Margin="0,0,14,8"/>
+                                    <CheckBox x:Name="SettingsFooterDeliveryTerms" Content="تحویل طبق توافق طرفین انجام می‌شود" Margin="0,0,14,8"/>
+                                </WrapPanel>
+                                <TextBlock Text="پانویس سفارشی" Margin="0,0,0,5"/><TextBox x:Name="SettingsInvoiceFooter" MinHeight="54" Padding="8" AcceptsReturn="True" TextWrapping="Wrap"/>
                                 <Button Content="ذخیره تنظیمات حسابداری" Click="SaveAccountingPreferences_Click" HorizontalAlignment="Right" Margin="0,12,0,0" Background="#0F766E" Foreground="White"/>
                             </StackPanel>
                         </Border>

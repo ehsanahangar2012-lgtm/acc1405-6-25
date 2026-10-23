@@ -5,7 +5,10 @@ using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 using Microsoft.Win32;
 using AshkeGhalam.Windows.Dialogs;
 using AshkeGhalam.Windows.Models;
@@ -25,12 +28,39 @@ public partial class MainWindow : Window
     private bool _uiReady;
     private readonly Dictionary<string, int> _gridPages = new(StringComparer.Ordinal);
     private string _startupAccountingWarning = "";
+    private static bool _textBoxSelectAllHandlersRegistered;
+    private const string FooterNoteNoReturns = "کالای فروخته‌شده پس گرفته نمی‌شود.";
+    private const string FooterNotePaymentTerms = "لطفاً هنگام پرداخت شماره فاکتور را ذکر کنید.";
+    private const string FooterNoteDeliveryTerms = "تحویل طبق توافق طرفین انجام می‌شود.";
 
     public MainWindow()
     {
         InitializeComponent();
+        if (!_textBoxSelectAllHandlersRegistered)
+        {
+            EventManager.RegisterClassHandler(typeof(TextBox), UIElement.GotKeyboardFocusEvent,
+                new KeyboardFocusChangedEventHandler(TextBox_GotKeyboardFocus), true);
+            EventManager.RegisterClassHandler(typeof(TextBox), UIElement.PreviewMouseLeftButtonDownEvent,
+                new MouseButtonEventHandler(TextBox_PreviewMouseLeftButtonDown), true);
+            _textBoxSelectAllHandlersRegistered = true;
+        }
         _uiReady = true;
         Loaded += MainWindow_Loaded;
+    }
+
+    private static void TextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (sender is TextBox box && !box.AcceptsReturn)
+            box.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(box.SelectAll));
+    }
+
+    private static void TextBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is TextBox box && !box.AcceptsReturn && box.IsKeyboardFocusWithin)
+        {
+            box.SelectAll();
+            e.Handled = true;
+        }
     }
 
     private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -88,7 +118,7 @@ public partial class MainWindow : Window
     {
         if (e.OriginalSource != MainTabs) return;
         RefreshAll();
-        if (MainTabs.SelectedIndex == 13) RefreshLicensePanel();
+        if (MainTabs.SelectedIndex == 16) RefreshLicensePanel();
     }
 
     private bool RequireWritable()
@@ -1121,6 +1151,39 @@ public partial class MainWindow : Window
         Commit(data => data.Products.RemoveAll(p => p.Id == selected.Id), "کالا حذف شد");
     }
 
+    private void ShowKardex_Click(object sender, RoutedEventArgs e)
+    {
+        if (ProductsGrid.SelectedItem is not ProductRecord product)
+        {
+            MessageBox.Show(this, "ابتدا کالا را از جدول انتخاب کنید.", "کارتکس کالا",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        new KardexWindow(this, product, _data.InventoryMovements, _data.Invoices, _data.Vouchers).ShowDialog();
+    }
+
+    private void ProductsBarcodeSearchBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        var barcode = ProductsBarcodeSearchBox.Text.Trim();
+        if (barcode.Length == 0) return;
+        var product = _data.Products.FirstOrDefault(item =>
+            string.Equals(item.Code, barcode, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(item.SerialNumber, barcode, StringComparison.OrdinalIgnoreCase));
+        if (product is null)
+        {
+            FooterStatus.Text = $"بارکد «{barcode}» با هیچ کد کالا یا شماره سریالی تطبیق نداشت.";
+            ProductsBarcodeSearchBox.SelectAll();
+            return;
+        }
+        ProductsSearchBox.Text = product.Code;
+        ProductsGrid.SelectedItem = product;
+        ProductsGrid.ScrollIntoView(product);
+        FooterStatus.Text = $"کالای «{product.Name}» از طریق بارکدخوان انتخاب شد.";
+        ProductsBarcodeSearchBox.Clear();
+    }
+
     private void AddStock_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
@@ -1138,7 +1201,7 @@ public partial class MainWindow : Window
             AddCustomerInline, AddProductInline,
             _data.Preferences.InvoiceTheme, _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
             _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
-            _data.Preferences.Currency, _data.Preferences.InvoiceFooter);
+            _data.Preferences.Currency, ConfiguredInvoiceFooter());
         if (dialog.ShowDialog() == true && dialog.Result is InvoiceDraft draft)
         {
             var message = draft.Type switch
@@ -1175,6 +1238,59 @@ public partial class MainWindow : Window
         Commit(data => AccountingOperations.CancelInvoice(data, invoice.Id), "سند لغو و اثر موجودی آن برگشت داده شد");
     }
 
+    private void EditInvoice_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var invoice = InvoicesGrid.SelectedItem as InvoiceRecord;
+        if (invoice is null)
+        {
+            MessageBox.Show(this, "ابتدا یک پیش‌فاکتور را انتخاب کنید.", "ویرایش سند",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        if (invoice.Type != "PROFORMA" || invoice.Status == "لغو شده" ||
+            _data.Payments.Any(payment => payment.InvoiceId == invoice.Id) ||
+            _data.Checks.Any(check => check.RelatedInvoiceId == invoice.Id))
+        {
+            MessageBox.Show(this,
+                "ویرایش مستقیم فقط برای پیش‌فاکتورِ غیرقطعی و بدون آثار مالی مجاز است. فاکتور قطعی را برای حفظ دفترکل و گردش موجودی از مسیر لغو/سند اصلاحی مدیریت کنید.",
+                "محدودیت ویرایش ایمن", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var dialog = new InvoiceDialog(
+            this, _data.Customers, _data.Products, _data.Invoices,
+            AddCustomerInline, AddProductInline, _data.Preferences.InvoiceTheme,
+            _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
+            _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
+            _data.Preferences.Currency, ConfiguredInvoiceFooter(), invoice);
+        if (dialog.ShowDialog() != true || dialog.Result is not InvoiceDraft draft) return;
+        Commit(data =>
+        {
+            var existing = data.Invoices.SingleOrDefault(item => item.Id == invoice.Id)
+                ?? throw new InvalidOperationException("پیش‌فاکتور پیدا نشد.");
+            if (existing.Type != "PROFORMA" ||
+                data.Payments.Any(payment => payment.InvoiceId == existing.Id) ||
+                data.Checks.Any(check => check.RelatedInvoiceId == existing.Id))
+                throw new InvalidOperationException("وضعیت مالی سند تغییر کرده است؛ ویرایش لغو شد.");
+            var oldId = existing.Id;
+            var oldNumber = existing.Number;
+            var oldPrefix = existing.Prefix;
+            var oldTrackingCode = existing.TrackingCode;
+            data.Invoices.Remove(existing);
+            var replacement = AccountingOperations.CreateInvoice(data, draft);
+            replacement.Id = oldId;
+            replacement.Number = oldNumber;
+            replacement.Prefix = oldPrefix;
+            replacement.TrackingCode = oldTrackingCode;
+        }, "پیش‌فاکتور ویرایش شد؛ شماره و کد پیگیری آن حفظ شد");
+    }
+
+    private void InvoicesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (InvoicesGrid.SelectedItem is InvoiceRecord)
+            PreviewInvoice_Click(sender, e);
+    }
+
     private void PreviewInvoice_Click(object sender, RoutedEventArgs e)
     {
         var invoice = InvoicesGrid.SelectedItem as InvoiceRecord
@@ -1188,7 +1304,7 @@ public partial class MainWindow : Window
 
         new InvoicePreviewWindow(this, invoice, _data.Preferences.InvoiceTheme,
             _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
-            _data.Preferences.Currency, _data.Preferences.InvoiceFooter).ShowDialog();
+            _data.Preferences.Currency, ConfiguredInvoiceFooter()).ShowDialog();
     }
 
     private void PrintInvoice_Click(object sender, RoutedEventArgs e)
@@ -1203,7 +1319,7 @@ public partial class MainWindow : Window
         // Preview and print share the same theme and QR output.
         new InvoicePreviewWindow(this, invoice, _data.Preferences.InvoiceTheme,
             _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
-            _data.Preferences.Currency, _data.Preferences.InvoiceFooter).ShowDialog();
+            _data.Preferences.Currency, ConfiguredInvoiceFooter()).ShowDialog();
     }
 
     private void AddPayment_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType(null);
@@ -1403,6 +1519,56 @@ public partial class MainWindow : Window
         var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices);
         if (dialog.ShowDialog() == true && dialog.Result is VoucherRecord voucher)
             Commit(data => AccountingOperations.CreateVoucher(data, voucher), "حواله ثبت و گردش موجودی به‌صورت اتمی ذخیره شد");
+    }
+
+    private void PreviewVoucher_Click(object sender, RoutedEventArgs e)
+    {
+        if (FindName("VouchersGrid") is not DataGrid grid || grid.SelectedItem is not VoucherGridRow row)
+        {
+            MessageBox.Show(this, "ابتدا یک حواله را از جدول انتخاب کنید.", "پیش‌نمایش حواله",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        new VoucherPreviewWindow(this, row.Record, ActiveCompanyProfile()).ShowDialog();
+    }
+
+    private void VouchersGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+    {
+        if (FindName("VouchersGrid") is DataGrid grid && grid.SelectedItem is VoucherGridRow)
+            PreviewVoucher_Click(sender, e);
+    }
+
+    private void EditVoucher_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (FindName("VouchersGrid") is not DataGrid grid || grid.SelectedItem is not VoucherGridRow row)
+        {
+            MessageBox.Show(this, "ابتدا حواله را انتخاب کنید.");
+            return;
+        }
+        if (row.Record.Status != "PENDING")
+        {
+            MessageBox.Show(this, "فقط حوالهٔ در انتظار و هنوز تحویل‌نشده قابل ویرایش است.",
+                "ویرایش حواله", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices, row.Record);
+        if (dialog.ShowDialog() != true || dialog.Result is not VoucherRecord changed) return;
+        Commit(data =>
+        {
+            var current = data.Vouchers.SingleOrDefault(item => item.Id == row.Record.Id)
+                ?? throw new InvalidOperationException("حواله پیدا نشد.");
+            if (current.Status != "PENDING")
+                throw new InvalidOperationException("وضعیت حواله تغییر کرده است؛ ویرایش انجام نشد.");
+            var number = current.Number;
+            var trackingCode = current.TrackingCode;
+            AccountingOperations.DeleteVoucher(data, current.Id);
+            var replacement = AccountingOperations.CreateVoucher(data, changed);
+            replacement.Number = number;
+            replacement.TrackingCode = trackingCode;
+            foreach (var movement in data.InventoryMovements.Where(item => item.VoucherId == replacement.Id))
+                movement.Description = $"حواله {number} — {trackingCode}";
+        }, "حواله ویرایش و اثر موجودی آن به‌صورت اتمی بازسازی شد");
     }
 
     private void AdvanceVoucherStatus_Click(object sender, RoutedEventArgs e)
@@ -1608,6 +1774,10 @@ public partial class MainWindow : Window
         CompanyProfileSelector.SelectedValue = _data.ActiveCompanyId;
         PopulateCompanyProfile(CompanyProfileSelector.SelectedItem as CompanyProfileRecord);
 
+        SettingsFooterNoReturns.IsChecked = (_data.Preferences.SelectedInvoiceFootnotes ?? []).Contains(FooterNoteNoReturns, StringComparer.Ordinal);
+        SettingsFooterPaymentTerms.IsChecked = (_data.Preferences.SelectedInvoiceFootnotes ?? []).Contains(FooterNotePaymentTerms, StringComparer.Ordinal);
+        SettingsFooterDeliveryTerms.IsChecked = (_data.Preferences.SelectedInvoiceFootnotes ?? []).Contains(FooterNoteDeliveryTerms, StringComparer.Ordinal);
+
         InvoiceThemeSelector.SelectedItem = InvoiceThemeSelector.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.Preferences.InvoiceTheme, StringComparison.Ordinal))
             ?? InvoiceThemeSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "modern", StringComparison.Ordinal));
@@ -1687,6 +1857,61 @@ public partial class MainWindow : Window
         }, "پروفایل شرکت فعال برای سربرگ فاکتور انتخاب شد.");
     }
 
+    private void ChooseCompanyImage_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (CompanyProfileSelector.SelectedItem is not CompanyProfileRecord selected)
+        {
+            MessageBox.Show(this, "ابتدا یک پروفایل شرکت را انتخاب کنید.");
+            return;
+        }
+        var property = (sender as FrameworkElement)?.Tag?.ToString();
+        if (property is not ("LogoDataBase64" or "StampDataBase64" or "SignatureDataBase64")) return;
+        var picker = new OpenFileDialog
+        {
+            Title = "انتخاب تصویر شرکت", Filter = "تصویر PNG یا JPEG|*.png;*.jpg;*.jpeg",
+            CheckFileExists = true, Multiselect = false
+        };
+        if (picker.ShowDialog() != true) return;
+        try
+        {
+            var info = new FileInfo(picker.FileName);
+            if (info.Length <= 0 || info.Length > 2 * 1024 * 1024)
+                throw new InvalidDataException("حجم تصویر باید کمتر از ۲ مگابایت باشد.");
+            var bytes = File.ReadAllBytes(picker.FileName);
+            using (var stream = new MemoryStream(bytes))
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit(); bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = stream; bitmap.EndInit();
+                if (bitmap.PixelWidth < 1 || bitmap.PixelHeight < 1 || bitmap.PixelWidth > 5000 || bitmap.PixelHeight > 5000)
+                    throw new InvalidDataException("ابعاد تصویر معتبر نیست یا بیش از حد بزرگ است.");
+                bitmap.Freeze();
+            }
+            var encoded = Convert.ToBase64String(bytes);
+            Commit(data =>
+            {
+                var company = data.Companies.SingleOrDefault(item => item.Id == selected.Id)
+                    ?? throw new InvalidOperationException("پروفایل شرکت پیدا نشد.");
+                switch (property)
+                {
+                    case "LogoDataBase64": company.LogoDataBase64 = encoded; break;
+                    case "StampDataBase64": company.StampDataBase64 = encoded; break;
+                    case "SignatureDataBase64": company.SignatureDataBase64 = encoded; break;
+                }
+            }, property switch
+            {
+                "LogoDataBase64" => "لوگوی شرکت ذخیره شد.",
+                "StampDataBase64" => "تصویر مهر شرکت ذخیره شد.",
+                _ => "تصویر امضای شرکت ذخیره شد."
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "ثبت تصویر شرکت", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void SaveCompanyProfile_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
@@ -1715,6 +1940,24 @@ public partial class MainWindow : Window
         }, "مشخصات پروفایل شرکت ذخیره شد.");
     }
 
+    private List<string> GetSelectedInvoiceFootnotes()
+    {
+        var selected = new List<string>();
+        if (SettingsFooterNoReturns.IsChecked == true) selected.Add(FooterNoteNoReturns);
+        if (SettingsFooterPaymentTerms.IsChecked == true) selected.Add(FooterNotePaymentTerms);
+        if (SettingsFooterDeliveryTerms.IsChecked == true) selected.Add(FooterNoteDeliveryTerms);
+        return selected;
+    }
+
+    private string ConfiguredInvoiceFooter()
+    {
+        var notes = (_data.Preferences.SelectedInvoiceFootnotes ?? [])
+            .Where(note => !string.IsNullOrWhiteSpace(note)).ToList();
+        if (!string.IsNullOrWhiteSpace(_data.Preferences.InvoiceFooter))
+            notes.Add(_data.Preferences.InvoiceFooter.Trim());
+        return string.Join(Environment.NewLine, notes.Distinct(StringComparer.Ordinal));
+    }
+
     private void SaveAccountingPreferences_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
@@ -1741,7 +1984,8 @@ public partial class MainWindow : Window
                 Currency = currency,
                 DefaultTaxRatePercent = taxRate,
                 SalesInvoicePrefix = string.IsNullOrWhiteSpace(SettingsInvoicePrefix.Text) ? "INV-" : SettingsInvoicePrefix.Text.Trim(),
-                InvoiceFooter = SettingsInvoiceFooter.Text.Trim()
+                InvoiceFooter = SettingsInvoiceFooter.Text.Trim(),
+                SelectedInvoiceFootnotes = GetSelectedInvoiceFootnotes()
             };
         }, "تنظیمات حسابداری ذخیره شد؛ در پیش‌نمایش‌های بعدی اعمال می‌شود.");
     }
@@ -1863,7 +2107,7 @@ public partial class MainWindow : Window
             ["vouchers"] = new("حواله‌های انبار", "عملیات محلی موجود", "/inventory (حواله‌های انبار)", 11),
             ["finance"] = new("امور مالی", "منوی اصلی", "/finance", 12),
             ["customers"] = new("اشخاص", "منوی اصلی", "/customers", 1),
-            ["companies"] = new("چندشرکتی و مشخصات شرکت", "تنظیمات حسابداری", "/settings/companies", 15),
+            ["companies"] = new("چندشرکتی و مشخصات شرکت", "تنظیمات حسابداری", "/settings/companies", 18),
             ["reports"] = new("گزارشات عمومی", "گزارشات و تحلیل", "/reports", 6),
             ["users"] = new("کاربران و سطح دسترسی", "تنظیمات و سیستم", "/users", null),
             ["payments"] = new("دریافت‌ها", "عملیات محلی موجود", "بخش دریافت‌های نسخه بومی", 4),
@@ -1876,9 +2120,9 @@ public partial class MainWindow : Window
             ["marketing"] = new("بازاریابی و سئو", "مدیریت کسب‌وکار", "/marketing", null),
             ["import-center"] = new("مرکز واردات اسناد", "مدیریت کسب‌وکار", "/import-center", null),
             ["accounting"] = new("حسابداری دوبل", "حسابداری پیشرفته", "/accounting", 12),
-            ["cashflow-predictor"] = new("پیش‌بینی جریان نقدینگی", "حسابداری پیشرفته", "/cashflow-predictor", 14),
-            ["cashflow"] = new("جریان نقدینگی", "حسابداری پیشرفته", "/cashflow", 14),
-            ["tax"] = new("مدیریت مالیات", "حسابداری پیشرفته", "/tax", 16),
+            ["cashflow-predictor"] = new("پیش‌بینی جریان نقدینگی", "حسابداری پیشرفته", "/cashflow-predictor", 17),
+            ["cashflow"] = new("جریان نقدینگی", "حسابداری پیشرفته", "/cashflow", 17),
+            ["tax"] = new("مدیریت مالیات", "حسابداری پیشرفته", "/tax", 19),
             ["loans"] = new("وام‌ها", "حسابداری پیشرفته", "/loans", null),
             ["due-calendar"] = new("تقویم سررسید و اقساط", "حسابداری پیشرفته", "/due-calendar", 8),
             ["bank-reconciliation"] = new("تطبیق بانکی", "حسابداری پیشرفته", "/bank-reconciliation", null),
@@ -1888,22 +2132,22 @@ public partial class MainWindow : Window
             ["ai-assistant"] = new("دستیار هوشمند مالی", "گزارشات و تحلیل", "/ai-assistant", null),
             ["signature-dashboard"] = new("داشبورد امضا", "امضای دیجیتال", "/signature-dashboard", null),
             ["signature-management"] = new("مدیریت امضا", "امضای دیجیتال", "/signature-management", null),
-            ["moadian"] = new("سامانه مؤدیان مالیاتی", "حسابداری پیشرفته", "/moadian", 16),
+            ["moadian"] = new("سامانه مؤدیان مالیاتی", "حسابداری پیشرفته", "/moadian", 19),
             ["pos-terminal"] = new("کارتخوان بانکی", "خدمات تجاری و ابری", "/pos-terminal", null),
             ["cloud-vault"] = new("پشتیبان ابری", "خدمات تجاری و ابری", "/cloud-vault", null),
             ["sms-center"] = new("پنل پیامک هوشمند", "خدمات تجاری و ابری", "/sms-center", null),
             ["multi-user-lan"] = new("شبکه محلی چندکاربره", "خدمات تجاری و ابری", "/multi-user-lan", null),
             ["client-broadcast"] = new("اطلاعیه‌ها", "خدمات تجاری و ابری", "/client-broadcast", null),
-            ["activation"] = new("اتصال سرور و فعال‌سازی لایسنس", "ارتباط با سرور", "/install-android (فقط اتصال/فعال‌سازی کلاینت)", 13),
-            ["server"] = new("ارتباط با سرور اصلی", "تنظیمات حسابداری", "/data-sync", 17),
+            ["activation"] = new("اتصال سرور و فعال‌سازی لایسنس", "ارتباط با سرور", "/install-android (فقط اتصال/فعال‌سازی کلاینت)", 16),
+            ["server"] = new("ارتباط با سرور اصلی", "تنظیمات حسابداری", "/data-sync", 20),
             ["mobile-catalog"] = new("کاتالوگ ویزیتوری همراه", "خدمات تجاری و ابری", "/mobile-catalog", null),
             ["catalog"] = new("کاتالوگ محصول", "خدمات تجاری و ابری", "/catalog", null),
             ["support-sla"] = new("پشتیبانی و تمدید", "خدمات تجاری و ابری", "/support-sla", null),
             ["fiscal-year"] = new("سال مالی", "تنظیمات و سیستم", "/fiscal-year", null),
             ["security"] = new("امنیت داده‌ها", "تنظیمات و سیستم", "/security", null),
-            ["data-sync"] = new("همگام‌سازی داده‌ها", "ارتباط با سرور اصلی", "/data-sync", 17),
-            ["advanced-settings"] = new("تنظیمات پیشرفته", "تنظیمات حسابداری", "/advanced-settings", 15),
-            ["settings"] = new("تنظیمات حسابداری", "تنظیمات حسابداری", "/settings", 15),
+            ["data-sync"] = new("همگام‌سازی داده‌ها", "ارتباط با سرور اصلی", "/data-sync", 20),
+            ["advanced-settings"] = new("تنظیمات پیشرفته", "تنظیمات حسابداری", "/advanced-settings", 18),
+            ["settings"] = new("تنظیمات حسابداری", "تنظیمات حسابداری", "/settings", 18),
             ["help"] = new("آموزش و راهنما", "تنظیمات و سیستم", "/help", null),
             ["updates"] = new("مرکز به‌روزرسانی", "تنظیمات و سیستم", "/updates", null)
         };

@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using AshkeGhalam.Windows.Models;
 using AshkeGhalam.Windows.Services;
@@ -23,6 +24,8 @@ public sealed class InvoiceDialog : Window
     private readonly decimal _defaultTaxRatePercent;
     private readonly string _currencyLabel;
     private readonly string _invoiceFooter;
+    private readonly InvoiceRecord? _existingInvoice;
+    private readonly TextBox _barcodeScan = new() { Height = 34, MinWidth = 240, Padding = new Thickness(8, 4, 8, 4), FlowDirection = FlowDirection.LeftToRight };
     private readonly CheckBox _taxIsAmount = new() { Content = "مالیات مبلغی است (خاموش: درصد از جمع کالاها)", IsChecked = true, Margin = new Thickness(0, 6, 0, 0) };
 
     private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), ItemsSource = new[]
@@ -68,7 +71,8 @@ public sealed class InvoiceDialog : Window
         string? defaultInvoicePrefix = null,
         decimal defaultTaxRatePercent = 0m,
         string? currencyCode = "RIAL",
-        string? invoiceFooter = null)
+        string? invoiceFooter = null,
+        InvoiceRecord? existingInvoice = null)
     {
         Owner = owner;
         _people = people.ToList();
@@ -88,20 +92,37 @@ public sealed class InvoiceDialog : Window
             _ => currencyCode.Trim()
         };
         _invoiceFooter = invoiceFooter ?? "";
+        _existingInvoice = existingInvoice;
         _taxIsAmount.IsChecked = _defaultTaxRatePercent == 0m;
         _tax.Text = _taxIsAmount.IsChecked == true
             ? "0"
             : _defaultTaxRatePercent.ToString("0.##", CultureInfo.InvariantCulture);
-        Title = "ثبت فاکتور / پیش‌فاکتور";
+        Title = existingInvoice is null ? "ثبت فاکتور / پیش‌فاکتور" : "ویرایش پیش‌فاکتور";
         Width = 760;
         Height = 900;
         MinHeight = 680;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft;
+        FontFamily = new System.Windows.Media.FontFamily("Vazirmatn, Tahoma, Segoe UI");
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
         ResizeMode = ResizeMode.CanResize;
 
-        _date.Text = FormatPersianDate(DateTimeOffset.Now);
+        _date.Text = FormatPersianDate(existingInvoice?.CreatedAt ?? DateTimeOffset.Now);
+        if (existingInvoice is not null)
+        {
+            _dueDate.Text = existingInvoice.DueDate is DateTimeOffset due ? FormatPersianDate(due) : "";
+            _discount.Text = existingInvoice.Discount.ToString(CultureInfo.InvariantCulture);
+            _taxIsAmount.IsChecked = existingInvoice.TaxIsAmount;
+            _tax.Text = (existingInvoice.TaxIsAmount ? existingInvoice.TaxAmount : existingInvoice.TaxRatePercent).ToString(CultureInfo.InvariantCulture);
+            _cashAmount.Text = existingInvoice.CashAmount.ToString(CultureInfo.InvariantCulture);
+            _description.Text = existingInvoice.Description;
+            _notes.Text = existingInvoice.Notes;
+            _driverName.Text = existingInvoice.DriverName;
+            _driverPhone.Text = existingInvoice.DriverPhone;
+            _vehiclePlate.Text = existingInvoice.VehiclePlate;
+            _taxId.Text = existingInvoice.TaxId;
+            _showPreviousBalance.IsChecked = existingInvoice.ShowPreviousBalance;
+        }
         _lineList.ItemsSource = _lines;
         // A ListBox can show a readable projection while keeping actual InvoiceLine values in the collection.
         _lineList.ItemsSource = _lines.Select(ToText).ToList();
@@ -156,6 +177,7 @@ public sealed class InvoiceDialog : Window
         root.Children.Add(dates);
 
         root.Children.Add(new TextBlock { Text = "اقلام سند", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 12, 0, 4) });
+        AddField(root, "اسکن بارکد (اسکنر دستی با ارسال Enter)", _barcodeScan);
         AddField(root, "کالا", _product);
         var addProductInline = new Button
         {
@@ -238,6 +260,10 @@ public sealed class InvoiceDialog : Window
         root.Children.Add(buttons);
         Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
+        foreach (var field in new[] { _quantity, _price, _discount, _tax, _cashAmount })
+            field.LostFocus += (_, _) => FormatNumericField(field);
+        _barcodeScan.PreviewKeyDown += BarcodeScan_PreviewKeyDown;
+
         _type.SelectionChanged += (_, _) =>
         {
             RefreshPeople();
@@ -265,8 +291,21 @@ public sealed class InvoiceDialog : Window
         };
         save.Click += (_, _) => SaveResult();
 
-        _type.SelectedIndex = 0;
+        _type.SelectedItem = _type.Items.Cast<Choice>()
+            .FirstOrDefault(choice => choice.Value == (_existingInvoice?.Type ?? "SALE")) ?? _type.Items[0];
         RefreshPeople();
+        if (_existingInvoice is not null)
+        {
+            _person.SelectedItem = _person.Items.Cast<CustomerRecord>()
+                .FirstOrDefault(person => person.Id == _existingInvoice.CustomerId);
+            foreach (var line in _existingInvoice.Lines)
+                _lines.Add(new InvoiceLine
+                {
+                    ProductId = line.ProductId, ProductName = line.ProductName, SerialNumber = line.SerialNumber,
+                    Quantity = line.Quantity, BuyPrice = line.BuyPrice, UnitPrice = line.UnitPrice, Profit = line.Profit,
+                    LineTotal = line.LineTotal, Description = line.Description, EntryOrder = line.EntryOrder
+                });
+        }
         if (_product.Items.Count > 0) _product.SelectedIndex = 0;
         RefreshNumberPreview();
         RefreshLines();
@@ -336,6 +375,37 @@ public sealed class InvoiceDialog : Window
         if (_product.SelectedItem is not ProductRecord product) return;
         var price = CurrentType == "SALE" ? product.SellPrice : (product.BuyPrice ?? 0m);
         _price.Text = price.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private void BarcodeScan_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        var barcode = _barcodeScan.Text.Trim();
+        if (barcode.Length == 0) return;
+        var product = _products.FirstOrDefault(item =>
+            string.Equals(item.Code, barcode, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(item.SerialNumber, barcode, StringComparison.OrdinalIgnoreCase));
+        if (product is null)
+        {
+            MessageBox.Show(this, $"برای بارکد «{barcode}» کالایی پیدا نشد.", "بارکدخوان",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            _barcodeScan.SelectAll();
+            return;
+        }
+        _product.SelectedItem = product;
+        ApplyDefaultPrice();
+        _quantity.Text = "1";
+        AddLine();
+        _barcodeScan.Clear();
+        _barcodeScan.Focus();
+    }
+
+    private static void FormatNumericField(TextBox field)
+    {
+        if (!string.IsNullOrWhiteSpace(field.Text) &&
+            PersianNumberParser.TryParseDecimal(field.Text, out var value))
+            field.Text = value.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"));
     }
 
     private void AddLine()
@@ -433,6 +503,8 @@ public sealed class InvoiceDialog : Window
 
     private string BuildNumberPreview(string type)
     {
+        if (_existingInvoice is not null)
+            return $"شماره سند: {_existingInvoice.DisplayNumber}  •  در ویرایش، شماره و کد پیگیری حفظ می‌شود.";
         var floor = type switch { "SALE" => 1000, "PROFORMA" => 2000, "PURCHASE" => 3000, _ => 0 };
         var prefix = type switch { "SALE" => _defaultInvoicePrefix, "PURCHASE" => "PUR-", "PROFORMA" => "PRO-", _ => "" };
         var number = _invoices.Where(i => i.Type == type).Select(i => i.Number).DefaultIfEmpty(floor).Max() + 1;

@@ -36,7 +36,9 @@ public sealed class AccountingData
         Companies = (Companies ?? []).Select(c => new CompanyProfileRecord
         {
             Id = c.Id, Name = c.Name, LegalName = c.LegalName, NationalId = c.NationalId,
-            TaxId = c.TaxId, Phone = c.Phone, Address = c.Address, Branch = c.Branch
+            TaxId = c.TaxId, Phone = c.Phone, Address = c.Address, Branch = c.Branch,
+            LogoDataBase64 = c.LogoDataBase64, StampDataBase64 = c.StampDataBase64,
+            SignatureDataBase64 = c.SignatureDataBase64
         }).ToList(),
         ActiveCompanyId = ActiveCompanyId,
         Preferences = new AccountingPreferences
@@ -46,7 +48,8 @@ public sealed class AccountingData
             Currency = Preferences?.Currency ?? "RIAL",
             DefaultTaxRatePercent = Preferences?.DefaultTaxRatePercent ?? 0m,
             SalesInvoicePrefix = Preferences?.SalesInvoicePrefix ?? "INV-",
-            InvoiceFooter = Preferences?.InvoiceFooter ?? ""
+            InvoiceFooter = Preferences?.InvoiceFooter ?? "",
+            SelectedInvoiceFootnotes = [..(Preferences?.SelectedInvoiceFootnotes ?? [])]
         },
         MoadianSettings = new MoadianSettingsRecord
         {
@@ -149,6 +152,9 @@ public sealed class CompanyProfileRecord
     public string Phone { get; set; } = "";
     public string Address { get; set; } = "";
     public string Branch { get; set; } = "مرکزی";
+    public string LogoDataBase64 { get; set; } = "";
+    public string StampDataBase64 { get; set; } = "";
+    public string SignatureDataBase64 { get; set; } = "";
 }
 
 public sealed class AccountingPreferences
@@ -159,6 +165,7 @@ public sealed class AccountingPreferences
     public decimal DefaultTaxRatePercent { get; set; }
     public string SalesInvoicePrefix { get; set; } = "INV-";
     public string InvoiceFooter { get; set; } = "";
+    public List<string> SelectedInvoiceFootnotes { get; set; } = [];
 }
 
 public sealed class MoadianSettingsRecord

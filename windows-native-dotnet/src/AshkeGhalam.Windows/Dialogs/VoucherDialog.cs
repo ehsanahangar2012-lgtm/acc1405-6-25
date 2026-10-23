@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using AshkeGhalam.Windows.Models;
 using AshkeGhalam.Windows.Services;
@@ -16,6 +17,11 @@ public sealed class VoucherDialog : Window
     {
         public ProductRecord Product { get; init; } = new();
         public decimal Quantity { get; set; }
+        public decimal? Weight { get; init; }
+        public string Unit { get; init; } = "";
+        public string ShelfLocation { get; init; } = "";
+        public string Description { get; init; } = "";
+        public string ImageUrl { get; init; } = "";
         public string Label => $"{Product.Name} — {Quantity:N2} {Product.Unit} — موجودی فعلی: {Product.StockQuantity:N2}";
     }
 
@@ -40,12 +46,14 @@ public sealed class VoucherDialog : Window
     private readonly IReadOnlyList<CustomerRecord> _people;
     private readonly IReadOnlyList<ProductRecord> _products;
     private readonly IReadOnlyList<InvoiceRecord> _invoices;
+    private readonly VoucherRecord? _existing;
     private readonly ComboBox _type = new() { Height = 34, ItemsSource = Types, DisplayMemberPath = nameof(Choice.Label), SelectedIndex = 1 };
     private readonly ComboBox _movementType = new() { Height = 34, ItemsSource = MovementTypes, DisplayMemberPath = nameof(Choice.Label) };
     private readonly ComboBox _person = new() { Height = 34, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 260 };
     private readonly ComboBox _invoice = new() { Height = 34, DisplayMemberPath = nameof(InvoiceChoice.Label), MinWidth = 260 };
     private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240 };
     private readonly TextBox _quantity = new() { Height = 32, Width = 110, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
+    private readonly TextBox _barcodeScan = new() { Height = 34, MinWidth = 230, Padding = new Thickness(8, 4, 8, 4), FlowDirection = FlowDirection.LeftToRight };
     private readonly TextBox _date = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _returnReason = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _supervisor = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
@@ -58,8 +66,9 @@ public sealed class VoucherDialog : Window
 
     public VoucherRecord? Result { get; private set; }
 
-    public VoucherDialog(Window owner, IReadOnlyList<CustomerRecord> people, IReadOnlyList<ProductRecord> products, IReadOnlyList<InvoiceRecord> invoices)
+    public VoucherDialog(Window owner, IReadOnlyList<CustomerRecord> people, IReadOnlyList<ProductRecord> products, IReadOnlyList<InvoiceRecord> invoices, VoucherRecord? existing = null)
     {
+        _existing = existing;
         Owner = owner;
         _people = people;
         _products = products;
@@ -71,13 +80,35 @@ public sealed class VoucherDialog : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
+        FontFamily = new System.Windows.Media.FontFamily("Vazirmatn, Tahoma, Segoe UI");
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
 
         _person.ItemsSource = people;
         _person.SelectedIndex = -1;
         _product.ItemsSource = products;
         _movementType.SelectedItem = MovementTypes[1];
-        _date.Text = FormatPersianDate(DateTimeOffset.Now);
+        _date.Text = FormatPersianDate(existing?.Date ?? DateTimeOffset.Now);
+        if (existing is not null)
+        {
+            _type.SelectedItem = Types.FirstOrDefault(type => type.Value == existing.Type);
+            _movementType.SelectedItem = MovementTypes.FirstOrDefault(type => type.Value == existing.MovementType);
+            _person.SelectedItem = people.FirstOrDefault(person => person.Id == existing.PersonId);
+            _returnReason.Text = existing.ReturnReason;
+            _supervisor.Text = existing.Supervisor;
+            _vehicle.Text = existing.VehicleNumber;
+            _receiverPhone.Text = existing.ReceiverPhone;
+            _notes.Text = existing.Notes;
+            foreach (var line in existing.Items)
+            {
+                var product = products.FirstOrDefault(item => item.Id == line.ProductId);
+                if (product is not null)
+                    _lines.Add(new VoucherLineDraft
+                    {
+                        Product = product, Quantity = line.Quantity, Weight = line.Weight, Unit = line.Unit,
+                        ShelfLocation = line.ShelfLocation, Description = line.Description, ImageUrl = line.ImageUrl
+                    });
+            }
+        }
         _lineList.ItemsSource = _lines;
         _lineList.DisplayMemberPath = nameof(VoucherLineDraft.Label);
         _invoice.ItemsSource = new[] { new InvoiceChoice(null, "بدون فاکتور مرتبط") };
@@ -109,6 +140,7 @@ public sealed class VoucherDialog : Window
 
         var lineHeading = new TextBlock { Text = "اقلام سند", FontWeight = FontWeights.Bold, FontSize = 16, Margin = new Thickness(0, 14, 0, 6) };
         root.Children.Add(lineHeading);
+        AddField(root, "اسکن بارکد (اسکنر دستی با ارسال Enter)", _barcodeScan);
         var pickRow = new WrapPanel { Margin = new Thickness(0, 4, 0, 6), VerticalAlignment = VerticalAlignment.Center };
         pickRow.Children.Add(_product);
         pickRow.Children.Add(_quantity);
@@ -136,14 +168,47 @@ public sealed class VoucherDialog : Window
         _person.SelectionChanged += (_, _) => RefreshInvoiceChoices();
         _type.SelectionChanged += (_, _) => SetDefaultMovement();
         _lines.CollectionChanged += (_, _) => RefreshTotals();
+        _quantity.LostFocus += (_, _) => FormatNumericField(_quantity);
+        _barcodeScan.PreviewKeyDown += BarcodeScan_PreviewKeyDown;
         addLine.Click += (_, _) => AddLine();
         removeLine.Click += (_, _) =>
         {
             if (_lineList.SelectedItem is VoucherLineDraft line) _lines.Remove(line);
         };
         save.Click += (_, _) => SaveResult();
-        SetDefaultMovement();
+        if (_existing is null) SetDefaultMovement();
+        else _movementType.SelectedItem = MovementTypes.FirstOrDefault(type => type.Value == _existing.MovementType);
+        RefreshInvoiceChoices();
+        if (_existing is not null)
+            _invoice.SelectedItem = _invoice.Items.Cast<InvoiceChoice>()
+                .FirstOrDefault(choice => choice.Invoice?.Id == _existing.RelatedInvoiceId) ?? _invoice.Items[0];
         RefreshTotals();
+    }
+
+    private void BarcodeScan_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        e.Handled = true;
+        var barcode = _barcodeScan.Text.Trim();
+        if (barcode.Length == 0) return;
+        var product = _products.FirstOrDefault(item =>
+            string.Equals(item.Code, barcode, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(item.SerialNumber, barcode, StringComparison.OrdinalIgnoreCase));
+        if (product is null)
+        {
+            MessageBox.Show(this, $"برای بارکد «{barcode}» کالا پیدا نشد.", "بارکدخوان",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            _barcodeScan.SelectAll(); return;
+        }
+        _product.SelectedItem = product; _quantity.Text = "1"; AddLine();
+        _barcodeScan.Clear(); _barcodeScan.Focus();
+    }
+
+    private static void FormatNumericField(TextBox field)
+    {
+        if (!string.IsNullOrWhiteSpace(field.Text) &&
+            PersianNumberParser.TryParseDecimal(field.Text, out var value))
+            field.Text = value.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"));
     }
 
     private void AddLine()
@@ -182,7 +247,18 @@ public sealed class VoucherDialog : Window
 
             Result = new VoucherRecord
             {
-                Id = Guid.NewGuid().ToString("N"),
+                Id = _existing?.Id ?? Guid.NewGuid().ToString("N"),
+                Number = _existing?.Number ?? 0,
+                TrackingCode = _existing?.TrackingCode ?? "",
+                Signature = _existing?.Signature ?? "",
+                CompanySignature = _existing?.CompanySignature ?? "",
+                SupervisorSignature = _existing?.SupervisorSignature ?? "",
+                LoadingPhotos = _existing is null ? [] : [.._existing.LoadingPhotos],
+                QrCode = _existing?.QrCode ?? "",
+                RelatedVoucherId = _existing?.RelatedVoucherId ?? "",
+                SourceWarehouseId = _existing?.SourceWarehouseId ?? "",
+                DestinationWarehouseId = _existing?.DestinationWarehouseId ?? "",
+                WarehouseId = _existing?.WarehouseId ?? "",
                 Type = type.Value,
                 MovementType = movement.Value,
                 Date = date,
@@ -198,11 +274,11 @@ public sealed class VoucherDialog : Window
                     ProductId = x.Product.Id,
                     ProductName = x.Product.Name,
                     Quantity = x.Quantity,
-                    Unit = x.Product.Unit,
-                    Weight = x.Product.Weight,
-                    ShelfLocation = x.Product.ShelfLocation,
-                    Description = x.Product.Description,
-                    ImageUrl = x.Product.ImageUrl
+                    Unit = string.IsNullOrWhiteSpace(x.Unit) ? x.Product.Unit : x.Unit,
+                    Weight = x.Weight ?? x.Product.Weight,
+                    ShelfLocation = string.IsNullOrWhiteSpace(x.ShelfLocation) ? x.Product.ShelfLocation : x.ShelfLocation,
+                    Description = string.IsNullOrWhiteSpace(x.Description) ? x.Product.Description : x.Description,
+                    ImageUrl = string.IsNullOrWhiteSpace(x.ImageUrl) ? x.Product.ImageUrl : x.ImageUrl
                 }).ToList(),
                 Notes = _notes.Text.Trim(),
                 Status = "PENDING"
