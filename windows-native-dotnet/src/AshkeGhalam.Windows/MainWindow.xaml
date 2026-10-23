@@ -16,10 +16,15 @@
             <Setter Property="AutoGenerateColumns" Value="False"/>
             <Setter Property="CanUserAddRows" Value="False"/>
             <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="CanUserResizeColumns" Value="True"/>
+            <Setter Property="CanUserSortColumns" Value="True"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
             <Setter Property="RowHeight" Value="36"/>
-            <Setter Property="ColumnHeaderHeight" Value="38"/>
+            <Setter Property="ColumnHeaderHeight" Value="40"/>
             <Setter Property="BorderBrush" Value="#E2E8F0"/>
             <Setter Property="Background" Value="White"/>
             <Setter Property="Margin" Value="0,12,0,0"/>
@@ -76,10 +81,13 @@
                 </Border>
             </Grid>
         </Border>
-                <Grid Grid.Row="1" Margin="18">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="282"/></Grid.ColumnDefinitions>
-            <Grid Grid.Column="0">
-                <TabControl x:Name="MainTabs" Margin="0,0,14,0" Padding="0" SelectionChanged="MainTabs_SelectionChanged">
+        <Grid Grid.Row="1" Margin="18" FlowDirection="LeftToRight">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="300"/>
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0" FlowDirection="RightToLeft">
+                <TabControl x:Name="MainTabs" FlowDirection="RightToLeft" Margin="0,0,14,0" Padding="0" SelectionChanged="MainTabs_SelectionChanged">
                     <TabControl.Template>
                         <ControlTemplate TargetType="{x:Type TabControl}">
                             <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
@@ -116,6 +124,22 @@
                                     <StackPanel><TextBlock Text="پرداختنی خرید" Foreground="#64748B"/><TextBlock x:Name="PayablesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
                                     <StackPanel><TextBlock Text="هزینه‌ها" Foreground="#64748B"/><TextBlock x:Name="ExpensesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
                                 </UniformGrid>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="White" BorderBrush="#DCE5EF" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="عملیات سریع" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                <TextBlock Text="ثبت اطلاعات پایه و انجام کارهای پرتکرار، بدون جست‌وجو در منوها" Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                                <WrapPanel Margin="0,12,0,0">
+                                    <Button Content="＋ ثبت سریع شخص" Click="AddCustomer_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                                    <Button Content="＋ ثبت سریع کالا" Click="AddProduct_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                                    <Button Content="＋ فاکتور جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                                    <Button Content="ثبت دریافت / پرداخت" Click="AddPayment_Click" Margin="0,0,8,8"/>
+                                    <Button Content="ثبت هزینه" Click="AddExpense_Click" Margin="0,0,8,8"/>
+                                    <Button Content="ورود موجودی" Click="AddStock_Click" Margin="0,0,8,8"/>
+                                    <Button Content="حواله انبار" Click="AddVoucher_Click" Margin="0,0,8,8"/>
+                                    <Button Content="پیش‌نمایش فاکتور انتخابی" Click="PreviewInvoice_Click" Margin="0,0,8,8"/>
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
                         <TextBlock Text="آخرین اسناد" FontSize="18" FontWeight="Bold" Margin="0,20,0,0"/>
@@ -213,6 +237,7 @@
                             <Button Content="تبدیل پیش‌فاکتور به فروش" Click="ConvertProformaToSale_Click"/>
                             <Button Content="ثبت دریافت/پرداخت" Click="AddPayment_Click"/>
                             <Button Content="لغو سند انتخابی" Click="CancelInvoice_Click"/>
+                            <Button Content="پیش‌نمایش سند انتخابی" Click="PreviewInvoice_Click"/>
                             <Button Content="چاپ سند انتخابی" Click="PrintInvoice_Click"/>
                             <Button Content="خروجی CSV کامل" Click="ExportInvoices_Click"/>
                         </WrapPanel>
@@ -654,7 +679,7 @@
                     </ScrollViewer>
                 </Border>
             </Grid>
-            <Border Grid.Column="1" Background="#0F172A" CornerRadius="15" Padding="10">
+            <Border Grid.Column="1" Background="#0F172A" CornerRadius="15" Padding="10" FlowDirection="RightToLeft">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel x:Name="NavigationRoot">
                         <Border Background="#111F35" CornerRadius="12" Padding="13" Margin="0,0,0,8">
