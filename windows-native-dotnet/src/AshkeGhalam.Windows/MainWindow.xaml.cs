@@ -70,6 +70,8 @@ public partial class MainWindow : Window
             var loaded = _store.Load();
             _data = loaded;
             EnsureConfigurationDefaults();
+            if (CompanyWorkspaceService.EnsureInitialized(_data))
+                _store.Save(_data);
 
             // Safely reconcile legacy operational records on a clone. If the account chart
             // has a conflict, preserve all loaded business data and report the accounting issue.
@@ -136,7 +138,9 @@ public partial class MainWindow : Window
         try
         {
             var next = _data.DeepCopy();
+            var previousCompanyId = _data.ActiveCompanyId;
             mutation(next);
+            CompanyWorkspaceService.SwitchIfRequested(next, previousCompanyId, next.ActiveCompanyId);
             NativeOperationalPostingService.Reconcile(next);
             AccountingDataValidator.Validate(next);
             _store.Save(next);
@@ -2526,12 +2530,12 @@ public partial class MainWindow : Window
             ["dashboard"] = new("پیشخوان", "منوی اصلی", "/", 0),
             ["invoices"] = new("فاکتورها", "منوی اصلی", "/invoices", 3),
             ["inventory"] = new("انبارداری", "منوی اصلی", "/inventory", 2),
-            ["kardex"] = new("کارتکس کالا", "عملیات محلی موجود", "/inventory/kardex", 21),
+            ["kardex"] = new("کارتکس کالا", "عملیات محلی موجود", "/inventory/kardex", 18),
             ["checks"] = new("مدیریت چک", "منوی اصلی", "/checks", 10),
             ["vouchers"] = new("حواله‌های انبار", "عملیات محلی موجود", "/inventory (حواله‌های انبار)", 11),
             ["finance"] = new("امور مالی", "منوی اصلی", "/finance", 12),
             ["customers"] = new("اشخاص", "منوی اصلی", "/customers", 1),
-            ["companies"] = new("چندشرکتی و مشخصات شرکت", "تنظیمات حسابداری", "/settings/companies", 18),
+            ["companies"] = new("چندشرکتی و مشخصات شرکت", "تنظیمات حسابداری", "/settings/companies", 15),
             ["reports"] = new("گزارشات عمومی", "گزارشات و تحلیل", "/reports", 6),
             ["users"] = new("کاربران و سطح دسترسی", "تنظیمات و سیستم", "/users", null),
             ["payments"] = new("دریافت‌ها", "عملیات محلی موجود", "بخش دریافت‌های نسخه بومی", 4),
@@ -2544,9 +2548,9 @@ public partial class MainWindow : Window
             ["marketing"] = new("بازاریابی و سئو", "مدیریت کسب‌وکار", "/marketing", null),
             ["import-center"] = new("مرکز واردات اسناد", "مدیریت کسب‌وکار", "/import-center", null),
             ["accounting"] = new("حسابداری دوبل", "حسابداری پیشرفته", "/accounting", 12),
-            ["cashflow-predictor"] = new("پیش‌بینی جریان نقدینگی", "حسابداری پیشرفته", "/cashflow-predictor", 17),
-            ["cashflow"] = new("جریان نقدینگی", "حسابداری پیشرفته", "/cashflow", 17),
-            ["tax"] = new("مدیریت مالیات", "حسابداری پیشرفته", "/tax", 19),
+            ["cashflow-predictor"] = new("پیش‌بینی جریان نقدینگی", "حسابداری پیشرفته", "/cashflow-predictor", 14),
+            ["cashflow"] = new("جریان نقدینگی", "حسابداری پیشرفته", "/cashflow", 14),
+            ["tax"] = new("مدیریت مالیات", "حسابداری پیشرفته", "/tax", 16),
             ["loans"] = new("وام‌ها", "حسابداری پیشرفته", "/loans", null),
             ["due-calendar"] = new("تقویم سررسید و اقساط", "حسابداری پیشرفته", "/due-calendar", 8),
             ["bank-reconciliation"] = new("تطبیق بانکی", "حسابداری پیشرفته", "/bank-reconciliation", null),
@@ -2556,22 +2560,22 @@ public partial class MainWindow : Window
             ["ai-assistant"] = new("دستیار هوشمند مالی", "گزارشات و تحلیل", "/ai-assistant", null),
             ["signature-dashboard"] = new("داشبورد امضا", "امضای دیجیتال", "/signature-dashboard", null),
             ["signature-management"] = new("مدیریت امضا", "امضای دیجیتال", "/signature-management", null),
-            ["moadian"] = new("سامانه مؤدیان مالیاتی", "حسابداری پیشرفته", "/moadian", 19),
+            ["moadian"] = new("سامانه مؤدیان مالیاتی", "حسابداری پیشرفته", "/moadian", 16),
             ["pos-terminal"] = new("کارتخوان بانکی", "خدمات تجاری و ابری", "/pos-terminal", null),
             ["cloud-vault"] = new("پشتیبان ابری", "خدمات تجاری و ابری", "/cloud-vault", null),
             ["sms-center"] = new("پنل پیامک هوشمند", "خدمات تجاری و ابری", "/sms-center", null),
             ["multi-user-lan"] = new("شبکه محلی چندکاربره", "خدمات تجاری و ابری", "/multi-user-lan", null),
             ["client-broadcast"] = new("اطلاعیه‌ها", "خدمات تجاری و ابری", "/client-broadcast", null),
-            ["activation"] = new("اتصال سرور و فعال‌سازی لایسنس", "ارتباط با سرور", "/install-android (فقط اتصال/فعال‌سازی کلاینت)", 16),
-            ["server"] = new("ارتباط با سرور اصلی", "تنظیمات حسابداری", "/data-sync", 20),
+            ["activation"] = new("اتصال سرور و فعال‌سازی لایسنس", "ارتباط با سرور", "/install-android (فقط اتصال/فعال‌سازی کلاینت)", 13),
+            ["server"] = new("ارتباط با سرور اصلی", "تنظیمات حسابداری", "/data-sync", 17),
             ["mobile-catalog"] = new("کاتالوگ ویزیتوری همراه", "خدمات تجاری و ابری", "/mobile-catalog", null),
             ["catalog"] = new("کاتالوگ محصول", "خدمات تجاری و ابری", "/catalog", null),
             ["support-sla"] = new("پشتیبانی و تمدید", "خدمات تجاری و ابری", "/support-sla", null),
             ["fiscal-year"] = new("سال مالی", "تنظیمات و سیستم", "/fiscal-year", null),
             ["security"] = new("امنیت داده‌ها", "تنظیمات و سیستم", "/security", null),
-            ["data-sync"] = new("همگام‌سازی داده‌ها", "ارتباط با سرور اصلی", "/data-sync", 20),
-            ["advanced-settings"] = new("تنظیمات پیشرفته", "تنظیمات حسابداری", "/advanced-settings", 18),
-            ["settings"] = new("تنظیمات حسابداری", "تنظیمات حسابداری", "/settings", 18),
+            ["data-sync"] = new("همگام‌سازی داده‌ها", "ارتباط با سرور اصلی", "/data-sync", 17),
+            ["advanced-settings"] = new("تنظیمات پیشرفته", "تنظیمات حسابداری", "/advanced-settings", 15),
+            ["settings"] = new("تنظیمات حسابداری", "تنظیمات حسابداری", "/settings", 15),
             ["help"] = new("آموزش و راهنما", "تنظیمات و سیستم", "/help", null),
             ["updates"] = new("مرکز به‌روزرسانی", "تنظیمات و سیستم", "/updates", null)
         };
