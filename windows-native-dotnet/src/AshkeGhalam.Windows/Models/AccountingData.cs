@@ -38,7 +38,8 @@ public sealed class AccountingData
             Id = c.Id, Name = c.Name, LegalName = c.LegalName, NationalId = c.NationalId,
             TaxId = c.TaxId, Phone = c.Phone, Address = c.Address, Branch = c.Branch,
             LogoDataBase64 = c.LogoDataBase64, StampDataBase64 = c.StampDataBase64,
-            SignatureDataBase64 = c.SignatureDataBase64
+            SignatureDataBase64 = c.SignatureDataBase64,
+            WorkspaceDataJson = c.WorkspaceDataJson ?? ""
         }).ToList(),
         ActiveCompanyId = ActiveCompanyId,
         Preferences = new AccountingPreferences
@@ -157,6 +158,11 @@ public sealed class CompanyProfileRecord
     public string LogoDataBase64 { get; set; } = "";
     public string StampDataBase64 { get; set; } = "";
     public string SignatureDataBase64 { get; set; } = "";
+    /// <summary>
+    /// Per-company snapshot of operational data, serialized as an opaque JSON string to keep
+    /// the global company registry out of each nested workspace.
+    /// </summary>
+    public string WorkspaceDataJson { get; set; } = "";
 }
 
 public sealed class AccountingPreferences
