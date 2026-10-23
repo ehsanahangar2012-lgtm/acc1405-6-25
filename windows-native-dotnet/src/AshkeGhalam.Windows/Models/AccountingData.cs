@@ -397,6 +397,7 @@ public static class AccountingDataValidator
         UniqueIds(data.Checks.Select(c => c?.Id), "چک");
         var validCheckStatuses = new[] { "PENDING", "DEPOSITED", "PASSED", "BOUNCED", "TRANSFERRED", "CASHED", "RETURNED" };
         var validCheckTypes = new[] { "RECEIVED", "ISSUED" };
+        var sayadIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var check in data.Checks)
         {
             if (check is null || string.IsNullOrWhiteSpace(check.BankName) ||
@@ -407,6 +408,8 @@ public static class AccountingDataValidator
                 check.DueDate == default || check.History is null || check.History.Count > 10_000 ||
                 check.History.Any(h => h is null || !validCheckStatuses.Contains(h.Status, StringComparer.Ordinal)))
                 throw new InvalidDataException("رکورد چک ناقص یا نامعتبر است.");
+            if (!string.IsNullOrWhiteSpace(check.SayadId) && !sayadIds.Add(check.SayadId.Trim()))
+                throw new InvalidDataException("شناسهٔ صیادی تکراری در سوابق چک وجود دارد.");
             if (!string.IsNullOrWhiteSpace(check.RelatedInvoiceId) && !invoiceIds.Contains(check.RelatedInvoiceId))
                 throw new InvalidDataException("چک به فاکتور ناموجود پیوند داده شده است.");
         }
