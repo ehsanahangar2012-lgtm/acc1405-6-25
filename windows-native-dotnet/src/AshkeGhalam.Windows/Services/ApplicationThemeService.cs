@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace AshkeGhalam.Windows.Services;
 
@@ -24,6 +25,24 @@ public static class ApplicationThemeService
 
     public static string Normalize(string? theme) =>
         string.Equals(theme, DarkTheme, StringComparison.OrdinalIgnoreCase) ? DarkTheme : LightTheme;
+
+    public static void ApplyWhenLoaded(Window window, string? theme)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        if (window.IsLoaded)
+        {
+            window.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Apply(window, theme)));
+            return;
+        }
+
+        RoutedEventHandler? loaded = null;
+        loaded = (_, _) =>
+        {
+            window.Loaded -= loaded;
+            window.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() => Apply(window, theme)));
+        };
+        window.Loaded += loaded;
+    }
 
     public static void Apply(Window window, string? theme)
     {
