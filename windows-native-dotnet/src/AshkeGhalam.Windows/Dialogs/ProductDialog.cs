@@ -21,19 +21,22 @@ public sealed class ProductDialog : Window
     private readonly TextBox _sellPrice = new() { Text = "0" };
     private readonly TextBox _weight = new();
     private readonly TextBox _shelfLocation = new();
-    private readonly TextBox _category = new();
-    private readonly TextBox _subCategory = new();
-    private readonly TextBox _subSubCategory = new();
-    private readonly TextBox _categoryPath = new();
+    private readonly ComboBox _category = new() { IsEditable = true, IsTextSearchEnabled = true, StaysOpenOnEdit = true, Height = 34 };
+    private readonly ComboBox _subCategory = new() { IsEditable = true, IsTextSearchEnabled = true, StaysOpenOnEdit = true, Height = 34 };
+    private readonly ComboBox _subSubCategory = new() { IsEditable = true, IsTextSearchEnabled = true, StaysOpenOnEdit = true, Height = 34 };
+    private readonly ComboBox _categoryPath = new() { IsEditable = true, IsTextSearchEnabled = true, StaysOpenOnEdit = true, Height = 34 };
+    private readonly List<ProductRecord> _knownProducts;
+    private bool _updatingCategoryChoices;
     private readonly TextBox _description = new() { Height = 62, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
     private readonly TextBox _imageUrl = new();
     private readonly ProductRecord? _existing;
 
     public ProductRecord? Result { get; private set; }
 
-    public ProductDialog(Window owner, ProductRecord? existing = null, string suggestedCode = "")
+    public ProductDialog(Window owner, ProductRecord? existing = null, string suggestedCode = "", IReadOnlyList<ProductRecord>? knownProducts = null)
     {
         _existing = existing;
+        _knownProducts = knownProducts?.ToList() ?? (existing is null ? [] : [existing]);
         Owner = owner;
         Title = existing is null ? "ثبت کالا و موجودی اولیه" : "ویرایش پرونده کالا";
         Width = 620;
@@ -61,6 +64,14 @@ public sealed class ProductDialog : Window
         _subCategory.Text = existing?.SubCategory ?? "";
         _subSubCategory.Text = existing?.SubSubCategory ?? "";
         _categoryPath.Text = existing?.CategoryPath ?? "";
+        SetChoices(_category, _knownProducts.Select(product => product.Category));
+        SetChoices(_subCategory, _knownProducts.Select(product => product.SubCategory));
+        SetChoices(_subSubCategory, _knownProducts.Select(product => product.SubSubCategory));
+        SetChoices(_categoryPath, _knownProducts.Select(product => product.CategoryPath));
+        _category.LostKeyboardFocus += (_, _) => RefreshSubCategoryChoices();
+        _category.SelectionChanged += (_, _) => { if (!_updatingCategoryChoices) RefreshSubCategoryChoices(); };
+        _subCategory.LostKeyboardFocus += (_, _) => RefreshSubSubCategoryChoices();
+        _subCategory.SelectionChanged += (_, _) => { if (!_updatingCategoryChoices) RefreshSubSubCategoryChoices(); };
         _description.Text = existing?.Description ?? "";
         _imageUrl.Text = existing?.ImageUrl ?? "";
         _quantity.IsEnabled = existing is null;
@@ -132,6 +143,45 @@ public sealed class ProductDialog : Window
         Content = layout;
 
         save.Click += (_, _) => SaveResult();
+    }
+
+    private static void SetChoices(ComboBox combo, IEnumerable<string?> values)
+    {
+        combo.ItemsSource = values.Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value!.Trim())
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+    }
+
+    private void RefreshSubCategoryChoices()
+    {
+        var category = _category.Text.Trim();
+        var current = _subCategory.Text;
+        _updatingCategoryChoices = true;
+        SetChoices(_subCategory, _knownProducts
+            .Where(product => string.IsNullOrWhiteSpace(category) ||
+                string.Equals(product.Category, category, StringComparison.CurrentCultureIgnoreCase))
+            .Select(product => product.SubCategory));
+        _subCategory.Text = current;
+        _updatingCategoryChoices = false;
+        RefreshSubSubCategoryChoices();
+    }
+
+    private void RefreshSubSubCategoryChoices()
+    {
+        var category = _category.Text.Trim();
+        var subCategory = _subCategory.Text.Trim();
+        var current = _subSubCategory.Text;
+        _updatingCategoryChoices = true;
+        SetChoices(_subSubCategory, _knownProducts
+            .Where(product => (string.IsNullOrWhiteSpace(category) ||
+                    string.Equals(product.Category, category, StringComparison.CurrentCultureIgnoreCase)) &&
+                (string.IsNullOrWhiteSpace(subCategory) ||
+                    string.Equals(product.SubCategory, subCategory, StringComparison.CurrentCultureIgnoreCase)))
+            .Select(product => product.SubSubCategory));
+        _subSubCategory.Text = current;
+        _updatingCategoryChoices = false;
     }
 
     private void SaveResult()
