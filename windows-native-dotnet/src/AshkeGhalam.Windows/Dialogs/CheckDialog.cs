@@ -28,133 +28,265 @@ public sealed class CheckDialog : Window
         new("RETURNED", "عودت‌شده")
     ];
 
-    private readonly TextBox _bankName = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _amount = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _dueDate = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _issueDate = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _sayadId = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _checkNumber = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _holderName = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _personName = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _description = new() { Height = 72, Padding = new Thickness(8, 4, 8, 4), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
-    private readonly ComboBox _checkType = new() { Height = 32, DisplayMemberPath = nameof(ChoiceItem.Label), ItemsSource = CheckTypes };
-    private readonly ComboBox _status = new() { Height = 32, DisplayMemberPath = nameof(ChoiceItem.Label), ItemsSource = CheckStatuses };
-    private readonly CheckBox _highPriority = new() { Content = "این چک در اولویت پیگیری قرار دارد", Margin = new Thickness(0, 10, 0, 0) };
+    private static readonly string[] IranianBanks =
+    [
+        "بانک ملی ایران",
+        "بانک سپه",
+        "بانک صادرات ایران",
+        "بانک ملت",
+        "بانک تجارت",
+        "بانک مسکن",
+        "بانک کشاورزی",
+        "بانک رفاه کارگران",
+        "پست بانک ایران",
+        "بانک توسعه تعاون",
+        "بانک توسعه صادرات ایران",
+        "بانک صنعت و معدن",
+        "بانک اقتصاد نوین",
+        "بانک پارسیان",
+        "بانک پاسارگاد",
+        "بانک کارآفرین",
+        "بانک سامان",
+        "بانک سرمایه",
+        "بانک سینا",
+        "بانک شهر",
+        "بانک دی",
+        "بانک گردشگری",
+        "بانک ایران‌زمین",
+        "بانک خاورمیانه",
+        "بانک قرض‌الحسنه مهر ایران",
+        "بانک قرض‌الحسنه رسالت",
+        "بانک مشترک ایران و ونزوئلا"
+    ];
+
+    private readonly ComboBox _bankName = new()
+    {
+        Height = 36,
+        ItemsSource = IranianBanks,
+        IsEditable = true,
+        IsTextSearchEnabled = true,
+        StaysOpenOnEdit = true
+    };
+    private readonly TextBox _amount = new()
+    {
+        Height = 36,
+        Padding = new Thickness(10, 5, 10, 5),
+        FlowDirection = FlowDirection.LeftToRight,
+        HorizontalContentAlignment = HorizontalAlignment.Right
+    };
+    private readonly PersianDateSelector _dueDate;
+    private readonly PersianDateSelector _issueDate;
+    private readonly TextBox _sayadId = new() { Height = 36, Padding = new Thickness(10, 5, 10, 5), FlowDirection = FlowDirection.LeftToRight };
+    private readonly TextBox _checkNumber = new() { Height = 36, Padding = new Thickness(10, 5, 10, 5), FlowDirection = FlowDirection.LeftToRight };
+    private readonly TextBox _holderName = new() { Height = 36, Padding = new Thickness(10, 5, 10, 5) };
+    private readonly TextBox _personName = new() { Height = 36, Padding = new Thickness(10, 5, 10, 5) };
+    private readonly TextBox _description = new()
+    {
+        Height = 90,
+        Padding = new Thickness(10, 5, 10, 5),
+        AcceptsReturn = true,
+        TextWrapping = TextWrapping.Wrap,
+        VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+    };
+    private readonly ComboBox _checkType = new() { Height = 36, DisplayMemberPath = nameof(ChoiceItem.Label), ItemsSource = CheckTypes };
+    private readonly ComboBox _status = new() { Height = 36, DisplayMemberPath = nameof(ChoiceItem.Label), ItemsSource = CheckStatuses };
+    private readonly CheckBox _highPriority = new() { Content = "این چک در اولویت پیگیری قرار دارد", Margin = new Thickness(0, 12, 0, 0) };
     private readonly CheckRecord? _existing;
+    private readonly ScrollViewer _stepHost = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+    private readonly TextBlock _stepIndicator = new() { FontSize = 12, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 12) };
+    private readonly Button _previousButton = new() { Content = "مرحله قبل", MinWidth = 104, Height = 38, Margin = new Thickness(0, 0, 8, 0) };
+    private readonly Button _nextButton = new() { Content = "ادامه", MinWidth = 104, Height = 38, IsDefault = true };
+    private readonly Button _saveButton = new() { Content = "ذخیره نهایی چک", MinWidth = 138, Height = 38, IsDefault = true, Visibility = Visibility.Collapsed };
+    private readonly StackPanel[] _steps;
+    private int _currentStep;
 
     public CheckRecord? Result { get; private set; }
 
     public CheckDialog(Window owner, CheckRecord? existing = null)
     {
         _existing = existing;
+        _dueDate = new PersianDateSelector(existing?.DueDate ?? DateTimeOffset.Now.AddDays(30));
+        _issueDate = new PersianDateSelector(existing?.IssueDate, optional: true);
+
         Owner = owner;
-        Title = existing is null ? "ثبت چک جدید" : "ویرایش مشخصات چک";
-        Width = 590;
-        Height = 760;
-        MinHeight = 620;
+        Title = existing is null ? "ثبت حرفه‌ای چک" : "ویرایش مشخصات چک";
+        Width = 650;
+        Height = 790;
+        MinWidth = 590;
+        MinHeight = 680;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
+        FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
 
         _bankName.Text = existing?.BankName ?? "";
-        _amount.Text = existing?.Amount.ToString("0.##", CultureInfo.InvariantCulture) ?? "";
-        _dueDate.Text = FormatPersianDate(existing?.DueDate ?? DateTimeOffset.Now.AddDays(30));
-        _issueDate.Text = existing?.IssueDate is DateTimeOffset issue ? FormatPersianDate(issue) : "";
+        _amount.Text = existing?.Amount.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")) ?? "";
         _sayadId.Text = existing?.SayadId ?? "";
         _checkNumber.Text = existing?.CheckNumber ?? "";
         _holderName.Text = existing?.HolderName ?? "";
         _personName.Text = existing?.PersonName ?? "";
         _description.Text = existing?.Description ?? "";
-        _checkType.SelectedItem = CheckTypes.First(x => x.Value == (existing?.CheckType ?? "RECEIVED"));
-        _status.SelectedItem = CheckStatuses.First(x => x.Value == (existing?.Status ?? "PENDING"));
+        _checkType.SelectedItem = CheckTypes.First(item => item.Value == (existing?.CheckType ?? "RECEIVED"));
+        _status.SelectedItem = CheckStatuses.First(item => item.Value == (existing?.Status ?? "PENDING"));
         _highPriority.IsChecked = existing?.IsHighPriority ?? false;
+        _amount.LostFocus += (_, _) => FormatAmount();
 
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(new TextBlock
+        var header = new StackPanel();
+        header.Children.Add(new TextBlock
         {
-            Text = existing is null ? "اطلاعات چک" : "ویرایش اطلاعات چک",
-            FontSize = 22,
+            Text = existing is null ? "ثبت چک جدید" : "ویرایش چک",
+            FontSize = 24,
             FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            Margin = new Thickness(0, 0, 0, 15)
+            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42))
         });
-        root.Children.Add(new TextBlock
+        header.Children.Add(new TextBlock
         {
-            Text = "تاریخ‌ها به شمسی وارد شوند؛ این فرم فقط ثبت محلی است و وضعیت بانک را آنلاین استعلام نمی‌کند.",
+            Text = "فرم مرحله‌ای برای ثبت اطلاعات بانکی، تاریخ‌های شمسی و جزئیات پیگیری.",
             FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+            Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
             TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12)
+            Margin = new Thickness(0, 5, 0, 0)
         });
 
-        AddField(root, "نوع چک", _checkType);
-        AddField(root, "نام بانک (الزامی)", _bankName);
-        AddField(root, "مبلغ (الزامی)", _amount);
-        AddField(root, "تاریخ سررسید شمسی (الزامی؛ مثال: ۱۴۰۵/۰۸/۰۱)", _dueDate);
-        AddField(root, "تاریخ صدور شمسی (اختیاری)", _issueDate);
-        AddField(root, "شناسه صیادی", _sayadId);
-        AddField(root, "شماره چک", _checkNumber);
-        AddField(root, "نام دارنده / ذی‌نفع (الزامی)", _holderName);
-        AddField(root, "شخص مرتبط (اختیاری)", _personName);
-        AddField(root, "وضعیت ثبت‌شده", _status);
-        AddField(root, "توضیحات", _description);
-        root.Children.Add(_highPriority);
+        var stepOne = new StackPanel { Margin = new Thickness(2, 4, 2, 12) };
+        AddField(stepOne, "نوع چک", _checkType);
+        AddField(stepOne, "بانک (از فهرست انتخاب کنید یا نام دیگری بنویسید)", _bankName);
+        AddField(stepOne, "مبلغ چک", _amount);
+        AddField(stepOne, "تاریخ سررسید شمسی (الزامی)", _dueDate);
+        stepOne.Children.Add(new TextBlock
+        {
+            Text = "با انتخاب سال، ماه و روز، تاریخ شمسی معتبر ساخته می‌شود.",
+            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 0)
+        });
 
-        var buttons = new StackPanel
+        var stepTwo = new StackPanel { Margin = new Thickness(2, 4, 2, 12) };
+        AddField(stepTwo, "تاریخ صدور شمسی (اختیاری)", _issueDate);
+        AddField(stepTwo, "شماره چک", _checkNumber);
+        AddField(stepTwo, "شناسه صیادی", _sayadId);
+        AddField(stepTwo, "نام دارنده / ذی‌نفع (الزامی)", _holderName);
+        AddField(stepTwo, "شخص مرتبط (اختیاری)", _personName);
+
+        var stepThree = new StackPanel { Margin = new Thickness(2, 4, 2, 12) };
+        AddField(stepThree, "وضعیت فعلی چک", _status);
+        stepThree.Children.Add(_highPriority);
+        AddField(stepThree, "توضیحات و یادداشت پیگیری", _description);
+        stepThree.Children.Add(new TextBlock
+        {
+            Text = "وضعیت و سوابق در همین برنامه ذخیره می‌شوند؛ این فرم استعلام آنلاین بانکی یا تأیید وصول انجام نمی‌دهد.",
+            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 8, 0, 0)
+        });
+
+        _steps = [stepOne, stepTwo, stepThree];
+
+        var footer = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Left,
-            Margin = new Thickness(0, 18, 0, 0)
+            Margin = new Thickness(0, 14, 0, 0)
         };
-        var save = new Button
+        _previousButton.Click += (_, _) => ShowStep(_currentStep - 1);
+        _nextButton.Click += (_, _) =>
         {
-            Content = existing is null ? "ذخیره چک" : "ثبت تغییرات",
-            Width = 120,
-            Height = 36,
-            Margin = new Thickness(0, 0, 8, 0),
-            IsDefault = true
+            if (!ValidateCurrentStep()) return;
+            ShowStep(_currentStep + 1);
         };
-        buttons.Children.Add(save);
-        buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 36, IsCancel = true });
-        root.Children.Add(buttons);
+        _saveButton.Click += (_, _) => SaveResult();
+        footer.Children.Add(_previousButton);
+        footer.Children.Add(_nextButton);
+        footer.Children.Add(_saveButton);
+        footer.Children.Add(new Button { Content = "انصراف", MinWidth = 90, Height = 38, Margin = new Thickness(8, 0, 0, 0), IsCancel = true });
 
+        var root = new StackPanel { Margin = new Thickness(22) };
+        root.Children.Add(header);
+        root.Children.Add(_stepIndicator);
+        root.Children.Add(_stepHost);
+        root.Children.Add(footer);
         Content = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             Content = root
         };
 
-        save.Click += (_, _) => SaveResult();
+        ShowStep(0);
+    }
+
+    private void ShowStep(int step)
+    {
+        _currentStep = Math.Clamp(step, 0, _steps.Length - 1);
+        _stepHost.Content = _steps[_currentStep];
+        _stepIndicator.Text = $"مرحله {_currentStep + 1} از {_steps.Length}  •  " + new[] { "نوع، بانک و مبلغ", "تاریخ و اشخاص", "وضعیت و یادداشت" }[_currentStep];
+        _previousButton.IsEnabled = _currentStep > 0;
+        _nextButton.Visibility = _currentStep < _steps.Length - 1 ? Visibility.Visible : Visibility.Collapsed;
+        _saveButton.Visibility = _currentStep == _steps.Length - 1 ? Visibility.Visible : Visibility.Collapsed;
+        _nextButton.IsDefault = _currentStep < _steps.Length - 1;
+        _saveButton.IsDefault = _currentStep == _steps.Length - 1;
+        _stepHost.ScrollToTop();
+    }
+
+    private bool ValidateCurrentStep()
+    {
+        try
+        {
+            if (_currentStep == 0)
+            {
+                if (_bankName.Text.Trim().Length < 2)
+                    throw new InvalidOperationException("بانک را از فهرست انتخاب کنید یا نام آن را وارد کنید.");
+                if (AccountingRules.Money(PersianNumberParser.ParseDecimal(_amount.Text, "مبلغ چک")) <= 0m)
+                    throw new InvalidOperationException("مبلغ چک باید بیشتر از صفر باشد.");
+                if (_dueDate.SelectedDate is null)
+                    throw new InvalidOperationException("تاریخ سررسید را از انتخاب‌گر شمسی کامل کنید.");
+            }
+            else if (_currentStep == 1 && _holderName.Text.Trim().Length < 2)
+            {
+                throw new InvalidOperationException("نام دارنده یا ذی‌نفع را وارد کنید.");
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "تکمیل مرحله", MessageBoxButton.OK, MessageBoxImage.Information);
+            return false;
+        }
+    }
+
+    private void FormatAmount()
+    {
+        if (PersianNumberParser.TryParseDecimal(_amount.Text, out var value))
+            _amount.Text = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
     }
 
     private void SaveResult()
     {
         try
         {
+            if (!ValidateCurrentStep()) return;
             var bank = _bankName.Text.Trim();
             var holder = _holderName.Text.Trim();
-            if (bank.Length < 2) throw new InvalidOperationException("نام بانک را وارد کنید.");
-            if (holder.Length < 2) throw new InvalidOperationException("نام دارنده یا ذی‌نفع را وارد کنید.");
-
             var amount = AccountingRules.Money(PersianNumberParser.ParseDecimal(_amount.Text, "مبلغ چک"));
-            if (amount <= 0m) throw new InvalidOperationException("مبلغ چک باید بیشتر از صفر باشد.");
-
-            var dueDate = ParsePersianDate(_dueDate.Text, "تاریخ سررسید");
-            DateTimeOffset? issueDate = string.IsNullOrWhiteSpace(_issueDate.Text)
-                ? null
-                : ParsePersianDate(_issueDate.Text, "تاریخ صدور");
-
+            var dueDate = _dueDate.SelectedDate
+                ?? throw new InvalidOperationException("تاریخ سررسید را از انتخاب‌گر شمسی کامل کنید.");
+            var issueDate = _issueDate.SelectedDate;
             var type = _checkType.SelectedItem as ChoiceItem
                 ?? throw new InvalidOperationException("نوع چک را انتخاب کنید.");
             var status = _status.SelectedItem as ChoiceItem
                 ?? throw new InvalidOperationException("وضعیت چک را انتخاب کنید.");
 
-            var history = _existing?.History.Select(h => new CheckHistoryRecord
+            if (bank.Length < 2) throw new InvalidOperationException("نام بانک را وارد کنید.");
+            if (holder.Length < 2) throw new InvalidOperationException("نام دارنده یا ذی‌نفع را وارد کنید.");
+            if (amount <= 0m) throw new InvalidOperationException("مبلغ چک باید بیشتر از صفر باشد.");
+
+            var history = _existing?.History.Select(item => new CheckHistoryRecord
             {
-                ChangedAt = h.ChangedAt,
-                Status = h.Status,
-                Note = h.Note
+                ChangedAt = item.ChangedAt,
+                Status = item.Status,
+                Note = item.Note
             }).ToList() ?? [];
 
             var oldStatus = _existing?.Status ?? "";
@@ -195,36 +327,7 @@ public sealed class CheckDialog : Window
         }
     }
 
-    private static DateTimeOffset ParsePersianDate(string value, string fieldName)
-    {
-        var normalized = value.Trim().Replace('-', '/').Replace('.', '/');
-        var parts = normalized.Split('/', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 3)
-            throw new InvalidOperationException(fieldName + " را به‌صورت سال/ماه/روز شمسی وارد کنید.");
-
-        var year = checked((int)PersianNumberParser.ParseDecimal(parts[0], fieldName));
-        var month = checked((int)PersianNumberParser.ParseDecimal(parts[1], fieldName));
-        var day = checked((int)PersianNumberParser.ParseDecimal(parts[2], fieldName));
-        try
-        {
-            var calendar = new PersianCalendar();
-            var local = calendar.ToDateTime(year, month, day, 0, 0, 0, 0, PersianCalendar.PersianEra);
-            return new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            throw new InvalidOperationException(fieldName + " معتبر نیست.");
-        }
-    }
-
-    private static string FormatPersianDate(DateTimeOffset value)
-    {
-        var calendar = new PersianCalendar();
-        return string.Format(CultureInfo.InvariantCulture, "{0:0000}/{1:00}/{2:00}",
-            calendar.GetYear(value.DateTime), calendar.GetMonth(value.DateTime), calendar.GetDayOfMonth(value.DateTime));
-    }
-
-    private static void AddField(Panel root, string label, Control field)
+    private static void AddField(Panel root, string label, FrameworkElement field)
     {
         root.Children.Add(new TextBlock
         {
@@ -232,9 +335,139 @@ public sealed class CheckDialog : Window
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
-            Margin = new Thickness(0, 7, 0, 4)
+            Margin = new Thickness(0, 8, 0, 4)
         });
-        field.Margin = new Thickness(0, 0, 0, 7);
+        field.Margin = new Thickness(0, 0, 0, 5);
         root.Children.Add(field);
+    }
+
+    private sealed class PersianDateSelector : StackPanel
+    {
+        private static readonly string[] MonthNames =
+        [
+            "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+            "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند"
+        ];
+
+        private readonly ComboBox _year = new() { MinWidth = 82, Height = 36, Margin = new Thickness(0, 0, 6, 0) };
+        private readonly ComboBox _month = new() { MinWidth = 120, Height = 36, Margin = new Thickness(0, 0, 6, 0) };
+        private readonly ComboBox _day = new() { MinWidth = 68, Height = 36 };
+        private readonly bool _optional;
+        private bool _updating;
+
+        public PersianDateSelector(DateTimeOffset? initialDate, bool optional = false)
+        {
+            Orientation = Orientation.Horizontal;
+            FlowDirection = FlowDirection.RightToLeft;
+            _optional = optional;
+            var calendar = new PersianCalendar();
+            var currentYear = calendar.GetYear(DateTime.Now);
+            _year.ItemsSource = Enumerable.Range(Math.Max(1300, currentYear - 30), 61).ToList();
+            _month.ItemsSource = MonthNames;
+            _day.ItemsSource = Enumerable.Range(1, 31).ToList();
+            _year.SelectionChanged += (_, _) => RefreshDayChoices();
+            _month.SelectionChanged += (_, _) => RefreshDayChoices();
+            Children.Add(_year);
+            Children.Add(_month);
+            Children.Add(_day);
+
+            if (optional)
+            {
+                var clear = new Button
+                {
+                    Content = "×",
+                    Width = 34,
+                    Height = 36,
+                    Margin = new Thickness(6, 0, 0, 0),
+                    ToolTip = "پاک‌کردن تاریخ"
+                };
+                clear.Click += (_, _) => Clear();
+                Children.Add(clear);
+            }
+
+            if (initialDate is DateTimeOffset value)
+                SetDate(value);
+            else if (!optional)
+                SetDate(DateTimeOffset.Now.AddDays(30));
+            else
+                Clear();
+        }
+
+        public DateTimeOffset? SelectedDate
+        {
+            get
+            {
+                if (_year.SelectedItem is not int year ||
+                    _month.SelectedIndex < 0 ||
+                    _day.SelectedItem is not int day)
+                    return null;
+
+                try
+                {
+                    var local = new PersianCalendar().ToDateTime(
+                        year, _month.SelectedIndex + 1, day, 0, 0, 0, 0, PersianCalendar.PersianEra);
+                    return new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
+                }
+                catch (ArgumentOutOfRangeException)
+                {
+                    return null;
+                }
+            }
+        }
+
+        private void SetDate(DateTimeOffset value)
+        {
+            var calendar = new PersianCalendar();
+            var year = calendar.GetYear(value.DateTime);
+            var month = calendar.GetMonth(value.DateTime);
+            var day = calendar.GetDayOfMonth(value.DateTime);
+
+            _updating = true;
+            var years = (_year.ItemsSource as IEnumerable<int>)?.ToList() ?? [];
+            if (!years.Contains(year))
+            {
+                years.Add(year);
+                years.Sort();
+                _year.ItemsSource = years;
+            }
+            _year.SelectedItem = year;
+            _month.SelectedIndex = month - 1;
+            _updating = false;
+
+            RefreshDayChoices();
+            _updating = true;
+            _day.SelectedItem = day;
+            _updating = false;
+        }
+
+        private void Clear()
+        {
+            _updating = true;
+            _year.SelectedIndex = -1;
+            _month.SelectedIndex = -1;
+            _day.SelectedIndex = -1;
+            _updating = false;
+        }
+
+        private void RefreshDayChoices()
+        {
+            if (_updating || _year.SelectedItem is not int year || _month.SelectedIndex < 0)
+                return;
+
+            var previousDay = _day.SelectedItem is int day ? day : 1;
+            var month = _month.SelectedIndex + 1;
+            int days;
+            try
+            {
+                days = new PersianCalendar().GetDaysInMonth(year, month, PersianCalendar.PersianEra);
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                days = month <= 6 ? 31 : month == 12 ? 29 : 30;
+            }
+
+            _day.ItemsSource = Enumerable.Range(1, days).ToList();
+            _day.SelectedItem = Math.Min(previousDay, days);
+        }
     }
 }
