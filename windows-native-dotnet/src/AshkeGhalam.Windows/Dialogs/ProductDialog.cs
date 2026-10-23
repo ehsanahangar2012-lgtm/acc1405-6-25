@@ -30,7 +30,7 @@ public sealed class ProductDialog : Window
 
     public ProductRecord? Result { get; private set; }
 
-    public ProductDialog(Window owner, ProductRecord? existing = null)
+    public ProductDialog(Window owner, ProductRecord? existing = null, string suggestedCode = "")
     {
         _existing = existing;
         Owner = owner;
@@ -44,7 +44,7 @@ public sealed class ProductDialog : Window
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
 
         _name.Text = existing?.Name ?? "";
-        _code.Text = existing?.Code ?? "";
+        _code.Text = existing?.Code ?? suggestedCode;
         _serialNumber.Text = existing?.SerialNumber ?? "";
         _unit.Text = existing?.Unit ?? "عدد";
         _quantity.Text = (existing?.StockQuantity ?? 0m).ToString("0.##", CultureInfo.InvariantCulture);
@@ -81,7 +81,7 @@ public sealed class ProductDialog : Window
         });
 
         Add(root, "نام کالا (الزامی)", _name);
-        Add(root, "کد کالا", _code);
+        Add(root, "کد کالا (خودکار پیشنهاد شده؛ قابل ویرایش و باید یکتا باشد)", _code);
         Add(root, "شماره سریال اختصاصی کالا", _serialNumber);
         Add(root, "واحد (مثلاً عدد، کیلوگرم، متر)", _unit);
         Add(root, existing is null ? "موجودی اولیه" : "موجودی فعلی (فقط از «ورود موجودی» تغییر می‌کند)", _quantity);
