@@ -1909,7 +1909,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new ExpenseDialog(this, selected);
+        var dialog = new ExpenseDialog(this, selected, _data.Expenses.Select(expense => expense.Category));
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true) return;
         Commit(data =>
@@ -2040,7 +2040,7 @@ public partial class MainWindow : Window
     private void AddExpense_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
-        var dialog = new ExpenseDialog(this);
+        var dialog = new ExpenseDialog(this, knownCategories: _data.Expenses.Select(expense => expense.Category));
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true)
             Commit(data => AccountingOperations.AddExpense(data, dialog.ExpenseTitle, dialog.Category, dialog.Amount, dialog.Notes), "هزینه ثبت شد");
