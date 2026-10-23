@@ -1018,19 +1018,23 @@ public partial class MainWindow : Window
         }
     }
 
-    private void AddCustomer_Click(object sender, RoutedEventArgs e)
+    private void AddCustomer_Click(object sender, RoutedEventArgs e) => AddPersonQuick(defaultSupplier: false);
+
+    private void AddSupplier_Click(object sender, RoutedEventArgs e) => AddPersonQuick(defaultSupplier: true);
+
+    private void AddPersonQuick(bool defaultSupplier)
     {
         if (!RequireWritable() || !ConfirmCanAddCustomer()) return;
         var suggestedCode = NextCode(_data.Customers.Select(person => person.Code), "CUS-");
-        var dialog = new CustomerDialog(this, suggestedCode: suggestedCode);
+        var dialog = new CustomerDialog(this, suggestedCode: suggestedCode, defaultSupplier: defaultSupplier);
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord customer)
             Commit(data =>
             {
                 if (!string.IsNullOrWhiteSpace(customer.Code) &&
-                    data.Customers.Any(p => string.Equals(p.Code, customer.Code, StringComparison.OrdinalIgnoreCase)))
+                    data.Customers.Any(person => string.Equals(person.Code, customer.Code, StringComparison.OrdinalIgnoreCase)))
                     throw new InvalidOperationException("کد شخص تکراری است.");
                 data.Customers.Add(customer);
-            }, "پرونده شخص ذخیره شد");
+            }, defaultSupplier ? "پرونده تأمین‌کننده ذخیره شد" : "پرونده شخص ذخیره شد");
     }
 
     private void EditCustomer_Click(object sender, RoutedEventArgs e)
@@ -1243,12 +1247,26 @@ public partial class MainWindow : Window
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "چاپ فاکتور", MessageBoxButton.OK, MessageBoxImage.Error); }
     }
 
-    private void AddPayment_Click(object sender, RoutedEventArgs e)
+    private void AddPayment_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType(null);
+
+    private void AddReceipt_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType("SALE");
+
+    private void AddSupplierPayment_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType("PURCHASE");
+
+    private void AddPaymentForInvoiceType(string? invoiceTypeFilter)
     {
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
-        var dialog = new PaymentDialog(this, _data);
+        var dialog = new PaymentDialog(this, _data, invoiceTypeFilter);
         if (dialog.ShowDialog() == true)
-            Commit(data => AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference), "عملیات دریافت/پرداخت ثبت شد");
+        {
+            var message = invoiceTypeFilter switch
+            {
+                "SALE" => "دریافت از مشتری ثبت شد",
+                "PURCHASE" => "پرداخت به تأمین‌کننده ثبت شد",
+                _ => "عملیات دریافت/پرداخت ثبت شد"
+            };
+            Commit(data => AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference), message);
+        }
     }
 
     private void AddExpense_Click(object sender, RoutedEventArgs e)
