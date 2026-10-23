@@ -52,7 +52,7 @@ public sealed class ExpenseDialog : Window
     private static void FormatNumericField(TextBox field)
     {
         if (string.IsNullOrWhiteSpace(field.Text)) return;
-        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "مبلغ").ToString("N2", System.Globalization.CultureInfo.GetCultureInfo("fa-IR")); }
+        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "مبلغ").ToString("#,##0.##", System.Globalization.CultureInfo.GetCultureInfo("fa-IR")); }
         catch (InvalidOperationException) { }
     }
 
