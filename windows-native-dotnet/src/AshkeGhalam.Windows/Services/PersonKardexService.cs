@@ -173,7 +173,7 @@ public static class PersonKardexService
         var endExclusive = toDate?.Date.AddDays(1);
         var beforeRange = start.HasValue
             ? raw.Where(entry => entry.Date.LocalDateTime.Date < start.Value).ToList()
-            : [];
+            : new List<RawEntry>();
         var inRange = raw.Where(entry =>
                 (!start.HasValue || entry.Date.LocalDateTime.Date >= start.Value) &&
                 (!endExclusive.HasValue || entry.Date.LocalDateTime.Date < endExclusive.Value))
@@ -240,7 +240,7 @@ public static class PersonKardexService
 
         try
         {
-            return new PersianCalendar().ToDateTime(year, month, day, 0, 0, 0, 0, DateTimeKind.Local).Date;
+            return new PersianCalendar().ToDateTime(year, month, day, 0, 0, 0, 0).Date;
         }
         catch (ArgumentOutOfRangeException)
         {
