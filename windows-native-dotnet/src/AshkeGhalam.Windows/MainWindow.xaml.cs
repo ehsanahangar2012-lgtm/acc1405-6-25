@@ -175,6 +175,8 @@ public partial class MainWindow : Window
             RefreshAll();
             RefreshLicensePanel();
             ApplyMainWindowTheme();
+            // Always land on the usable dashboard instead of an empty hidden-tab shell.
+            NavigateModule_Click(NavigationDashboardButton, new RoutedEventArgs());
             ConfigureGridContextMenus();
             RefreshFiscalYearPage();
             RefreshSecurityStatus();
