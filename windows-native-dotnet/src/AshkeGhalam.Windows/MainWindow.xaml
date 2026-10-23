@@ -35,6 +35,10 @@
             <Setter Property="CanUserSortColumns" Value="True"/>
             <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
             <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="MinColumnWidth" Value="52"/>
+            <Setter Property="ColumnWidth" Value="*"/>
+            <Setter Property="EnableColumnVirtualization" Value="True"/>
+            <Setter Property="EnableRowVirtualization" Value="True"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
             <Setter Property="RowHeight" Value="36"/>
@@ -66,8 +70,8 @@
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#CCFBF1"/></Trigger>
-                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#0F766E"/></Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Opacity" Value="0.88"/></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#0F766E"/><Setter Property="Foreground" Value="#FFFFFF"/></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -167,12 +171,12 @@
                         <TextBlock Text="آخرین اسناد" FontSize="18" FontWeight="Bold" Margin="0,20,0,0"/>
                         <DataGrid x:Name="RecentInvoicesGrid" Height="235">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="105"/>
-                                <DataGridTextColumn Header="شماره سند" Binding="{Binding DisplayNumber}" Width="120"/>
+                                <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="1.05*"/>
+                                <DataGridTextColumn Header="شماره سند" Binding="{Binding DisplayNumber}" Width="1.2*"/>
                                 <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="*"/>
-                                <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="150"/>
-                                <DataGridTextColumn Header="مبلغ کل" Binding="{Binding Total, StringFormat={}{0:N2}}" Width="150"/>
-                                <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="120"/>
+                                <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="1.5*"/>
+                                <DataGridTextColumn Header="مبلغ کل" Binding="{Binding Total, StringFormat={}{0:N2}}" Width="1.5*"/>
+                                <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.2*"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </StackPanel>
@@ -205,17 +209,17 @@
                               VerticalScrollBarVisibility="Auto"
                               CanUserResizeColumns="True">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="کد شخص" Binding="{Binding Code}" Width="105"/>
-                            <DataGridTextColumn Header="نام / شرکت" Binding="{Binding Name}" Width="210"/>
-                            <DataGridTextColumn Header="نقش" Binding="{Binding RoleLabel}" Width="155"/>
-                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding Category}" Width="120"/>
-                            <DataGridTextColumn Header="تلفن" Binding="{Binding Phone}" Width="135"/>
-                            <DataGridTextColumn Header="ایمیل" Binding="{Binding Email}" Width="190"/>
-                            <DataGridTextColumn Header="شناسه ملی" Binding="{Binding NationalId}" Width="130"/>
-                            <DataGridTextColumn Header="نشانی" Binding="{Binding Address}" Width="250"/>
-                            <DataGridTextColumn Header="یادداشت" Binding="{Binding Notes}" Width="220"/>
-                            <DataGridTextColumn Header="ماندهٔ ذخیره‌شده*" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="145"/>
-                            <DataGridTextColumn Header="تاریخ ثبت" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="155"/>
+                            <DataGridTextColumn Header="کد شخص" Binding="{Binding Code}" Width="1.05*"/>
+                            <DataGridTextColumn Header="نام / شرکت" Binding="{Binding Name}" Width="2.1*"/>
+                            <DataGridTextColumn Header="نقش" Binding="{Binding RoleLabel}" Width="1.55*"/>
+                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding Category}" Width="1.2*"/>
+                            <DataGridTextColumn Header="تلفن" Binding="{Binding Phone}" Width="1.35*"/>
+                            <DataGridTextColumn Header="ایمیل" Binding="{Binding Email}" Width="1.9*"/>
+                            <DataGridTextColumn Header="شناسه ملی" Binding="{Binding NationalId}" Width="1.3*"/>
+                            <DataGridTextColumn Header="نشانی" Binding="{Binding Address}" Width="2.5*"/>
+                            <DataGridTextColumn Header="یادداشت" Binding="{Binding Notes}" Width="2.2*"/>
+                            <DataGridTextColumn Header="ماندهٔ ذخیره‌شده*" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="1.45*"/>
+                            <DataGridTextColumn Header="تاریخ ثبت" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="1.55*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -248,21 +252,21 @@
                               VerticalScrollBarVisibility="Auto"
                               CanUserResizeColumns="True">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="نام کالا" Binding="{Binding Name}" Width="210"/>
-                            <DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="120"/>
-                            <DataGridTextColumn Header="شماره سریال" Binding="{Binding SerialNumber}" Width="140"/>
-                            <DataGridTextColumn Header="بارکد" Binding="{Binding Barcode}" Width="150"/>
-                            <DataGridTextColumn Header="واحد" Binding="{Binding Unit}" Width="90"/>
-                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding CategoryPath}" Width="190"/>
-                            <DataGridTextColumn Header="موجودی" Binding="{Binding StockQuantity, StringFormat={}{0:N2}}" Width="120"/>
-                            <DataGridTextColumn Header="رزروشده" Binding="{Binding ReservedStock, StringFormat={}{0:N2}}" Width="100"/>
-                            <DataGridTextColumn Header="حداقل موجودی" Binding="{Binding MinStock, StringFormat={}{0:N2}}" Width="120"/>
-                            <DataGridTextColumn Header="قیمت خرید" Binding="{Binding BuyPrice, StringFormat={}{0:N2}}" Width="130"/>
-                            <DataGridTextColumn Header="قیمت فروش" Binding="{Binding SellPrice, StringFormat={}{0:N2}}" Width="130"/>
-                            <DataGridTextColumn Header="وزن" Binding="{Binding Weight, StringFormat={}{0:N2}}" Width="90"/>
-                            <DataGridTextColumn Header="قفسه" Binding="{Binding ShelfLocation}" Width="130"/>
-                            <DataGridTextColumn Header="توضیحات" Binding="{Binding Description}" Width="220"/>
-                            <DataGridTextColumn Header="تصویر / مسیر" Binding="{Binding ImageUrl}" Width="220"/>
+                            <DataGridTextColumn Header="نام کالا" Binding="{Binding Name}" Width="2.1*"/>
+                            <DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="1.2*"/>
+                            <DataGridTextColumn Header="شماره سریال" Binding="{Binding SerialNumber}" Width="1.4*"/>
+                            <DataGridTextColumn Header="بارکد" Binding="{Binding Barcode}" Width="1.5*"/>
+                            <DataGridTextColumn Header="واحد" Binding="{Binding Unit}" Width="0.9*"/>
+                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding CategoryPath}" Width="1.9*"/>
+                            <DataGridTextColumn Header="موجودی" Binding="{Binding StockQuantity, StringFormat={}{0:N2}}" Width="1.2*"/>
+                            <DataGridTextColumn Header="رزروشده" Binding="{Binding ReservedStock, StringFormat={}{0:N2}}" Width="1*"/>
+                            <DataGridTextColumn Header="حداقل موجودی" Binding="{Binding MinStock, StringFormat={}{0:N2}}" Width="1.2*"/>
+                            <DataGridTextColumn Header="قیمت خرید" Binding="{Binding BuyPrice, StringFormat={}{0:N2}}" Width="1.3*"/>
+                            <DataGridTextColumn Header="قیمت فروش" Binding="{Binding SellPrice, StringFormat={}{0:N2}}" Width="1.3*"/>
+                            <DataGridTextColumn Header="وزن" Binding="{Binding Weight, StringFormat={}{0:N2}}" Width="0.9*"/>
+                            <DataGridTextColumn Header="قفسه" Binding="{Binding ShelfLocation}" Width="1.3*"/>
+                            <DataGridTextColumn Header="توضیحات" Binding="{Binding Description}" Width="2.2*"/>
+                            <DataGridTextColumn Header="تصویر / مسیر" Binding="{Binding ImageUrl}" Width="2.2*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -297,20 +301,20 @@
                               VerticalScrollBarVisibility="Auto"
                               CanUserResizeColumns="True">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="نوع سند" Binding="{Binding TypeLabel}" Width="115"/>
-                            <DataGridTextColumn Header="شماره سند" Binding="{Binding DisplayNumber}" Width="130"/>
-                            <DataGridTextColumn Header="کد پیگیری" Binding="{Binding TrackingCode}" Width="190"/>
-                            <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="180"/>
-                            <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="200"/>
-                            <DataGridTextColumn Header="جمع کالاها" Binding="{Binding Subtotal, StringFormat={}{0:N2}}" Width="130"/>
-                            <DataGridTextColumn Header="تخفیف" Binding="{Binding Discount, StringFormat={}{0:N2}}" Width="110"/>
-                            <DataGridTextColumn Header="مالیات" Binding="{Binding TaxAmount, StringFormat={}{0:N2}}" Width="110"/>
-                            <DataGridTextColumn Header="مبلغ نهایی" Binding="{Binding Total, StringFormat={}{0:N2}}" Width="135"/>
-                            <DataGridTextColumn Header="نقدی" Binding="{Binding CashAmount, StringFormat={}{0:N2}}" Width="110"/>
-                            <DataGridTextColumn Header="چک" Binding="{Binding CheckAmount, StringFormat={}{0:N2}}" Width="110"/>
-                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy}" Width="110"/>
-                            <DataGridTextColumn Header="سررسید" Binding="{Binding DueDate, StringFormat=dd/MM/yyyy}" Width="110"/>
-                            <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="110"/>
+                            <DataGridTextColumn Header="نوع سند" Binding="{Binding TypeLabel}" Width="1.15*"/>
+                            <DataGridTextColumn Header="شماره سند" Binding="{Binding DisplayNumber}" Width="1.3*"/>
+                            <DataGridTextColumn Header="کد پیگیری" Binding="{Binding TrackingCode}" Width="1.9*"/>
+                            <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="1.8*"/>
+                            <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="2*"/>
+                            <DataGridTextColumn Header="جمع کالاها" Binding="{Binding Subtotal, StringFormat={}{0:N2}}" Width="1.3*"/>
+                            <DataGridTextColumn Header="تخفیف" Binding="{Binding Discount, StringFormat={}{0:N2}}" Width="1.1*"/>
+                            <DataGridTextColumn Header="مالیات" Binding="{Binding TaxAmount, StringFormat={}{0:N2}}" Width="1.1*"/>
+                            <DataGridTextColumn Header="مبلغ نهایی" Binding="{Binding Total, StringFormat={}{0:N2}}" Width="1.35*"/>
+                            <DataGridTextColumn Header="نقدی" Binding="{Binding CashAmount, StringFormat={}{0:N2}}" Width="1.1*"/>
+                            <DataGridTextColumn Header="چک" Binding="{Binding CheckAmount, StringFormat={}{0:N2}}" Width="1.1*"/>
+                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy}" Width="1.1*"/>
+                            <DataGridTextColumn Header="سررسید" Binding="{Binding DueDate, StringFormat=dd/MM/yyyy}" Width="1.1*"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.1*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -338,12 +342,12 @@
                     </StackPanel>
                     <DataGrid x:Name="PaymentsGrid" Grid.Row="1">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="شماره فاکتور" Binding="{Binding InvoiceNumber}" Width="120"/>
+                            <DataGridTextColumn Header="شماره فاکتور" Binding="{Binding InvoiceNumber}" Width="1.2*"/>
                             <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="*"/>
-                            <DataGridTextColumn Header="مبلغ تسویه" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="170"/>
-                            <DataGridTextColumn Header="روش" Binding="{Binding Method}" Width="130"/>
+                            <DataGridTextColumn Header="مبلغ تسویه" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="1.7*"/>
+                            <DataGridTextColumn Header="روش" Binding="{Binding Method}" Width="1.3*"/>
                             <DataGridTextColumn Header="پیگیری" Binding="{Binding Reference}" Width="*"/>
-                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="145"/>
+                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="1.45*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -371,10 +375,10 @@
                     <DataGrid x:Name="ExpensesGrid" Grid.Row="1">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="عنوان" Binding="{Binding Title}" Width="*"/>
-                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding Category}" Width="180"/>
-                            <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="170"/>
+                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding Category}" Width="1.8*"/>
+                            <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="1.7*"/>
                             <DataGridTextColumn Header="توضیحات" Binding="{Binding Notes}" Width="*"/>
-                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="145"/>
+                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="1.45*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -454,12 +458,12 @@
                         <TextBlock Text="مانده و گردش حساب‌ها" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
                         <DataGrid x:Name="FinancialAccountsGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MinHeight="220" MaxHeight="420">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="90"/>
+                                <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="0.9*"/>
                                 <DataGridTextColumn Header="نام حساب" Binding="{Binding Name}" Width="*"/>
-                                <DataGridTextColumn Header="نوع" Binding="{Binding Type}" Width="130"/>
-                                <DataGridTextColumn Header="بدهکار" Binding="{Binding Debit, StringFormat=N2}" Width="130"/>
-                                <DataGridTextColumn Header="بستانکار" Binding="{Binding Credit, StringFormat=N2}" Width="130"/>
-                                <DataGridTextColumn Header="مانده (بدهکار - بستانکار)" Binding="{Binding Balance, StringFormat=N2}" Width="190"/>
+                                <DataGridTextColumn Header="نوع" Binding="{Binding Type}" Width="1.3*"/>
+                                <DataGridTextColumn Header="بدهکار" Binding="{Binding Debit, StringFormat=N2}" Width="1.3*"/>
+                                <DataGridTextColumn Header="بستانکار" Binding="{Binding Credit, StringFormat=N2}" Width="1.3*"/>
+                                <DataGridTextColumn Header="مانده (بدهکار - بستانکار)" Binding="{Binding Balance, StringFormat=N2}" Width="1.9*"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <Button Content="خروجی CSV گزارش مالی کامل" Click="ExportFinancialReports_Click" HorizontalAlignment="Right" Margin="0,12,0,0"/>
@@ -481,14 +485,14 @@
                     </StackPanel>
                     <DataGrid x:Name="DueCalendarGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="تاریخ سررسید" Binding="{Binding DueDate}" Width="135"/>
-                            <DataGridTextColumn Header="نوع تعهد" Binding="{Binding Kind}" Width="170"/>
-                            <DataGridTextColumn Header="شماره سند/چک" Binding="{Binding DocumentNumber}" Width="135"/>
+                            <DataGridTextColumn Header="تاریخ سررسید" Binding="{Binding DueDate}" Width="1.35*"/>
+                            <DataGridTextColumn Header="نوع تعهد" Binding="{Binding Kind}" Width="1.7*"/>
+                            <DataGridTextColumn Header="شماره سند/چک" Binding="{Binding DocumentNumber}" Width="1.35*"/>
                             <DataGridTextColumn Header="طرف حساب" Binding="{Binding Contact}" Width="*"/>
-                            <DataGridTextColumn Header="مبلغ باز" Binding="{Binding Amount, StringFormat=N2}" Width="135"/>
-                            <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="170"/>
-                            <DataGridTextColumn Header="مانده تا سررسید" Binding="{Binding Days}" Width="145"/>
-                            <DataGridTextColumn Header="اولویت" Binding="{Binding Priority}" Width="120"/>
+                            <DataGridTextColumn Header="مبلغ باز" Binding="{Binding Amount, StringFormat=N2}" Width="1.35*"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.7*"/>
+                            <DataGridTextColumn Header="مانده تا سررسید" Binding="{Binding Days}" Width="1.45*"/>
+                            <DataGridTextColumn Header="اولویت" Binding="{Binding Priority}" Width="1.2*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </DockPanel>
@@ -534,17 +538,17 @@
                     </StackPanel>
                     <DataGrid x:Name="ChecksGrid" Grid.Row="1">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="100"/>
-                            <DataGridTextColumn Header="دارنده / ذی‌نفع" Binding="{Binding HolderName}" Width="190"/>
-                            <DataGridTextColumn Header="بانک" Binding="{Binding BankName}" Width="110"/>
-                            <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="140"/>
-                            <DataGridTextColumn Header="شناسه صیادی" Binding="{Binding SayadId}" Width="150"/>
-                            <DataGridTextColumn Header="شماره چک" Binding="{Binding CheckNumber}" Width="110"/>
-                            <DataGridTextColumn Header="سررسید شمسی" Binding="{Binding DueDateLabel}" Width="110"/>
-                            <DataGridTextColumn Header="تاریخ صدور" Binding="{Binding IssueDateLabel}" Width="100"/>
-                            <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="130"/>
-                            <DataGridTextColumn Header="اولویت" Binding="{Binding PriorityLabel}" Width="95"/>
-                            <DataGridTextColumn Header="شخص مرتبط" Binding="{Binding PersonName}" Width="150"/>
+                            <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="1*"/>
+                            <DataGridTextColumn Header="دارنده / ذی‌نفع" Binding="{Binding HolderName}" Width="1.9*"/>
+                            <DataGridTextColumn Header="بانک" Binding="{Binding BankName}" Width="1.1*"/>
+                            <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="1.4*"/>
+                            <DataGridTextColumn Header="شناسه صیادی" Binding="{Binding SayadId}" Width="1.5*"/>
+                            <DataGridTextColumn Header="شماره چک" Binding="{Binding CheckNumber}" Width="1.1*"/>
+                            <DataGridTextColumn Header="سررسید شمسی" Binding="{Binding DueDateLabel}" Width="1.1*"/>
+                            <DataGridTextColumn Header="تاریخ صدور" Binding="{Binding IssueDateLabel}" Width="1*"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="1.3*"/>
+                            <DataGridTextColumn Header="اولویت" Binding="{Binding PriorityLabel}" Width="0.95*"/>
+                            <DataGridTextColumn Header="شخص مرتبط" Binding="{Binding PersonName}" Width="1.5*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -566,17 +570,17 @@
                     </StackPanel>
                     <DataGrid x:Name="VouchersGrid" Grid.Row="1" MouseDoubleClick="VouchersGrid_MouseDoubleClick" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="شماره" Binding="{Binding Number}" Width="75"/>
-                            <DataGridTextColumn Header="کد پیگیری" Binding="{Binding TrackingCode}" Width="175"/>
-                            <DataGridTextColumn Header="نوع سند" Binding="{Binding TypeLabel}" Width="110"/>
-                            <DataGridTextColumn Header="نوع گردش" Binding="{Binding MovementTypeLabel}" Width="145"/>
-                            <DataGridTextColumn Header="تاریخ شمسی" Binding="{Binding DateLabel}" Width="110"/>
-                            <DataGridTextColumn Header="شخص مرتبط" Binding="{Binding PersonName}" Width="175"/>
-                            <DataGridTextColumn Header="تعداد اقلام" Binding="{Binding ItemCount}" Width="85"/>
-                            <DataGridTextColumn Header="جمع تعداد" Binding="{Binding QuantityTotal, StringFormat={}{0:N2}}" Width="110"/>
-                            <DataGridTextColumn Header="ارزش تخمینی" Binding="{Binding EstimatedValue, StringFormat={}{0:N2}}" Width="130"/>
-                            <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="110"/>
-                            <DataGridTextColumn Header="توضیحات" Binding="{Binding Notes}" Width="240"/>
+                            <DataGridTextColumn Header="شماره" Binding="{Binding Number}" Width="0.75*"/>
+                            <DataGridTextColumn Header="کد پیگیری" Binding="{Binding TrackingCode}" Width="1.75*"/>
+                            <DataGridTextColumn Header="نوع سند" Binding="{Binding TypeLabel}" Width="1.1*"/>
+                            <DataGridTextColumn Header="نوع گردش" Binding="{Binding MovementTypeLabel}" Width="1.45*"/>
+                            <DataGridTextColumn Header="تاریخ شمسی" Binding="{Binding DateLabel}" Width="1.1*"/>
+                            <DataGridTextColumn Header="شخص مرتبط" Binding="{Binding PersonName}" Width="1.75*"/>
+                            <DataGridTextColumn Header="تعداد اقلام" Binding="{Binding ItemCount}" Width="0.85*"/>
+                            <DataGridTextColumn Header="جمع تعداد" Binding="{Binding QuantityTotal, StringFormat={}{0:N2}}" Width="1.1*"/>
+                            <DataGridTextColumn Header="ارزش تخمینی" Binding="{Binding EstimatedValue, StringFormat={}{0:N2}}" Width="1.3*"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="1.1*"/>
+                            <DataGridTextColumn Header="توضیحات" Binding="{Binding Notes}" Width="2.4*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -604,25 +608,25 @@
                         <TabItem Header="دفتر روزنامه">
                             <DataGrid x:Name="LedgerEntriesGrid" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="شماره" Binding="{Binding DisplayNumber}" Width="90"/>
-                                    <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="105"/>
+                                    <DataGridTextColumn Header="شماره" Binding="{Binding DisplayNumber}" Width="0.9*"/>
+                                    <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="1.05*"/>
                                     <DataGridTextColumn Header="شرح سند" Binding="{Binding Description}" Width="*"/>
-                                    <DataGridTextColumn Header="بدهکار" Binding="{Binding DebitAccount}" Width="190"/>
-                                    <DataGridTextColumn Header="بستانکار" Binding="{Binding CreditAccount}" Width="190"/>
-                                    <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="145"/>
-                                    <DataGridTextColumn Header="نوع سند" Binding="{Binding DocumentTypeLabel}" Width="110"/>
-                                    <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="95"/>
+                                    <DataGridTextColumn Header="بدهکار" Binding="{Binding DebitAccount}" Width="1.9*"/>
+                                    <DataGridTextColumn Header="بستانکار" Binding="{Binding CreditAccount}" Width="1.9*"/>
+                                    <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="1.45*"/>
+                                    <DataGridTextColumn Header="نوع سند" Binding="{Binding DocumentTypeLabel}" Width="1.1*"/>
+                                    <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="0.95*"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
                         <TabItem Header="کدینگ حساب‌ها">
                             <DataGrid x:Name="LedgerAccountsGrid" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="100"/>
+                                    <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="1*"/>
                                     <DataGridTextColumn Header="عنوان حساب" Binding="{Binding Name}" Width="*"/>
-                                    <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="140"/>
-                                    <DataGridTextColumn Header="سطح" Binding="{Binding LevelLabel}" Width="110"/>
-                                    <DataGridTextColumn Header="حساب والد" Binding="{Binding ParentName}" Width="220"/>
+                                    <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="1.4*"/>
+                                    <DataGridTextColumn Header="سطح" Binding="{Binding LevelLabel}" Width="1.1*"/>
+                                    <DataGridTextColumn Header="حساب والد" Binding="{Binding ParentName}" Width="2.2*"/>
                                     <DataGridCheckBoxColumn Header="فعال" Binding="{Binding IsActive}" Width="70"/>
                                 </DataGrid.Columns>
                             </DataGrid>
@@ -630,12 +634,12 @@
                         <TabItem Header="تراز آزمایشی">
                             <DataGrid x:Name="TrialBalanceGrid" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="کد حساب" Binding="{Binding Code}" Width="100"/>
+                                    <DataGridTextColumn Header="کد حساب" Binding="{Binding Code}" Width="1*"/>
                                     <DataGridTextColumn Header="حساب" Binding="{Binding Name}" Width="*"/>
-                                    <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="135"/>
-                                    <DataGridTextColumn Header="گردش بدهکار" Binding="{Binding Debit, StringFormat={}{0:N2}}" Width="155"/>
-                                    <DataGridTextColumn Header="گردش بستانکار" Binding="{Binding Credit, StringFormat={}{0:N2}}" Width="155"/>
-                                    <DataGridTextColumn Header="مانده (بدهکار منهای بستانکار)" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="205"/>
+                                    <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="1.35*"/>
+                                    <DataGridTextColumn Header="گردش بدهکار" Binding="{Binding Debit, StringFormat={}{0:N2}}" Width="1.55*"/>
+                                    <DataGridTextColumn Header="گردش بستانکار" Binding="{Binding Credit, StringFormat={}{0:N2}}" Width="1.55*"/>
+                                    <DataGridTextColumn Header="مانده (بدهکار منهای بستانکار)" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="2.05*"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </TabItem>
@@ -707,26 +711,26 @@
                         <TextBlock Text="روند روزانه ماندهٔ پیش‌بینی‌شده" FontSize="18" FontWeight="Bold" Margin="4,16,4,8"/>
                         <DataGrid x:Name="CashFlowProjectionGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MinHeight="130" MaxHeight="290">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="130"/>
-                                <DataGridTextColumn Header="ورودی" Binding="{Binding Inflows, StringFormat=N2}" Width="145"/>
-                                <DataGridTextColumn Header="خروجی" Binding="{Binding Outflows, StringFormat=N2}" Width="145"/>
-                                <DataGridTextColumn Header="تغییر خالص" Binding="{Binding NetChange, StringFormat=N2}" Width="145"/>
-                                <DataGridTextColumn Header="مانده پس از رخدادها" Binding="{Binding ProjectedBalance, StringFormat=N2}" Width="190"/>
-                                <DataGridTextColumn Header="تعداد تعهدها" Binding="{Binding MovementCount}" Width="120"/>
-                                <DataGridTextColumn Header="موارد سررسیدگذشته" Binding="{Binding OverdueCount}" Width="150"/>
+                                <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="1.3*"/>
+                                <DataGridTextColumn Header="ورودی" Binding="{Binding Inflows, StringFormat=N2}" Width="1.45*"/>
+                                <DataGridTextColumn Header="خروجی" Binding="{Binding Outflows, StringFormat=N2}" Width="1.45*"/>
+                                <DataGridTextColumn Header="تغییر خالص" Binding="{Binding NetChange, StringFormat=N2}" Width="1.45*"/>
+                                <DataGridTextColumn Header="مانده پس از رخدادها" Binding="{Binding ProjectedBalance, StringFormat=N2}" Width="1.9*"/>
+                                <DataGridTextColumn Header="تعداد تعهدها" Binding="{Binding MovementCount}" Width="1.2*"/>
+                                <DataGridTextColumn Header="موارد سررسیدگذشته" Binding="{Binding OverdueCount}" Width="1.5*"/>
                             </DataGrid.Columns>
                         </DataGrid>
                         <TextBlock Text="جزئیات تعهدهای لحاظ‌شده در پیش‌بینی" FontSize="18" FontWeight="Bold" Margin="4,16,4,8"/>
                         <DataGrid x:Name="CashFlowMovementsGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MinHeight="160" MaxHeight="360">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="تاریخ پیش‌بینی" Binding="{Binding Date}" Width="130"/>
-                                <DataGridTextColumn Header="جهت" Binding="{Binding Direction}" Width="100"/>
-                                <DataGridTextColumn Header="نوع تعهد" Binding="{Binding Kind}" Width="170"/>
-                                <DataGridTextColumn Header="شماره" Binding="{Binding DocumentNumber}" Width="130"/>
+                                <DataGridTextColumn Header="تاریخ پیش‌بینی" Binding="{Binding Date}" Width="1.3*"/>
+                                <DataGridTextColumn Header="جهت" Binding="{Binding Direction}" Width="1*"/>
+                                <DataGridTextColumn Header="نوع تعهد" Binding="{Binding Kind}" Width="1.7*"/>
+                                <DataGridTextColumn Header="شماره" Binding="{Binding DocumentNumber}" Width="1.3*"/>
                                 <DataGridTextColumn Header="طرف حساب" Binding="{Binding Counterparty}" Width="*"/>
-                                <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat=N2}" Width="140"/>
-                                <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="130"/>
-                                <DataGridTextColumn Header="سررسید" Binding="{Binding DueStatus}" Width="130"/>
+                                <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat=N2}" Width="1.4*"/>
+                                <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.3*"/>
+                                <DataGridTextColumn Header="سررسید" Binding="{Binding DueStatus}" Width="1.3*"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </StackPanel>
@@ -789,7 +793,7 @@
                         </Border>
                         <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
                             <StackPanel>
-                                <TextBlock Text="تنظیمات فاکتور و چاپ" FontSize="17" FontWeight="Bold"/>
+                                <TextBlock x:Name="AdvancedSettingsSection" Text="تنظیمات فاکتور و چاپ" FontSize="17" FontWeight="Bold"/>
                                 <UniformGrid Columns="2" Margin="0,12,0,0">
                                     <StackPanel Margin="0,0,12,10"><TextBlock Text="قالب پیش‌فرض" Margin="0,0,0,5"/><ComboBox x:Name="InvoiceThemeSelector" MinHeight="34" SelectedIndex="0">
                                         <ComboBoxItem Content="شرکتی مدرن" Tag="modern"/><ComboBoxItem Content="رسمی و اداری" Tag="official"/><ComboBoxItem Content="لوکس / مدیریتی" Tag="premium"/><ComboBoxItem Content="حرارتی" Tag="thermal"/><ComboBoxItem Content="مینیمال" Tag="minimal"/><ComboBoxItem Content="کلاسیک" Tag="classic"/><ComboBoxItem Content="هوشمند" Tag="smart"/><ComboBoxItem Content="رنگی" Tag="colorful"/><ComboBoxItem Content="صنعتی" Tag="industrial"/><ComboBoxItem Content="خلاقانه" Tag="creative"/><ComboBoxItem Content="ایرانی" Tag="persian"/>
@@ -883,13 +887,13 @@
                         <TextBlock x:Name="KardexModuleSummary" Text="برای مشاهدهٔ گردش، کالا را انتخاب کنید." Foreground="#334155" FontWeight="SemiBold" Margin="0,4,0,4"/>
                         <DataGrid x:Name="KardexModuleGrid" MinHeight="280" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="110"/>
-                                <DataGridTextColumn Header="نوع گردش" Binding="{Binding Movement}" Width="155"/>
-                                <DataGridTextColumn Header="سند مرجع" Binding="{Binding Document}" Width="160"/>
+                                <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="1.1*"/>
+                                <DataGridTextColumn Header="نوع گردش" Binding="{Binding Movement}" Width="1.55*"/>
+                                <DataGridTextColumn Header="سند مرجع" Binding="{Binding Document}" Width="1.6*"/>
                                 <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="*"/>
-                                <DataGridTextColumn Header="ورودی" Binding="{Binding Incoming, StringFormat={}{0:N2}}" Width="110"/>
-                                <DataGridTextColumn Header="خروجی" Binding="{Binding Outgoing, StringFormat={}{0:N2}}" Width="110"/>
-                                <DataGridTextColumn Header="مانده" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="120"/>
+                                <DataGridTextColumn Header="ورودی" Binding="{Binding Incoming, StringFormat={}{0:N2}}" Width="1.1*"/>
+                                <DataGridTextColumn Header="خروجی" Binding="{Binding Outgoing, StringFormat={}{0:N2}}" Width="1.1*"/>
+                                <DataGridTextColumn Header="مانده" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="1.2*"/>
                             </DataGrid.Columns>
                         </DataGrid>
                     </StackPanel>
