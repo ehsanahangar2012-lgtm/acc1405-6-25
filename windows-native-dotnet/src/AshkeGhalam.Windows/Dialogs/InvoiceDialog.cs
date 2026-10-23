@@ -301,9 +301,9 @@ public sealed class InvoiceDialog : Window
     private void RefreshTotals()
     {
         var subtotal = AccountingRules.Money(_lines.Sum(l => l.LineTotal));
-        var discount = PersianNumberParser.TryParseDecimal(_discount.Text, out var d) && d >= 0m ? d : 0m;
-        var tax = PersianNumberParser.TryParseDecimal(_tax.Text, out var t) && t >= 0m ? t : 0m;
-        var cash = PersianNumberParser.TryParseDecimal(_cashAmount.Text, out var c) && c >= 0m ? c : 0m;
+        var discount = TryParseAmount(_discount.Text, out var d) && d >= 0m ? d : 0m;
+        var tax = TryParseAmount(_tax.Text, out var t) && t >= 0m ? t : 0m;
+        var cash = TryParseAmount(_cashAmount.Text, out var c) && c >= 0m ? c : 0m;
         var total = AccountingRules.Money(subtotal - discount + tax);
         var remaining = total - cash;
         _totals.Text = $"جمع کالاها: {subtotal:N2}   |   تخفیف: {discount:N2}   |   مالیات: {tax:N2}\nمبلغ نهایی: {total:N2}   |   نقدی: {cash:N2}   |   مانده پس از نقدی: {remaining:N2}";
@@ -377,6 +377,20 @@ public sealed class InvoiceDialog : Window
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "بررسی سند", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static bool TryParseAmount(string text, out decimal value)
+    {
+        try
+        {
+            value = PersianNumberParser.ParseDecimal(text, "مبلغ");
+            return true;
+        }
+        catch (Exception)
+        {
+            value = 0m;
+            return false;
         }
     }
 
