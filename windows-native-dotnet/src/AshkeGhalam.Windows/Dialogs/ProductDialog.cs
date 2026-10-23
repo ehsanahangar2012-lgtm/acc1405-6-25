@@ -120,13 +120,16 @@ public sealed class ProductDialog : Window
         };
         buttons.Children.Add(save);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 36, IsCancel = true });
-        root.Children.Add(buttons);
-
-        Content = new ScrollViewer
-        {
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Content = root
-        };
+        var layout = new Grid { Margin = new Thickness(0) };
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var body = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root };
+        Grid.SetRow(body, 0);
+        Grid.SetRow(buttons, 1);
+        buttons.Margin = new Thickness(22, 10, 22, 18);
+        layout.Children.Add(body);
+        layout.Children.Add(buttons);
+        Content = layout;
 
         save.Click += (_, _) => SaveResult();
     }
