@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private VerifiedLicensePayload? _sessionEntitlements;
     private string _sessionLicenseFailure = "";
     private bool _canWrite;
+    private string _startupAccountingWarning = "";
 
     public MainWindow()
     {
@@ -32,10 +33,37 @@ public partial class MainWindow : Window
     {
         try
         {
-            _data = _store.Load();
+            var loaded = _store.Load();
+            _data = loaded;
+
+            // Safely reconcile legacy operational records on a clone. If the account chart
+            // has a conflict, preserve all loaded business data and report the accounting issue.
+            try
+            {
+                var reconciled = loaded.DeepCopy();
+                var oldAccountCount = reconciled.LedgerAccounts.Count;
+                var oldJournalCount = reconciled.JournalEntries.Count;
+                NativeOperationalPostingService.Reconcile(reconciled);
+                if (reconciled.LedgerAccounts.Count != oldAccountCount ||
+                    reconciled.JournalEntries.Count != oldJournalCount)
+                {
+                    AccountingDataValidator.Validate(reconciled);
+                    _store.Save(reconciled);
+                    _data = reconciled;
+                    _startupAccountingWarning = "ثبت خودکار اسناد عملیاتی در دفتر روزنامه تکمیل شد.";
+                }
+            }
+            catch (Exception accountingEx)
+            {
+                _data = loaded;
+                _startupAccountingWarning = "تطبیق حسابداری خودکار انجام نشد: " + accountingEx.Message;
+            }
+
             _canWrite = true;
             StorageStatus.Text = "ذخیره‌سازی محلی آماده";
-            FooterStatus.Text = "ذخیره‌سازی خودکار روی این رایانه فعال است؛ پشتیبان رمزگذاری‌شده تهیه کنید.";
+            FooterStatus.Text = string.IsNullOrWhiteSpace(_startupAccountingWarning)
+                ? "ذخیره‌سازی خودکار روی این رایانه فعال است؛ پشتیبان رمزگذاری‌شده تهیه کنید."
+                : _startupAccountingWarning;
             RefreshAll();
             RefreshLicensePanel();
             _ = RefreshSavedLicenseOnlineAsync();
@@ -73,6 +101,7 @@ public partial class MainWindow : Window
         {
             var next = _data.DeepCopy();
             mutation(next);
+            NativeOperationalPostingService.Reconcile(next);
             AccountingDataValidator.Validate(next);
             _store.Save(next);
             _data = next;
