@@ -37,6 +37,8 @@ assert.match(html, /data-check-status/, "Check status updates must be available.
 assert.doesNotMatch(html, /data-page="migration"/, "The client navigation must not expose unrelated/miscellaneous modules.");
 assert.match(html, /class="nav-btn" data-page="moadian"/, "Accounting navigation should expose taxpayer module.");
 assert.match(html, /class="nav-btn" data-page="companies"/, "Accounting navigation should expose company switching.");
+assert.match(html, /data-page-link="vouchers"/, "Kardex page should link to the voucher registration page.");
+assert.match(html, /const navLink=e\.target\.closest\('\[data-page-link\]'\)/, "Internal accounting page links must navigate.");
 assert.match(html, /qrcode-generator by Kazuhiko Arase, MIT licensed/, "Offline QR library attribution and license notice must be included.");
 assert.match(html, /refreshInvoiceCustomerOptions\(customer\.id\)/, "Saved people should be offered in the open invoice.");
 assert.match(html, /refreshInvoiceProductOptions\(product\.id\)/, "Saved products should be offered in the open invoice.");
