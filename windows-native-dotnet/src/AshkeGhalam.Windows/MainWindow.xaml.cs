@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, int> _gridPages = new(StringComparer.Ordinal);
     private string _startupAccountingWarning = "";
     private static bool _textBoxSelectAllHandlersRegistered;
+    private string _activeNavigationKey = "dashboard";
     private const string FooterNoteNoReturns = "کالای فروخته‌شده پس گرفته نمی‌شود.";
     private const string FooterNotePaymentTerms = "لطفاً هنگام پرداخت شماره فاکتور را ذکر کنید.";
     private const string FooterNoteDeliveryTerms = "تحویل طبق توافق طرفین انجام می‌شود.";
@@ -100,10 +101,17 @@ public partial class MainWindow : Window
         if (!_uiReady || !IsLoaded || ApplicationThemeSelector.SelectedItem is not ComboBoxItem selected)
             return;
         ApplicationThemeService.Apply(this, selected.Tag?.ToString());
+        UpdateNavigationSelection(_activeNavigationKey);
     }
 
     private void ApplyCurrentThemeTo(Window dialog) =>
         ApplicationThemeService.ApplyWhenLoaded(dialog, _data.Preferences?.ApplicationTheme ?? "light");
+
+    private void ApplyMainWindowTheme()
+    {
+        ApplicationThemeService.Apply(this, _data.Preferences?.ApplicationTheme ?? "light");
+        UpdateNavigationSelection(_activeNavigationKey);
+    }
 
     private static void TextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
@@ -160,7 +168,7 @@ public partial class MainWindow : Window
                 : _startupAccountingWarning;
             RefreshAll();
             RefreshLicensePanel();
-            ApplicationThemeService.Apply(this, _data.Preferences.ApplicationTheme);
+            ApplyMainWindowTheme();
             _ = RefreshSavedLicenseOnlineAsync();
         }
         catch (Exception ex)
@@ -182,12 +190,11 @@ public partial class MainWindow : Window
 
         // The selected-content-only TabControl template realizes one page at a time.
         // Reapply the current palette after WPF has created the newly selected page.
-        var theme = _data.Preferences?.ApplicationTheme ?? "light";
-        ApplicationThemeService.Apply(this, theme);
+        ApplyMainWindowTheme();
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
         {
             if (IsLoaded)
-                ApplicationThemeService.Apply(this, _data.Preferences?.ApplicationTheme ?? "light");
+                ApplyMainWindowTheme();
         }));
     }
 
@@ -2539,7 +2546,7 @@ public partial class MainWindow : Window
                 CustomInvoiceFootnoteOptions = ParseCustomInvoiceFootnoteOptions(SettingsCustomFootnoteOptions.Text)
             };
         }, "تنظیمات حسابداری ذخیره شد؛ تم رابط کاربری اعمال شد.");
-        ApplicationThemeService.Apply(this, _data.Preferences.ApplicationTheme);
+        ApplyMainWindowTheme();
     }
 
     private void SaveMoadianSettings_Click(object sender, RoutedEventArgs e)
@@ -2742,7 +2749,9 @@ public partial class MainWindow : Window
 
     private void UpdateNavigationSelection(string activeKey)
     {
+        _activeNavigationKey = activeKey;
         if (FindName("NavigationRoot") is not DependencyObject root) return;
+        var isDark = ApplicationThemeService.Normalize(_data.Preferences?.ApplicationTheme) == "dark";
         var pending = new Stack<DependencyObject>();
         pending.Push(root);
         while (pending.Count > 0)
@@ -2750,10 +2759,17 @@ public partial class MainWindow : Window
             var current = pending.Pop();
             if (current is Button button && button.Tag is string key && NativeModuleLinks.ContainsKey(key))
             {
-                button.Background = string.Equals(key, activeKey, StringComparison.Ordinal)
+                var isActive = string.Equals(key, activeKey, StringComparison.Ordinal);
+                button.Background = isActive
                     ? new SolidColorBrush(Color.FromRgb(15, 118, 110))
-                    : new SolidColorBrush(Color.FromRgb(23, 32, 51));
-                button.Foreground = Brushes.WhiteSmoke;
+                    : new SolidColorBrush(isDark ? Color.FromRgb(31, 41, 55) : Colors.White);
+                button.Foreground = isActive
+                    ? Brushes.White
+                    : new SolidColorBrush(isDark ? Color.FromRgb(229, 231, 235) : Color.FromRgb(31, 41, 55));
+                button.BorderBrush = new SolidColorBrush(isDark
+                    ? Color.FromRgb(65, 81, 106)
+                    : Color.FromRgb(203, 213, 225));
+                button.BorderThickness = new Thickness(1);
             }
             if (current is not Visual) continue;
             for (var i = 0; i < VisualTreeHelper.GetChildrenCount(current); i++)
