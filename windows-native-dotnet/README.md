@@ -14,6 +14,10 @@
 - ذخیرهٔ خودکار محلی با DPAPI ویندوز برای حساب کاربری جاری؛ فایل داده در مسیر `%LOCALAPPDATA%\AshkeGhalam\WindowsNative\accounting-data.dat`.
 - پشتیبان قابل انتقال با رمز انتخابی کاربر: AES-256-GCM و PBKDF2-SHA256؛ بازیابی قبل از جایگزینی، ساختار و صحت رمزنگاری را بررسی می‌کند.
 - ورودی اعداد فارسی و عربی.
+- اتصال و بررسی آنلاین لایسنس با همان مرجع HTTPS نسخه اصلی، دریافت کلید عمومی، اعتبارسنجی رسید RSA-SHA256، تطبیق کلید/فضای کاری/HWID/تاریخ/سهمیه و ذخیره رسید تأییدشده با DPAPI. این کار به معنی پیاده‌سازی کامل کنترل سهمیه/قابلیت در تمام ماژول‌ها نیست.
+
+## وضعیت مهاجرت (۲۳ اکتبر ۲۰۲۶)
+این نسخه به‌صورت موازی و آزمایشی نگهداری می‌شود. مسیرهای اصلی مشتری، کالا/انبار، فاکتور، دریافت، هزینه، گزارش، پشتیبان، چک، حواله و دفتر دوبل در پوستهٔ WPF وجود دارند، اما دامنهٔ برخی قابلیت‌ها نسبت به برنامهٔ اصلی محدودتر است. کدینگ و دفتر دوبل جدید هنوز از فاکتورها/دریافت‌ها به‌طور خودکار سند تولید نمی‌کند. منوهای باقی‌مانده در همه موارد پیاده‌سازی نشده‌اند؛ صفحات دارای برچسب «در حال مهاجرت» قابلیت فعال محسوب نمی‌شوند.
 
 ## راه‌اندازی سریع
 ۱. فایل ZIP مربوط به artifact را از بخش Artifacts اجرای موفق workflow دانلود و در یک پوشهٔ محلی استخراج کنید.
@@ -37,4 +41,4 @@
     dotnet test windows-native-dotnet/tests/AshkeGhalam.Windows.Tests.csproj -c Release
     dotnet publish windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o ./artifacts/windows
 
-گزارش ممیزی و مرزهای مهاجرت در [AUDIT.md](AUDIT.md) و معماری پیشنهادی در [ARCHITECTURE.md](ARCHITECTURE.md) نگهداری می‌شوند.
+برای آخرین نتایج ساخت/آزمون به اجرای workflow «Validate native Windows WPF» و Draft PR شماره ۲ مراجعه کنید. گزارش ممیزی و مرزهای مهاجرت در [AUDIT.md](AUDIT.md) و معماری پیشنهادی در [ARCHITECTURE.md](ARCHITECTURE.md) هستند.
