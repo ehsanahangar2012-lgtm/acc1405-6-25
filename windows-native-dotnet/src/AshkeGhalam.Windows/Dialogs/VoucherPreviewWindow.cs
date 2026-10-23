@@ -17,7 +17,9 @@ public sealed class VoucherPreviewWindow : Window
     public VoucherPreviewWindow(Window owner, VoucherRecord voucher, CompanyProfileRecord? company)
     {
         _voucher = voucher ?? throw new ArgumentNullException(nameof(voucher));
-        Owner = owner; Title = $"پیش‌نمایش حواله {voucher.Number:N0}";
+        Owner = owner; Title = voucher.Number > 0
+            ? $"پیش‌نمایش حواله {voucher.Number:N0}"
+            : "پیش‌نمایش حواله پیش از ثبت";
         Width = 1000; Height = 800; MinWidth = 760; MinHeight = 560;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft;
@@ -57,9 +59,11 @@ public sealed class VoucherPreviewWindow : Window
             Padding = new Thickness(4), Margin = new Thickness(0, 0, 0, 8) }));
         document.Blocks.Add(new Paragraph(new Run(string.IsNullOrWhiteSpace(company?.LegalName) ? company?.Name ?? "اشک قلم" : company.LegalName))
         { FontSize = 22, FontWeight = FontWeights.Bold, Foreground = accent, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 0, 0, 4) });
-        document.Blocks.Add(new Paragraph(new Run($"حواله / رسید انبار — شماره {voucher.Number:N0}"))
+        var numberLabel = voucher.Number > 0 ? voucher.Number.ToString("N0", CultureInfo.GetCultureInfo("fa-IR")) : "پس از ثبت تعیین می‌شود";
+        document.Blocks.Add(new Paragraph(new Run($"حواله / رسید انبار — شماره {numberLabel}"))
         { FontSize = 17, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 0, 0, 10) });
-        document.Blocks.Add(new Paragraph(new Run($"کد پیگیری: {voucher.TrackingCode}    تاریخ: {FormatPersianDate(voucher.Date)}    وضعیت: {StatusLabel(voucher.Status)}")) { TextAlignment = TextAlignment.Right });
+        var trackingLabel = string.IsNullOrWhiteSpace(voucher.TrackingCode) ? "پس از ثبت تولید می‌شود" : voucher.TrackingCode;
+        document.Blocks.Add(new Paragraph(new Run($"کد پیگیری: {trackingLabel}    تاریخ: {FormatPersianDate(voucher.Date)}    وضعیت: {StatusLabel(voucher.Status)}")) { TextAlignment = TextAlignment.Right });
         document.Blocks.Add(new Paragraph(new Run($"نوع سند: {TypeLabel(voucher.Type)}    نوع گردش: {MovementLabel(voucher.MovementType)}")) { TextAlignment = TextAlignment.Right });
         document.Blocks.Add(new Paragraph(new Run($"طرف حساب: {(string.IsNullOrWhiteSpace(voucher.PersonName) ? "—" : voucher.PersonName)}    فاکتور مرتبط: {(string.IsNullOrWhiteSpace(voucher.RelatedInvoiceId) ? "—" : voucher.RelatedInvoiceId)}")) { TextAlignment = TextAlignment.Right });
         if (!string.IsNullOrWhiteSpace(voucher.VehicleNumber) || !string.IsNullOrWhiteSpace(voucher.Supervisor) || !string.IsNullOrWhiteSpace(voucher.ReceiverPhone))
