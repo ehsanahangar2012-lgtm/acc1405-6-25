@@ -19,6 +19,9 @@ public sealed class InvoiceDialog : Window
     private readonly string _defaultInvoiceTheme;
     private readonly bool _showInvoiceQr;
     private readonly CompanyProfileRecord? _companyProfile;
+    private readonly string _defaultInvoicePrefix;
+    private readonly decimal _defaultTaxRatePercent;
+    private readonly CheckBox _taxIsAmount = new() { Content = "مالیات مبلغی است (خاموش: درصد از جمع کالاها)", IsChecked = true, Margin = new Thickness(0, 6, 0, 0) };
 
     private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), ItemsSource = new[]
     {
@@ -59,7 +62,9 @@ public sealed class InvoiceDialog : Window
         Func<Window, ProductRecord?>? quickAddProduct = null,
         string? defaultInvoiceTheme = null,
         bool showInvoiceQr = true,
-        CompanyProfileRecord? companyProfile = null)
+        CompanyProfileRecord? companyProfile = null,
+        string? defaultInvoicePrefix = null,
+        decimal defaultTaxRatePercent = 0m)
     {
         Owner = owner;
         _people = people.ToList();
@@ -70,6 +75,12 @@ public sealed class InvoiceDialog : Window
         _defaultInvoiceTheme = defaultInvoiceTheme ?? "smart";
         _showInvoiceQr = showInvoiceQr;
         _companyProfile = companyProfile;
+        _defaultInvoicePrefix = string.IsNullOrWhiteSpace(defaultInvoicePrefix) ? "INV-" : defaultInvoicePrefix.Trim();
+        _defaultTaxRatePercent = defaultTaxRatePercent is >= 0m and <= 100m ? defaultTaxRatePercent : 0m;
+        _taxIsAmount.IsChecked = _defaultTaxRatePercent == 0m;
+        _tax.Text = _taxIsAmount.IsChecked == true
+            ? "0"
+            : _defaultTaxRatePercent.ToString("0.##", CultureInfo.InvariantCulture);
         Title = "ثبت فاکتور / پیش‌فاکتور";
         Width = 760;
         Height = 900;
@@ -172,7 +183,8 @@ public sealed class InvoiceDialog : Window
         AddField(discountPanel, "تخفیف (مبلغ)", _discount);
         Grid.SetColumn(discountPanel, 0);
         var taxPanel = new StackPanel();
-        AddField(taxPanel, "مالیات (مبلغ)", _tax);
+        AddField(taxPanel, "مالیات (مبلغ یا درصد بر اساس گزینهٔ زیر)", _tax);
+        taxPanel.Children.Add(_taxIsAmount);
         Grid.SetColumn(taxPanel, 2);
         pricing.Children.Add(discountPanel);
         var pricingSpacer = new Border();
@@ -227,6 +239,8 @@ public sealed class InvoiceDialog : Window
         _product.SelectionChanged += (_, _) => ApplyDefaultPrice();
         _discount.TextChanged += (_, _) => RefreshTotals();
         _tax.TextChanged += (_, _) => RefreshTotals();
+        _taxIsAmount.Checked += (_, _) => RefreshTotals();
+        _taxIsAmount.Unchecked += (_, _) => RefreshTotals();
         _cashAmount.TextChanged += (_, _) => RefreshTotals();
         addLine.Click += (_, _) => AddLine();
         remove.Click += (_, _) =>
@@ -391,11 +405,17 @@ public sealed class InvoiceDialog : Window
     {
         var subtotal = AccountingRules.Money(_lines.Sum(l => l.LineTotal));
         var discount = TryParseAmount(_discount.Text, out var d) && d >= 0m ? d : 0m;
-        var tax = TryParseAmount(_tax.Text, out var t) && t >= 0m ? t : 0m;
+        var taxInput = TryParseAmount(_tax.Text, out var parsedTax) && parsedTax >= 0m ? parsedTax : 0m;
+        var isTaxAmount = _taxIsAmount.IsChecked == true;
+        var taxInputValid = isTaxAmount || taxInput <= 100m;
+        var tax = taxInputValid
+            ? (isTaxAmount ? taxInput : AccountingRules.CalculateTax(subtotal, taxInput))
+            : 0m;
         var cash = TryParseAmount(_cashAmount.Text, out var c) && c >= 0m ? c : 0m;
         var total = AccountingRules.Money(subtotal - discount + tax);
         var remaining = total - cash;
-        _totals.Text = $"جمع کالاها: {subtotal:N2}   |   تخفیف: {discount:N2}   |   مالیات: {tax:N2}\nمبلغ نهایی: {total:N2}   |   نقدی: {cash:N2}   |   مانده پس از نقدی: {remaining:N2}";
+        var taxLabel = isTaxAmount ? "مالیات مبلغی" : $"مالیات ({taxInput:N2}٪)";
+        _totals.Text = $"جمع کالاها: {subtotal:N2}   |   تخفیف: {discount:N2}   |   {taxLabel}: {tax:N2}\nمبلغ نهایی: {total:N2}   |   نقدی: {cash:N2}   |   مانده پس از نقدی: {remaining:N2}";
     }
 
     private void RefreshNumberPreview() => _numberPreview.Text = BuildNumberPreview(CurrentType);
@@ -403,7 +423,7 @@ public sealed class InvoiceDialog : Window
     private string BuildNumberPreview(string type)
     {
         var floor = type switch { "SALE" => 1000, "PROFORMA" => 2000, "PURCHASE" => 3000, _ => 0 };
-        var prefix = type switch { "SALE" => "INV-", "PURCHASE" => "PUR-", "PROFORMA" => "PRO-", _ => "" };
+        var prefix = type switch { "SALE" => _defaultInvoicePrefix, "PURCHASE" => "PUR-", "PROFORMA" => "PRO-", _ => "" };
         var number = _invoices.Where(i => i.Type == type).Select(i => i.Number).DefaultIfEmpty(floor).Max() + 1;
         return $"شماره پیشنهادی: {prefix}{number:D4}  •  طرف حساب: {(type == "PURCHASE" ? "تأمین‌کننده" : "مشتری")}";
     }
@@ -418,13 +438,16 @@ public sealed class InvoiceDialog : Window
             throw new InvalidOperationException("حداقل یک قلم به سند اضافه کنید.");
 
         var discount = AccountingRules.Money(PersianNumberParser.ParseDecimal(_discount.Text, "تخفیف"));
-        var tax = AccountingRules.Money(PersianNumberParser.ParseDecimal(_tax.Text, "مالیات"));
+        var taxInput = AccountingRules.Money(PersianNumberParser.ParseDecimal(_tax.Text, "مالیات"));
+        var taxIsAmount = _taxIsAmount.IsChecked == true;
+        var taxRatePercent = taxIsAmount ? 0m : taxInput;
+        var tax = taxIsAmount ? taxInput : AccountingRules.CalculateTax(_lines.Sum(l => l.LineTotal), taxInput);
         var cash = AccountingRules.Money(PersianNumberParser.ParseDecimal(_cashAmount.Text, "مبلغ نقدی"));
         var subtotal = AccountingRules.Money(_lines.Sum(l => l.LineTotal));
         if (discount < 0m || discount > subtotal)
             throw new InvalidOperationException("تخفیف باید بین صفر و جمع کالاها باشد.");
-        if (tax < 0m || cash < 0m || cash > subtotal - discount + tax)
-            throw new InvalidOperationException("مالیات یا مبلغ نقدی معتبر نیست.");
+        if (taxInput < 0m || (!taxIsAmount && taxInput > 100m) || tax < 0m || cash < 0m || cash > subtotal - discount + tax)
+            throw new InvalidOperationException("نرخ/مبلغ مالیات یا مبلغ نقدی معتبر نیست.");
         if (CurrentType == "PROFORMA" && cash > 0m)
             throw new InvalidOperationException("برای پیش‌فاکتور دریافت نقدی ثبت نکنید؛ ابتدا آن را به فروش تبدیل کنید.");
         var taxId = _taxId.Text.Trim();
@@ -437,12 +460,12 @@ public sealed class InvoiceDialog : Window
         {
             CustomerId = person.Id,
             Type = CurrentType,
-            Prefix = CurrentType switch { "SALE" => "INV-", "PURCHASE" => "PUR-", "PROFORMA" => "PRO-", _ => "INV-" },
+            Prefix = CurrentType switch { "SALE" => _defaultInvoicePrefix, "PURCHASE" => "PUR-", "PROFORMA" => "PRO-", _ => "INV-" },
             Date = date,
             DueDate = due,
-            TaxRatePercent = 0m,
-            TaxAmount = tax,
-            TaxIsAmount = true,
+            TaxRatePercent = taxRatePercent,
+            TaxAmount = taxIsAmount ? taxInput : 0m,
+            TaxIsAmount = taxIsAmount,
             Discount = discount,
             CashAmount = cash,
             Description = _description.Text.Trim(),
