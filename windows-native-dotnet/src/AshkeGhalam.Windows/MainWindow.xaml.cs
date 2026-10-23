@@ -3047,26 +3047,34 @@ public partial class MainWindow : Window
     private void ApplyCurrencyLabels()
     {
         if (MainTabs is null) return;
-        var moneyHeaders = new HashSet<string>(StringComparer.Ordinal)
+        var moneyHeadersByGrid = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal)
         {
-            "مبلغ", "مبلغ تسویه", "مبلغ باز", "مبلغ نهایی", "جمع کالاها", "تخفیف", "مالیات",
-            "نقدی", "چک", "بدهکار", "بستانکار", "مانده (بدهکار - بستانکار)", "ارزش تخمینی",
-            "مبلغ بدهکار", "مبلغ بستانکار", "مبلغ سند", "جمع بدهکار", "جمع بستانکار"
+            ["RecentInvoicesGrid"] = new(["مبلغ کل"], StringComparer.Ordinal),
+            ["CustomersGrid"] = new(["ماندهٔ ذخیره‌شده*"], StringComparer.Ordinal),
+            ["ProductsGrid"] = new(["قیمت خرید", "قیمت فروش"], StringComparer.Ordinal),
+            ["InvoicesGrid"] = new(["جمع کالاها", "تخفیف", "مالیات", "مبلغ نهایی", "نقدی", "چک"], StringComparer.Ordinal),
+            ["PaymentsGrid"] = new(["مبلغ تسویه"], StringComparer.Ordinal),
+            ["ExpensesGrid"] = new(["مبلغ"], StringComparer.Ordinal),
+            ["FinancialAccountsGrid"] = new(["بدهکار", "بستانکار", "مانده (بدهکار - بستانکار)"], StringComparer.Ordinal),
+            ["DueCalendarGrid"] = new(["مبلغ باز"], StringComparer.Ordinal),
+            ["ChecksGrid"] = new(["مبلغ"], StringComparer.Ordinal),
+            ["VouchersGrid"] = new(["ارزش تخمینی"], StringComparer.Ordinal),
+            ["LedgerEntriesGrid"] = new(["مبلغ"], StringComparer.Ordinal),
+            ["TrialBalanceGrid"] = new(["گردش بدهکار", "گردش بستانکار", "مانده (بدهکار منهای بستانکار)"], StringComparer.Ordinal),
+            ["CashFlowProjectionGrid"] = new(["ورودی", "خروجی", "تغییر خالص", "مانده پس از رخدادها"], StringComparer.Ordinal),
+            ["CashFlowMovementsGrid"] = new(["مبلغ"], StringComparer.Ordinal),
+            ["FiscalYearLedgerGrid"] = new(["مبلغ"], StringComparer.Ordinal)
         };
         var unit = CurrencyUnitLabel();
-        foreach (var gridName in new[]
-                 {
-                     "RecentInvoicesGrid", "InvoicesGrid", "PaymentsGrid", "ExpensesGrid", "ChecksGrid",
-                     "FinancialAccountsGrid", "LedgerEntriesGrid", "TrialBalanceGrid", "CashFlowProjectionGrid", "CashFlowMovementsGrid"
-                 })
+        foreach (var pair in moneyHeadersByGrid)
         {
-            if (FindName(gridName) is not DataGrid grid) continue;
+            if (FindName(pair.Key) is not DataGrid grid) continue;
             foreach (var column in grid.Columns)
             {
                 if (column.Header is not string header) continue;
                 var normalized = header.Replace(" (ریال)", "", StringComparison.Ordinal)
                     .Replace(" (تومان)", "", StringComparison.Ordinal);
-                if (moneyHeaders.Contains(normalized))
+                if (pair.Value.Contains(normalized))
                     column.Header = normalized + " (" + unit + ")";
             }
         }
