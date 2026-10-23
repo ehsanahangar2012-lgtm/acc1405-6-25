@@ -1246,22 +1246,31 @@ public partial class MainWindow : Window
     private void EditInvoice_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
-        var invoice = InvoicesGrid.SelectedItem as InvoiceRecord;
-        if (invoice is null)
+        if (InvoicesGrid.SelectedItem is not InvoiceRecord invoice)
         {
-            MessageBox.Show(this, "ابتدا یک پیش‌فاکتور را انتخاب کنید.", "ویرایش سند",
+            MessageBox.Show(this, "ابتدا یک فاکتور را از جدول انتخاب کنید.", "ویرایش سند",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        if (invoice.Type != "PROFORMA" || invoice.Status == "لغو شده" ||
-            _data.Payments.Any(payment => payment.InvoiceId == invoice.Id) ||
-            _data.Checks.Any(check => check.RelatedInvoiceId == invoice.Id))
+
+        // Preserve financial history: documents with received payments, checks or manually-linked
+        // journal entries must use a reversal/adjustment flow instead of direct editing.
+        var hasPayments = _data.Payments.Any(payment => payment.InvoiceId == invoice.Id);
+        var hasChecks = _data.Checks.Any(check => check.RelatedInvoiceId == invoice.Id);
+        var hasManualLedgerEntries = _data.JournalEntries.Any(entry =>
+            string.Equals(entry.ReferenceId, invoice.Id, StringComparison.Ordinal) &&
+            !entry.ReferenceType.StartsWith("AUTO_INVOICE_", StringComparison.Ordinal) &&
+            !entry.ReferenceType.StartsWith("AUTO_REVERSAL_", StringComparison.Ordinal));
+
+        if (invoice.Status == "لغو شده" || hasPayments || invoice.CheckAmount > 0m ||
+            hasChecks || hasManualLedgerEntries)
         {
             MessageBox.Show(this,
-                "ویرایش مستقیم فقط برای پیش‌فاکتورِ غیرقطعی و بدون آثار مالی مجاز است. فاکتور قطعی را برای حفظ دفترکل و گردش موجودی از مسیر لغو/سند اصلاحی مدیریت کنید.",
-                "محدودیت ویرایش ایمن", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "این فاکتور سابقهٔ دریافت/پرداخت، چک یا سند دستی دفترکل دارد یا لغو شده است. برای حفظ تاریخچه باید از سند اصلاحی/برگشت استفاده شود؛ ویرایش مستقیم انجام نشد.",
+                "ویرایش ایمن محدود شد", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
+
         var dialog = new InvoiceDialog(
             this, _data.Customers, _data.Products, _data.Invoices,
             AddCustomerInline, AddProductInline, _data.Preferences.InvoiceTheme,
@@ -1269,25 +1278,63 @@ public partial class MainWindow : Window
             _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
             _data.Preferences.Currency, ConfiguredInvoiceFooter(), invoice);
         if (dialog.ShowDialog() != true || dialog.Result is not InvoiceDraft draft) return;
+
         Commit(data =>
         {
             var existing = data.Invoices.SingleOrDefault(item => item.Id == invoice.Id)
-                ?? throw new InvalidOperationException("پیش‌فاکتور پیدا نشد.");
-            if (existing.Type != "PROFORMA" ||
+                ?? throw new InvalidOperationException("فاکتور پیدا نشد.");
+            if (existing.Status == "لغو شده" ||
                 data.Payments.Any(payment => payment.InvoiceId == existing.Id) ||
-                data.Checks.Any(check => check.RelatedInvoiceId == existing.Id))
-                throw new InvalidOperationException("وضعیت مالی سند تغییر کرده است؛ ویرایش لغو شد.");
+                existing.CheckAmount > 0m ||
+                data.Checks.Any(check => check.RelatedInvoiceId == existing.Id) ||
+                data.JournalEntries.Any(entry =>
+                    string.Equals(entry.ReferenceId, existing.Id, StringComparison.Ordinal) &&
+                    !entry.ReferenceType.StartsWith("AUTO_INVOICE_", StringComparison.Ordinal) &&
+                    !entry.ReferenceType.StartsWith("AUTO_REVERSAL_", StringComparison.Ordinal)))
+                throw new InvalidOperationException("وضعیت مالی فاکتور تغییر کرده است؛ ویرایش لغو شد.");
+
             var oldId = existing.Id;
             var oldNumber = existing.Number;
             var oldPrefix = existing.Prefix;
             var oldTrackingCode = existing.TrackingCode;
+
+            // Restore old stock effect within Commit's cloned transaction before applying the edited lines.
+            foreach (var line in existing.Lines)
+            {
+                var product = data.Products.SingleOrDefault(item => item.Id == line.ProductId)
+                    ?? throw new InvalidOperationException($"کالای «{line.ProductName}» پیدا نشد؛ ویرایش برای حفظ موجودی لغو شد.");
+                if (existing.Type == "SALE") product.StockQuantity += line.Quantity;
+                else if (existing.Type == "PURCHASE") product.StockQuantity -= line.Quantity;
+            }
+
+            data.InventoryMovements.RemoveAll(movement =>
+                string.Equals(movement.ReferenceId, oldId, StringComparison.Ordinal) &&
+                string.Equals(movement.ReferenceType, "INVOICE", StringComparison.Ordinal));
             data.Invoices.Remove(existing);
-            var replacement = AccountingOperations.CreateInvoice(data, draft);
-            replacement.Id = oldId;
-            replacement.Number = oldNumber;
-            replacement.Prefix = oldPrefix;
-            replacement.TrackingCode = oldTrackingCode;
-        }, "پیش‌فاکتور ویرایش شد؛ شماره و کد پیگیری آن حفظ شد");
+
+            var replacementInvoice = AccountingOperations.CreateInvoice(data, draft);
+            var generatedId = replacementInvoice.Id;
+            replacementInvoice.Id = oldId;
+            replacementInvoice.Number = oldNumber;
+            replacementInvoice.Prefix = oldPrefix;
+            replacementInvoice.TrackingCode = oldTrackingCode;
+            data.NextInvoiceNumber = Math.Max(data.NextInvoiceNumber, oldNumber + 1);
+
+            // CreateInvoice generates references using its initial ID; remap them atomically to the preserved ID.
+            foreach (var movement in data.InventoryMovements.Where(item =>
+                string.Equals(item.ReferenceId, generatedId, StringComparison.Ordinal) &&
+                string.Equals(item.ReferenceType, "INVOICE", StringComparison.Ordinal)))
+            {
+                movement.ReferenceId = oldId;
+                movement.Description = $"{replacementInvoice.TypeLabel} {replacementInvoice.DisplayNumber} — {movement.Description}";
+            }
+
+            foreach (var payment in data.Payments.Where(item => string.Equals(item.InvoiceId, generatedId, StringComparison.Ordinal)))
+            {
+                payment.InvoiceId = oldId;
+                payment.InvoiceNumber = oldNumber;
+            }
+        }, "فاکتور ویرایش شد؛ شماره و کد پیگیری حفظ شد و موجودی/ثبت خودکار حسابداری بازسازی شد.");
     }
 
     private void DeleteInvoice_Click(object sender, RoutedEventArgs e)
