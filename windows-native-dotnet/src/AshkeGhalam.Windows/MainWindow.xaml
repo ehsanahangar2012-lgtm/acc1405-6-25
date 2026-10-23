@@ -735,7 +735,7 @@
                             <StackPanel>
                                 <TextBlock Text="تنظیمات فاکتور و چاپ" FontSize="17" FontWeight="Bold"/>
                                 <UniformGrid Columns="2" Margin="0,12,0,0">
-                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="قالب پیش‌فرض" Margin="0,0,0,5"/><ComboBox x:Name="InvoiceThemeSelector" MinHeight="34" SelectedIndex="6">
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="قالب پیش‌فرض" Margin="0,0,0,5"/><ComboBox x:Name="InvoiceThemeSelector" MinHeight="34" SelectedIndex="0">
                                         <ComboBoxItem Content="شرکتی مدرن" Tag="modern"/><ComboBoxItem Content="رسمی و اداری" Tag="official"/><ComboBoxItem Content="لوکس / مدیریتی" Tag="premium"/><ComboBoxItem Content="حرارتی" Tag="thermal"/><ComboBoxItem Content="مینیمال" Tag="minimal"/><ComboBoxItem Content="کلاسیک" Tag="classic"/><ComboBoxItem Content="هوشمند" Tag="smart"/><ComboBoxItem Content="رنگی" Tag="colorful"/><ComboBoxItem Content="صنعتی" Tag="industrial"/><ComboBoxItem Content="خلاقانه" Tag="creative"/><ComboBoxItem Content="ایرانی" Tag="persian"/>
                                     </ComboBox></StackPanel>
                                     <StackPanel Margin="0,0,0,10"><TextBlock Text="واحد پول" Margin="0,0,0,5"/><ComboBox x:Name="SettingsCurrencySelector" MinHeight="34"><ComboBoxItem Content="ریال" Tag="RIAL"/><ComboBoxItem Content="تومان" Tag="TOMAN"/></ComboBox></StackPanel>
