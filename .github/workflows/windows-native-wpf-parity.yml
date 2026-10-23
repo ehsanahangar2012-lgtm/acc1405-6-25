@@ -221,5 +221,3 @@ jobs:
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
             Write-Host "Published actual WPF screenshot: $previewUrl"
           }
-          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
-          Write-Host "Published tested package: $download"
