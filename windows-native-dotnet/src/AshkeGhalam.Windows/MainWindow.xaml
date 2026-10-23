@@ -848,7 +848,7 @@
                         <Button Tag="accounting" Content="حسابداری دوبل" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="cashflow-predictor" Content="پیش‌بینی جریان نقدینگی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="cashflow" Content="جریان نقدینگی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="tax" Content="مدیریت مالیات" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="tax" Content="سامانه مؤدیان مالیاتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="loans" Content="وام‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="due-calendar" Content="تقویم سررسید و اقساط" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="bank-reconciliation" Content="تطبیق بانکی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
@@ -856,18 +856,15 @@
                         <Button Tag="workflow-rules" Content="قواعد گردش مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="گزارشات و تحلیل" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="financial-reports" Content="گزارشات مالی پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="ai-assistant" Content="دستیار هوشمند مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <TextBlock Text="خدمات تجاری و ابری" Style="{StaticResource NavSectionLabel}"/>
-                        <Button Tag="moadian" Content="سامانه مؤدیان مالیاتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <TextBlock Text="تنظیمات و سیستم" Style="{StaticResource NavSectionLabel}"/>
+                        <TextBlock Text="سامانه‌های مالیاتی" Style="{StaticResource NavSectionLabel}"/>
+                        <TextBlock Text="تنظیمات حسابداری و اتصال" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="companies" Content="چندشرکتی و مشخصات شرکت" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="server" Content="ارتباط با سرور اصلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="fiscal-year" Content="سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="security" Content="امنیت داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="data-sync" Content="همگام‌سازی داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="advanced-settings" Content="تنظیمات پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="settings" Content="تنظیمات عمومی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="updates" Content="مرکز به‌روزرسانی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="settings" Content="تنظیمات حسابداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
