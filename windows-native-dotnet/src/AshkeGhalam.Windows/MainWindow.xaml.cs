@@ -463,6 +463,8 @@ public partial class MainWindow : Window
             !NativeModuleLinks.TryGetValue(key, out var module))
             return;
 
+        UpdateNavigationSelection(key);
+
         // Resolve controls by name so this handler can be committed before the new XAML shell.
         if (FindName("CurrentModuleText") is TextBlock currentModule)
             currentModule.Text = module.Title + (module.NativeTabIndex.HasValue ? " • نسخهٔ بومی" : " • در حال مهاجرت");
@@ -488,6 +490,26 @@ public partial class MainWindow : Window
             pageState.Text = "وضعیت: هنوز به‌صورت بومی پیاده‌سازی و با نسخهٔ اصلی آزمون تطبیقی نشده است.";
         if (FindName("FooterStatus") is TextBlock migrationFooter)
             migrationFooter.Text = "این بخش هنوز برای استفادهٔ عملی آماده نیست؛ نسخهٔ فعلی وب/اندروید/الکترون دست‌نخورده باقی می‌ماند.";
+    }
+
+    private void UpdateNavigationSelection(string activeKey)
+    {
+        if (FindName("NavigationRoot") is not DependencyObject root) return;
+        var pending = new Stack<DependencyObject>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            if (current is Button button && button.Tag is string key && NativeModuleLinks.ContainsKey(key))
+            {
+                button.Background = string.Equals(key, activeKey, StringComparison.Ordinal)
+                    ? new SolidColorBrush(Color.FromRgb(15, 118, 110))
+                    : new SolidColorBrush(Color.FromRgb(23, 32, 51));
+                button.Foreground = Brushes.WhiteSmoke;
+            }
+            for (var i = 0; i < VisualTreeHelper.GetChildrenCount(current); i++)
+                pending.Push(VisualTreeHelper.GetChild(current, i));
+        }
     }
 
     private void ReturnToDashboard_Click(object sender, RoutedEventArgs e)
