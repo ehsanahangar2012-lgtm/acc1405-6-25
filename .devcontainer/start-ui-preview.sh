@@ -7,6 +7,7 @@ if curl --silent --fail "$PREVIEW_URL" >/dev/null 2>&1; then
 fi
 
 nohup node .devcontainer/preview-server.mjs > /tmp/ashkghalam-ui-preview.log 2>&1 < /dev/null &
+nohup bash .devcontainer/watch-preview-branch.sh > /tmp/ashkghalam-ui-preview-sync.log 2>&1 < /dev/null &
 for _ in $(seq 1 30); do
   if curl --silent --fail "$PREVIEW_URL" >/dev/null 2>&1; then
     echo "Ashke Ghalam private UI preview is running at port 4173."
