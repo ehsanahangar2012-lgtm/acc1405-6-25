@@ -43,22 +43,36 @@ public sealed class PersonKardexWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-        var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        var brand = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+        var ink = new SolidColorBrush(Color.FromRgb(15, 23, 42));
+        var soft = new SolidColorBrush(Color.FromRgb(231, 248, 244));
+        var heading = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
         heading.Children.Add(new TextBlock
         {
-            Text = $"کاردکس مالی: {_person.Name}",
+            Text = $"کاردکس مالی اشخاص  /  {_person.Name}",
             FontSize = 23,
             FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42))
+            Foreground = Brushes.White,
+            TextWrapping = TextWrapping.Wrap
         });
         heading.Children.Add(new TextBlock
         {
             Text = $"کد شخص: {_person.Code}   •   نقش: {_person.RoleLabel}   •   تلفن: {_person.Phone}",
             FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
-            Margin = new Thickness(0, 4, 0, 0)
+            Foreground = Brushes.White,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 5, 0, 0)
         });
-        root.Children.Add(heading);
+        root.Children.Add(new Border
+        {
+            Background = brand,
+            BorderBrush = brand,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(18),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = heading
+        });
 
         var filter = new WrapPanel { Margin = new Thickness(0, 0, 0, 10), VerticalAlignment = VerticalAlignment.Center };
         filter.Children.Add(new TextBlock { Text = "از تاریخ شمسی", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
@@ -80,13 +94,19 @@ public sealed class PersonKardexWindow : Window
             FontSize = 13,
             FontWeight = FontWeights.SemiBold,
             TextWrapping = TextWrapping.Wrap,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            Background = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
-            Padding = new Thickness(12, 10, 12, 10),
-            Margin = new Thickness(0, 0, 0, 10)
+            Foreground = ink,
+            Padding = new Thickness(12, 10, 12, 10)
         };
         Grid.SetRow(_summary, 2);
-        root.Children.Add(_summary);
+        root.Children.Add(new Border
+        {
+            Background = soft,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Margin = new Thickness(0, 0, 0, 10),
+            Child = _summary
+        });
 
         _grid = new DataGrid
         {
@@ -114,6 +134,15 @@ public sealed class PersonKardexWindow : Window
         _grid.Columns.Add(new DataGridTextColumn { Header = "بدهکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Debit)) { StringFormat = "N2" }, Width = 115 });
         _grid.Columns.Add(new DataGridTextColumn { Header = "بستانکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Credit)) { StringFormat = "N2" }, Width = 115 });
         _grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Balance)) { StringFormat = "N2" }, Width = 125 });
+        _grid.AlternationCount = 2;
+        _grid.RowBackground = Brushes.White;
+        _grid.AlternatingRowBackground = soft;
+        var headerStyle = new Style(typeof(DataGridColumnHeader));
+        headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, brand));
+        headerStyle.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.White));
+        headerStyle.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.Bold));
+        headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(8, 6, 8, 6)));
+        _grid.ColumnHeaderStyle = headerStyle;
         Grid.SetRow(_grid, 3);
         root.Children.Add(_grid);
 
