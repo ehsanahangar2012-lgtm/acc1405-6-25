@@ -266,7 +266,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const excludeMotherPortalAdminTools = mode === 'android' || mode === 'desktop' || mode === 'browser-preview';
   return {
-    base: './',
+    base: process.env.VITE_BASE_PATH || './',
     server: {
       port: 3000,
       host: '0.0.0.0',

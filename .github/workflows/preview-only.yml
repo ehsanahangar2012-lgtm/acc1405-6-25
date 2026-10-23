@@ -1,0 +1,71 @@
+name: Browser Preview Only
+
+on:
+  push:
+    branches: [ fix/core-data-integrity ]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: browser-preview-only
+  cancel-in-progress: true
+
+jobs:
+  publish-browser-preview:
+    name: Build and publish browser preview only
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout approved branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check and run backup safety regressions
+        run: bun run lint && bun run test:backup-encryption && node scripts/test-desktop-backup-safety.mjs
+
+      - name: Build sanitized browser preview only
+        env:
+          VITE_BASE_PATH: /acc1405-6-25/
+        run: bun run build:browser-preview
+
+      - name: Stamp preview version and check client isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '{"sha":"%s"}\\n' "$GITHUB_SHA" > dist/version.json
+          node scripts/sanitize-client-build.js dist --verify-only
+
+      - name: Publish static site to dedicated preview branch (no Actions artifacts)
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SOURCE_DIR="$RUNNER_TEMP/ashkg-preview-source"
+          SITE_REPO="$RUNNER_TEMP/ashkg-preview-site"
+          rm -rf "$SOURCE_DIR" "$SITE_REPO"
+          mkdir -p "$SOURCE_DIR" "$SITE_REPO"
+          cp -R dist/. "$SOURCE_DIR"/
+
+          cd "$SITE_REPO"
+          git init
+          git checkout --orphan gh-pages-preview
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp -R "$SOURCE_DIR"/. .
+          touch .nojekyll
+          cp index.html 404.html
+          git add --all
+          git commit -m "Publish browser preview ${GITHUB_SHA}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin HEAD:gh-pages-preview
