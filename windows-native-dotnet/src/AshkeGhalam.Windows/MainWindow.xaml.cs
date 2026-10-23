@@ -102,6 +102,9 @@ public partial class MainWindow : Window
         ApplicationThemeService.Apply(this, selected.Tag?.ToString());
     }
 
+    private void ApplyCurrentThemeTo(Window dialog) =>
+        ApplicationThemeService.ApplyWhenLoaded(dialog, _data.Preferences?.ApplicationTheme ?? "light");
+
     private static void TextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         if (sender is TextBox box && !box.AcceptsReturn)
@@ -469,6 +472,7 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable()) return;
         var dialog = new LedgerAccountDialog(this, _data.LedgerAccounts);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not ChartOfAccountRecord draft) return;
         Commit(data => NativeLedgerService.AddAccount(
             data, draft.Code, draft.Name, draft.Type, draft.Level, draft.ParentId), "سرفصل حساب اضافه شد");
@@ -486,6 +490,7 @@ public partial class MainWindow : Window
         }
 
         var dialog = new JournalEntryDialog(this, activeAccounts);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not AccountingEntryRecord draft) return;
         Commit(data => { NativeLedgerService.PostEntry(data, draft); },
             "سند حسابداری ثبت قطعی شد");
@@ -1060,6 +1065,7 @@ public partial class MainWindow : Window
 
         var suggestedCode = NextCode(_data.Customers.Select(person => person.Code), "CUS-");
         var dialog = new CustomerDialog(dialogOwner, suggestedCode: suggestedCode);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not CustomerRecord customer)
             return null;
 
@@ -1096,6 +1102,7 @@ public partial class MainWindow : Window
 
         var suggestedCode = NextCode(_data.Products.Select(product => product.Code), "SKU-");
         var dialog = new ProductDialog(dialogOwner, suggestedCode: suggestedCode);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not ProductRecord product)
             return null;
 
@@ -1130,6 +1137,7 @@ public partial class MainWindow : Window
         if (!RequireWritable() || !ConfirmCanAddCustomer()) return;
         var suggestedCode = NextCode(_data.Customers.Select(person => person.Code), "CUS-");
         var dialog = new CustomerDialog(this, suggestedCode: suggestedCode, defaultSupplier: defaultSupplier);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord customer)
             Commit(data =>
             {
@@ -1145,6 +1153,7 @@ public partial class MainWindow : Window
         if (!RequireWritable()) return;
         if (CustomersGrid.SelectedItem is not CustomerRecord selected) { MessageBox.Show(this, "یک مشتری را انتخاب کنید."); return; }
         var dialog = new CustomerDialog(this, selected);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord changed)
             Commit(data =>
             {
@@ -1176,6 +1185,7 @@ public partial class MainWindow : Window
         if (!RequireWritable()) return;
         var suggestedCode = NextCode(_data.Products.Select(product => product.Code), "SKU-");
         var dialog = new ProductDialog(this, suggestedCode: suggestedCode);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is ProductRecord product)
             Commit(data =>
             {
@@ -1192,6 +1202,7 @@ public partial class MainWindow : Window
         if (!RequireWritable()) return;
         if (ProductsGrid.SelectedItem is not ProductRecord selected) { MessageBox.Show(this, "یک کالا را انتخاب کنید."); return; }
         var dialog = new ProductDialog(this, selected);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is ProductRecord changed)
             Commit(data =>
             {
@@ -1281,7 +1292,9 @@ public partial class MainWindow : Window
             MessageBox.Show(this, "ابتدا یک کالا را انتخاب کنید.", "کارتکس کالا", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        new KardexWindow(this, product, _data.InventoryMovements, _data.Invoices, _data.Vouchers).ShowDialog();
+        var window = new KardexWindow(this, product, _data.InventoryMovements, _data.Invoices, _data.Vouchers);
+        ApplyCurrentThemeTo(window);
+        window.ShowDialog();
     }
 
     private static string KardexMovementLabel(string value) => value switch
@@ -1330,6 +1343,7 @@ public partial class MainWindow : Window
         if (!RequireWritable()) return;
         if (_data.Products.Count == 0) { MessageBox.Show(this, "ابتدا یک کالا ثبت کنید."); return; }
         var dialog = new StockDialog(this, _data.Products);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true)
             Commit(data => AccountingOperations.AddStock(data, dialog.ProductId, dialog.Quantity), "موجودی کالا افزایش یافت");
     }
@@ -1343,6 +1357,7 @@ public partial class MainWindow : Window
             _data.Preferences.InvoiceTheme, _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
             _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
             _data.Preferences.Currency, ConfiguredInvoiceFooter());
+            ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is InvoiceDraft draft)
         {
             var message = draft.Type switch
@@ -1413,6 +1428,7 @@ public partial class MainWindow : Window
             _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
             _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
             _data.Preferences.Currency, ConfiguredInvoiceFooter(), invoice);
+            ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not InvoiceDraft draft) return;
 
         Commit(data =>
@@ -1646,6 +1662,7 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         var dialog = new PaymentDialog(this, _data, invoiceTypeFilter);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true)
         {
             var message = invoiceTypeFilter switch
@@ -1674,6 +1691,7 @@ public partial class MainWindow : Window
         }
 
         var dialog = new ExpenseDialog(this, selected);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true) return;
         Commit(data =>
         {
@@ -1732,6 +1750,7 @@ public partial class MainWindow : Window
             return;
         }
         var dialog = new PaymentDialog(this, _data, existingPayment: selected);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true) return;
         Commit(data =>
         {
@@ -1803,6 +1822,7 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         var dialog = new ExpenseDialog(this);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true)
             Commit(data => AccountingOperations.AddExpense(data, dialog.ExpenseTitle, dialog.Category, dialog.Amount, dialog.Notes), "هزینه ثبت شد");
     }
@@ -1810,6 +1830,7 @@ public partial class MainWindow : Window
     private void CreateBackup_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new BackupPasswordDialog(this, "ساخت پشتیبان رمزگذاری‌شده", confirmPassword: true);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true) return;
         var picker = new SaveFileDialog
         {
@@ -1841,6 +1862,7 @@ public partial class MainWindow : Window
         };
         if (picker.ShowDialog() != true) return;
         var dialog = new BackupPasswordDialog(this, "رمز فایل پشتیبان", confirmPassword: false);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true) return;
         try
         {
@@ -1869,7 +1891,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        new PersonKardexWindow(this, person, _data).ShowDialog();
+        var window = new PersonKardexWindow(this, person, _data);
+        ApplyCurrentThemeTo(window);
+        window.ShowDialog();
     }
 
     private void ExportCustomers_Click(object sender, RoutedEventArgs e) =>
@@ -1984,6 +2008,7 @@ public partial class MainWindow : Window
         if (_data.Products.Count == 0)
         { MessageBox.Show(this, "برای ثبت حواله ابتدا کالا ثبت کنید.", "پیش‌نیاز حواله", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices, companyProfile: ActiveCompanyProfile());
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is VoucherRecord voucher)
             Commit(data => AccountingOperations.CreateVoucher(data, voucher), "حواله ثبت و گردش موجودی به‌صورت اتمی ذخیره شد");
     }
@@ -2020,6 +2045,7 @@ public partial class MainWindow : Window
             return;
         }
         var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices, row.Record, ActiveCompanyProfile());
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not VoucherRecord changed) return;
         Commit(data =>
         {
@@ -2095,6 +2121,7 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         var dialog = new CheckDialog(this);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not CheckRecord check) return;
         Commit(data =>
         {
@@ -2111,6 +2138,7 @@ public partial class MainWindow : Window
         { MessageBox.Show(this, "یک چک را انتخاب کنید."); return; }
         var selected = selectedRow.Record;
         var dialog = new CheckDialog(this, selected);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not CheckRecord changed) return;
         Commit(data =>
         {
@@ -2129,6 +2157,7 @@ public partial class MainWindow : Window
         { MessageBox.Show(this, "ابتدا یک چک را انتخاب کنید."); return; }
         var selected = selectedRow.Record;
         var dialog = new CheckStatusDialog(this, selected.Status);
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true) return;
         if (string.Equals(selected.Status, dialog.SelectedStatus, StringComparison.Ordinal))
         { MessageBox.Show(this, "وضعیت انتخاب‌شده با وضعیت فعلی تفاوتی ندارد."); return; }
