@@ -1,8 +1,17 @@
 // Persistent Host Storage Service - High-Performance, Multi-Tenant & Standalone Offline Ready
 import { workspaceService } from './workspaceService';
 import { idbService } from './indexedDBService';
-import { isDesktopApp } from '../utils';
 import { licenseQuotaService } from './licenseQuotaService';
+import {
+  hasNativeBackupStorage,
+  getNativeBackupValue,
+  setNativeBackupValue
+} from './nativeBackupStorage';
+import {
+  createPersistentCacheRecord,
+  parsePersistentCacheRecord,
+  persistentCacheNativeKey
+} from './persistentCacheRecord';
 
 interface StorageResponse {
     success: boolean;
@@ -19,6 +28,95 @@ class PersistentStorage {
     private inFlightSaves: Set<string> = new Set();
     private readonly CACHE_TTL_MS = 6000; // ۶ ثانیه اعتبار کش در حافظه رم
     private readonly WRITE_DEBOUNCE_MS = 400; // ۴۰۰ میلی‌ثانیه دی‌بانس برای تجمیع درخواست‌های ذخیره
+    private nativeCacheMigrationPromise: Promise<void> | null = null;
+    private readonly NATIVE_CACHE_MIGRATION_KEY = 'persistent-storage:migration:v1';
+
+    private async ensureNativeCacheMigration(): Promise<void> {
+        if (!hasNativeBackupStorage()) return;
+        if (this.nativeCacheMigrationPromise) return this.nativeCacheMigrationPromise;
+
+        this.nativeCacheMigrationPromise = (async () => {
+            const marker = await getNativeBackupValue(this.NATIVE_CACHE_MIGRATION_KEY);
+            if (marker === 'complete') return;
+
+            // Move every old storage_* mirror to native encrypted storage. Keep each old
+            // record until the encrypted value has been read back and verified.
+            const legacyRecords = await idbService.getAll('backups');
+            for (const legacy of legacyRecords || []) {
+                if (!legacy || typeof legacy.id !== 'string' || !legacy.id.startsWith('storage_')) continue;
+                const key = legacy.id.slice('storage_'.length);
+                if (!key || typeof legacy.data !== 'string') {
+                    throw new Error('رکورد قدیمی کش محلی ساختار معتبری ندارد؛ نسخهٔ اصلی حفظ شد.');
+                }
+
+                const nativeKey = persistentCacheNativeKey(key);
+                const existingText = await getNativeBackupValue(nativeKey);
+                let preferredRecord = null as ReturnType<typeof createPersistentCacheRecord> | null;
+                if (existingText !== null) {
+                    const existing = parsePersistentCacheRecord(existingText, key);
+                    const legacyUpdatedAt = Number.isFinite(legacy.updatedAt) ? legacy.updatedAt : 0;
+                    preferredRecord = legacyUpdatedAt > existing.record.updatedAt
+                        ? createPersistentCacheRecord(key, legacy.data, legacyUpdatedAt || Date.now())
+                        : existing.record;
+                } else {
+                    const legacyUpdatedAt = Number.isFinite(legacy.updatedAt) ? legacy.updatedAt : Date.now();
+                    preferredRecord = createPersistentCacheRecord(key, legacy.data, legacyUpdatedAt);
+                }
+
+                if (existingText === null || preferredRecord.data !== parsePersistentCacheRecord(existingText, key).record.data) {
+                    await setNativeBackupValue(nativeKey, JSON.stringify(preferredRecord));
+                }
+
+                const readBack = await getNativeBackupValue(nativeKey);
+                if (readBack === null) throw new Error('تأیید خواندن کش محلی رمزگذاری‌شده ناموفق بود.');
+                const verified = parsePersistentCacheRecord(readBack, key);
+                if (!verified.integrityVerified || verified.record.data !== preferredRecord.data) {
+                    throw new Error('تأیید صحت مهاجرت کش محلی ناموفق بود؛ نسخهٔ اصلی حفظ شد.');
+                }
+                await idbService.delete('backups', legacy.id);
+            }
+
+            await setNativeBackupValue(this.NATIVE_CACHE_MIGRATION_KEY, 'complete');
+        })().catch(error => {
+            // Allow a future retry; never mark migration complete after a partial failure.
+            this.nativeCacheMigrationPromise = null;
+            throw error;
+        });
+
+        return this.nativeCacheMigrationPromise;
+    }
+
+    private async writeLocalSnapshot(key: string, value: any): Promise<void> {
+        const serializedData = JSON.stringify(value);
+        if (typeof serializedData !== 'string') throw new Error('داده برای ذخیرهٔ کش قابل سریال‌سازی نیست.');
+        const record = createPersistentCacheRecord(key, serializedData, Date.now());
+
+        if (hasNativeBackupStorage()) {
+            await this.ensureNativeCacheMigration();
+            await setNativeBackupValue(persistentCacheNativeKey(key), JSON.stringify(record));
+            return;
+        }
+
+        // Browser/PWA IndexedDB remains plaintext at rest and is labelled as such in the UI.
+        await idbService.save('backups', { id: `storage_${key}`, ...record });
+    }
+
+    private async readLocalSnapshot(key: string): Promise<any> {
+        if (hasNativeBackupStorage()) {
+            await this.ensureNativeCacheMigration();
+            const raw = await getNativeBackupValue(persistentCacheNativeKey(key));
+            if (raw === null) return null;
+            const parsed = parsePersistentCacheRecord(raw, key);
+            if (!parsed.integrityVerified) {
+                throw new Error('کش محلی بومی فاقد کنترل صحت معتبر است؛ از نسخهٔ اصلی استفاده نشد.');
+            }
+            return parsed.value;
+        }
+
+        const legacy = await idbService.get('backups', `storage_${key}`);
+        if (!legacy || typeof legacy.data !== 'string') return null;
+        return parsePersistentCacheRecord({ ...legacy, key }, key).value;
+    }
 
     private async request(action: string, data: any): Promise<StorageResponse> {
         // ۱. اگر حالت آفلاین مستقل فعال باشد، نیازی به ارتباط با هاست نیست
@@ -95,27 +193,24 @@ class PersistentStorage {
      * ۳. ارسال دی‌بانس شده به سرور در پس‌زمینه بدون مسدودسازی نخ اصلی رابط کاربری
      */
     async saveData(key: string, value: any): Promise<boolean> {
-        // به‌روزرسانی فوری کش محلی؛ این به‌تنهایی به‌معنای تأیید ذخیره ابری نیست.
+        // RAM is a transient cache; the durable mirror must use native encryption on devices.
         this.memoryCache.set(key, { data: value, timestamp: Date.now() });
-
-        // ذخیره پشتیبان محلی به‌صورت ناهمگام
-        if (typeof window !== 'undefined') {
-            try {
-                idbService.save('backups', {
-                    id: `storage_${key}`,
-                    data: JSON.stringify(value),
-                    updatedAt: Date.now()
-                }).catch(() => {});
-            } catch {}
+        let localSnapshotSaved = false;
+        try {
+            await this.writeLocalSnapshot(key, value);
+            localSnapshotSaved = true;
+        } catch (error) {
+            // Never downgrade a native write to plaintext IndexedDB/localStorage.
+            console.warn('[PersistentStorage] Local snapshot could not be saved securely:', error);
         }
 
-        // در حالت آفلاین مستقل، ذخیره محلی کافی است.
+        // Offline mode can claim success only when the local durable write actually succeeded.
         if (workspaceService.isStandaloneOffline()) {
-            return true;
+            return localSnapshotSaved;
         }
 
-        // همه فراخوانی‌های یک کلید، نتیجه همان آخرین مقدارِ ارسال‌شده را دریافت می‌کنند.
-        // موفقیت فقط پس از پاسخ موفق سرور اعلام می‌شود؛ نه بلافاصله پس از صف‌بندی.
+        // All calls for one key share the result of the latest server-bound value.
+        // Success is returned only after the server response, not after queuing.
         return new Promise<boolean>((resolve) => {
             const existing = this.pendingSaves.get(key);
             if (existing) {
@@ -196,11 +291,11 @@ class PersistentStorage {
 
         if (workspaceService.isStandaloneOffline()) {
             try {
-                const local = await idbService.get('backups', `storage_${key}`);
-                const data = local?.data ? JSON.parse(local.data) : null;
-                if (data) this.memoryCache.set(key, { data, timestamp: Date.now() });
+                const data = await this.readLocalSnapshot(key);
+                if (data !== null) this.memoryCache.set(key, { data, timestamp: Date.now() });
                 return data;
-            } catch {
+            } catch (error) {
+                console.error('[PersistentStorage] Secure local read failed:', error);
                 return null;
             }
         }
@@ -222,22 +317,17 @@ class PersistentStorage {
                     }
                 }
 
-                // اگر هاست پاسخ نداد یا آفلاین بود، از کش محلی استفاده شود
-                const fallback = await idbService.get('backups', `storage_${key}`);
-                let fallbackData = null;
-                try {
-                    fallbackData = fallback?.data ? JSON.parse(fallback.data) : null;
-                } catch {
-                    fallbackData = null;
-                }
-                if (fallbackData) {
+                // If the host fails, use only the appropriate platform-local cache.
+                // Native apps migrate legacy plaintext mirrors before reading them.
+                const fallbackData = await this.readLocalSnapshot(key);
+                if (fallbackData !== null) {
                     this.memoryCache.set(key, { data: fallbackData, timestamp: Date.now() });
                 }
                 return fallbackData;
-            } catch {
+            } catch (error) {
+                console.warn('[PersistentStorage] Remote read and local fallback failed:', error);
                 try {
-                    const fallback = await idbService.get('backups', `storage_${key}`);
-                    return fallback?.data ? JSON.parse(fallback.data) : null;
+                    return await this.readLocalSnapshot(key);
                 } catch {
                     return null;
                 }

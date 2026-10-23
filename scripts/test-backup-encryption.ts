@@ -70,3 +70,28 @@ assert.throws(() => verifyLocalBackupRecord({
 }), /سازگار نیست/);
 
 console.log('Local backup integrity checks passed: checksum, tamper rejection, legacy warning state, structure validation.');
+
+
+import {
+  createPersistentCacheRecord,
+  parsePersistentCacheRecord,
+  persistentCacheNativeKey
+} from '../services/persistentCacheRecord';
+
+const persistentData = JSON.stringify({ invoices: [{ id: 'invoice-cache-test', amount: 42 }] });
+const persistentRecord = createPersistentCacheRecord('invoices', persistentData, 1792752000000);
+assert.match(persistentCacheNativeKey('invoices'), /^persistent-storage:v1:[a-f0-9]{48}$/);
+assert.equal(parsePersistentCacheRecord(persistentRecord, 'invoices').integrityVerified, true);
+assert.deepEqual(parsePersistentCacheRecord(JSON.stringify(persistentRecord), 'invoices').value, JSON.parse(persistentData));
+assert.throws(() => parsePersistentCacheRecord({ ...persistentRecord, data: persistentData + ' ' }, 'invoices'), /کنترل صحت کش محلی ناموفق/);
+assert.throws(() => parsePersistentCacheRecord(persistentRecord, 'products'), /کلید رکورد کش محلی/);
+
+const legacyPersistentRecord = {
+  id: 'storage_invoices',
+  data: persistentData,
+  updatedAt: 1792752000000
+};
+assert.equal(parsePersistentCacheRecord({ ...legacyPersistentRecord, key: 'invoices' }, 'invoices').integrityVerified, false);
+assert.deepEqual(parsePersistentCacheRecord({ ...legacyPersistentRecord, key: 'invoices' }, 'invoices').value, JSON.parse(persistentData));
+
+console.log('Persistent cache checks passed: native-safe key, checksum, wrong-key rejection, legacy read compatibility.');
