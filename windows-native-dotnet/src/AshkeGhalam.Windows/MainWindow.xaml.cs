@@ -1326,6 +1326,143 @@ public partial class MainWindow : Window
         window.ShowDialog();
     }
 
+    private void PrintKardexModule_Click(object sender, RoutedEventArgs e)
+    {
+        if (KardexModuleProductSelector.SelectedItem is not ProductRecord product ||
+            KardexModuleGrid.ItemsSource is not IEnumerable<KardexModuleRow> source)
+        {
+            MessageBox.Show(this, "ابتدا یک کالا را انتخاب کنید تا گردش آن آمادهٔ چاپ شود.",
+                "چاپ کارتکس", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var rows = source.ToList();
+        if (rows.Count == 0)
+        {
+            MessageBox.Show(this, "برای کالای انتخاب‌شده ردیفی برای چاپ وجود ندارد.",
+                "چاپ کارتکس", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var document = new FlowDocument
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
+            FontSize = 9,
+            PagePadding = new Thickness(28),
+            ColumnWidth = 740,
+            PageWidth = 816,
+            PageHeight = 1056
+        };
+        var title = new Paragraph(new Run("کارتکس کالا و گردش موجودی"))
+        {
+            FontSize = 19,
+            FontWeight = FontWeights.Bold,
+            TextAlignment = TextAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        document.Blocks.Add(title);
+        document.Blocks.Add(new Paragraph(new Run(
+            $"کالا: {product.Name}   •   کد: {product.Code}   •   واحد: {product.Unit}   •   موجودی ثبت‌شده: {product.StockQuantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))}"))
+        {
+            FontSize = 11, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 5)
+        });
+        document.Blocks.Add(new Paragraph(new Run(
+            $"شرکت: {ActiveCompanyProfile()?.Name ?? "اشک قلم"}   •   تاریخ چاپ: {FormatPersianDate(DateTimeOffset.Now)}   •   تعداد ردیف: {rows.Count:N0}"))
+        {
+            FontSize = 9, Margin = new Thickness(0, 0, 0, 10)
+        });
+
+        var table = new Table { CellSpacing = 0 };
+        foreach (var width in new[] { 66d, 86d, 72d, 190d, 78d, 78d, 90d })
+            table.Columns.Add(new TableColumn { Width = new GridLength(width) });
+
+        var headerGroup = new TableRowGroup();
+        var header = new TableRow();
+        foreach (var heading in new[] { "تاریخ", "نوع گردش", "سند مرجع", "شرح", "ورودی", "خروجی", "مانده" })
+            header.Cells.Add(CreateKardexPrintCell(heading, true));
+        headerGroup.Rows.Add(header);
+        table.RowGroups.Add(headerGroup);
+
+        var body = new TableRowGroup();
+        foreach (var row in rows)
+        {
+            var values = new[]
+            {
+                row.Date, row.Movement, row.Document, row.Description,
+                row.Incoming.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")),
+                row.Outgoing.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")),
+                row.Balance.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))
+            };
+            var tableRow = new TableRow();
+            foreach (var value in values)
+                tableRow.Cells.Add(CreateKardexPrintCell(string.IsNullOrWhiteSpace(value) ? "—" : value, false));
+            body.Rows.Add(tableRow);
+        }
+        table.RowGroups.Add(body);
+        document.Blocks.Add(table);
+
+        var dialog = new PrintDialog();
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            var pageWidth = Math.Max(560, dialog.PrintableAreaWidth);
+            var pageHeight = Math.Max(720, dialog.PrintableAreaHeight);
+            document.PageWidth = pageWidth;
+            document.PageHeight = pageHeight;
+            document.ColumnWidth = Math.Max(500, pageWidth - document.PagePadding.Left - document.PagePadding.Right);
+            dialog.PrintDocument(((IDocumentPaginatorSource)document).DocumentPaginator,
+                $"AshkeGhalam-Kardex-{product.Code}-{DateTime.Now:yyyyMMdd-HHmm}");
+            FooterStatus.Text = "کارتکس برای چاپ ارسال شد.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "چاپ کارتکس", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private static TableCell CreateKardexPrintCell(string value, bool isHeader)
+    {
+        var cell = new TableCell(new Paragraph(new Run(value))
+        {
+            Margin = new Thickness(0),
+            FontWeight = isHeader ? FontWeights.Bold : FontWeights.Normal,
+            FontSize = isHeader ? 9 : 8,
+            TextAlignment = TextAlignment.Right
+        })
+        {
+            Padding = new Thickness(4, 5, 4, 5),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+            BorderThickness = new Thickness(0.5),
+            Background = isHeader
+                ? new SolidColorBrush(Color.FromRgb(15, 118, 110))
+                : Brushes.White,
+            Foreground = isHeader ? Brushes.White : new SolidColorBrush(Color.FromRgb(15, 23, 42))
+        };
+        return cell;
+    }
+
+    private void ExportKardexModule_Click(object sender, RoutedEventArgs e)
+    {
+        if (KardexModuleProductSelector.SelectedItem is not ProductRecord product ||
+            KardexModuleGrid.ItemsSource is not IEnumerable<KardexModuleRow> source)
+        {
+            MessageBox.Show(this, "ابتدا یک کالا را انتخاب کنید.", "خروجی کارتکس",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var rows = source.ToList();
+        ExportCsv($"Kardex-{product.Code}-{DateTime.Now:yyyyMMdd}.csv",
+            new[] { "DateJalali", "Movement", "Document", "Description", "Incoming", "Outgoing", "Balance", "Unit" },
+            rows.Select(row => new[]
+            {
+                row.Date, row.Movement, row.Document, row.Description,
+                row.Incoming.ToString(CultureInfo.InvariantCulture),
+                row.Outgoing.ToString(CultureInfo.InvariantCulture),
+                row.Balance.ToString(CultureInfo.InvariantCulture), product.Unit
+            }));
+    }
+
     private static string KardexMovementLabel(string value) => value switch
     {
         "GOODS_RECEIPT" => "رسید ورود کالا", "GOODS_ISSUE" => "حواله خروج کالا", "INVENTORY_ADJUSTMENT" => "تعدیل موجودی",
