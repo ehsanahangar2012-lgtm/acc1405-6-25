@@ -53,6 +53,11 @@ public static class ApplicationThemeService
 
     private static IEnumerable<DependencyProperty> GetBrushProperties(DependencyObject element)
     {
+        // Window is not a Control in WPF. Without its BackgroundProperty, the outer shell
+        // stayed light even while the selected page had switched to the dark palette.
+        if (element is Window)
+            yield return Window.BackgroundProperty;
+
         if (element is Control)
         {
             yield return Control.BackgroundProperty;
