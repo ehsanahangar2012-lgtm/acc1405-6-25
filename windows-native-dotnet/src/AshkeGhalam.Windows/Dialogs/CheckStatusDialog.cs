@@ -42,12 +42,19 @@ public sealed class CheckStatusDialog : Window
         root.Children.Add(_status);
         root.Children.Add(new TextBlock { Text = "یادداشت سابقه (اختیاری)", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 14, 0, 5) });
         root.Children.Add(_note);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 16, 0, 0) };
-        var save = new Button { Content = "ثبت وضعیت", Width = 110, Height = 36, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 10, 22, 18) };
+        var save = new Button { Content = "ثبت وضعیت", Width = 120, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
         actions.Children.Add(save);
-        actions.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 36, IsCancel = true });
-        root.Children.Add(actions);
-        Content = root;
+        actions.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var body = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root };
+        Grid.SetRow(body, 0);
+        Grid.SetRow(actions, 1);
+        layout.Children.Add(body);
+        layout.Children.Add(actions);
+        Content = layout;
 
         save.Click += (_, _) =>
         {
