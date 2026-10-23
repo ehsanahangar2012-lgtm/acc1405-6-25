@@ -65,12 +65,10 @@ public sealed class LicenseActivationDialog : Window
         AddField(root, "نام شرکت (نمایشی؛ اختیاری)", _company);
         AddField(root, "شناسه سخت‌افزاری این رایانه", _hardwareId);
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 10, 0, 4) };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 8, 22, 8) };
         actions.Children.Add(_copy);
         actions.Children.Add(_verify);
         actions.Children.Add(new Button { Content = "بستن", Width = 80, Height = 38, Margin = new Thickness(8, 0, 0, 0), IsCancel = true });
-        root.Children.Add(actions);
-        root.Children.Add(_status);
         root.Children.Add(new TextBlock
         {
             Text = "وضعیت ذخیره‌شده به‌صورت رمزگذاری‌شده با DPAPI برای حساب جاری Windows نگهداری می‌شود. این پنجره به‌تنهایی جایگزین مهاجرت سهمیه‌ها و کنترل دسترسی همهٔ ماژول‌ها نیست.",
@@ -79,7 +77,21 @@ public sealed class LicenseActivationDialog : Window
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 20, 0, 0)
         });
-        Content = root;
+
+        var footer = new StackPanel();
+        footer.Children.Add(actions);
+        footer.Children.Add(_status);
+        footer.Margin = new Thickness(22, 4, 22, 16);
+
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var body = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root };
+        Grid.SetRow(body, 0);
+        Grid.SetRow(footer, 1);
+        layout.Children.Add(body);
+        layout.Children.Add(footer);
+        Content = layout;
 
         _copy.Click += (_, _) =>
         {
