@@ -171,6 +171,18 @@ public static class NativeOperationalPostingService
         var received = string.IsNullOrWhiteSpace(check.CheckType) ||
             string.Equals(check.CheckType, "RECEIVED", StringComparison.Ordinal);
         var wasDeposited = received && check.History.Any(h => h.Status == "DEPOSITED");
+        var isEndorsedCheckRecord = !received &&
+            (check.Description ?? "").StartsWith("خرج از چک دریافتی", StringComparison.Ordinal);
+
+        if (isEndorsedCheckRecord)
+        {
+            // The endorsed incoming cheque already settles the payable when it leaves the
+            // incoming-cheque asset account. This companion record is for traceability, not a
+            // second bank-issued cheque liability; its later status changes must not post again.
+            var endorsedDescription = $"وضعیت پیگیری چک واگذارشده {check.CheckNumber} — {check.Status}";
+            PostOnce(data, check.Id, "AUTO_CHECK_STATUS", date, endorsedDescription, "1110", "1120", 0m);
+            return;
+        }
 
         string? debit = null;
         string? credit = null;
