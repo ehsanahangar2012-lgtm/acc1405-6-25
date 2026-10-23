@@ -236,19 +236,38 @@ public partial class MainWindow : Window
     private void AddInvoice_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
-        var eligibleCustomers = _data.Customers.Where(c => c.IsCustomer).ToList();
-        if (eligibleCustomers.Count == 0 || _data.Products.Count == 0)
+        if (_data.Customers.Count == 0 || _data.Products.Count == 0)
         {
-            MessageBox.Show(this, "برای صدور فاکتور فروش، ابتدا یک شخص با نقش «مشتری» و یک کالا ثبت کنید.",
-                "پیش‌نیاز فاکتور", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(this, "برای ثبت فاکتور/پیش‌فاکتور ابتدا طرف حساب و کالا ثبت کنید.",
+                "پیش‌نیاز سند", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        var dialog = new InvoiceDialog(this, eligibleCustomers, _data.Products);
+        var dialog = new InvoiceDialog(this, _data.Customers, _data.Products, _data.Invoices);
         if (dialog.ShowDialog() == true && dialog.Result is InvoiceDraft draft)
         {
-            Commit(data => AccountingOperations.CreateInvoice(data, draft), "فاکتور ثبت شد و موجودی کالا به‌روزرسانی شد");
+            var message = draft.Type switch
+            {
+                "PURCHASE" => "فاکتور خرید ثبت و موجودی به‌روزرسانی شد",
+                "PROFORMA" => "پیش‌فاکتور ثبت شد؛ موجودی هنوز تغییر نکرده است",
+                _ => "فاکتور فروش ثبت و موجودی به‌روزرسانی شد"
+            };
+            Commit(data => AccountingOperations.CreateInvoice(data, draft), message);
             MainTabs.SelectedIndex = 3;
         }
+    }
+
+    private void ConvertProformaToSale_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (InvoicesGrid.SelectedItem is not InvoiceRecord invoice)
+        { MessageBox.Show(this, "یک پیش‌فاکتور را انتخاب کنید."); return; }
+        if (invoice.Type != "PROFORMA")
+        { MessageBox.Show(this, "سند انتخابی پیش‌فاکتور نیست."); return; }
+        if (MessageBox.Show(this,
+            $"پیش‌فاکتور {invoice.DisplayNumber} به فروش قطعی تبدیل و موجودی اقلام کاهش داده شود؟\nپیش از تأیید، موجودی آزاد همهٔ اقلام کنترل می‌شود.",
+            "تبدیل پیش‌فاکتور به فروش", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Commit(data => AccountingOperations.ConvertProformaToSale(data, invoice.Id),
+            "پیش‌فاکتور به فروش تبدیل شد و موجودی کاهش یافت");
     }
 
     private void CancelInvoice_Click(object sender, RoutedEventArgs e)
@@ -275,14 +294,20 @@ public partial class MainWindow : Window
                 PagePadding = new Thickness(45),
                 ColumnWidth = 720
             };
-            doc.Blocks.Add(new Paragraph(new Run("اشک قلم — فاکتور فروش"))
+            doc.Blocks.Add(new Paragraph(new Run($"اشک قلم — {invoice.TypeLabel}"))
             {
                 FontSize = 22, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 20)
             });
-            doc.Blocks.Add(new Paragraph(new Run($"شماره فاکتور: {invoice.Number}     تاریخ: {invoice.CreatedAt.ToLocalTime():yyyy/MM/dd HH:mm}"))
+            doc.Blocks.Add(new Paragraph(new Run($"شماره سند: {invoice.DisplayNumber}     کد پیگیری: {invoice.TrackingCode}     تاریخ: {invoice.CreatedAt.ToLocalTime():yyyy/MM/dd HH:mm}"))
             { TextAlignment = TextAlignment.Right });
-            doc.Blocks.Add(new Paragraph(new Run($"مشتری: {invoice.CustomerName}")) { TextAlignment = TextAlignment.Right });
+            doc.Blocks.Add(new Paragraph(new Run($"طرف حساب: {invoice.CustomerName}")) { TextAlignment = TextAlignment.Right });
+            if (invoice.DueDate is DateTimeOffset dueDate)
+                doc.Blocks.Add(new Paragraph(new Run($"سررسید: {dueDate.ToLocalTime():yyyy/MM/dd}")) { TextAlignment = TextAlignment.Right });
+            if (!string.IsNullOrWhiteSpace(invoice.DriverName) || !string.IsNullOrWhiteSpace(invoice.VehiclePlate))
+                doc.Blocks.Add(new Paragraph(new Run($"راننده: {invoice.DriverName}   تلفن: {invoice.DriverPhone}   خودرو: {invoice.VehiclePlate}")) { TextAlignment = TextAlignment.Right });
+            if (!string.IsNullOrWhiteSpace(invoice.TaxId))
+                doc.Blocks.Add(new Paragraph(new Run($"شناسه مالیاتی: {invoice.TaxId}")) { TextAlignment = TextAlignment.Right });
             if (!string.IsNullOrWhiteSpace(invoice.Notes))
                 doc.Blocks.Add(new Paragraph(new Run($"توضیحات: {invoice.Notes}")) { TextAlignment = TextAlignment.Right });
 
@@ -307,9 +332,11 @@ public partial class MainWindow : Window
             }
             table.RowGroups.Add(group);
             doc.Blocks.Add(table);
-            doc.Blocks.Add(new Paragraph(new Run($"جمع: {invoice.Subtotal:N2}")) { TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 18, 0, 0) });
-            doc.Blocks.Add(new Paragraph(new Run($"مالیات ({invoice.TaxRatePercent:N2}%): {invoice.TaxAmount:N2}")) { TextAlignment = TextAlignment.Left });
+            doc.Blocks.Add(new Paragraph(new Run($"جمع کالاها: {invoice.Subtotal:N2}")) { TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 18, 0, 0) });
+            doc.Blocks.Add(new Paragraph(new Run($"تخفیف: {invoice.Discount:N2}")) { TextAlignment = TextAlignment.Left });
+            doc.Blocks.Add(new Paragraph(new Run($"{(invoice.TaxIsAmount ? "مالیات" : $"مالیات ({invoice.TaxRatePercent:N2}%)")}: {invoice.TaxAmount:N2}")) { TextAlignment = TextAlignment.Left });
             doc.Blocks.Add(new Paragraph(new Run($"مبلغ نهایی: {invoice.Total:N2}")) { FontSize = 17, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Left });
+            doc.Blocks.Add(new Paragraph(new Run($"نقدی ثبت‌شده: {invoice.CashAmount:N2}    مبلغ چک: {invoice.CheckAmount:N2}")) { TextAlignment = TextAlignment.Left });
             doc.Blocks.Add(new Paragraph(new Run($"وضعیت: {invoice.Status}")) { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 18, 0, 0) });
             printDialog.PrintDocument(((IDocumentPaginatorSource)doc).DocumentPaginator, $"AshkeGhalam-Invoice-{invoice.Number}");
         }
@@ -406,22 +433,32 @@ public partial class MainWindow : Window
             }));
 
     private void ExportInvoices_Click(object sender, RoutedEventArgs e) =>
-        ExportCsv("invoices.csv", new[] { "Number", "CustomerName", "Description", "Subtotal", "TaxRatePercent", "TaxAmount", "Total", "Status", "CreatedAt" },
-            _data.Invoices.Select(i => new[] { i.Number.ToString(CultureInfo.InvariantCulture), i.CustomerName, i.Description,
-                i.Subtotal.ToString(CultureInfo.InvariantCulture), i.TaxRatePercent.ToString(CultureInfo.InvariantCulture),
-                i.TaxAmount.ToString(CultureInfo.InvariantCulture), i.Total.ToString(CultureInfo.InvariantCulture), i.Status, i.CreatedAt.ToString("O") }));
+        ExportCsv("invoices.csv", new[] { "Type", "Prefix", "Number", "TrackingCode", "PersonName", "Description", "Subtotal", "Discount", "TaxIsAmount", "TaxRatePercent", "TaxAmount", "Total", "CashAmount", "CheckAmount", "DueDate", "DriverName", "DriverPhone", "VehiclePlate", "TaxId", "Status", "CreatedAt", "Notes" },
+            _data.Invoices.Select(i => new[]
+            {
+                i.Type, i.Prefix, i.Number.ToString(CultureInfo.InvariantCulture), i.TrackingCode, i.CustomerName, i.Description,
+                i.Subtotal.ToString(CultureInfo.InvariantCulture), i.Discount.ToString(CultureInfo.InvariantCulture), i.TaxIsAmount.ToString(),
+                i.TaxRatePercent.ToString(CultureInfo.InvariantCulture), i.TaxAmount.ToString(CultureInfo.InvariantCulture),
+                i.Total.ToString(CultureInfo.InvariantCulture), i.CashAmount.ToString(CultureInfo.InvariantCulture),
+                i.CheckAmount.ToString(CultureInfo.InvariantCulture), i.DueDate?.ToString("O") ?? "",
+                i.DriverName, i.DriverPhone, i.VehiclePlate, i.TaxId, i.Status, i.CreatedAt.ToString("O"), i.Notes
+            }));
 
     private void ExportReport_Click(object sender, RoutedEventArgs e)
     {
-        var sales = _data.Invoices.Where(i => i.Status != "لغو شده").Sum(i => i.Total);
+        var sales = _data.Invoices.Where(i => i.Status != "لغو شده" && i.Type == "SALE").Sum(i => i.Total);
+        var purchases = _data.Invoices.Where(i => i.Status != "لغو شده" && i.Type == "PURCHASE").Sum(i => i.Total);
+        var receivables = _data.Invoices.Where(i => i.Status != "لغو شده" && i.Type == "SALE").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
+        var payables = _data.Invoices.Where(i => i.Status != "لغو شده" && i.Type == "PURCHASE").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
         var paid = _data.Payments.Sum(p => p.Amount);
-        var remaining = _data.Invoices.Where(i => i.Status != "لغو شده").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
         var expenses = _data.Expenses.Sum(i => i.Amount);
         ExportCsv("summary-report.csv", new[] { "Metric", "Value" }, new[]
         {
             new[] { "Sales", sales.ToString(CultureInfo.InvariantCulture) },
-            new[] { "Payments", paid.ToString(CultureInfo.InvariantCulture) },
-            new[] { "Receivables", remaining.ToString(CultureInfo.InvariantCulture) },
+            new[] { "Purchases", purchases.ToString(CultureInfo.InvariantCulture) },
+            new[] { "AllPayments", paid.ToString(CultureInfo.InvariantCulture) },
+            new[] { "SalesReceivables", receivables.ToString(CultureInfo.InvariantCulture) },
+            new[] { "PurchasePayables", payables.ToString(CultureInfo.InvariantCulture) },
             new[] { "Expenses", expenses.ToString(CultureInfo.InvariantCulture) },
             new[] { "NetCashFlow", (paid - expenses).ToString(CultureInfo.InvariantCulture) }
         });
