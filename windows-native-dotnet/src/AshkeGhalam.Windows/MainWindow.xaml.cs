@@ -1521,7 +1521,7 @@ public partial class MainWindow : Window
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         if (_data.Products.Count == 0)
         { MessageBox.Show(this, "برای ثبت حواله ابتدا کالا ثبت کنید.", "پیش‌نیاز حواله", MessageBoxButton.OK, MessageBoxImage.Information); return; }
-        var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices);
+        var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices, companyProfile: ActiveCompanyProfile());
         if (dialog.ShowDialog() == true && dialog.Result is VoucherRecord voucher)
             Commit(data => AccountingOperations.CreateVoucher(data, voucher), "حواله ثبت و گردش موجودی به‌صورت اتمی ذخیره شد");
     }
@@ -1557,7 +1557,7 @@ public partial class MainWindow : Window
                 "ویرایش حواله", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices, row.Record);
+        var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices, row.Record, ActiveCompanyProfile());
         if (dialog.ShowDialog() != true || dialog.Result is not VoucherRecord changed) return;
         Commit(data =>
         {
@@ -1793,6 +1793,8 @@ public partial class MainWindow : Window
         SettingsInvoicePrefix.Text = _data.Preferences.SalesInvoicePrefix;
         SettingsShowInvoiceQr.IsChecked = _data.Preferences.ShowInvoiceQr;
         SettingsInvoiceFooter.Text = _data.Preferences.InvoiceFooter;
+        SettingsCustomFootnoteOptions.Text = string.Join(Environment.NewLine, _data.Preferences.CustomInvoiceFootnoteOptions ?? []);
+        RefreshCustomInvoiceFootnoteChoices(_data.Preferences.CustomInvoiceFootnoteOptions, _data.Preferences.SelectedInvoiceFootnotes);
 
         MoadianTaxpayerId.Text = _data.MoadianSettings.TaxpayerId;
         MoadianApiBaseUrl.Text = _data.MoadianSettings.ApiBaseUrl;
@@ -1806,6 +1808,37 @@ public partial class MainWindow : Window
         ServerSyncModeSelector.SelectedItem = ServerSyncModeSelector.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.ServerConnection.SyncMode, StringComparison.Ordinal))
             ?? ServerSyncModeSelector.Items.OfType<ComboBoxItem>().FirstOrDefault();
+    }
+
+    private static List<string> ParseCustomInvoiceFootnoteOptions(string? text) =>
+        (text ?? "").Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(note => !string.IsNullOrWhiteSpace(note))
+            .Distinct(StringComparer.Ordinal)
+            .Take(50)
+            .ToList();
+
+    private void RefreshCustomInvoiceFootnoteChoices(IEnumerable<string>? options = null, IEnumerable<string>? selectedNotes = null)
+    {
+        var entries = (options ?? ParseCustomInvoiceFootnoteOptions(SettingsCustomFootnoteOptions.Text))
+            .Where(note => !string.IsNullOrWhiteSpace(note))
+            .Distinct(StringComparer.Ordinal)
+            .Take(50)
+            .ToList();
+        var selected = (selectedNotes ?? _data.Preferences.SelectedInvoiceFootnotes ?? [])
+            .ToHashSet(StringComparer.Ordinal);
+
+        CustomInvoiceFootnoteSelector.ItemsSource = null;
+        CustomInvoiceFootnoteSelector.ItemsSource = entries;
+        foreach (var note in entries.Where(selected.Contains))
+            CustomInvoiceFootnoteSelector.SelectedItems.Add(note);
+    }
+
+    private void LoadCustomInvoiceFootnotes_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = GetSelectedInvoiceFootnotes();
+        var options = ParseCustomInvoiceFootnoteOptions(SettingsCustomFootnoteOptions.Text);
+        RefreshCustomInvoiceFootnoteChoices(options, selected);
+        FooterStatus.Text = $"گزینه‌های پانویس به‌روزرسانی شد: {options.Count:N0} مورد. برای درج، موارد دلخواه را انتخاب و تنظیمات را ذخیره کنید.";
     }
 
     private void CompanyProfileSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1951,15 +1984,18 @@ public partial class MainWindow : Window
         if (SettingsFooterNoReturns.IsChecked == true) selected.Add(FooterNoteNoReturns);
         if (SettingsFooterPaymentTerms.IsChecked == true) selected.Add(FooterNotePaymentTerms);
         if (SettingsFooterDeliveryTerms.IsChecked == true) selected.Add(FooterNoteDeliveryTerms);
-        return selected;
+        selected.AddRange(CustomInvoiceFootnoteSelector.SelectedItems.Cast<object>().OfType<string>());
+        return selected.Where(note => !string.IsNullOrWhiteSpace(note))
+            .Distinct(StringComparer.Ordinal).ToList();
     }
 
     private string ConfiguredInvoiceFooter()
     {
         var notes = (_data.Preferences.SelectedInvoiceFootnotes ?? [])
             .Where(note => !string.IsNullOrWhiteSpace(note)).ToList();
-        if (!string.IsNullOrWhiteSpace(_data.Preferences.InvoiceFooter))
-            notes.Add(_data.Preferences.InvoiceFooter.Trim());
+        notes.AddRange((_data.Preferences.InvoiceFooter ?? "")
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(note => !string.IsNullOrWhiteSpace(note)));
         return string.Join(Environment.NewLine, notes.Distinct(StringComparer.Ordinal));
     }
 
@@ -1990,7 +2026,8 @@ public partial class MainWindow : Window
                 DefaultTaxRatePercent = taxRate,
                 SalesInvoicePrefix = string.IsNullOrWhiteSpace(SettingsInvoicePrefix.Text) ? "INV-" : SettingsInvoicePrefix.Text.Trim(),
                 InvoiceFooter = SettingsInvoiceFooter.Text.Trim(),
-                SelectedInvoiceFootnotes = GetSelectedInvoiceFootnotes()
+                SelectedInvoiceFootnotes = GetSelectedInvoiceFootnotes(),
+                CustomInvoiceFootnoteOptions = ParseCustomInvoiceFootnoteOptions(SettingsCustomFootnoteOptions.Text)
             };
         }, "تنظیمات حسابداری ذخیره شد؛ در پیش‌نمایش‌های بعدی اعمال می‌شود.");
     }
