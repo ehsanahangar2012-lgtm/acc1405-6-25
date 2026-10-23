@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useAndroidBackButtonHandler } from '../useMobile';
 import { 
   AlertCircle, CheckCircle2, AlertTriangle, Info, HelpCircle, 
   Clock, ShieldAlert, LogOut, DownloadCloud, X 
@@ -18,6 +19,18 @@ export const AppDialogModal: React.FC = () => {
       dialogService.unregister();
     };
   }, []);
+
+  const handleAndroidBack = useCallback(() => {
+    if (!dialog) return false;
+    // A non-cancellable alert consumes Back instead of confirming or dismissing.
+    if (dialog.showCancel) {
+      dialog.onCancel?.();
+      dialogService.close();
+    }
+    return true;
+  }, [dialog]);
+
+  useAndroidBackButtonHandler(handleAndroidBack, Boolean(dialog));
 
   if (!dialog) return null;
 

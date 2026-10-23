@@ -1,7 +1,8 @@
 // Activation Dashboard Component (داشبورد فعال‌سازی، لایسنس و قفل سخت‌افزاری HWID)
 // فعال‌سازی آنلاین با تأیید امضای دیجیتال سرور و مدیریت AppManifest
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
+import { useAndroidBackButtonHandler } from '../useMobile';
 import { 
     ShieldCheck, 
     KeyRound, 
@@ -59,6 +60,18 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
     const [activeTab, setActiveTab] = useState<'online' | 'manifest'>('online');
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
     const [showGuideModal, setShowGuideModal] = useState(false);
+
+    const handleAndroidBack = useCallback(() => {
+        if (!isOpen) return false;
+        if (showGuideModal) {
+            setShowGuideModal(false);
+            return true;
+        }
+        onClose?.();
+        return true;
+    }, [isOpen, onClose, showGuideModal]);
+
+    useAndroidBackButtonHandler(handleAndroidBack, isOpen);
 
     useEffect(() => {
         loadStatus();

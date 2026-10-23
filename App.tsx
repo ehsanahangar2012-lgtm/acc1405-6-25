@@ -284,7 +284,7 @@ const LoginPage = () => {
             if (ok) {
                 setSyncMessage('کاربران و اطلاعات با موفقیت از هاست دریافت شدند');
             } else {
-                setSyncMessage('دسترسی به سرور برقرار است');
+                setSyncMessage('همگام‌سازی تأیید نشد؛ وضعیت اتصال و پاسخ سرور را بررسی کنید.');
             }
         } catch (e) {
             setSyncMessage('خطا در ارتباط با سرور ابری');
@@ -337,7 +337,7 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#111827] flex items-start sm:items-center justify-center p-3 sm:p-6 pb-8 relative overflow-x-hidden overflow-y-auto overscroll-y-contain font-sans" dir="rtl">
+        <div className="min-h-screen min-h-dvh bg-[#111827] flex items-start sm:items-center justify-center p-3 sm:p-6 pb-8 relative overflow-x-hidden overflow-y-auto overscroll-y-contain font-sans" dir="rtl">
             <div className="hidden sm:block fixed top-4 left-4 z-50">
                 <SmartSectionGuide customPath="/login" />
             </div>
@@ -358,7 +358,9 @@ const LoginPage = () => {
                     <div className="flex items-center gap-2 overflow-hidden">
                         <Cloud size={16} className={isSyncing ? "text-amber-400 animate-pulse" : "text-teal-400"} />
                         <span className="truncate text-[11px]">
-                            {syncMessage || 'همگام‌سازی ابری فعال است'}
+                            {syncMessage || (workspaceService.isRemoteCloudConfigured()
+                                ? 'آدرس سرور تنظیم شده است؛ اتصال هنگام همگام‌سازی بررسی می‌شود'
+                                : 'حالت محلی؛ اتصال سرور هنوز پیکربندی نشده است')}
                         </span>
                     </div>
                     <button
@@ -424,13 +426,14 @@ const LoginPage = () => {
                 ) : (
                     <form onSubmit={handleLogin} className="space-y-5">
                     <div className="space-y-2">
-                        <label className="text-xs text-slate-400 pr-2 font-bold flex items-center gap-1.5">
-                            <UserIcon size={14} className="text-teal-400" />
+                        <label htmlFor="login-username" className="text-sm text-slate-200 pr-2 font-bold flex items-center gap-1.5">
+                            <UserIcon size={16} className="text-teal-400" />
                             نام کاربری
                         </label>
                         <input 
+                            id="login-username"
                             type="text" 
-                            className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-teal-500 font-mono transition-all text-left placeholder:text-slate-600" 
+                            className="w-full bg-slate-950/90 border border-white/30 rounded-2xl p-4 min-h-12 text-white outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30 font-mono transition-all text-left placeholder:text-slate-400" 
                             placeholder="username"
                             value={username} 
                             onChange={e => setUsername(e.target.value)} 
@@ -438,13 +441,14 @@ const LoginPage = () => {
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs text-slate-400 pr-2 font-bold flex items-center gap-1.5">
-                            <Lock size={14} className="text-teal-400" />
+                        <label htmlFor="login-password" className="text-sm text-slate-200 pr-2 font-bold flex items-center gap-1.5">
+                            <Lock size={16} className="text-teal-400" />
                             رمز عبور
                         </label>
                         <input 
+                            id="login-password"
                             type="password" 
-                            className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-teal-500 font-mono transition-all text-left placeholder:text-slate-600" 
+                            className="w-full bg-slate-950/90 border border-white/30 rounded-2xl p-4 min-h-12 text-white outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30 font-mono transition-all text-left placeholder:text-slate-400" 
                             placeholder="••••••••"
                             value={password} 
                             onChange={e => setPassword(e.target.value)} 

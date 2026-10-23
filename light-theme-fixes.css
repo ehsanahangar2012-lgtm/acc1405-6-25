@@ -333,3 +333,35 @@ body.light main [class*="bg-gradient"]:is(
 ) :is(.text-white, .text-slate-100, .text-slate-200, .text-sky-100, .text-indigo-100, .text-emerald-100, .text-teal-100, .text-amber-100, .text-blue-100, .text-slate-300, .text-slate-400):not(button *):not(a *) {
   color: #172033 !important;
 }
+
+
+/* Consistent form and keyboard-focus contrast, including login/setup surfaces. */
+body.light input::placeholder,
+body.light textarea::placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
+}
+
+body.light :is(input, select, textarea):disabled {
+  background-color: #edf2f7 !important;
+  color: #64748b !important;
+  border-color: #cbd5e1 !important;
+  opacity: 1 !important;
+}
+
+body.light :is(button, a, [role="button"], input, select, textarea):focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px !important;
+}
+
+/* Normalize legacy commercial/cloud gradients on pages and overlays in light mode. */
+body.light [class*="bg-gradient"][class*="via-slate-900"]:not(button):not(a),
+body.light [class*="bg-gradient"][class*="to-slate-900"]:not(button):not(a),
+body.light [class*="bg-gradient"][class*="from-amber-950"]:not(button):not(a),
+body.light [class*="bg-gradient"][class*="from-rose-950"]:not(button):not(a) {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08) !important;
+}

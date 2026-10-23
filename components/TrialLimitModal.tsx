@@ -1,5 +1,6 @@
 // Trial Limit & Support Activation Modal (دیالوگ اتمام سقف نسخه پایه و تماس با پشتیبانی جهت لایسنس)
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
+import { useAndroidBackButtonHandler } from '../useMobile';
 import { 
     Lock, 
     ShieldAlert, 
@@ -47,6 +48,15 @@ export const TrialLimitModal: React.FC<TrialLimitModalProps> = ({
     const [copiedHwid, setCopiedHwid] = useState(false);
     const [licenseKey, setLicenseKey] = useState('');
     const [statusMessage, setStatusMessage] = useState<{ type: 'error'; text: string } | null>(null);
+
+    const handleAndroidBack = useCallback(() => {
+        if (!isOpen) return false;
+        onClose?.();
+        // If the owner cannot close this dialog, consume Back rather than navigating underneath it.
+        return true;
+    }, [isOpen, onClose]);
+
+    useAndroidBackButtonHandler(handleAndroidBack, isOpen);
 
     const isAndroid = isAndroidApp();
     const customerCount = people.length;
