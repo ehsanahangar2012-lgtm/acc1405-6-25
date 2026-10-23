@@ -53,9 +53,17 @@ public sealed class ServerLicenseClient
     private const string ReceiptAlgorithm = "RSASSA-PKCS1-v1_5-SHA256";
     private static readonly string[] AllowedPlans = ["TRIAL", "HEMAYAT", "BRONZE", "SILVER", "GOLD", "ENTERPRISE"];
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
-    private static readonly HttpClient Http = CreateHttpClient();
-    private static readonly SemaphoreSlim KeyLock = new(1, 1);
-    private static RSA? _cachedPublicKey;
+    private readonly HttpClient _http;
+    private readonly SemaphoreSlim _keyLock = new(1, 1);
+    private RSA? _cachedPublicKey;
+
+    public ServerLicenseClient() : this(CreateHttpClient()) { }
+
+    // Injectable HTTP transport supports deterministic tests without contacting production servers.
+    public ServerLicenseClient(HttpClient httpClient)
+    {
+        _http = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
+    }
 
     private static HttpClient CreateHttpClient()
     {
@@ -134,7 +142,7 @@ public sealed class ServerLicenseClient
             using var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
             request.Headers.Accept.ParseAdd("application/json");
             request.Content = new StringContent(body, Encoding.UTF8, "application/json");
-            using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
             if (response.StatusCode == HttpStatusCode.NotFound)
                 continue;
             if ((int)response.StatusCode is >= 300 and < 400)
@@ -219,7 +227,7 @@ public sealed class ServerLicenseClient
     private static async Task<RSA> GetPublicKeyAsync(CancellationToken cancellationToken)
     {
         if (_cachedPublicKey is not null) return _cachedPublicKey;
-        await KeyLock.WaitAsync(cancellationToken);
+        await _keyLock.WaitAsync(cancellationToken);
         try
         {
             if (_cachedPublicKey is not null) return _cachedPublicKey;
@@ -231,7 +239,7 @@ public sealed class ServerLicenseClient
             {
                 using var request = new HttpRequestMessage(HttpMethod.Get, endpoint);
                 request.Headers.Accept.ParseAdd("application/json");
-                using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+                using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                 if (response.StatusCode == HttpStatusCode.NotFound)
                     continue;
                 if ((int)response.StatusCode is >= 300 and < 400)
@@ -268,7 +276,7 @@ public sealed class ServerLicenseClient
         }
         finally
         {
-            KeyLock.Release();
+            _keyLock.Release();
         }
     }
 }
