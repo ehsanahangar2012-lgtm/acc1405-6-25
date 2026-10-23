@@ -22,7 +22,11 @@ public sealed class CustomerDialog : Window
 
     public CustomerRecord? Result { get; private set; }
 
-    public CustomerDialog(Window owner, CustomerRecord? existing = null, string suggestedCode = "")
+    public CustomerDialog(
+        Window owner,
+        CustomerRecord? existing = null,
+        string suggestedCode = "",
+        bool defaultSupplier = false)
     {
         _existing = existing;
         Owner = owner;
@@ -43,8 +47,8 @@ public sealed class CustomerDialog : Window
         _nationalId.Text = existing?.NationalId ?? "";
         _address.Text = existing?.Address ?? "";
         _notes.Text = existing?.Notes ?? "";
-        _isCustomer.IsChecked = existing?.IsCustomer ?? true;
-        _isSupplier.IsChecked = existing?.IsSupplier ?? false;
+        _isCustomer.IsChecked = existing?.IsCustomer ?? !defaultSupplier;
+        _isSupplier.IsChecked = existing?.IsSupplier ?? defaultSupplier;
 
         var root = new StackPanel { Margin = new Thickness(22) };
         root.Children.Add(new TextBlock
