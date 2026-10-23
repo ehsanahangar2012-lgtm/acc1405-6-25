@@ -439,8 +439,17 @@ public static class AccountingOperations
         if (!validTypes.Contains(draft.Type, StringComparer.Ordinal))
             throw new InvalidOperationException("نوع حواله معتبر نیست.");
         var validMovementTypes = new[] { "GOODS_RECEIPT", "GOODS_ISSUE", "INVENTORY_ADJUSTMENT", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT", "RETURN_RECEIPT", "RETURN_ISSUE" };
+        if (string.Equals(draft.MovementType, "INTERNAL_TRANSFER", StringComparison.Ordinal))
+            throw new InvalidOperationException("انتقال بین دو انبار تا زمان تکمیل دفتر موجودی تفکیک‌شدهٔ انبارها قابل ثبت نیست.");
         if (!validMovementTypes.Contains(draft.MovementType, StringComparer.Ordinal))
             throw new InvalidOperationException("نوع گردش موجودی معتبر نیست یا هنوز پشتیبانی نمی‌شود.");
+        var returnMovement = draft.MovementType is "RETURN_RECEIPT" or "RETURN_ISSUE";
+        if ((draft.Type == "RETURN") != returnMovement)
+            throw new InvalidOperationException("نوع سند برگشت باید با نوع گردش «برگشت از فروش/خرید» سازگار باشد.");
+        if (draft.Type == "IN" && draft.MovementType is "GOODS_ISSUE" or "PRODUCTION_CONSUMPTION")
+            throw new InvalidOperationException("نوع گردش خروج با سند ورود سازگار نیست.");
+        if (draft.Type == "OUT" && draft.MovementType is "GOODS_RECEIPT" or "PRODUCTION_OUTPUT")
+            throw new InvalidOperationException("نوع گردش ورود با سند خروج سازگار نیست.");
         if (!string.IsNullOrWhiteSpace(draft.PersonId) && !data.Customers.Any(p => p.Id == draft.PersonId))
             throw new InvalidOperationException("شخص مرتبط با حواله پیدا نشد.");
         if (!string.IsNullOrWhiteSpace(draft.RelatedInvoiceId) && !data.Invoices.Any(i => i.Id == draft.RelatedInvoiceId))
@@ -469,10 +478,6 @@ public static class AccountingOperations
                 }, VoucherStockDelta(draft.Type, draft.MovementType, line.Quantity)));
             }
         }
-
-        // Internal transfers require a per-warehouse stock ledger; prevent a false single-quantity transfer.
-        if (string.Equals(draft.MovementType, "INTERNAL_TRANSFER", StringComparison.Ordinal))
-            throw new InvalidOperationException("انتقال بین دو انبار تا زمان تکمیل دفتر موجودی تفکیک‌شدهٔ انبارها قابل ثبت نیست.");
 
         var created = new VoucherRecord
         {
