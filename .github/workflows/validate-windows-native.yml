@@ -1,0 +1,78 @@
+name: Validate native Windows WPF
+
+on:
+  push:
+    branches:
+      - feature/windows-native-dotnet
+    paths:
+      - "windows-native-dotnet/**"
+      - ".github/workflows/validate-windows-native.yml"
+  pull_request:
+    branches:
+      - fix/core-data-integrity
+    paths:
+      - "windows-native-dotnet/**"
+      - ".github/workflows/validate-windows-native.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-wpf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-publish:
+    name: Build, unit-test and publish Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore WPF application
+        run: dotnet restore windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj
+
+      - name: Build WPF application
+        run: dotnet build windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj --configuration Release --no-restore
+
+      - name: Run WPF unit tests
+        run: dotnet test windows-native-dotnet/tests/AshkeGhalam.Windows.Tests.csproj --configuration Release --logger "trx;LogFileName=native-wpf-tests.trx" --results-directory TestResults
+
+      - name: Publish self-contained Windows x64
+        run: dotnet publish windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj --configuration Release --runtime win-x64 --self-contained true --output publish/native-wpf
+
+      - name: Smoke-test executable startup
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE "publish/native-wpf/AshkeGhalam.Windows.exe"
+          if (-not (Test-Path $exe)) { throw "Published WPF executable was not found: $exe" }
+          $process = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 5
+          $process.Refresh()
+          if ($process.HasExited) { throw "WPF application exited during the startup smoke test (exit code $($process.ExitCode))." }
+          Stop-Process -Id $process.Id -Force
+          Write-Host "WPF executable remained running for the smoke-test interval."
+
+      - name: Upload Windows x64 release
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Windows-WPF-${{ github.sha }}
+          path: publish/native-wpf/**
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Windows-WPF-test-results-${{ github.sha }}
+          path: TestResults/**
+          if-no-files-found: ignore
+          retention-days: 14
