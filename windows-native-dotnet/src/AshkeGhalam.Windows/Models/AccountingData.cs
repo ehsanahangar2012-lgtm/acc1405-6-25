@@ -447,6 +447,7 @@ public static class AccountingOperations
 
         var floor = draft.Type switch { "SALE" => 1000, "PROFORMA" => 2000, "PURCHASE" => 3000, _ => 0 };
         var number = data.Invoices.Where(i => i.Type == draft.Type).Select(i => i.Number).DefaultIfEmpty(floor).Max() + 1;
+        while (data.Invoices.Any(i => i.Number == number)) number++;
         var prefix = !string.IsNullOrWhiteSpace(draft.Prefix) ? draft.Prefix.Trim() : draft.Type switch
         {
             "SALE" => "INV-",
@@ -667,9 +668,10 @@ public static class AccountingOperations
                 ?? throw new InvalidOperationException("یکی از کالاهای حواله پیدا نشد.");
             if (group.Any(i => i.Quantity <= 0m))
                 throw new InvalidOperationException("تعداد هر قلم باید بیشتر از صفر باشد.");
-            var resultingStock = product.StockQuantity + group.Sum(i => VoucherStockDelta(draft.Type, draft.MovementType, i.Quantity));
-            if (resultingStock < 0m)
-                throw new InvalidOperationException($"موجودی کالای «{product.Name}» برای این حواله کافی نیست. موجودی فعلی: {product.StockQuantity:N2}");
+            var delta = group.Sum(i => VoucherStockDelta(draft.Type, draft.MovementType, i.Quantity));
+            var resultingStock = product.StockQuantity + delta;
+            if (resultingStock < 0m || (delta < 0m && resultingStock < product.ReservedStock))
+                throw new InvalidOperationException($"موجودی آزاد کالای «{product.Name}» برای این حواله کافی نیست. موجودی: {product.StockQuantity:N2}، رزروشده: {product.ReservedStock:N2}");
             foreach (var line in group)
             {
                 resolved.Add((product, new VoucherItemRecord
@@ -776,8 +778,8 @@ public static class AccountingOperations
             }).ToList();
         if (invoice.Type != "PROFORMA" && products.Any(item => item.Product is null))
             throw new InvalidOperationException("یکی از کالاهای این سند برای برگشت گردش موجودی پیدا نشد.");
-        if (invoice.Type == "PURCHASE" && products.Any(item => item.Product!.StockQuantity < item.Quantity))
-            throw new InvalidOperationException("موجودی خرید قبلاً مصرف شده است؛ ابتدا سند برگشت/تعدیل ثبت کنید.");
+        if (invoice.Type == "PURCHASE" && products.Any(item => item.Product!.StockQuantity - item.Product.ReservedStock < item.Quantity))
+            throw new InvalidOperationException("موجودی خرید قبلاً مصرف یا رزرو شده است؛ ابتدا سند برگشت/تعدیل را بررسی کنید.");
 
         if (invoice.Type == "SALE")
         {
