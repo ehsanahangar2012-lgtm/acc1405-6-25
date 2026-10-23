@@ -3,6 +3,7 @@ name: Browser Preview Only
 on:
   push:
     branches: [ fix/core-data-integrity ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -48,7 +49,8 @@ jobs:
       - name: Publish static site to dedicated preview branch (no Actions artifacts)
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Use a narrowly scoped PAT when configured; GITHUB_TOKEN pushes do not trigger branch-based Pages deployments.
+          GH_TOKEN: ${{ secrets.PREVIEW_DEPLOY_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           SOURCE_DIR="$RUNNER_TEMP/ashkg-preview-source"
