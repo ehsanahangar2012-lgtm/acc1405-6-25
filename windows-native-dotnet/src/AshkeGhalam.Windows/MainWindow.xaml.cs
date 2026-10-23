@@ -1136,7 +1136,9 @@ public partial class MainWindow : Window
         var dialog = new InvoiceDialog(
             this, _data.Customers, _data.Products, _data.Invoices,
             AddCustomerInline, AddProductInline,
-            _data.Preferences.InvoiceTheme, _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile());
+            _data.Preferences.InvoiceTheme, _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
+            _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
+            _data.Preferences.Currency, _data.Preferences.InvoiceFooter);
         if (dialog.ShowDialog() == true && dialog.Result is InvoiceDraft draft)
         {
             var message = draft.Type switch
@@ -1185,7 +1187,8 @@ public partial class MainWindow : Window
         }
 
         new InvoicePreviewWindow(this, invoice, _data.Preferences.InvoiceTheme,
-            _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile()).ShowDialog();
+            _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
+            _data.Preferences.Currency, _data.Preferences.InvoiceFooter).ShowDialog();
     }
 
     private void PrintInvoice_Click(object sender, RoutedEventArgs e)
@@ -1199,7 +1202,8 @@ public partial class MainWindow : Window
         }
         // Preview and print share the same theme and QR output.
         new InvoicePreviewWindow(this, invoice, _data.Preferences.InvoiceTheme,
-            _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile()).ShowDialog();
+            _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
+            _data.Preferences.Currency, _data.Preferences.InvoiceFooter).ShowDialog();
     }
 
     private void AddPayment_Click(object sender, RoutedEventArgs e) => AddPaymentForInvoiceType(null);
