@@ -41,7 +41,7 @@ public sealed class AccountingData
         ActiveCompanyId = ActiveCompanyId,
         Preferences = new AccountingPreferences
         {
-            InvoiceTheme = Preferences?.InvoiceTheme ?? "smart",
+            InvoiceTheme = Preferences?.InvoiceTheme ?? "modern",
             ShowInvoiceQr = Preferences?.ShowInvoiceQr ?? true,
             Currency = Preferences?.Currency ?? "RIAL",
             DefaultTaxRatePercent = Preferences?.DefaultTaxRatePercent ?? 0m,
@@ -153,7 +153,7 @@ public sealed class CompanyProfileRecord
 
 public sealed class AccountingPreferences
 {
-    public string InvoiceTheme { get; set; } = "smart";
+    public string InvoiceTheme { get; set; } = "modern";
     public bool ShowInvoiceQr { get; set; } = true;
     public string Currency { get; set; } = "RIAL";
     public decimal DefaultTaxRatePercent { get; set; }
