@@ -189,6 +189,35 @@ public sealed class ServerLicenseClient
         if (!key.VerifyData(payloadBytes, signatureBytes, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1))
             return null;
 
+        using var payloadDocument = JsonDocument.Parse(payloadBytes);
+        if (payloadDocument.RootElement.ValueKind != JsonValueKind.Object)
+            return null;
+        var payloadRoot = payloadDocument.RootElement;
+
+        static bool HasString(JsonElement root, string name) =>
+            root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String;
+        static bool HasInteger(JsonElement root, string name) =>
+            root.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _);
+        static bool HasBoolean(JsonElement root, string name) =>
+            root.TryGetProperty(name, out var value) && value.ValueKind is JsonValueKind.True or JsonValueKind.False;
+
+        // The source TS client rejects missing/wrongly typed claims. Do not let DTO defaults
+        // turn an absent quota/timestamp/boolean into a valid-looking zero or false.
+        if (!HasString(payloadRoot, "issuer") || !HasString(payloadRoot, "workspace_id") ||
+            !HasString(payloadRoot, "license_key_hash") || !HasString(payloadRoot, "hwid") ||
+            !HasString(payloadRoot, "plan") || !HasString(payloadRoot, "expire_date") ||
+            !HasInteger(payloadRoot, "issued_at") || !HasInteger(payloadRoot, "expires_at") ||
+            !HasInteger(payloadRoot, "max_customers") || !HasInteger(payloadRoot, "max_documents") ||
+            !HasInteger(payloadRoot, "max_users") || !HasBoolean(payloadRoot, "is_unlimited") ||
+            !payloadRoot.TryGetProperty("features", out var featuresElement) ||
+            featuresElement.ValueKind != JsonValueKind.Array)
+            return null;
+        if (featuresElement.EnumerateArray().Any(item => item.ValueKind != JsonValueKind.String))
+            return null;
+        if (payloadRoot.TryGetProperty("company_name", out var companyElement) &&
+            companyElement.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
+            return null;
+
         var payload = JsonSerializer.Deserialize<VerifiedLicensePayload>(payloadBytes, JsonOptions);
         if (payload is null)
             return null;
