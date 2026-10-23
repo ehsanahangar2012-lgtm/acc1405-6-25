@@ -9,15 +9,16 @@ namespace AshkeGhalam.Windows.Dialogs;
 
 public sealed class StockDialog:Window
 {
-    private readonly ComboBox _product = new() { DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 260, Height = 34, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 280 };\n    private readonly TextBlock _stockHint = new() { Margin = new Thickness(0, 6, 0, 4), TextWrapping = TextWrapping.Wrap };
+    private readonly ComboBox _product = new() { DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 260, Height = 34, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 280 };
+    private readonly TextBlock _stockHint = new() { Margin = new Thickness(0, 6, 0, 4), TextWrapping = TextWrapping.Wrap };
     private readonly TextBox _quantity=new(){Text="1",Height=34,Padding=new Thickness(8,4,8,4)};
     public string ProductId{get;private set;}="";
     public decimal Quantity{get;private set;}
 
     public StockDialog(Window owner,IReadOnlyList<ProductRecord> products)
     {
-        Owner=owner;Title="افزایش موجودی کالا";Width=450;Height=300;WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
+        Owner = owner; Title = "افزایش موجودی کالا"; Width = 500; Height = 360; MinWidth = 420; MinHeight = 280; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background = Brushes.White; ResizeMode = ResizeMode.CanResize;
         NumericTextBoxFormatter.Attach(_quantity);
         _product.ItemsSource = products.OrderBy(product => product.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         if (_product.Items.Count > 0) _product.SelectedIndex = 0;
