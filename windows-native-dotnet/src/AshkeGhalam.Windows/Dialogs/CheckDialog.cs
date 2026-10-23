@@ -146,7 +146,8 @@ public sealed class CheckDialog : Window
         FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
 
         _bankName.Text = existing?.BankName ?? "";
-        _amount.Text = (existing?.Amount ?? _prefillAmount)?.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")) ?? "";
+        var initialAmount = existing is not null ? existing.Amount : _prefillAmount;
+        _amount.Text = initialAmount.HasValue ? initialAmount.Value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")) : "";
         _sayadId.Text = existing?.SayadId ?? "";
         _checkNumber.Text = existing?.CheckNumber ?? "";
         _holderName.ItemsSource = _people.Select(person => person.Name).Where(name => !string.IsNullOrWhiteSpace(name))
