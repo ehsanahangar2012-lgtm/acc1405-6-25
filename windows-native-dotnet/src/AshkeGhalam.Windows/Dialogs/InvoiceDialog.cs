@@ -66,7 +66,6 @@ public sealed class InvoiceDialog : Window
 
         _date.Text = FormatPersianDate(DateTimeOffset.Now);
         _lineList.ItemsSource = _lines;
-        _lineList.DisplayMemberPath = nameof(InvoiceLineDisplayText);
         // A ListBox can show a readable projection while keeping actual InvoiceLine values in the collection.
         _lineList.ItemsSource = _lines.Select(ToText).ToList();
         _product.ItemsSource = products;
@@ -174,6 +173,7 @@ public sealed class InvoiceDialog : Window
         _type.SelectionChanged += (_, _) =>
         {
             RefreshPeople();
+            ApplyDefaultPrice();
             RepriceLines();
             RefreshNumberPreview();
             RefreshTotals();
@@ -426,5 +426,4 @@ public sealed class InvoiceDialog : Window
         root.Children.Add(field);
     }
 
-    private static string InvoiceLineDisplayText => nameof(InvoiceLine);
 }
