@@ -81,7 +81,7 @@ jobs:
       # Actions artifact storage is quota-limited. Use a dedicated parallel-build
       # prerelease asset instead; never publish or alter the main branch.
       - name: Publish tested EXE as a parallel WPF prerelease asset
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
