@@ -280,6 +280,47 @@ public sealed class NativeOperationalPostingServiceTests
             "Reconciliation must not create duplicate source postings.");
     }
 
+    [TestMethod]
+    public void LaterStatusChangesOnEndorsedCheckTrackingRecordDoNotDoublePostBankPayment()
+    {
+        var data = CreateData();
+        data.Checks.Add(new CheckRecord
+        {
+            Id = "check-endorsed-source",
+            CheckType = "RECEIVED",
+            CheckNumber = "445566",
+            BankName = "بانک آزمون",
+            Amount = 900m,
+            Status = "TRANSFERRED",
+            Description = "چک واگذار شده",
+            History = [new CheckHistoryRecord { Status = "TRANSFERRED", ChangedAt = DateTimeOffset.Now, Note = "خرج" }]
+        });
+        data.Checks.Add(new CheckRecord
+        {
+            Id = "check-endorsed-tracking",
+            CheckType = "ISSUED",
+            CheckNumber = "445566",
+            BankName = "بانک آزمون",
+            Amount = 900m,
+            HolderName = "تأمین‌کننده",
+            Status = "PASSED",
+            Description = "خرج از چک دریافتی 445566 (شناسهٔ اصلی: sayad-1).",
+            History = [new CheckHistoryRecord { Status = "PASSED", ChangedAt = DateTimeOffset.Now, Note = "وصول نزد ذی‌نفع" }]
+        });
+
+        NativeOperationalPostingService.Reconcile(data);
+
+        var active = data.JournalEntries.Where(entry =>
+            entry.Status is "POSTED" or "APPROVED" &&
+            !data.JournalEntries.Any(reversal => reversal.ReferenceType == "AUTO_REVERSAL_" + entry.Id)).ToList();
+        Assert.AreEqual(1, active.Count(entry => entry.ReferenceType == "AUTO_CHECK_STATUS"),
+            "The source endorsement should be posted once; its linked tracking row must not debit bank/check liabilities again.");
+        var posting = active.Single(entry => entry.ReferenceType == "AUTO_CHECK_STATUS");
+        Assert.AreEqual("2110", data.LedgerAccounts.Single(account => account.Id == posting.DebitAccountId).Code);
+        Assert.AreEqual("1140", data.LedgerAccounts.Single(account => account.Id == posting.CreditAccountId).Code);
+        Assert.AreEqual(900m, posting.Amount);
+    }
+
     private static AccountingData CreateData()
     {
         var data = new AccountingData();
