@@ -189,6 +189,53 @@ public sealed class NativeOperationalPostingServiceTests
         Assert.AreEqual("1110", data.LedgerAccounts.Single(a => a.Id == entry.CreditAccountId).Code);
     }
 
+    [TestMethod]
+    public void ReceivedCheckDepositAndCashoutReversePreviousStatusPosting()
+    {
+        var data = CreateData();
+        var check = new CheckRecord
+        {
+            Id = "check-transition-1",
+            CheckType = "RECEIVED",
+            CheckNumber = "123456",
+            BankName = "بانک آزمون",
+            Amount = 500m,
+            Status = "DEPOSITED",
+            CreatedAt = DateTimeOffset.Now,
+            History = [new CheckHistoryRecord
+            {
+                Status = "DEPOSITED",
+                ChangedAt = DateTimeOffset.Now,
+                Note = "واگذاری به بانک"
+            }]
+        };
+        data.Checks.Add(check);
+
+        NativeOperationalPostingService.Reconcile(data);
+        Assert.AreEqual(1, data.JournalEntries.Count);
+        var transit = data.JournalEntries.Single();
+        Assert.AreEqual("1150", data.LedgerAccounts.Single(a => a.Id == transit.DebitAccountId).Code);
+        Assert.AreEqual("1140", data.LedgerAccounts.Single(a => a.Id == transit.CreditAccountId).Code);
+
+        check.Status = "CASHED";
+        check.History.Add(new CheckHistoryRecord
+        {
+            Status = "CASHED",
+            ChangedAt = DateTimeOffset.Now,
+            Note = "وصول چک"
+        });
+        NativeOperationalPostingService.Reconcile(data);
+        Assert.AreEqual(3, data.JournalEntries.Count, "The prior status entry is reversed before cashout is posted.");
+
+        NativeOperationalPostingService.Reconcile(data);
+        Assert.AreEqual(3, data.JournalEntries.Count, "Repeated check reconciliation must be idempotent.");
+        var active = data.JournalEntries.Single(e => e.ReferenceType == "AUTO_CHECK_STATUS" &&
+            !data.JournalEntries.Any(r => r.ReferenceType == "AUTO_REVERSAL_" + e.Id));
+        Assert.AreEqual("1120", data.LedgerAccounts.Single(a => a.Id == active.DebitAccountId).Code);
+        Assert.AreEqual("1150", data.LedgerAccounts.Single(a => a.Id == active.CreditAccountId).Code);
+        Assert.AreEqual(500m, active.Amount);
+    }
+
     private static AccountingData CreateData()
     {
         var data = new AccountingData();
