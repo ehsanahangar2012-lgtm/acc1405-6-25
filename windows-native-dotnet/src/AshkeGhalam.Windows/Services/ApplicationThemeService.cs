@@ -170,13 +170,19 @@ public static class ApplicationThemeService
         }
         if (element is DataGridCell cell)
         {
-            cell.Background = darkSurface;
-            cell.Foreground = lightText;
+            // Let row selection show through transparent cells; selected rows use a
+            // distinct teal surface so selection remains visible in the dark palette.
+            cell.Background = cell.IsSelected
+                ? new SolidColorBrush(Color.FromRgb(15, 118, 110))
+                : Brushes.Transparent;
+            cell.Foreground = cell.IsSelected ? Brushes.White : lightText;
             cell.BorderBrush = outline;
         }
         if (element is DataGridRow row)
         {
-            row.Background = darkSurface;
+            row.Background = row.IsSelected
+                ? new SolidColorBrush(Color.FromRgb(15, 118, 110))
+                : darkSurface;
             row.Foreground = lightText;
         }
         if (element is DataGridColumnHeader header)
