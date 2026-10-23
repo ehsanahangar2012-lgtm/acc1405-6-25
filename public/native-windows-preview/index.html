@@ -125,7 +125,6 @@
     <button class="nav-btn" data-page="expenses"><span class="nav-leading"><span class="nav-ico">−</span> هزینه‌ها</span></button>
     <div class="nav-group">حسابداری پیشرفته</div>
     <button class="nav-btn" data-page="forecast"><span class="nav-leading"><span class="nav-ico">↗</span> پیش‌بینی نقدینگی</span><span class="nav-badge">۳۰–۹۰ روز</span></button>
-    <button class="nav-btn" data-page="ledger"><span class="nav-leading"><span class="nav-ico">≡</span> حسابداری دوبل</span></button>
     <button class="nav-btn" data-page="vouchers"><span class="nav-leading"><span class="nav-ico">⇥</span> رسید و حوالهٔ انبار</span></button>
     <button class="nav-btn" data-page="cardex"><span class="nav-leading"><span class="nav-ico">≋</span> کاردکس کالا</span></button>
     <button class="nav-btn" data-page="checks"><span class="nav-leading"><span class="nav-ico">▱</span> مدیریت چک</span></button>
@@ -238,7 +237,7 @@
     </section>
     <section class="page" id="page-companies" hidden>
       <div class="page-head"><div><div class="page-title">چندشرکتی و شعب</div><div class="page-sub">تعریف شرکت، مشخصات سربرگ و انتخاب شرکت فعال برای صدور سند و پیش‌نمایش فاکتور.</div></div></div>
-      <div class="module-notice">اطلاعات شرکت‌ها در این پیش‌نمایش فقط در localStorage همین مرورگر ذخیره می‌شود. جداسازی واقعی دفترکل/انبار/شماره‌گذاری بین شرکت‌ها باید در پایگاه دادهٔ WPF اعمال و آزمون شود.</div>
+      <div class="module-notice">در این پیش‌نمایش، داده‌ها و تنظیمات هر شرکت به‌صورت جداگانه در localStorage همین مرورگر نگهداری می‌شود. جداسازی، مهاجرت امن و آزمون داده‌های چندشرکتی در برنامهٔ بومی WPF نیز باید پیش از استفادهٔ عملی تکمیل و تأیید شود.</div>
       <div class="panel"><div class="panel-head"><div class="panel-title">مجموعه‌های تعریف‌شده</div><span class="badge" id="companyCount">۰ شرکت</span></div><div class="company-grid" id="companiesList"></div></div>
       <div class="panel"><div class="form-section-title">تعریف شرکت یا شعبهٔ جدید</div><div class="inline-form">
         <div class="field-wrap"><label class="field-label" for="companyName">نام شرکت / کسب‌وکار *</label><input class="field" id="companyName" required placeholder="نام قابل نمایش"></div>
@@ -2654,7 +2653,7 @@ var qrcode = function() {
       {id:'co2-demo',name:'شرکت نمونهٔ دوم (آزمایشی)',legalName:'شرکت نمونهٔ دوم',nationalId:'',taxId:'',phone:'',address:'',branch:'شعبهٔ نمونه'}
     ],
     activeCompanyId:'co1',
-    settings:{invoiceTheme:'smart',showQr:true,currency:'ریال',taxRate:0,invoicePrefix:'INV-',invoiceFooter:'از انتخاب شما سپاسگزاریم.'},
+    settings:{invoiceTheme:'modern',showQr:true,currency:'ریال',taxRate:0,invoicePrefix:'INV-',invoiceFooter:'از انتخاب شما سپاسگزاریم.'},
     moadian:{fiscalId:'',environment:'sandbox',apiBase:'',enabled:'disabled'},
     moadianRecords:[],
     server:{baseUrl:'https://ashkghalam.ir',workspace:'',syncMode:'approval',connectionStatus:'بررسی نشده',lastCheck:''}
@@ -2672,16 +2671,53 @@ var qrcode = function() {
   state.vouchers = Array.isArray(state.vouchers) ? state.vouchers : [];
   state.moadianRecords = Array.isArray(state.moadianRecords) ? state.moadianRecords : [];
   if (!state.companies.some(c => c.id === state.activeCompanyId)) state.activeCompanyId = state.companies[0].id;
+  const companyDataKeys = ['customers','products','invoices','payments','expenses','checks','ledger','vouchers','moadianRecords','settings','moadian','server'];
+  const cloneCompanyData = value => JSON.parse(JSON.stringify(value));
+  const emptyCompanyData = () => ({
+    customers:[], products:[], invoices:[], payments:[], expenses:[], checks:[], ledger:[], vouchers:[], moadianRecords:[],
+    settings:cloneCompanyData(latestDefaults.settings),
+    moadian:cloneCompanyData(latestDefaults.moadian),
+    server:{...cloneCompanyData(latestDefaults.server),workspace:''}
+  });
+  const captureCompanyData = () => Object.fromEntries(companyDataKeys.map(key => [key,cloneCompanyData(state[key])]));
+  const applyCompanyData = data => {
+    const empty=emptyCompanyData();
+    for(const key of companyDataKeys) state[key]=cloneCompanyData(data && Object.prototype.hasOwnProperty.call(data,key) ? data[key] : empty[key]);
+  };
+  const initializeCompanyData = () => {
+    if(!state.companyData || typeof state.companyData!=='object' || Array.isArray(state.companyData)) state.companyData={};
+    // The active company snapshot in the top-level fields is authoritative on reload.
+    delete state.companyData[state.activeCompanyId];
+    for(const company of state.companies) if(company.id!==state.activeCompanyId && !state.companyData[company.id]) state.companyData[company.id]=emptyCompanyData();
+  };
+  initializeCompanyData();
   const persist = () => { try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch {} };
   let currentPage = 'dashboard';
   let formMode = null;
   let selectedInvoiceId = null;
   let inlineEntityMode = null;
   let draftLines = [];
-  let invoiceTheme = state.settings.invoiceTheme || 'smart';
+  let invoiceTheme = state.settings.invoiceTheme || 'modern';
   let invoiceQrEnabled = state.settings.showQr !== false;
   let currentMoadianPayload = '';
   let toastTimer;
+
+  const switchActiveCompany = id => {
+    if(!state.companies.some(company=>company.id===id)) return false;
+    if(id===state.activeCompanyId) return true;
+    state.companyData[state.activeCompanyId]=captureCompanyData();
+    state.activeCompanyId=id;
+    const nextData=state.companyData[id] || emptyCompanyData();
+    delete state.companyData[id];
+    applyCompanyData(nextData);
+    selectedInvoiceId=null;
+    $('invoiceOverlay')?.classList.remove('open');
+    invoiceTheme=state.settings.invoiceTheme || 'modern';
+    invoiceQrEnabled=state.settings.showQr !== false;
+    persist();
+    renderAll();
+    return true;
+  };
 
   const nextCode = (items, property, prefix) => {
     const max = items.map(item => String(item[property] || '').match(new RegExp('^'+prefix+'(\\d+)$','i')))
@@ -2781,7 +2817,7 @@ var qrcode = function() {
   };
   const renderSettings = () => {
     if (!$('settingsInvoiceTheme')) return;
-    $('settingsInvoiceTheme').value=state.settings.invoiceTheme || 'smart';
+    $('settingsInvoiceTheme').value=state.settings.invoiceTheme || 'modern';
     $('settingsCurrency').value=state.settings.currency || 'ریال';
     $('settingsTaxRate').value=state.settings.taxRate ?? 0;
     $('settingsShowQr').checked=state.settings.showQr !== false;
@@ -3063,7 +3099,7 @@ var qrcode = function() {
   document.addEventListener('change',e=>{
     if(e.target.id==='invoiceThemeSelect'){invoiceTheme=e.target.value;renderInvoiceDocument();return;}
     if(e.target.id==='invoiceQrToggle'){invoiceQrEnabled=e.target.checked;renderInvoiceDocument();return;}
-    if(e.target.id==='activeCompanySelector'){if(state.companies.some(c=>c.id===e.target.value)){state.activeCompanyId=e.target.value;persist();renderAll();if(selectedInvoiceId&&$('invoiceOverlay').classList.contains('open'))renderInvoiceDocument();}return;}
+    if(e.target.id==='activeCompanySelector'){if(state.companies.some(c=>c.id===e.target.value)&&e.target.value!==state.activeCompanyId){switchActiveCompany(e.target.value);toast('شرکت فعال تغییر کرد؛ داده‌ها و تنظیمات محلی آن مستقل هستند.');}return;}
     if(e.target.id==='cardexProductSelect'){renderCardex();return;}
   });
   document.addEventListener('click',e=>{
@@ -3092,12 +3128,12 @@ var qrcode = function() {
     if(e.target.closest('#saveCompany')){
       const name=$('companyName').value.trim();if(name.length<2){toast('نام شرکت / شعبه را وارد کن.');return;}
       const company={id:crypto.randomUUID(),name,legalName:$('companyLegalName').value.trim(),nationalId:$('companyNationalId').value.trim(),taxId:$('companyTaxId').value.trim(),phone:$('companyPhone').value.trim(),address:$('companyAddress').value.trim(),branch:$('companyBranch').value.trim()||'مرکزی'};
-      state.companies.push(company);state.activeCompanyId=company.id;
+      state.companies.push(company);
       ['companyName','companyLegalName','companyNationalId','companyTaxId','companyPhone','companyAddress'].forEach(id=>$(id).value='');$('companyBranch').value='مرکزی';
-      persist();renderAll();toast('شرکت نمونه ثبت و به‌عنوان شرکت فعال انتخاب شد.');return;
+      switchActiveCompany(company.id);toast('شرکت جدید با فضای دادهٔ مستقل ایجاد و فعال شد.');return;
     }
     const activateCompany=e.target.closest('[data-company-activate]');
-    if(activateCompany){const id=activateCompany.dataset.companyActivate;if(state.companies.some(c=>c.id===id)){state.activeCompanyId=id;persist();renderAll();toast('شرکت فعال برای پیش‌نمایش تغییر کرد.');}return;}
+    if(activateCompany){const id=activateCompany.dataset.companyActivate;if(state.companies.some(c=>c.id===id)){switchActiveCompany(id);toast('شرکت فعال تغییر کرد؛ داده‌های محلی شرکت‌ها از هم جدا هستند.');}return;}
     if(e.target.closest('#saveSettings')){
       const rate=Number($('settingsTaxRate').value||0);if(!Number.isFinite(rate)||rate<0||rate>100){toast('نرخ مالیات باید بین صفر تا صد باشد.');return;}
       state.settings={...state.settings,invoiceTheme:$('settingsInvoiceTheme').value,showQr:$('settingsShowQr').checked,currency:$('settingsCurrency').value,taxRate:rate,invoicePrefix:$('settingsInvoicePrefix').value.trim()||'INV-',invoiceFooter:$('settingsInvoiceFooter').value.trim()};
@@ -3166,8 +3202,9 @@ var qrcode = function() {
     const i=state.invoices.find(x=>x.id===selectedInvoiceId);if(!i)return;
     const originalTitle=document.title;document.title='AshkeGhalam-'+i.tracking;window.print();document.title=originalTitle;
   });
-  const reset=()=>{if(!confirm('داده‌های همین پیش‌نمایش از نو با نمونه‌های اولیه جایگزین شود؟'))return;state=defaultState();persist();renderAll();toast('داده‌های نمونه بازنشانی شد.')};
-  $('resetDemo').addEventListener('click',reset);$('clearLocal').addEventListener('click',()=>{if(confirm('تمام داده‌های محلی همین صفحه پاک شود؟')){localStorage.removeItem(storageKey);state=defaultState();persist();renderAll();toast('داده‌های محلی پاک شد.')}});
+  const resetPreviewData=()=>{state=defaultState();initializeCompanyData();invoiceTheme=state.settings.invoiceTheme||'modern';invoiceQrEnabled=state.settings.showQr!==false;selectedInvoiceId=null;currentPage='dashboard';$('invoiceOverlay')?.classList.remove('open');persist();renderAll();};
+  const reset=()=>{if(!confirm('داده‌های همین پیش‌نمایش از نو با نمونه‌های اولیه جایگزین شود؟'))return;resetPreviewData();toast('داده‌های نمونه بازنشانی شد.')};
+  $('resetDemo').addEventListener('click',reset);$('clearLocal').addEventListener('click',()=>{if(confirm('تمام داده‌های محلی همین صفحه بازنشانی شود؟')){localStorage.removeItem(storageKey);resetPreviewData();toast('داده‌های همین پیش‌نمایش بازنشانی شد؛ دادهٔ سرور تغییر نکرده است.')}});
   window.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.overlay.open').forEach(el=>el.classList.remove('open'))});
   // Auto-reload the browser UI when a new preview build is published to this same path.
   fetch('./version.json?check='+Date.now(),{cache:'no-store'}).then(r=>r.ok?r.json():null).then(v=>{if(v?.build)$('buildId').textContent=v.build}).catch(()=>{});
