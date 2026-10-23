@@ -391,6 +391,67 @@
                     </DataGrid>
                 </Grid>
             </TabItem>
+            <TabItem Header="حسابداری دوبل">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="حسابداری دوبل و دفتر روزنامه" FontSize="23" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="این بخش بر مبنای مدل ChartOfAccount و AccountingEntry نسخهٔ اصلی ساخته شده است. هر سند ثبت‌شده یک بدهکار و یک بستانکار برابر دارد؛ هنوز از فاکتورها/دریافت‌ها به‌صورت خودکار سند تولید نمی‌شود و با دفتر نسخهٔ اصلی همگام نیست."
+                                   Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,12,0,0">
+                            <Button Content="ایجاد سرفصل‌های پایه" Click="SeedLedgerAccounts_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="افزودن سرفصل" Click="AddLedgerAccount_Click"/>
+                            <Button Content="ثبت سند دوبل" Click="AddJournalEntry_Click"/>
+                            <Button Content="خروجی دفتر روزنامه CSV" Click="ExportJournalEntries_Click"/>
+                            <Button Content="خروجی تراز آزمایشی CSV" Click="ExportTrialBalance_Click"/>
+                        </WrapPanel>
+                        <TextBlock x:Name="LedgerSummary" Text="برای شروع، سرفصل‌های پایه را ایجاد کنید." FontWeight="SemiBold" Foreground="#0F766E" Margin="0,12,0,0"/>
+                    </StackPanel>
+                    <TabControl Grid.Row="1" Margin="0,12,0,0">
+                        <TabItem Header="دفتر روزنامه">
+                            <DataGrid x:Name="LedgerEntriesGrid" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="شماره" Binding="{Binding DisplayNumber}" Width="90"/>
+                                    <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="105"/>
+                                    <DataGridTextColumn Header="شرح سند" Binding="{Binding Description}" Width="*"/>
+                                    <DataGridTextColumn Header="بدهکار" Binding="{Binding DebitAccount}" Width="190"/>
+                                    <DataGridTextColumn Header="بستانکار" Binding="{Binding CreditAccount}" Width="190"/>
+                                    <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="145"/>
+                                    <DataGridTextColumn Header="نوع سند" Binding="{Binding DocumentTypeLabel}" Width="110"/>
+                                    <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="95"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem Header="کدینگ حساب‌ها">
+                            <DataGrid x:Name="LedgerAccountsGrid" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="100"/>
+                                    <DataGridTextColumn Header="عنوان حساب" Binding="{Binding Name}" Width="*"/>
+                                    <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="140"/>
+                                    <DataGridTextColumn Header="سطح" Binding="{Binding LevelLabel}" Width="110"/>
+                                    <DataGridTextColumn Header="حساب والد" Binding="{Binding ParentName}" Width="220"/>
+                                    <DataGridCheckBoxColumn Header="فعال" Binding="{Binding IsActive}" Width="70"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem Header="تراز آزمایشی">
+                            <DataGrid x:Name="TrialBalanceGrid" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="کد حساب" Binding="{Binding Code}" Width="100"/>
+                                    <DataGridTextColumn Header="حساب" Binding="{Binding Name}" Width="*"/>
+                                    <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="135"/>
+                                    <DataGridTextColumn Header="گردش بدهکار" Binding="{Binding Debit, StringFormat={}{0:N2}}" Width="155"/>
+                                    <DataGridTextColumn Header="گردش بستانکار" Binding="{Binding Credit, StringFormat={}{0:N2}}" Width="155"/>
+                                    <DataGridTextColumn Header="مانده (بدهکار منهای بستانکار)" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="205"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+            </TabItem>
                 </TabControl>
                 <Border x:Name="MigrationPanel" Visibility="Collapsed" Background="#F1F5F9" CornerRadius="14" Padding="28">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
