@@ -30,9 +30,10 @@ public sealed class CheckStatusDialog : Window
         Owner = owner;
         Title = "تغییر وضعیت چک";
         Width = 430;
-        Height = 300;
+        Height = 390;
+        MinHeight = 320;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
         Background = Brushes.White;
         _status.SelectedItem = Statuses.FirstOrDefault(s => s.Value == currentStatus) ?? Statuses[0];
