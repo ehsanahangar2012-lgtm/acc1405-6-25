@@ -52,7 +52,10 @@ public sealed class AccountingData
             InvoiceFooter = Preferences?.InvoiceFooter ?? "",
             ApplicationTheme = Preferences?.ApplicationTheme ?? "light",
             SelectedInvoiceFootnotes = [..(Preferences?.SelectedInvoiceFootnotes ?? [])],
-            CustomInvoiceFootnoteOptions = [..(Preferences?.CustomInvoiceFootnoteOptions ?? [])]
+            CustomInvoiceFootnoteOptions = [..(Preferences?.CustomInvoiceFootnoteOptions ?? [])],
+            ActiveFiscalYear = Preferences?.ActiveFiscalYear ?? "",
+            FiscalYearStartDate = Preferences?.FiscalYearStartDate ?? "",
+            FiscalYearEndDate = Preferences?.FiscalYearEndDate ?? ""
         },
         MoadianSettings = new MoadianSettingsRecord
         {
@@ -178,6 +181,9 @@ public sealed class AccountingPreferences
     public List<string> SelectedInvoiceFootnotes { get; set; } = [];
     // Custom, selectable footer options configured by the user (one phrase per option).
     public List<string> CustomInvoiceFootnoteOptions { get; set; } = [];
+    public string ActiveFiscalYear { get; set; } = "";
+    public string FiscalYearStartDate { get; set; } = "";
+    public string FiscalYearEndDate { get; set; } = "";
 }
 
 public sealed class MoadianSettingsRecord
