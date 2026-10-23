@@ -97,19 +97,72 @@ public sealed class NativeOperationalPostingServiceTests
             Status = "صادر شده"
         });
 
+        data.Payments.Add(new PaymentRecord
+        {
+            Id = "payment-cancel-1",
+            InvoiceId = "invoice-cancel-1",
+            InvoiceNumber = 1002,
+            CustomerName = "مشتری آزمون",
+            Amount = 20m,
+            Method = "نقدی",
+            CreatedAt = DateTimeOffset.Now
+        });
+
         NativeOperationalPostingService.Reconcile(data);
-        Assert.AreEqual(2, data.JournalEntries.Count, "Revenue and cost entries are created; zero tax is omitted.");
+        Assert.AreEqual(3, data.JournalEntries.Count, "Revenue, cost and receipt are created; zero tax is omitted.");
         data.Invoices[0].Status = "لغو شده";
 
         NativeOperationalPostingService.Reconcile(data);
-        Assert.AreEqual(4, data.JournalEntries.Count, "Cancellation must append reversals, not delete the audit trail.");
-        Assert.AreEqual(2, data.JournalEntries.Count(e => e.ReferenceType.StartsWith("AUTO_REVERSAL_")));
+        Assert.AreEqual(6, data.JournalEntries.Count, "Cancellation reverses the invoice and its linked receipt without deleting history.");
+        Assert.AreEqual(3, data.JournalEntries.Count(e => e.ReferenceType.StartsWith("AUTO_REVERSAL_")));
         NativeOperationalPostingService.Reconcile(data);
-        Assert.AreEqual(4, data.JournalEntries.Count, "A repeated reconciliation must not create duplicate reversals.");
+        Assert.AreEqual(6, data.JournalEntries.Count, "A repeated reconciliation must not create duplicate reversals.");
 
         var balance = NativeLedgerService.GetTrialBalance(data);
         Assert.IsTrue(balance.All(x => x.Debit == x.Credit),
             "Each source/reversal pair should net to zero for each touched account.");
+    }
+
+    [TestMethod]
+    public void EditedInvoiceAppendsReversalAndRepostsCurrentAmountExactlyOnce()
+    {
+        var data = CreateData();
+        data.Invoices.Add(new InvoiceRecord
+        {
+            Id = "invoice-edited-1",
+            Number = 1003,
+            Prefix = "INV-",
+            Type = "SALE",
+            CustomerId = "customer-1",
+            CustomerName = "مشتری آزمون",
+            Description = "فروش اصلاح‌شونده",
+            Lines = [new InvoiceLine
+            {
+                ProductId = "product-1", ProductName = "کالای آزمون",
+                Quantity = 1m, BuyPrice = 30m, UnitPrice = 100m, Profit = 70m, LineTotal = 100m
+            }],
+            Subtotal = 100m,
+            Total = 100m,
+            CreatedAt = DateTimeOffset.Now,
+            Status = "صادر شده"
+        });
+
+        NativeOperationalPostingService.Reconcile(data);
+        data.Invoices[0].Subtotal = 150m;
+        data.Invoices[0].Lines[0].UnitPrice = 150m;
+        data.Invoices[0].Lines[0].LineTotal = 150m;
+        NativeOperationalPostingService.Reconcile(data);
+        var countAfterEdit = data.JournalEntries.Count;
+        NativeOperationalPostingService.Reconcile(data);
+
+        Assert.AreEqual(4, countAfterEdit, "Changed revenue and cost are reversed and current revenue/cost are posted.");
+        Assert.AreEqual(countAfterEdit, data.JournalEntries.Count, "Repeat reconciliation remains idempotent.");
+        Assert.AreEqual(150m, data.JournalEntries.Single(e => e.ReferenceType == "AUTO_INVOICE_SALE_REVENUE" &&
+            !data.JournalEntries.Any(r => r.ReferenceType == "AUTO_REVERSAL_" + e.Id)).Amount);
+        Assert.AreEqual(150m, data.JournalEntries.Single(e => e.ReferenceType == "AUTO_INVOICE_SALE_COGS" &&
+            !data.JournalEntries.Any(r => r.ReferenceType == "AUTO_REVERSAL_" + e.Id)).Amount == 0m ? 0m :
+            data.JournalEntries.Single(e => e.ReferenceType == "AUTO_INVOICE_SALE_COGS" &&
+                !data.JournalEntries.Any(r => r.ReferenceType == "AUTO_REVERSAL_" + e.Id)).Amount);
     }
 
     [TestMethod]
