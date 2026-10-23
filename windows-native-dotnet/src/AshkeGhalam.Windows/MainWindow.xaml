@@ -49,8 +49,8 @@
             <Setter Property="Margin" Value="0,5,0,0"/>
         </Style>
         <Style x:Key="NavButton" TargetType="{x:Type Button}">
-            <Setter Property="Background" Value="#172033"/>
-            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#1F2937"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="HorizontalAlignment" Value="Stretch"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -66,7 +66,7 @@
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
                         </Border>
                         <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#26364E"/></Trigger>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#CCFBF1"/></Trigger>
                             <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#0F766E"/></Trigger>
                             <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
                         </ControlTemplate.Triggers>
@@ -83,19 +83,19 @@
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions><RowDefinition Height="76"/><RowDefinition Height="*"/><RowDefinition Height="30"/></Grid.RowDefinitions>
-        <Border x:Name="WindowHeader" Grid.Row="0" Background="#0F172A" Padding="24,0" MouseLeftButtonDown="WindowHeader_MouseLeftButtonDown">
+        <Border x:Name="WindowHeader" Grid.Row="0" Background="#FFFFFF" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1" Padding="24,0" MouseLeftButtonDown="WindowHeader_MouseLeftButtonDown">
             <Grid>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="اشک قلم" Foreground="#F8FAFC" FontSize="22" FontWeight="Bold"/>
-                    <TextBlock x:Name="CurrentModuleText" Text="پیشخوان • نسخهٔ بومی در کنار نسخهٔ اصلی" Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0"/>
+                    <TextBlock Text="اشک قلم" Foreground="#0F172A" FontSize="22" FontWeight="Bold"/>
+                    <TextBlock x:Name="CurrentModuleText" Text="پیشخوان • نسخهٔ بومی در کنار نسخهٔ اصلی" Foreground="#64748B" FontSize="12" Margin="0,3,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border VerticalAlignment="Center" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="18" Padding="12,7" Margin="0,0,10,0">
-                        <TextBlock x:Name="StorageStatus" Text="در حال بارگذاری..." Foreground="#E2E8F0" FontSize="12"/>
+                    <Border VerticalAlignment="Center" Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="18" Padding="12,7" Margin="0,0,10,0">
+                        <TextBlock x:Name="StorageStatus" Text="در حال بارگذاری..." Foreground="#334155" FontSize="12"/>
                     </Border>
-                    <Button x:Name="WindowMinimizeButton" Content="—" Width="34" Height="32" Padding="0" Margin="0,0,5,0" Background="#26364E" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" ToolTip="کوچک‌کردن پنجره" Click="WindowMinimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
-                    <Button x:Name="WindowMaximizeButton" Content="□" Width="34" Height="32" Padding="0" Margin="0,0,5,0" Background="#26364E" Foreground="#F8FAFC" BorderBrush="#475569" BorderThickness="1" ToolTip="تمام‌صفحه / بازگردانی" Click="WindowMaximize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                    <Button x:Name="WindowMinimizeButton" Content="—" Width="34" Height="32" Padding="0" Margin="0,0,5,0" Background="#F1F5F9" Foreground="#334155" BorderBrush="#CBD5E1" BorderThickness="1" ToolTip="کوچک‌کردن پنجره" Click="WindowMinimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                    <Button x:Name="WindowMaximizeButton" Content="□" Width="34" Height="32" Padding="0" Margin="0,0,5,0" Background="#F1F5F9" Foreground="#334155" BorderBrush="#CBD5E1" BorderThickness="1" ToolTip="تمام‌صفحه / بازگردانی" Click="WindowMaximize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
                     <Button Content="×" Width="34" Height="32" Padding="0" Margin="0" Background="#991B1B" Foreground="#FFFFFF" BorderBrush="#B91C1C" BorderThickness="1" ToolTip="بستن برنامه" Click="WindowClose_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
                 </StackPanel>
             </Grid>
@@ -919,14 +919,14 @@
                     </ScrollViewer>
                 </Border>
             </Grid>
-            <Border Grid.Column="1" Background="#0F172A" CornerRadius="15" Padding="10" FlowDirection="RightToLeft">
+            <Border Grid.Column="1" Background="#E2E8F0" CornerRadius="15" Padding="10" FlowDirection="RightToLeft">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                     <StackPanel x:Name="NavigationRoot">
-                        <Border Background="#111F35" CornerRadius="12" Padding="13" Margin="0,0,0,8">
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="13" Margin="0,0,0,8">
                             <StackPanel>
-                                <TextBlock Text="اشک قلم" Foreground="#F8FAFC" FontSize="21" FontWeight="Bold"/>
-                                <TextBlock Text="نسخهٔ بومی ویندوز" Foreground="#CBD5E1" FontSize="12" Margin="0,4,0,0"/>
-                                <TextBlock Text="مهاجرت مستقل از نسخهٔ اصلی" Foreground="#94A3B8" FontSize="10" Margin="0,5,0,0"/>
+                                <TextBlock Text="اشک قلم" Foreground="#0F172A" FontSize="21" FontWeight="Bold"/>
+                                <TextBlock Text="نسخهٔ بومی ویندوز" Foreground="#475569" FontSize="12" Margin="0,4,0,0"/>
+                                <TextBlock Text="مهاجرت مستقل از نسخهٔ اصلی" Foreground="#64748B" FontSize="10" Margin="0,5,0,0"/>
                             </StackPanel>
                         </Border>
                         <TextBlock Text="منوی اصلی" Style="{StaticResource NavSectionLabel}"/>
