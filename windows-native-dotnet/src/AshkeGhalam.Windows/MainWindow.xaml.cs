@@ -383,8 +383,15 @@ public partial class MainWindow : Window
             }));
 
     private void ExportProducts_Click(object sender, RoutedEventArgs e) =>
-        ExportCsv("products.csv", new[] { "Id", "Name", "Sku", "Unit", "StockQuantity", "UnitPrice" },
-            _data.Products.Select(p => new[] { p.Id, p.Name, p.Sku, p.Unit, p.StockQuantity.ToString(CultureInfo.InvariantCulture), p.UnitPrice.ToString(CultureInfo.InvariantCulture) }));
+        ExportCsv("products.csv", new[] { "Id", "Name", "Code", "SerialNumber", "Unit", "StockQuantity", "ReservedStock", "MinStock", "BuyPrice", "SellPrice", "Weight", "ShelfLocation", "Category", "SubCategory", "SubSubCategory", "CategoryPath", "Description", "ImageUrl", "CreatedAt" },
+            _data.Products.Select(p => new[]
+            {
+                p.Id, p.Name, p.Code, p.SerialNumber, p.Unit,
+                p.StockQuantity.ToString(CultureInfo.InvariantCulture), p.ReservedStock.ToString(CultureInfo.InvariantCulture),
+                p.MinStock?.ToString(CultureInfo.InvariantCulture) ?? "", p.BuyPrice?.ToString(CultureInfo.InvariantCulture) ?? "",
+                p.SellPrice.ToString(CultureInfo.InvariantCulture), p.Weight?.ToString(CultureInfo.InvariantCulture) ?? "",
+                p.ShelfLocation, p.Category, p.SubCategory, p.SubSubCategory, p.CategoryPath, p.Description, p.ImageUrl, p.CreatedAt.ToString("O")
+            }));
 
     private void ExportInvoices_Click(object sender, RoutedEventArgs e) =>
         ExportCsv("invoices.csv", new[] { "Number", "CustomerName", "Description", "Subtotal", "TaxRatePercent", "TaxAmount", "Total", "Status", "CreatedAt" },
