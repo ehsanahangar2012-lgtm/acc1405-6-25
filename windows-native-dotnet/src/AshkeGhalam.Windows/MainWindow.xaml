@@ -366,6 +366,33 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+            <TabItem Header="تقویم سررسیدها">
+                <DockPanel Margin="12">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <TextBlock Text="تقویم سررسید دریافت‌ها و پرداخت‌ها" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="فاکتورهای بازِ دارای تاریخ سررسید و چک‌های حل‌نشده نمایش داده می‌شوند؛ سندهای تسویه‌شده و پیش‌فاکتورها حذف شده‌اند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,8"/>
+                        <DockPanel>
+                            <TextBlock x:Name="DueCalendarSummary" VerticalAlignment="Center" FontWeight="SemiBold" Text="در انتظار محاسبه"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="بازمحاسبه" Click="RefreshDueCalendar_Click" Margin="4,0"/>
+                                <Button Content="خروجی CSV سررسیدها" Click="ExportDueCalendar_Click" Margin="4,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="DueCalendarGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="تاریخ سررسید" Binding="{Binding DueDate}" Width="135"/>
+                            <DataGridTextColumn Header="نوع تعهد" Binding="{Binding Kind}" Width="170"/>
+                            <DataGridTextColumn Header="شماره سند/چک" Binding="{Binding DocumentNumber}" Width="135"/>
+                            <DataGridTextColumn Header="طرف حساب" Binding="{Binding Contact}" Width="*"/>
+                            <DataGridTextColumn Header="مبلغ باز" Binding="{Binding Amount, StringFormat=N2}" Width="135"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="170"/>
+                            <DataGridTextColumn Header="مانده تا سررسید" Binding="{Binding Days}" Width="145"/>
+                            <DataGridTextColumn Header="اولویت" Binding="{Binding Priority}" Width="120"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
             <TabItem Header="پشتیبان‌گیری">
                 <StackPanel Margin="18" MaxWidth="850" HorizontalAlignment="Right">
                     <TextBlock Text="پشتیبان‌گیری و بازیابی" FontSize="24" FontWeight="Bold"/>
