@@ -256,6 +256,8 @@ namespace AshkeGhalam.Windows.Dialogs;
 public sealed class InvoicePreviewWindow : Window
 {
     private readonly InvoiceRecord _invoice;
+    private readonly CompanyProfileRecord? _company;
+    private readonly bool _showQr;
     private FlowDocument _document;
     private FlowDocumentScrollViewer _viewer = null!;
     private string _theme = "smart";
@@ -282,8 +284,11 @@ public sealed class InvoicePreviewWindow : Window
         Window owner,
         InvoiceDraft draft,
         IReadOnlyList<CustomerRecord> people,
-        IReadOnlyList<InvoiceRecord> invoices)
-        : this(owner, BuildDraftPreview(draft, people, invoices))
+        IReadOnlyList<InvoiceRecord> invoices,
+        string? defaultTheme = null,
+        bool showQr = true,
+        CompanyProfileRecord? company = null)
+        : this(owner, BuildDraftPreview(draft, people, invoices), defaultTheme, showQr, company)
     {
     }
 
@@ -361,9 +366,19 @@ public sealed class InvoicePreviewWindow : Window
         };
     }
 
-    public InvoicePreviewWindow(Window owner, InvoiceRecord invoice)
+    public InvoicePreviewWindow(
+        Window owner,
+        InvoiceRecord invoice,
+        string? defaultTheme = null,
+        bool showQr = true,
+        CompanyProfileRecord? company = null)
     {
         _invoice = invoice ?? throw new ArgumentNullException(nameof(invoice));
+        _company = company;
+        _showQr = showQr;
+        _theme = InvoiceThemes.Any(option => string.Equals(option.Key, defaultTheme, StringComparison.Ordinal))
+            ? defaultTheme!
+            : "smart";
         Owner = owner;
         Title = $"پیش‌نمایش {invoice.TypeLabel} — {invoice.DisplayNumber}";
         Width = 1080;
@@ -374,7 +389,7 @@ public sealed class InvoicePreviewWindow : Window
         FlowDirection = FlowDirection.RightToLeft;
         Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
 
-        _document = BuildDocument(invoice, _theme);
+        _document = BuildDocument(invoice, _theme, _showQr, _company);
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -419,7 +434,7 @@ public sealed class InvoicePreviewWindow : Window
         {
             if (themeSelector.SelectedValue is not string selected || selected == _theme) return;
             _theme = selected;
-            _document = BuildDocument(_invoice, _theme);
+            _document = BuildDocument(_invoice, _theme, _showQr, _company);
             if (_viewer is not null) _viewer.Document = _document;
         };
         buttons.Children.Add(themeSelector);
