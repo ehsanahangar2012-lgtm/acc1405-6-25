@@ -504,7 +504,9 @@ public sealed class InvoiceDialog : Window
                 throw new InvalidOperationException("تعداد باید مثبت و قیمت واحد نمی‌تواند منفی باشد.");
             if (CurrentType == "SALE")
             {
-                var alreadyInInvoice = _lines.Where(l => l.ProductId == product.Id).Sum(l => l.Quantity);
+                var alreadyInInvoice = _lines
+                    .Where((line, index) => index != _editingLineIndex && line.ProductId == product.Id)
+                    .Sum(line => line.Quantity);
                 var available = product.StockQuantity - product.ReservedStock;
                 // When editing a posted sale, temporarily account for its existing stock-out.
                 if (_existingInvoice?.Type == "SALE")
@@ -513,7 +515,10 @@ public sealed class InvoiceDialog : Window
                     throw new InvalidOperationException($"موجودی آزاد کافی نیست؛ موجودی آزاد پس از درنظرگرفتن سند انتخابی: {available:N2}");
             }
             var buyPrice = AccountingRules.Money(product.BuyPrice ?? 0m);
-            _lines.Add(new InvoiceLine
+            var entryOrder = _editingLineIndex >= 0 && _editingLineIndex < _lines.Count
+                ? _lines[_editingLineIndex].EntryOrder
+                : _lines.Count + 1;
+            var updatedLine = new InvoiceLine
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
@@ -525,8 +530,16 @@ public sealed class InvoiceDialog : Window
                 Profit = CurrentType == "SALE" ? AccountingRules.Money((price - buyPrice) * quantity) : 0m,
                 LineTotal = AccountingRules.Money(quantity * price),
                 Description = _lineDescription.Text.Trim(),
-                EntryOrder = _lines.Count + 1
-            });
+                EntryOrder = entryOrder
+            };
+
+            if (_editingLineIndex >= 0 && _editingLineIndex < _lines.Count)
+                _lines[_editingLineIndex] = updatedLine;
+            else
+                _lines.Add(updatedLine);
+
+            _editingLineIndex = -1;
+            _addLineButton.Content = "افزودن قلم";
             _quantity.Text = "1";
             _lineDescription.Clear();
             RefreshLines();
@@ -567,8 +580,11 @@ public sealed class InvoiceDialog : Window
 
     private void RefreshLines()
     {
-        _lineList.ItemsSource = null;
-        _lineList.ItemsSource = _lines.Select(ToText).ToList();
+        for (var index = 0; index < _lines.Count; index++)
+            _lines[index].EntryOrder = index + 1;
+        if (!ReferenceEquals(_lineList.ItemsSource, _lines))
+            _lineList.ItemsSource = _lines;
+        _lineList.Items.Refresh();
     }
 
     private void RefreshTotals()
