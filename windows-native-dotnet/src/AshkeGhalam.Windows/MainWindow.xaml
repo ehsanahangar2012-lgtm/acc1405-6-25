@@ -73,6 +73,7 @@
             <Setter Property="SelectionUnit" Value="FullRow"/>
             <Setter Property="CanUserResizeColumns" Value="True"/>
             <Setter Property="CanUserSortColumns" Value="True"/>
+            <Setter Property="AlternationCount" Value="2"/>
             <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
             <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
             <Setter Property="MinColumnWidth" Value="52"/>
@@ -1136,13 +1137,12 @@
                         <Button Tag="workflow-rules" Content="⚙️  قواعد گردش مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="گزارشات و تحلیل" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="financial-reports" Content="📊  گزارشات مالی پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="companies" Content="🏢  چندشرکتی و مشخصات شرکت" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="companies" Content="🏢  تنظیمات حسابداری و چندشرکتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="server" Content="🌐  ارتباط با سرور اصلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="fiscal-year" Content="📅  سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="security" Content="🔐  امنیت داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="data-sync" Content="🔄  همگام‌سازی داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="advanced-settings" Content="🎛️  تنظیمات پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="settings" Content="⚙️  تنظیمات حسابداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
