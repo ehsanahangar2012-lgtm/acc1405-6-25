@@ -876,21 +876,11 @@ const App = () => {
       adminChatNotificationService.startMonitoring(isAndroidApp() ? 12000 : 30000);
     }
 
-    // شروع پردازش دوره‌ای صف سینک - هر ۲ دقیقه (صرفاً در صورت اتصال به سرور)
-    const queueTimer = setInterval(() => {
-      if (navigator.onLine && workspaceService.isRemoteCloudConfigured()) {
-        syncQueue.processQueue().catch(() => {});
-      }
-    }, 2 * 60 * 1000); // هر ۲ دقیقه
-
-    // پردازش فوری هنگام اولیه در صورت اتصال به سرور
-    if (workspaceService.isRemoteCloudConfigured()) {
-      setTimeout(() => syncQueue.processQueue().catch(() => {}), 3000);
-    }
+    // صف همگام‌سازی توسط autoSyncService در چرخهٔ مرکزی پردازش می‌شود؛
+    // تایمر جداگانهٔ App حذف شده تا درخواست‌های تکراری ایجاد نشود.
     
     return () => {
       clearTimeout(initConnection);
-      clearInterval(queueTimer);
       autoBackupService.stop();
       if (FEATURES.ENABLE_CROSS_DEVICE_SYNC) {
         crossDeviceSync.stopAutoSync();
