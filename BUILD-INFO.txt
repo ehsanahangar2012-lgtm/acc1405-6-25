@@ -1,0 +1,8 @@
+AshkeGhalam native Windows WPF parallel build
+Source branch: feature/windows-native-dotnet
+Tested commit: 3d1f951f198656c450af16d0fac488db06f0834c
+GitHub Actions run: 39981187669
+Build number: 192
+
+This is a parallel evaluation build, not a declaration of full parity with every source module.
+Existing application versions and main branch remain unchanged.
