@@ -446,9 +446,9 @@ public static class AccountingOperations
         var returnMovement = draft.MovementType is "RETURN_RECEIPT" or "RETURN_ISSUE";
         if ((draft.Type == "RETURN") != returnMovement)
             throw new InvalidOperationException("نوع سند برگشت باید با نوع گردش «برگشت از فروش/خرید» سازگار باشد.");
-        if (draft.Type == "IN" && draft.MovementType is "GOODS_ISSUE" or "PRODUCTION_CONSUMPTION")
+        if (draft.Type == "IN" && (draft.MovementType is "GOODS_ISSUE" or "PRODUCTION_CONSUMPTION"))
             throw new InvalidOperationException("نوع گردش خروج با سند ورود سازگار نیست.");
-        if (draft.Type == "OUT" && draft.MovementType is "GOODS_RECEIPT" or "PRODUCTION_OUTPUT")
+        if (draft.Type == "OUT" && (draft.MovementType is "GOODS_RECEIPT" or "PRODUCTION_OUTPUT"))
             throw new InvalidOperationException("نوع گردش ورود با سند خروج سازگار نیست.");
         if (!string.IsNullOrWhiteSpace(draft.PersonId) && !data.Customers.Any(p => p.Id == draft.PersonId))
             throw new InvalidOperationException("شخص مرتبط با حواله پیدا نشد.");
@@ -461,14 +461,12 @@ public static class AccountingOperations
                 ?? throw new InvalidOperationException("یکی از کالاهای حواله پیدا نشد.");
             if (group.Any(i => i.Quantity <= 0m))
                 throw new InvalidOperationException("تعداد هر قلم باید بیشتر از صفر باشد.");
-            var deltaPerUnit = VoucherStockDelta(draft.Type, draft.MovementType, 1m);
             var resultingStock = product.StockQuantity + group.Sum(i => VoucherStockDelta(draft.Type, draft.MovementType, i.Quantity));
             if (resultingStock < 0m)
                 throw new InvalidOperationException($"موجودی کالای «{product.Name}» برای این حواله کافی نیست. موجودی فعلی: {product.StockQuantity:N2}");
             foreach (var line in group)
             {
-                var resolvedProduct = product;
-                resolved.Add((resolvedProduct, new VoucherItemRecord
+                resolved.Add((product, new VoucherItemRecord
                 {
                     ProductId = product.Id, ProductName = product.Name, Quantity = line.Quantity,
                     Unit = string.IsNullOrWhiteSpace(line.Unit) ? product.Unit : line.Unit,
@@ -690,11 +688,11 @@ public static class AccountingDataValidator
                 throw new InvalidDataException("چک به فاکتور ناموجود پیوند داده شده است.");
         }
 
-        UniqueIds(data.Vouchers.Select(v => v?.Id), "حواله");
+        var voucherIds = UniqueIds(data.Vouchers.Select(v => v?.Id), "حواله");
         var voucherNumbers = new HashSet<int>();
         var trackingCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var validVoucherTypes = new[] { "IN", "OUT", "RETURN" };
-        var validMovementTypes = new[] { "GOODS_RECEIPT", "GOODS_ISSUE", "INTERNAL_TRANSFER", "INVENTORY_ADJUSTMENT", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT", "RETURN_RECEIPT", "RETURN_ISSUE" };
+        var validMovementTypes = new[] { "GOODS_RECEIPT", "GOODS_ISSUE", "INVENTORY_ADJUSTMENT", "PRODUCTION_CONSUMPTION", "PRODUCTION_OUTPUT", "RETURN_RECEIPT", "RETURN_ISSUE" };
         var validVoucherStatuses = new[] { "PENDING", "IN_TRANSIT", "DELIVERED" };
         foreach (var voucher in data.Vouchers)
         {
@@ -703,13 +701,22 @@ public static class AccountingDataValidator
                 !validVoucherTypes.Contains(voucher.Type, StringComparer.Ordinal) ||
                 !validMovementTypes.Contains(voucher.MovementType, StringComparer.Ordinal) ||
                 !validVoucherStatuses.Contains(voucher.Status, StringComparer.Ordinal) ||
-                voucher.Date == default || voucher.Items is null || voucher.Items.Count == 0 || voucher.Items.Count > 100_000 ||
+                voucher.Date == default || voucher.TotalWeight < 0m || voucher.EstimatedValue < 0m ||
+                voucher.Items is null || voucher.Items.Count == 0 || voucher.Items.Count > 100_000 ||
+                voucher.LoadingPhotos is null ||
                 voucher.Items.Any(i => i is null || string.IsNullOrWhiteSpace(i.ProductId) || string.IsNullOrWhiteSpace(i.ProductName) || i.Quantity <= 0m || (i.Weight.HasValue && i.Weight.Value < 0m)))
                 throw new InvalidDataException("حواله ناقص یا نامعتبر است.");
+            var isReturnMovement = voucher.MovementType is "RETURN_RECEIPT" or "RETURN_ISSUE";
+            if ((voucher.Type == "RETURN") != isReturnMovement ||
+                (voucher.Type == "IN" && (voucher.MovementType is "GOODS_ISSUE" or "PRODUCTION_CONSUMPTION")) ||
+                (voucher.Type == "OUT" && (voucher.MovementType is "GOODS_RECEIPT" or "PRODUCTION_OUTPUT")))
+                throw new InvalidDataException("نوع گردش موجودی با نوع حواله سازگار نیست.");
             if (!string.IsNullOrWhiteSpace(voucher.PersonId) && !customerIds.Contains(voucher.PersonId))
                 throw new InvalidDataException("شخص مرتبط با حواله وجود ندارد.");
             if (!string.IsNullOrWhiteSpace(voucher.RelatedInvoiceId) && !invoiceIds.Contains(voucher.RelatedInvoiceId))
                 throw new InvalidDataException("فاکتور مرتبط با حواله وجود ندارد.");
+            if (!string.IsNullOrWhiteSpace(voucher.RelatedVoucherId) && !voucherIds.Contains(voucher.RelatedVoucherId))
+                throw new InvalidDataException("حوالهٔ مرتبط در داده‌ها وجود ندارد.");
             if (voucher.Items.Any(i => !productIds.Contains(i.ProductId)))
                 throw new InvalidDataException("یکی از کالاهای حواله در فهرست کالاها وجود ندارد.");
         }
