@@ -27,6 +27,7 @@
             <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
             <Setter Property="MinHeight" Value="34"/>
             <Setter Property="IsTextSearchEnabled" Value="True"/>
+            <Setter Property="IsTextSearchCaseSensitive" Value="False"/>
             <Setter Property="MaxDropDownHeight" Value="320"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
             <Setter Property="Padding" Value="8,4"/>
