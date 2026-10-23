@@ -20,12 +20,47 @@ public sealed class AccountingData
     public List<ChartOfAccountRecord> LedgerAccounts { get; set; } = [];
     public List<AccountingEntryRecord> JournalEntries { get; set; } = [];
 
+    // Optional persisted configuration; initializers preserve compatibility with old schema-v1 files.
+    public List<CompanyProfileRecord> Companies { get; set; } = [];
+    public string ActiveCompanyId { get; set; } = "";
+    public AccountingPreferences Preferences { get; set; } = new();
+    public MoadianSettingsRecord MoadianSettings { get; set; } = new();
+    public ServerConnectionSettings ServerConnection { get; set; } = new();
+
     public AccountingData DeepCopy() => new()
     {
         SchemaVersion = SchemaVersion,
         NextInvoiceNumber = NextInvoiceNumber,
         NextVoucherNumber = NextVoucherNumber,
         NextJournalNumber = NextJournalNumber,
+        Companies = (Companies ?? []).Select(c => new CompanyProfileRecord
+        {
+            Id = c.Id, Name = c.Name, LegalName = c.LegalName, NationalId = c.NationalId,
+            TaxId = c.TaxId, Phone = c.Phone, Address = c.Address, Branch = c.Branch
+        }).ToList(),
+        ActiveCompanyId = ActiveCompanyId,
+        Preferences = new AccountingPreferences
+        {
+            InvoiceTheme = Preferences?.InvoiceTheme ?? "smart",
+            ShowInvoiceQr = Preferences?.ShowInvoiceQr ?? true,
+            Currency = Preferences?.Currency ?? "RIAL",
+            DefaultTaxRatePercent = Preferences?.DefaultTaxRatePercent ?? 0m,
+            SalesInvoicePrefix = Preferences?.SalesInvoicePrefix ?? "INV-",
+            InvoiceFooter = Preferences?.InvoiceFooter ?? ""
+        },
+        MoadianSettings = new MoadianSettingsRecord
+        {
+            TaxpayerId = MoadianSettings?.TaxpayerId ?? "",
+            Environment = MoadianSettings?.Environment ?? "Sandbox",
+            ApiBaseUrl = MoadianSettings?.ApiBaseUrl ?? "",
+            IsConfigured = MoadianSettings?.IsConfigured ?? false
+        },
+        ServerConnection = new ServerConnectionSettings
+        {
+            BaseUrl = ServerConnection?.BaseUrl ?? "https://acc.ashkghalam.ir/",
+            WorkspaceId = ServerConnection?.WorkspaceId ?? "",
+            SyncMode = ServerConnection?.SyncMode ?? "manual"
+        },
         Customers = Customers.Select(c => new CustomerRecord
         {
             Id=c.Id, Code=c.Code, Name=c.Name, Phone=c.Phone, Email=c.Email, Balance=c.Balance,
@@ -102,6 +137,43 @@ public sealed class AccountingData
             DocumentType=j.DocumentType, FiscalYear=j.FiscalYear, Status=j.Status, CreatedAt=j.CreatedAt
         }).ToList()
     };
+}
+
+public sealed class CompanyProfileRecord
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Name { get; set; } = "شرکت چاپ و کارتن‌سازی اشک قلم";
+    public string LegalName { get; set; } = "شرکت چاپ و کارتن‌سازی اشک قلم";
+    public string NationalId { get; set; } = "";
+    public string TaxId { get; set; } = "";
+    public string Phone { get; set; } = "";
+    public string Address { get; set; } = "";
+    public string Branch { get; set; } = "مرکزی";
+}
+
+public sealed class AccountingPreferences
+{
+    public string InvoiceTheme { get; set; } = "smart";
+    public bool ShowInvoiceQr { get; set; } = true;
+    public string Currency { get; set; } = "RIAL";
+    public decimal DefaultTaxRatePercent { get; set; }
+    public string SalesInvoicePrefix { get; set; } = "INV-";
+    public string InvoiceFooter { get; set; } = "";
+}
+
+public sealed class MoadianSettingsRecord
+{
+    public string TaxpayerId { get; set; } = "";
+    public string Environment { get; set; } = "Sandbox";
+    public string ApiBaseUrl { get; set; } = "";
+    public bool IsConfigured { get; set; }
+}
+
+public sealed class ServerConnectionSettings
+{
+    public string BaseUrl { get; set; } = "https://acc.ashkghalam.ir/";
+    public string WorkspaceId { get; set; } = "";
+    public string SyncMode { get; set; } = "manual";
 }
 
 public sealed class CustomerRecord
