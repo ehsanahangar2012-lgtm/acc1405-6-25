@@ -1789,8 +1789,21 @@ public partial class MainWindow : Window
             _data.ActiveCompanyId = _data.Companies[0].Id;
 
         _data.Preferences ??= new AccountingPreferences();
+        _data.Preferences.CustomInvoiceFootnoteOptions ??= [];
+        _data.Preferences.SelectedInvoiceFootnotes ??= [];
         _data.MoadianSettings ??= new MoadianSettingsRecord();
         _data.ServerConnection ??= new ServerConnectionSettings();
+
+        // Populate missing unit snapshots on older locally saved invoices without changing amounts.
+        foreach (var invoice in _data.Invoices ?? [])
+        {
+            invoice.Lines ??= [];
+            foreach (var line in invoice.Lines)
+            {
+                if (string.IsNullOrWhiteSpace(line.Unit))
+                    line.Unit = _data.Products.FirstOrDefault(product => product.Id == line.ProductId)?.Unit ?? "عدد";
+            }
+        }
     }
 
     private CompanyProfileRecord? ActiveCompanyProfile()
