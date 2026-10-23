@@ -1290,6 +1290,48 @@ public partial class MainWindow : Window
         }, "پیش‌فاکتور ویرایش شد؛ شماره و کد پیگیری آن حفظ شد");
     }
 
+    private void DeleteInvoice_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (InvoicesGrid.SelectedItem is not InvoiceRecord invoice)
+        {
+            MessageBox.Show(this, "ابتدا یک سند را از جدول فاکتورها انتخاب کنید.", "حذف سند",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        // Physical deletion is limited to a proforma with no downstream financial or ledger links.
+        // Posted sales/purchases must be cancelled/reversed instead of silently removed.
+        var hasPayments = _data.Payments.Any(payment => payment.InvoiceId == invoice.Id);
+        var hasChecks = _data.Checks.Any(check => check.RelatedInvoiceId == invoice.Id);
+        var hasLedgerEntries = _data.JournalEntries.Any(entry =>
+            string.Equals(entry.ReferenceId, invoice.Id, StringComparison.Ordinal));
+        if (invoice.Type != "PROFORMA" || invoice.Status == "لغو شده" ||
+            hasPayments || hasChecks || hasLedgerEntries)
+        {
+            MessageBox.Show(this,
+                "حذف فیزیکی فقط برای پیش‌فاکتورِ بدون دریافت، چک یا سند دفترکل مجاز است. برای فاکتور قطعی/دارای سابقه از عملیات لغو یا سند اصلاحی استفاده کنید تا تاریخچه و موجودی حفظ شود.",
+                "حذف ایمن محدود شد", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        if (MessageBox.Show(this, $"پیش‌فاکتور {invoice.DisplayNumber} برای همیشه حذف شود؟",
+            "تأیید حذف پیش‌فاکتور", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+            return;
+
+        Commit(data =>
+        {
+            var current = data.Invoices.SingleOrDefault(item => item.Id == invoice.Id)
+                ?? throw new InvalidOperationException("سند دیگر وجود ندارد.");
+            if (current.Type != "PROFORMA" || current.Status == "لغو شده" ||
+                data.Payments.Any(payment => payment.InvoiceId == current.Id) ||
+                data.Checks.Any(check => check.RelatedInvoiceId == current.Id) ||
+                data.JournalEntries.Any(entry => string.Equals(entry.ReferenceId, current.Id, StringComparison.Ordinal)))
+                throw new InvalidOperationException("سابقهٔ مالی سند تغییر کرده است؛ حذف انجام نشد.");
+            data.Invoices.Remove(current);
+        }, "پیش‌فاکتور بدون سابقهٔ مالی حذف شد.");
+    }
+
     private void InvoicesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (InvoicesGrid.SelectedItem is InvoiceRecord)
