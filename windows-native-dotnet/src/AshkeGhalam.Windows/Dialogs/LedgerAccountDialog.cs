@@ -13,7 +13,8 @@ public sealed class LedgerAccountDialog : Window
     private readonly TextBox _name = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
     private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
     private readonly ComboBox _level = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
-    private readonly ComboBox _parent = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };\n    private IReadOnlyList<ChartOfAccountRecord> _accounts = [];
+    private readonly ComboBox _parent = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private IReadOnlyList<ChartOfAccountRecord> _accounts = [];
 
     public ChartOfAccountRecord? Result { get; private set; }
 
@@ -22,14 +23,15 @@ public sealed class LedgerAccountDialog : Window
         Owner = owner;
         Title = "افزودن سرفصل حساب";
         Width = 510;
-        Height = 520;
-        MinHeight = 500;
+        Height = 560;
+        MinHeight = 420;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
 
-        _accounts = accounts;\n        _type.ItemsSource = new[]
+        _accounts = accounts;
+        _type.ItemsSource = new[]
         {
             new Choice("ASSET", "دارایی"),
             new Choice("LIABILITY", "بدهی"),
