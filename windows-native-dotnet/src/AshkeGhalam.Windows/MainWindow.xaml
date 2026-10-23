@@ -306,6 +306,66 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+            <TabItem Header="گزارش مالی پیشرفته">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="8">
+                        <TextBlock Text="گزارش مالی و کنترل تراز" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="این گزارش فقط اسناد قطعی/تأییدشده دفتر روزنامه بومی را محاسبه می‌کند. تراز کنترل یک آزمون ریاضی است و به‌تنهایی جایگزین تطبیق با نسخه اصلی نیست." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,10"/>
+                        <Button Content="بازمحاسبه گزارش" Click="RefreshFinancialReports_Click" HorizontalAlignment="Right" Background="#0F766E" Foreground="White" Margin="0,0,0,12"/>
+                        <UniformGrid Columns="4">
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="درآمد ثبت‌شده" Foreground="#64748B"/><TextBlock x:Name="FinancialRevenue" Text="۰" FontSize="20" FontWeight="Bold" Foreground="#0F766E" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="بهای تمام‌شده" Foreground="#64748B"/><TextBlock x:Name="FinancialCostOfSales" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="سود ناخالص" Foreground="#64748B"/><TextBlock x:Name="FinancialGrossProfit" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="هزینه‌های عملیاتی" Foreground="#64748B"/><TextBlock x:Name="FinancialOperatingExpenses" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="سود / زیان خالص" Foreground="#64748B"/><TextBlock x:Name="FinancialNetProfit" Text="۰" FontSize="20" FontWeight="Bold" Foreground="#0F766E" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="جمع دارایی‌ها" Foreground="#64748B"/><TextBlock x:Name="FinancialAssets" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="جمع بدهی‌ها" Foreground="#64748B"/><TextBlock x:Name="FinancialLiabilities" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="حقوق مالکانه" Foreground="#64748B"/><TextBlock x:Name="FinancialEquity" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="ورودی نقد و بانک" Foreground="#64748B"/><TextBlock x:Name="FinancialCashInflows" Text="۰" FontSize="20" FontWeight="Bold" Foreground="#0F766E" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="خروجی نقد و بانک" Foreground="#64748B"/><TextBlock x:Name="FinancialCashOutflows" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="تغییر خالص نقد" Foreground="#64748B"/><TextBlock x:Name="FinancialNetCashChange" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="مانده نقد و بانک" Foreground="#64748B"/><TextBlock x:Name="FinancialCashBalance" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                        </UniformGrid>
+                        <TextBlock x:Name="FinancialBalanceIntegrity" Text="کنترل تراز در انتظار محاسبه" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="4,10,4,16"/>
+                        <TextBlock Text="مانده و گردش حساب‌ها" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <DataGrid x:Name="FinancialAccountsGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MinHeight="220" MaxHeight="420">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="90"/>
+                                <DataGridTextColumn Header="نام حساب" Binding="{Binding Name}" Width="*"/>
+                                <DataGridTextColumn Header="نوع" Binding="{Binding Type}" Width="130"/>
+                                <DataGridTextColumn Header="بدهکار" Binding="{Binding Debit, StringFormat=N2}" Width="130"/>
+                                <DataGridTextColumn Header="بستانکار" Binding="{Binding Credit, StringFormat=N2}" Width="130"/>
+                                <DataGridTextColumn Header="مانده (بدهکار - بستانکار)" Binding="{Binding Balance, StringFormat=N2}" Width="190"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Button Content="خروجی CSV گزارش مالی کامل" Click="ExportFinancialReports_Click" HorizontalAlignment="Right" Margin="0,12,0,0"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
             <TabItem Header="پشتیبان‌گیری">
                 <StackPanel Margin="18" MaxWidth="850" HorizontalAlignment="Right">
                     <TextBlock Text="پشتیبان‌گیری و بازیابی" FontSize="24" FontWeight="Bold"/>
