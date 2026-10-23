@@ -19,7 +19,7 @@ public sealed class InvoicePreviewWindow : Window
     private readonly string _invoiceFooter;
     private FlowDocument _document;
     private FlowDocumentScrollViewer _viewer = null!;
-    private string _theme = "smart";
+    private string _theme = "modern";
 
     private sealed record ThemeOption(string Key, string Label);
     private sealed record InvoicePalette(Color Accent, Color Soft, Color Ink);
@@ -148,7 +148,7 @@ public sealed class InvoicePreviewWindow : Window
         _invoiceFooter = invoiceFooter ?? "";
         _theme = InvoiceThemes.Any(option => string.Equals(option.Key, defaultTheme, StringComparison.Ordinal))
             ? defaultTheme!
-            : "smart";
+            : "modern";
         Owner = owner;
         Title = $"پیش‌نمایش {invoice.TypeLabel} — {invoice.DisplayNumber}";
         Width = 1080;
