@@ -2814,6 +2814,502 @@ public partial class MainWindow : Window
         }
     }
 
+
+    private sealed record GridMenuAction(string Label, RoutedEventHandler Handler);
+
+    private void ConfigureGridContextMenus()
+    {
+        if (_gridMenusConfigured) return;
+        _gridMenusConfigured = true;
+
+        AttachGridContextMenu(InvoicesGrid,
+            new("👁 پیش‌نمایش", PreviewInvoice_Click),
+            new("🖨 چاپ سند", PrintInvoice_Click),
+            new("✏️ ویرایش", EditInvoice_Click),
+            new("💳 ثبت دریافت / پرداخت", AddPayment_Click),
+            new("↩ لغو سند", CancelInvoice_Click),
+            new("🗑 حذف پیش‌فاکتور", DeleteInvoice_Click));
+
+        AttachGridContextMenu(ChecksGrid,
+            new("👁 نمایش / 🖨 چاپ چک", PreviewCheck_Click),
+            new("✏️ ویرایش چک", EditCheck_Click),
+            new("↗ خرج / واگذاری چک دریافتی", SpendCheck_Click),
+            new("🔄 تغییر وضعیت و سابقه", ChangeCheckStatus_Click),
+            new("🗑 حذف چک مجاز", DeleteCheck_Click));
+
+        AttachGridContextMenu(PaymentsGrid,
+            new("👁 نمایش / 🖨 چاپ رسید", PreviewPaymentReceipt_Click),
+            new("✏️ ویرایش دریافت / پرداخت", EditPayment_Click),
+            new("🗑 حذف دریافت / پرداخت", DeletePayment_Click));
+
+        AttachGridContextMenu(ExpensesGrid,
+            new("✏️ ویرایش هزینه", EditExpense_Click),
+            new("🗑 حذف هزینه", DeleteExpense_Click));
+
+        AttachGridContextMenu(CustomersGrid,
+            new("✏️ ویرایش شخص", EditCustomer_Click),
+            new("📒 کارتکس / گردش حساب", ShowPersonKardex_Click),
+            new("🗑 حذف شخص", DeleteCustomer_Click));
+
+        AttachGridContextMenu(ProductsGrid,
+            new("✏️ ویرایش کالا", EditProduct_Click),
+            new("🗑 حذف کالا", DeleteProduct_Click));
+
+        AttachGridContextMenu(VouchersGrid,
+            new("👁 نمایش / 🖨 چاپ حواله", PreviewVoucher_Click),
+            new("✏️ ویرایش حواله", EditVoucher_Click),
+            new("🔄 تغییر وضعیت حواله", AdvanceVoucherStatus_Click),
+            new("🗑 حذف حواله", DeleteVoucher_Click));
+
+        AttachGridContextMenu(RecentInvoicesGrid,
+            new("👁 پیش‌نمایش فاکتور", PreviewInvoice_Click));
+
+        // InvoicesGrid already has a named XAML double-click handler; other tables are wired here.
+        foreach (var grid in new[] { ChecksGrid, PaymentsGrid, ExpensesGrid, CustomersGrid, ProductsGrid, VouchersGrid, RecentInvoicesGrid })
+            grid.MouseDoubleClick += Grid_MouseDoubleClickToOpenMenu;
+        ApplyContextMenuTheme();
+    }
+
+    private void AttachGridContextMenu(DataGrid grid, params GridMenuAction[] actions)
+    {
+        var menu = new ContextMenu
+        {
+            Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint,
+            StaysOpen = false
+        };
+        foreach (var action in actions)
+        {
+            var item = new MenuItem { Header = action.Label, Padding = new Thickness(10, 7, 16, 7), FontSize = 13 };
+            item.Click += (_, _) =>
+            {
+                menu.IsOpen = false;
+                action.Handler(this, new RoutedEventArgs());
+            };
+            menu.Items.Add(item);
+        }
+        grid.ContextMenu = menu;
+        grid.ContextMenuOpening += (_, _) => ApplyContextMenuTheme(menu);
+    }
+
+    private void Grid_MouseDoubleClickToOpenMenu(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not DataGrid grid) return;
+        if (e.OriginalSource is not DependencyObject original || FindVisualAncestor<DataGridRow>(original) is null)
+            return;
+        OpenGridContextMenu(grid);
+        e.Handled = true;
+    }
+
+    private static T? FindVisualAncestor<T>(DependencyObject? current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match) return match;
+            current = current is Visual || current is System.Windows.Media.Media3D.Visual3D
+                ? VisualTreeHelper.GetParent(current)
+                : LogicalTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
+    private void OpenGridContextMenu(DataGrid grid)
+    {
+        if (grid.ContextMenu is not ContextMenu menu) return;
+        menu.PlacementTarget = grid;
+        menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+        ApplyContextMenuTheme(menu);
+        menu.IsOpen = true;
+    }
+
+    private void ApplyContextMenuTheme()
+    {
+        foreach (var grid in new[] { InvoicesGrid, ChecksGrid, PaymentsGrid, ExpensesGrid, CustomersGrid, ProductsGrid, VouchersGrid, RecentInvoicesGrid })
+            if (grid.ContextMenu is ContextMenu menu) ApplyContextMenuTheme(menu);
+    }
+
+    private void ApplyContextMenuTheme(ContextMenu menu)
+    {
+        var dark = ApplicationThemeService.Normalize(_data.Preferences?.ApplicationTheme) == "dark";
+        menu.Background = new SolidColorBrush(dark ? Color.FromRgb(17, 24, 39) : Color.FromRgb(255, 255, 255));
+        menu.BorderBrush = new SolidColorBrush(dark ? Color.FromRgb(71, 85, 105) : Color.FromRgb(203, 213, 225));
+        menu.Foreground = new SolidColorBrush(dark ? Color.FromRgb(241, 245, 249) : Color.FromRgb(15, 23, 42));
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            item.Foreground = menu.Foreground;
+            item.Background = menu.Background;
+        }
+    }
+
+    private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        var modifiers = Keyboard.Modifiers;
+        if (modifiers == ModifierKeys.Control && e.Key == Key.N)
+        {
+            AddInvoice_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+        if (modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && e.Key == Key.C)
+        {
+            AddCheck_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+        if (modifiers == ModifierKeys.Control && e.Key == Key.B)
+        {
+            CreateBackup_Click(this, new RoutedEventArgs());
+            e.Handled = true;
+            return;
+        }
+        if (modifiers == ModifierKeys.Control && e.Key == Key.P)
+        {
+            switch (MainTabs.SelectedIndex)
+            {
+                case 3: PrintInvoice_Click(this, new RoutedEventArgs()); break;
+                case 10: PreviewCheck_Click(this, new RoutedEventArgs()); break;
+                case 4: PreviewPaymentReceipt_Click(this, new RoutedEventArgs()); break;
+                case 11: PreviewVoucher_Click(this, new RoutedEventArgs()); break;
+                default: PreviewInvoice_Click(this, new RoutedEventArgs()); break;
+            }
+            e.Handled = true;
+            return;
+        }
+        if (modifiers == ModifierKeys.Control)
+        {
+            var tabIndex = e.Key switch
+            {
+                Key.D1 or Key.NumPad1 => 0,
+                Key.D2 or Key.NumPad2 => 1,
+                Key.D3 or Key.NumPad3 => 2,
+                Key.D4 or Key.NumPad4 => 3,
+                Key.D5 or Key.NumPad5 => 4,
+                Key.D6 or Key.NumPad6 => 5,
+                _ => -1
+            };
+            if (tabIndex >= 0)
+            {
+                if (MainTabs is not null && MigrationPanel is not null)
+                {
+                    MigrationPanel.Visibility = Visibility.Collapsed;
+                    MainTabs.Visibility = Visibility.Visible;
+                    MainTabs.SelectedIndex = tabIndex;
+                }
+                e.Handled = true;
+            }
+        }
+    }
+
+    private string CurrencyUnitLabel() =>
+        string.Equals(_data.Preferences?.Currency, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "تومان" : "ریال";
+
+    private string FormatMoney(decimal value) =>
+        value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")) + " " + CurrencyUnitLabel();
+
+    private void ApplyCurrencyLabels()
+    {
+        if (MainTabs is null) return;
+        var moneyHeaders = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "مبلغ", "مبلغ تسویه", "مبلغ باز", "مبلغ نهایی", "جمع کالاها", "تخفیف", "مالیات",
+            "نقدی", "چک", "بدهکار", "بستانکار", "مانده (بدهکار - بستانکار)", "ارزش تخمینی",
+            "مبلغ بدهکار", "مبلغ بستانکار", "مبلغ سند", "جمع بدهکار", "جمع بستانکار"
+        };
+        var unit = CurrencyUnitLabel();
+        foreach (var gridName in new[]
+                 {
+                     "RecentInvoicesGrid", "InvoicesGrid", "PaymentsGrid", "ExpensesGrid", "ChecksGrid",
+                     "FinancialAccountsGrid", "LedgerEntriesGrid", "TrialBalanceGrid", "CashFlowProjectionGrid", "CashFlowMovementsGrid"
+                 })
+        {
+            if (FindName(gridName) is not DataGrid grid) continue;
+            foreach (var column in grid.Columns)
+            {
+                if (column.Header is not string header) continue;
+                var normalized = header.Replace(" (ریال)", "", StringComparison.Ordinal)
+                    .Replace(" (تومان)", "", StringComparison.Ordinal);
+                if (moneyHeaders.Contains(normalized))
+                    column.Header = normalized + " (" + unit + ")";
+            }
+        }
+        foreach (var label in new[] { "SalesTotal", "PurchasesTotal", "PaymentsTotal", "ReceivablesTotal", "PayablesTotal", "ExpensesTotal",
+                                      "ReportSales", "ReportPurchases", "ReportPayments", "ReportReceivables", "ReportPayables", "ReportExpenses", "ReportCash" })
+        {
+            if (FindName(label) is not TextBlock block || !decimal.TryParse(block.Text.Replace(",", "").Replace("٬", ""), NumberStyles.Number, CultureInfo.CurrentCulture, out var value))
+                continue;
+            block.Text = FormatMoney(value);
+        }
+    }
+
+    private void RefreshFiscalYearPage()
+    {
+        if (FiscalYearSelector is null) return;
+        var calendar = new PersianCalendar();
+        var currentYear = calendar.GetYear(DateTime.Now);
+        var years = Enumerable.Range(Math.Max(1300, currentYear - 8), 17)
+            .Select(year => year.ToString(CultureInfo.InvariantCulture))
+            .Concat(_data.JournalEntries.Select(entry => entry.FiscalYear))
+            .Append(_data.Preferences.ActiveFiscalYear)
+            .Where(year => int.TryParse(year, out _))
+            .Distinct(StringComparer.Ordinal)
+            .OrderByDescending(year => int.Parse(year, CultureInfo.InvariantCulture))
+            .ToList();
+        FiscalYearSelector.ItemsSource = years;
+        FiscalYearSelector.SelectedItem = _data.Preferences.ActiveFiscalYear;
+        FiscalYearStartDate.Text = _data.Preferences.FiscalYearStartDate;
+        FiscalYearEndDate.Text = _data.Preferences.FiscalYearEndDate;
+        RefreshFiscalYearLedger();
+    }
+
+    private void FiscalYearSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_uiReady || FiscalYearSelector.SelectedItem is not string year || !int.TryParse(year, out var yearNumber))
+            return;
+        var calendar = new PersianCalendar();
+        var lastDay = calendar.GetDaysInMonth(yearNumber, 12);
+        FiscalYearStartDate.Text = year + "/01/01";
+        FiscalYearEndDate.Text = string.Format(CultureInfo.InvariantCulture, "{0:0000}/12/{1:00}", yearNumber, lastDay);
+        RefreshFiscalYearLedger();
+    }
+
+    private void RefreshFiscalYearLedger()
+    {
+        if (FiscalYearLedgerGrid is null || FiscalYearSelector is null) return;
+        var year = FiscalYearSelector.SelectedItem?.ToString() ?? _data.Preferences?.ActiveFiscalYear ?? "";
+        FiscalYearLedgerGrid.ItemsSource = _data.JournalEntries
+            .Where(entry => string.Equals(
+                string.IsNullOrWhiteSpace(entry.FiscalYear) ? entry.Date.Split('/').FirstOrDefault() ?? "" : entry.FiscalYear,
+                year, StringComparison.Ordinal))
+            .OrderByDescending(entry => entry.Number)
+            .Select(entry => new
+            {
+                entry.Date,
+                entry.Description,
+                FiscalYear = string.IsNullOrWhiteSpace(entry.FiscalYear) ? entry.Date.Split('/').FirstOrDefault() ?? "" : entry.FiscalYear,
+                entry.Amount,
+                entry.Status
+            }).ToList();
+        if (FiscalYearStatus is not null)
+            FiscalYearStatus.Text = $"سال انتخابی {year} • تعداد اسناد دفتر: {FiscalYearLedgerGrid.Items.Count:N0} • جمع مبالغ: {FormatMoney(_data.JournalEntries.Where(entry => string.Equals(entry.FiscalYear, year, StringComparison.Ordinal)).Sum(entry => entry.Amount))}";
+    }
+
+    private void SaveFiscalYear_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var year = FiscalYearSelector.SelectedItem?.ToString() ?? "";
+        if (!int.TryParse(year, out var yearNumber) || yearNumber is < 1300 or > 1500)
+        {
+            MessageBox.Show(this, "سال مالی شمسی معتبر انتخاب کنید.", "سال مالی", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        try
+        {
+            var start = ParseFiscalDate(FiscalYearStartDate.Text);
+            var end = ParseFiscalDate(FiscalYearEndDate.Text);
+            if (start > end) throw new InvalidOperationException("تاریخ شروع باید پیش از تاریخ پایان باشد.");
+            if (new PersianCalendar().GetYear(start) != yearNumber || new PersianCalendar().GetYear(end) != yearNumber)
+                throw new InvalidOperationException("سال تاریخ شروع و پایان باید با سال انتخابی یکسان باشد.");
+            Commit(data =>
+            {
+                data.Preferences.ActiveFiscalYear = year;
+                data.Preferences.FiscalYearStartDate = FormatPersianDate(new DateTimeOffset(start, TimeZoneInfo.Local.GetUtcOffset(start)));
+                data.Preferences.FiscalYearEndDate = FormatPersianDate(new DateTimeOffset(end, TimeZoneInfo.Local.GetUtcOffset(end)));
+            }, "سال مالی فعال و بازهٔ شمسی ذخیره شد.");
+            RefreshFiscalYearLedger();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "بررسی سال مالی", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static DateTime ParseFiscalDate(string input)
+    {
+        var normalized = NativeLedgerService.NormalizeAndValidateDate(input);
+        var parts = normalized.Split('/');
+        var year = int.Parse(parts[0], CultureInfo.InvariantCulture);
+        if (year is < 1300 or > 1500)
+            throw new InvalidOperationException("تاریخ سال مالی باید شمسی باشد؛ نمونه: ۱۴۰۵/۰۱/۰۱.");
+        return new PersianCalendar().ToDateTime(
+            year, int.Parse(parts[1], CultureInfo.InvariantCulture), int.Parse(parts[2], CultureInfo.InvariantCulture),
+            0, 0, 0, 0, PersianCalendar.PersianEra);
+    }
+
+    private void RefreshSecurityStatus()
+    {
+        if (SecurityStatusText is null) return;
+        var path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "AshkeGhalam", "WindowsNative", "accounting-data.dat");
+        SecurityStatusText.Text = $"حفاظت فایل: رمزگذاری DPAPI ویندوز برای کاربر فعلی\n" +
+            $"فایل داده: {(File.Exists(path) ? "موجود" : "با نخستین ذخیره ساخته می‌شود")}\n" +
+            $"اشخاص: {_data.Customers.Count:N0} • کالاها: {_data.Products.Count:N0} • اسناد: {_data.Invoices.Count:N0} • شرکت‌ها: {_data.Companies.Count:N0}";
+    }
+
+    private void AuditLocalData_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var loaded = AccountingDataValidator.Validate(_store.Load());
+            var companiesWithImages = loaded.Companies.Count(company =>
+                !string.IsNullOrWhiteSpace(company.LogoDataBase64) ||
+                !string.IsNullOrWhiteSpace(company.StampDataBase64) ||
+                !string.IsNullOrWhiteSpace(company.SignatureDataBase64));
+            MessageBox.Show(this,
+                $"اعتبارسنجی دادهٔ رمزگذاری‌شده موفق بود.\nاشخاص: {loaded.Customers.Count:N0}\nکالاها: {loaded.Products.Count:N0}\nفاکتورها: {loaded.Invoices.Count:N0}\nدریافت / پرداخت: {loaded.Payments.Count:N0}\nچک‌ها: {loaded.Checks.Count:N0}\nشرکت‌ها: {loaded.Companies.Count:N0}\nشرکت‌های دارای لوگو / مهر / امضا: {companiesWithImages:N0}\nاسناد دفتر: {loaded.JournalEntries.Count:N0}",
+                "بررسی سلامت داده‌ها", MessageBoxButton.OK, MessageBoxImage.Information);
+            RefreshSecurityStatus();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "بررسی سلامت داده‌ها", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void OpenDataFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AshkeGhalam", "WindowsNative");
+        try
+        {
+            Directory.CreateDirectory(folder);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "\"" + folder + "\"") { UseShellExecute = true });
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "پوشهٔ داده‌ها", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
+    private void OpenBackupFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Directory.CreateDirectory(AutomaticBackupService.BackupDirectory);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "\"" + AutomaticBackupService.BackupDirectory + "\"") { UseShellExecute = true });
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "پوشهٔ پشتیبان‌ها", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
+    private void OpenAdvancedBackup_Click(object sender, RoutedEventArgs e)
+    {
+        if (FindName("NavigationRoot") is DependencyObject root)
+        {
+            var target = FindVisualButtonByTag(root, "advanced-settings");
+            if (target is not null) NavigateModule_Click(target, new RoutedEventArgs());
+        }
+    }
+
+    private static Button? FindVisualButtonByTag(DependencyObject root, string tag)
+    {
+        if (root is Button button && string.Equals(button.Tag?.ToString(), tag, StringComparison.Ordinal))
+            return button;
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            var result = FindVisualButtonByTag(VisualTreeHelper.GetChild(root, i), tag);
+            if (result is not null) return result;
+        }
+        return null;
+    }
+
+    private void RefreshAutoBackupControls()
+    {
+        if (AutoBackupEnabled is null) return;
+        try
+        {
+            var settings = AutomaticBackupService.LoadSettings();
+            AutoBackupEnabled.IsChecked = settings.Enabled;
+            AutoBackupIntervalSelector.SelectedItem = AutoBackupIntervalSelector.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), settings.IntervalHours.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
+                ?? AutoBackupIntervalSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "24", StringComparison.Ordinal));
+            AutoBackupPathText.Text = AutomaticBackupService.BackupDirectory;
+            AutoBackupStatusText.Text = settings.Enabled
+                ? $"فعال • هر {settings.IntervalHours:N0} ساعت • نگهداری حداکثر {settings.RetentionCount:N0} فایل • آخرین پشتیبان: {(settings.LastBackupUtc is DateTimeOffset last ? FormatPersianDate(last.ToLocalTime()) : "هنوز ساخته نشده")}"
+                : "غیرفعال • برای فعال‌سازی ابتدا رمز پشتیبان را تعیین و زمان‌بندی را ذخیره کنید.";
+        }
+        catch (Exception ex)
+        {
+            AutoBackupStatusText.Text = "خطا در تنظیمات پشتیبان خودکار: " + ex.Message;
+            AutoBackupPathText.Text = AutomaticBackupService.BackupDirectory;
+        }
+    }
+
+    private void SetAutoBackupPassword_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new BackupPasswordDialog(this, "تنظیم رمز پشتیبان خودکار", confirmPassword: true);
+        ApplyCurrentThemeTo(dialog);
+        if (dialog.ShowDialog() != true) return;
+        try
+        {
+            AutomaticBackupService.SetPassphrase(dialog.Passphrase);
+            RefreshAutoBackupControls();
+            AutoBackupStatusText.Text = "رمز با DPAPI ویندوز برای حساب کاربری فعلی حفاظت شد؛ زمان‌بندی را ذخیره کنید.";
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "رمز پشتیبان خودکار", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
+    private void SaveAutoBackupSettings_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var enabled = AutoBackupEnabled.IsChecked == true;
+            var interval = int.TryParse((AutoBackupIntervalSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var parsed)
+                ? parsed : 24;
+            if (enabled && !AutomaticBackupService.HasConfiguredPassphrase())
+            {
+                var passwordDialog = new BackupPasswordDialog(this, "تنظیم رمز پشتیبان خودکار", confirmPassword: true);
+                ApplyCurrentThemeTo(passwordDialog);
+                if (passwordDialog.ShowDialog() != true) return;
+                AutomaticBackupService.SetPassphrase(passwordDialog.Passphrase);
+            }
+            AutomaticBackupService.SaveSettings(enabled, interval, 20);
+            RefreshAutoBackupControls();
+            if (enabled)
+            {
+                var path = AutomaticBackupService.CreateBackupNow(_data);
+                AutoBackupStatusText.Text = "زمان‌بندی ذخیره شد؛ پشتیبان اولیه ساخته شد: " + Path.GetFileName(path);
+                FooterStatus.Text = "پشتیبان خودکار فعال شد؛ نگهداری حداکثر ۲۰ فایل.";
+            }
+            else
+            {
+                AutoBackupStatusText.Text = "زمان‌بندی پشتیبان خودکار غیرفعال شد؛ فایل‌های قبلی دست‌نخورده باقی ماندند.";
+            }
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "تنظیم پشتیبان خودکار", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
+    private void CreateAutomaticBackupNow_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!AutomaticBackupService.HasConfiguredPassphrase())
+            {
+                var dialog = new BackupPasswordDialog(this, "تنظیم رمز پشتیبان خودکار", confirmPassword: true);
+                ApplyCurrentThemeTo(dialog);
+                if (dialog.ShowDialog() != true) return;
+                AutomaticBackupService.SetPassphrase(dialog.Passphrase);
+            }
+            var path = AutomaticBackupService.CreateBackupNow(_data);
+            RefreshAutoBackupControls();
+            AutoBackupStatusText.Text = "پشتیبان رمزگذاری‌شده ساخته شد: " + Path.GetFileName(path);
+            FooterStatus.Text = "پشتیبان خودکار به‌صورت دستی اجرا شد.";
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "پشتیبان‌گیری خودکار", MessageBoxButton.OK, MessageBoxImage.Error); }
+    }
+
+    private void AutomaticBackupTimer_Tick(object? sender, EventArgs e)
+    {
+        if (!_canWrite) return;
+        try
+        {
+            var path = AutomaticBackupService.TryCreateDueBackup(_data);
+            if (path is not null)
+            {
+                AutoBackupStatusText.Text = "پشتیبان زمان‌بندی‌شده ساخته شد: " + Path.GetFileName(path);
+                FooterStatus.Text = "پشتیبان خودکار ذخیره شد؛ فایل‌های قدیمی مازاد بر ۲۰ مورد پاک‌سازی شدند.";
+            }
+        }
+        catch (Exception ex)
+        {
+            AutoBackupStatusText.Text = "خطای پشتیبان زمان‌بندی‌شده: " + ex.Message;
+            FooterStatus.Text = "پشتیبان خودکار موفق نبود؛ دادهٔ اصلی تغییری نکرد.";
+        }
+    }
+
     // Native navigation mirrors the existing Ashke Ghalam sidebar. Unported pages are
     // deliberately marked as pending instead of being represented by fake functionality.
     private sealed record NativeModuleLink(string Title, string Group, string OriginalRoute, int? NativeTabIndex);
