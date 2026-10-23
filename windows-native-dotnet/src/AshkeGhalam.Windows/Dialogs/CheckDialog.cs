@@ -271,16 +271,21 @@ public sealed class CheckDialog : Window
         footer.Children.Add(_saveButton);
         footer.Children.Add(new Button { Content = "انصراف", MinWidth = 90, Height = 38, Margin = new Thickness(8, 0, 0, 0), IsCancel = true });
 
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(header);
-        root.Children.Add(_stepIndicator);
-        root.Children.Add(_stepHost);
-        root.Children.Add(footer);
-        Content = new ScrollViewer
-        {
-            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-            Content = root
-        };
+        var layout = new Grid { Margin = new Thickness(22) };
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        Grid.SetRow(header, 0);
+        Grid.SetRow(_stepIndicator, 1);
+        Grid.SetRow(_stepHost, 2);
+        Grid.SetRow(footer, 3);
+        layout.Children.Add(header);
+        layout.Children.Add(_stepIndicator);
+        layout.Children.Add(_stepHost);
+        layout.Children.Add(footer);
+        // Keep action buttons pinned while only the active step's fields scroll.
+        Content = layout;
 
         ShowStep(0);
     }
