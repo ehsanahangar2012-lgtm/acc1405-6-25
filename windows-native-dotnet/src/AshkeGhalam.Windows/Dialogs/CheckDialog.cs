@@ -59,7 +59,7 @@ public sealed class CheckDialog : Window
 
         _bankName.Text = existing?.BankName ?? "";
         _amount.Text = existing?.Amount.ToString("0.##", CultureInfo.InvariantCulture) ?? "";
-        _dueDate.Text = FormatPersianDate(existing?.DueDate ?? DateTimeOffset.Now.Date.AddDays(30));
+        _dueDate.Text = FormatPersianDate(existing?.DueDate ?? DateTimeOffset.Now.AddDays(30));
         _issueDate.Text = existing?.IssueDate is DateTimeOffset issue ? FormatPersianDate(issue) : "";
         _sayadId.Text = existing?.SayadId ?? "";
         _checkNumber.Text = existing?.CheckNumber ?? "";
