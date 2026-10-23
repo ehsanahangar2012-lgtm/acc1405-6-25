@@ -164,12 +164,16 @@ public static class NativeLedgerService
     {
         ArgumentNullException.ThrowIfNull(data);
         var posted = data.JournalEntries.Where(e => e.Status is "POSTED" or "APPROVED").ToList();
+        var debits = posted.GroupBy(e => e.DebitAccountId, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount), StringComparer.Ordinal);
+        var credits = posted.GroupBy(e => e.CreditAccountId, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => g.Sum(e => e.Amount), StringComparer.Ordinal);
         return data.LedgerAccounts
             .OrderBy(a => a.Code, StringComparer.OrdinalIgnoreCase)
             .Select(account =>
             {
-                var debit = posted.Where(e => e.DebitAccountId == account.Id).Sum(e => e.Amount);
-                var credit = posted.Where(e => e.CreditAccountId == account.Id).Sum(e => e.Amount);
+                var debit = debits.GetValueOrDefault(account.Id, 0m);
+                var credit = credits.GetValueOrDefault(account.Id, 0m);
                 return new TrialBalanceLine(account.Id, account.Code, account.Name, account.Type,
                     debit, credit, debit - credit);
             })
