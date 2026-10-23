@@ -574,6 +574,8 @@ public static class AccountingOperations
         data.Payments.Add(payment);
         if (string.Equals(payment.Method, "نقدی", StringComparison.Ordinal))
             invoice.CashAmount = AccountingRules.Money(invoice.CashAmount + payment.Amount);
+        else if (string.Equals(payment.Method, "چک", StringComparison.Ordinal))
+            invoice.CheckAmount = AccountingRules.Money(invoice.CheckAmount + payment.Amount);
         if (AccountingRules.RemainingForInvoice(data, invoice) == 0m)
             invoice.Status = "تسویه شده";
         return payment;
