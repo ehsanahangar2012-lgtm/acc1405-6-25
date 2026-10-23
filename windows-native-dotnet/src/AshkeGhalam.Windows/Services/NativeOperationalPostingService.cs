@@ -39,7 +39,8 @@ public static class NativeOperationalPostingService
         var hasPostableOperations =
             data.Invoices.Any(i => i.Type is "SALE" or "PURCHASE") ||
             data.Payments.Count > 0 ||
-            data.Expenses.Count > 0;
+            data.Expenses.Count > 0 ||
+            data.Checks.Count > 0;
         if (!hasPostableOperations)
             return;
 
@@ -69,6 +70,9 @@ public static class NativeOperationalPostingService
 
         foreach (var expense in data.Expenses.OrderBy(e => e.CreatedAt).ThenBy(e => e.Id, StringComparer.Ordinal))
             PostExpense(data, expense);
+
+        foreach (var check in data.Checks.OrderBy(c => c.CreatedAt).ThenBy(c => c.Id, StringComparer.Ordinal))
+            PostCheckStatus(data, check);
     }
 
     private static void EnsureRequiredAccounts(AccountingData data)
@@ -158,6 +162,74 @@ public static class NativeOperationalPostingService
 
         PostOnce(data, expense.Id, "AUTO_EXPENSE", ToJalaliDate(expense.CreatedAt),
             $"هزینه: {expense.Title}", expenseAccount, "1110", expense.Amount);
+    }
+
+    private static void PostCheckStatus(AccountingData data, CheckRecord check)
+    {
+        var currentHistory = check.History.LastOrDefault(h => h.Status == check.Status);
+        var date = ToJalaliDate(currentHistory?.ChangedAt ?? check.CreatedAt);
+        var received = string.IsNullOrWhiteSpace(check.CheckType) ||
+            string.Equals(check.CheckType, "RECEIVED", StringComparison.Ordinal);
+        var wasDeposited = received && check.History.Any(h => h.Status == "DEPOSITED");
+
+        string? debit = null;
+        string? credit = null;
+        var status = (check.Status ?? "PENDING").Trim().ToUpperInvariant();
+
+        if (status == "DEPOSITED" && received)
+        {
+            debit = "1150";
+            credit = "1140";
+        }
+        else if (status is "PASSED" or "CASHED")
+        {
+            if (received)
+            {
+                debit = "1120";
+                credit = wasDeposited ? "1150" : "1140";
+            }
+            else
+            {
+                debit = "2130";
+                credit = "1120";
+            }
+        }
+        else if (status == "BOUNCED")
+        {
+            if (received)
+            {
+                debit = "1130";
+                credit = wasDeposited ? "1150" : "1140";
+            }
+            else
+            {
+                debit = "2130";
+                credit = "2110";
+            }
+        }
+        else if (status == "RETURNED")
+        {
+            if (received)
+            {
+                debit = "1130";
+                credit = "1140";
+            }
+            else
+            {
+                debit = "2130";
+                credit = "2110";
+            }
+        }
+
+        var description = $"تغییر وضعیت چک {(received ? "دریافتی" : "پرداختی")} شماره {check.CheckNumber} — {status}";
+        if (debit is null || credit is null)
+        {
+            // A status with no accounting effect reverses a previous status posting, if any.
+            PostOnce(data, check.Id, "AUTO_CHECK_STATUS", date, description, "1110", "1120", 0m);
+            return;
+        }
+
+        PostOnce(data, check.Id, "AUTO_CHECK_STATUS", date, description, debit, credit, check.Amount);
     }
 
     private static void ReverseInvoiceEntries(AccountingData data, InvoiceRecord invoice)
