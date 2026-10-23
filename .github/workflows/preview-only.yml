@@ -6,16 +6,18 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: browser-preview-only
   cancel-in-progress: true
 
 jobs:
-  publish-browser-preview:
-    name: Build and publish browser preview only
+  build-browser-preview:
+    name: Build and validate browser preview
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout approved branch
         uses: actions/checkout@v4
@@ -43,31 +45,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf '{"sha":"%s"}\n' "$GITHUB_SHA" > dist/version.json
+          printf '{"sha":"%s"}\\n' "$GITHUB_SHA" > dist/version.json
           node scripts/sanitize-client-build.js dist --verify-only
 
-      - name: Publish static site to dedicated preview branch (no Actions artifacts)
-        shell: bash
-        env:
-          # Use a narrowly scoped PAT when configured; GITHUB_TOKEN pushes do not trigger branch-based Pages deployments.
-          GH_TOKEN: ${{ secrets.PREVIEW_DEPLOY_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          SOURCE_DIR="$RUNNER_TEMP/ashkg-preview-source"
-          SITE_REPO="$RUNNER_TEMP/ashkg-preview-site"
-          rm -rf "$SOURCE_DIR" "$SITE_REPO"
-          mkdir -p "$SOURCE_DIR" "$SITE_REPO"
-          cp -R dist/. "$SOURCE_DIR"/
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
 
-          cd "$SITE_REPO"
-          git init
-          git checkout --orphan gh-pages-preview
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          cp -R "$SOURCE_DIR"/. .
-          touch .nojekyll
-          cp index.html 404.html
-          git add --all
-          git commit -m "Publish browser preview ${GITHUB_SHA}"
-          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push --force origin HEAD:gh-pages-preview
+      - name: Upload browser preview for Pages
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./dist
+
+  deploy-browser-preview:
+    name: Deploy browser preview to GitHub Pages
+    needs: build-browser-preview
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy preview
+        id: deployment
+        uses: actions/deploy-pages@v4
