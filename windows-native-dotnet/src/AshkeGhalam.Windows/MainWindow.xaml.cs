@@ -16,7 +16,10 @@ public partial class MainWindow : Window
 {
     private readonly LocalDataStore _store = new();
     private readonly NativeLicenseStore _licenseStore = new();
+    private readonly ServerLicenseClient _licenseClient = new();
     private AccountingData _data = new();
+    private VerifiedLicensePayload? _sessionEntitlements;
+    private string _sessionLicenseFailure = "";
     private bool _canWrite;
 
     public MainWindow()
@@ -35,6 +38,7 @@ public partial class MainWindow : Window
             FooterStatus.Text = "ذخیره‌سازی خودکار روی این رایانه فعال است؛ پشتیبان رمزگذاری‌شده تهیه کنید.";
             RefreshAll();
             RefreshLicensePanel();
+            _ = RefreshSavedLicenseOnlineAsync();
         }
         catch (Exception ex)
         {
@@ -212,7 +216,7 @@ public partial class MainWindow : Window
 
     private void AddJournalEntry_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireWritable()) return;
+        if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         var activeAccounts = _data.LedgerAccounts.Where(a => a.IsActive).ToList();
         if (activeAccounts.Count < 2)
         {
@@ -394,6 +398,8 @@ public partial class MainWindow : Window
         try
         {
             _licenseStore.Save(verified);
+            _sessionEntitlements = verified.Payload;
+            _sessionLicenseFailure = "";
             RefreshLicensePanel();
             FooterStatus.Text = "رسید امضاشدهٔ لایسنس پس از تأیید آنلاین، رمزگذاری و ذخیره شد. اعمال سهمیه در همهٔ ماژول‌ها هنوز کامل نیست.";
             MessageBox.Show(this,
@@ -407,9 +413,101 @@ public partial class MainWindow : Window
         }
     }
 
+    private async Task RefreshSavedLicenseOnlineAsync()
+    {
+        NativeLicenseState? saved;
+        try { saved = _licenseStore.Load(); }
+        catch
+        {
+            _sessionEntitlements = null;
+            _sessionLicenseFailure = "فایل لایسنس محلی قابل خواندن نیست؛ نسخهٔ پایه با سقف محدود باقی می‌ماند.";
+            RefreshLicensePanel();
+            return;
+        }
+        if (saved is null) return;
+
+        try
+        {
+            var currentHardwareId = HardwareIdentityService.GetHardwareId();
+            if (!string.Equals(saved.HardwareId, currentHardwareId, StringComparison.OrdinalIgnoreCase))
+            {
+                _sessionEntitlements = null;
+                _sessionLicenseFailure = "لایسنس ذخیره‌شده به شناسه دستگاه دیگری متصل است؛ بررسی آنلاین این دستگاه لازم است.";
+                RefreshLicensePanel();
+                return;
+            }
+
+            // Do not trust a DPAPI-protected cached receipt as proof of current server status.
+            // Re-check the fixed server asynchronously after the window appears, without blocking UI.
+            var result = await _licenseClient.VerifyAsync(saved.LicenseKey, saved.WorkspaceId, currentHardwareId);
+            if (!result.Success || result.License is null)
+            {
+                _sessionEntitlements = null;
+                _sessionLicenseFailure = result.Message + " نسخهٔ پایه با سقف محدود فعال می‌ماند.";
+                RefreshLicensePanel();
+                return;
+            }
+
+            var current = result.License;
+            var refreshed = new NativeLicenseState
+            {
+                LicenseKey = saved.LicenseKey,
+                WorkspaceId = saved.WorkspaceId,
+                HardwareId = currentHardwareId,
+                CompanyName = string.IsNullOrWhiteSpace(saved.CompanyName)
+                    ? current.Payload.CompanyName ?? ""
+                    : saved.CompanyName,
+                Payload = current.Payload,
+                Receipt = current.Receipt,
+                VerifiedAtUtc = DateTimeOffset.UtcNow
+            };
+            _licenseStore.Save(refreshed);
+            _sessionEntitlements = current.Payload;
+            _sessionLicenseFailure = "";
+            RefreshLicensePanel();
+            FooterStatus.Text = "لایسنس در این نشست مجدداً توسط سرور تأیید شد.";
+        }
+        catch
+        {
+            _sessionEntitlements = null;
+            _sessionLicenseFailure = "بررسی مجدد سرور انجام نشد؛ نسخهٔ پایه با سقف محدود فعال می‌ماند.";
+            RefreshLicensePanel();
+        }
+    }
+
+    private bool ConfirmCanAddCustomer()
+    {
+        var decision = NativeLicenseQuotaService.CanAddCustomer(_data, GetLiveSessionEntitlements());
+        if (decision.Allowed) return true;
+        MessageBox.Show(this, decision.Message, "سقف استفاده از نسخه", MessageBoxButton.OK, MessageBoxImage.Information);
+        return false;
+    }
+
+    private bool ConfirmCanAddDocument()
+    {
+        var decision = NativeLicenseQuotaService.CanAddDocument(_data, GetLiveSessionEntitlements());
+        if (decision.Allowed) return true;
+        MessageBox.Show(this, decision.Message, "سقف استفاده از نسخه", MessageBoxButton.OK, MessageBoxImage.Information);
+        return false;
+    }
+
+    private VerifiedLicensePayload? GetLiveSessionEntitlements()
+    {
+        if (_sessionEntitlements is null)
+            return null;
+        if (_sessionEntitlements.ExpiresAt <= DateTimeOffset.UtcNow.ToUnixTimeSeconds())
+        {
+            _sessionEntitlements = null;
+            _sessionLicenseFailure = "رسید لایسنس منقضی شده است؛ برای ادامه لایسنس را آنلاین بررسی کنید.";
+            RefreshLicensePanel();
+            return null;
+        }
+        return _sessionEntitlements;
+    }
+
     private void AddCustomer_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireWritable()) return;
+        if (!RequireWritable() || !ConfirmCanAddCustomer()) return;
         var dialog = new CustomerDialog(this);
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord customer)
             Commit(data =>
@@ -512,7 +610,7 @@ public partial class MainWindow : Window
 
     private void AddInvoice_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireWritable()) return;
+        if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         if (_data.Customers.Count == 0 || _data.Products.Count == 0)
         {
             MessageBox.Show(this, "برای ثبت فاکتور/پیش‌فاکتور ابتدا طرف حساب و کالا ثبت کنید.",
@@ -622,7 +720,7 @@ public partial class MainWindow : Window
 
     private void AddPayment_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireWritable()) return;
+        if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         var dialog = new PaymentDialog(this, _data);
         if (dialog.ShowDialog() == true)
             Commit(data => AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference), "عملیات دریافت/پرداخت ثبت شد");
@@ -630,7 +728,7 @@ public partial class MainWindow : Window
 
     private void AddExpense_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireWritable()) return;
+        if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         var dialog = new ExpenseDialog(this);
         if (dialog.ShowDialog() == true)
             Commit(data => AccountingOperations.AddExpense(data, dialog.ExpenseTitle, dialog.Category, dialog.Amount, dialog.Notes), "هزینه ثبت شد");
@@ -770,7 +868,7 @@ public partial class MainWindow : Window
 
     private void AddVoucher_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireWritable()) return;
+        if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         if (_data.Products.Count == 0)
         { MessageBox.Show(this, "برای ثبت حواله ابتدا کالا ثبت کنید.", "پیش‌نیاز حواله", MessageBoxButton.OK, MessageBoxImage.Information); return; }
         var dialog = new VoucherDialog(this, _data.Customers, _data.Products, _data.Invoices);
@@ -833,7 +931,7 @@ public partial class MainWindow : Window
 
     private void AddCheck_Click(object sender, RoutedEventArgs e)
     {
-        if (!RequireWritable()) return;
+        if (!RequireWritable() || !ConfirmCanAddDocument()) return;
         var dialog = new CheckDialog(this);
         if (dialog.ShowDialog() != true || dialog.Result is not CheckRecord check) return;
         Commit(data =>
