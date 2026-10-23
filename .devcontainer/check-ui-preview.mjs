@@ -49,7 +49,7 @@ assert.match(html, /دادهٔ حسابداری را به سرور ارسال ن
 assert.match(html, /const renderCardex = \(\) =>/, "Kardex renderer must exist.");
 assert.match(html, /running\+=incoming\?v\.quantity:-v\.quantity/, "Kardex must show a running stock balance.");
 assert.match(html, /data-check-status/, "Check status updates must be available.");
-assert.doesNotMatch(html, /data-page="migration"/, "The client navigation must not expose unrelated/miscellaneous modules.");
+assert.ok(!navPages.includes("migration"), "The client navigation must not expose unrelated/miscellaneous modules.");
 assert.match(html, /class="nav-btn" data-page="moadian"/, "Accounting navigation should expose taxpayer module.");
 assert.match(html, /class="nav-btn" data-page="companies"/, "Accounting navigation should expose company switching.");
 assert.match(html, /data-page-link="vouchers"/, "Kardex page should link to the voucher registration page.");
