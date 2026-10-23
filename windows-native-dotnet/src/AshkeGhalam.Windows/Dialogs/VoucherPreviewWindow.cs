@@ -54,22 +54,116 @@ public sealed class VoucherPreviewWindow : Window
         var document = new FlowDocument { FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 12,
             FlowDirection = FlowDirection.RightToLeft, PagePadding = new Thickness(28), ColumnWidth = 760,
             Background = Brushes.White, Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)) };
-        var logo = CreateImage(company?.LogoDataBase64, 112, 82);
-        if (logo is not null) document.Blocks.Add(new BlockUIContainer(new Border { Child = logo, HorizontalAlignment = HorizontalAlignment.Center,
-            Padding = new Thickness(4), Margin = new Thickness(0, 0, 0, 8) }));
-        document.Blocks.Add(new Paragraph(new Run(string.IsNullOrWhiteSpace(company?.LegalName) ? company?.Name ?? "اشک قلم" : company.LegalName))
-        { FontSize = 22, FontWeight = FontWeights.Bold, Foreground = accent, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 0, 0, 4) });
         var numberLabel = voucher.Number > 0 ? voucher.Number.ToString("N0", CultureInfo.GetCultureInfo("fa-IR")) : "پس از ثبت تعیین می‌شود";
-        document.Blocks.Add(new Paragraph(new Run($"حواله / رسید انبار — شماره {numberLabel}"))
-        { FontSize = 17, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 0, 0, 10) });
         var trackingLabel = string.IsNullOrWhiteSpace(voucher.TrackingCode) ? "پس از ثبت تولید می‌شود" : voucher.TrackingCode;
-        document.Blocks.Add(new Paragraph(new Run($"کد پیگیری: {trackingLabel}    تاریخ: {FormatPersianDate(voucher.Date)}    وضعیت: {StatusLabel(voucher.Status)}")) { TextAlignment = TextAlignment.Right });
-        document.Blocks.Add(new Paragraph(new Run($"نوع سند: {TypeLabel(voucher.Type)}    نوع گردش: {MovementLabel(voucher.MovementType)}")) { TextAlignment = TextAlignment.Right });
-        document.Blocks.Add(new Paragraph(new Run($"طرف حساب: {(string.IsNullOrWhiteSpace(voucher.PersonName) ? "—" : voucher.PersonName)}    فاکتور مرتبط: {(string.IsNullOrWhiteSpace(voucher.RelatedInvoiceId) ? "—" : voucher.RelatedInvoiceId)}")) { TextAlignment = TextAlignment.Right });
+        var companyName = string.IsNullOrWhiteSpace(company?.LegalName) ? company?.Name ?? "اشک قلم" : company.LegalName;
+
+        var headerGrid = new Grid { Width = 660, FlowDirection = FlowDirection.RightToLeft };
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var headerText = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 14, 0) };
+        headerText.Children.Add(new TextBlock
+        {
+            Text = "حواله / رسید انبار",
+            FontSize = 25,
+            FontWeight = FontWeights.Bold,
+            Foreground = Brushes.White,
+            TextWrapping = TextWrapping.Wrap
+        });
+        headerText.Children.Add(new TextBlock
+        {
+            Text = companyName,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = Brushes.White,
+            Margin = new Thickness(0, 3, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+        headerText.Children.Add(new TextBlock
+        {
+            Text = $"شماره سند: {numberLabel}   •   کد پیگیری: {trackingLabel}",
+            FontSize = 10,
+            Foreground = Brushes.White,
+            Margin = new Thickness(0, 7, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+        Grid.SetColumn(headerText, 0);
+        headerGrid.Children.Add(headerText);
+        var logo = CreateImage(company?.LogoDataBase64, 92, 72);
+        if (logo is not null)
+        {
+            logo.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(logo, 1);
+            headerGrid.Children.Add(logo);
+        }
+        document.Blocks.Add(new BlockUIContainer(new Border
+        {
+            Width = 660,
+            Background = accent,
+            BorderBrush = accent,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(18),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = headerGrid
+        }));
+
+        if (company is not null &&
+            (!string.IsNullOrWhiteSpace(company.Phone) ||
+             !string.IsNullOrWhiteSpace(company.Address) ||
+             !string.IsNullOrWhiteSpace(company.NationalId) ||
+             !string.IsNullOrWhiteSpace(company.TaxId)))
+        {
+            var companyFacts = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+            var contact = string.Join("   •   ", new[]
+            {
+                string.IsNullOrWhiteSpace(company.Branch) ? "" : "شعبه: " + company.Branch,
+                string.IsNullOrWhiteSpace(company.Phone) ? "" : "تلفن: " + company.Phone,
+                string.IsNullOrWhiteSpace(company.Address) ? "" : "نشانی: " + company.Address
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+            if (!string.IsNullOrWhiteSpace(contact))
+                companyFacts.Children.Add(new TextBlock { Text = contact, FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)), TextWrapping = TextWrapping.Wrap });
+            var ids = string.Join("   •   ", new[]
+            {
+                string.IsNullOrWhiteSpace(company.NationalId) ? "" : "شناسه ملی: " + company.NationalId,
+                string.IsNullOrWhiteSpace(company.TaxId) ? "" : "شناسه مالیاتی: " + company.TaxId
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+            if (!string.IsNullOrWhiteSpace(ids))
+                companyFacts.Children.Add(new TextBlock { Text = ids, FontSize = 9, Foreground = new SolidColorBrush(Color.FromRgb(51, 65, 85)), Margin = new Thickness(0, 3, 0, 0), TextWrapping = TextWrapping.Wrap });
+            document.Blocks.Add(new BlockUIContainer(new Border
+            {
+                Width = 660, Background = soft, BorderBrush = accent,
+                BorderThickness = new Thickness(0, 0, 4, 0), CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12), Margin = new Thickness(0, 0, 0, 12), Child = companyFacts
+            }));
+        }
+
+        Border InfoCard(string label, string value, double minWidth = 190)
+        {
+            var stack = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+            stack.Children.Add(new TextBlock { Text = label, FontSize = 9, FontWeight = FontWeights.SemiBold, Foreground = accent });
+            stack.Children.Add(new TextBlock { Text = string.IsNullOrWhiteSpace(value) ? "—" : value,
+                FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)),
+                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0) });
+            return new Border { MinWidth = minWidth, MaxWidth = 310, Background = soft,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(220, 226, 234)), BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8), Padding = new Thickness(10), Margin = new Thickness(0, 0, 8, 8), Child = stack };
+        }
+
+        var facts = new WrapPanel { Width = 660, FlowDirection = FlowDirection.RightToLeft, Margin = new Thickness(0, 0, 0, 10) };
+        facts.Children.Add(InfoCard("تاریخ شمسی", FormatPersianDate(voucher.Date), 140));
+        facts.Children.Add(InfoCard("وضعیت سند", StatusLabel(voucher.Status), 140));
+        facts.Children.Add(InfoCard("نوع سند", TypeLabel(voucher.Type), 160));
+        facts.Children.Add(InfoCard("نوع گردش", MovementLabel(voucher.MovementType), 190));
+        facts.Children.Add(InfoCard("طرف حساب", voucher.PersonName, 220));
+        facts.Children.Add(InfoCard("فاکتور مرتبط", voucher.RelatedInvoiceId, 220));
         if (!string.IsNullOrWhiteSpace(voucher.VehicleNumber) || !string.IsNullOrWhiteSpace(voucher.Supervisor) || !string.IsNullOrWhiteSpace(voucher.ReceiverPhone))
-            document.Blocks.Add(new Paragraph(new Run($"خودرو: {voucher.VehicleNumber}    مسئول: {voucher.Supervisor}    تلفن: {voucher.ReceiverPhone}")) { TextAlignment = TextAlignment.Right });
-        if (!string.IsNullOrWhiteSpace(voucher.ReturnReason)) document.Blocks.Add(new Paragraph(new Run($"علت برگشت: {voucher.ReturnReason}")) { TextAlignment = TextAlignment.Right });
-        if (!string.IsNullOrWhiteSpace(voucher.Notes)) document.Blocks.Add(new Paragraph(new Run($"توضیحات: {voucher.Notes}")) { TextAlignment = TextAlignment.Right });
+            facts.Children.Add(InfoCard("حمل و تحویل", $"خودرو: {voucher.VehicleNumber}   •   مسئول: {voucher.Supervisor}   •   تلفن: {voucher.ReceiverPhone}", 300));
+        if (!string.IsNullOrWhiteSpace(voucher.ReturnReason))
+            facts.Children.Add(InfoCard("علت برگشت", voucher.ReturnReason, 300));
+        if (!string.IsNullOrWhiteSpace(voucher.Notes))
+            facts.Children.Add(InfoCard("توضیحات", voucher.Notes, 300));
+        document.Blocks.Add(new BlockUIContainer(facts));
 
         var table = new Table { CellSpacing = 0 };
         for (var i = 0; i < 4; i++) table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
@@ -79,19 +173,29 @@ public sealed class VoucherPreviewWindow : Window
             header.Cells.Add(new TableCell(new Paragraph(new Run(label))) { FontWeight = FontWeights.Bold, Background = soft,
                 Foreground = accent, Padding = new Thickness(7), BorderBrush = accent, BorderThickness = new Thickness(0.5) });
         group.Rows.Add(header);
+        var voucherRowIndex = 0;
         foreach (var item in voucher.Items)
         {
             var row = new TableRow();
             var values = new[] { item.ProductName, item.Quantity.ToString("N2", CultureInfo.GetCultureInfo("fa-IR")), item.Unit,
                 string.Join(" / ", new[] { item.Description, item.ShelfLocation }.Where(value => !string.IsNullOrWhiteSpace(value))) };
             foreach (var value in values)
-                row.Cells.Add(new TableCell(new Paragraph(new Run(value))) { Padding = new Thickness(7),
+                row.Cells.Add(new TableCell(new Paragraph(new Run(value))) { Padding = new Thickness(8),
+                    Background = voucherRowIndex % 2 == 0 ? Brushes.White : soft,
                     BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5) });
+            voucherRowIndex++;
             group.Rows.Add(row);
         }
-        table.RowGroups.Add(group); document.Blocks.Add(table);
-        document.Blocks.Add(new Paragraph(new Run($"جمع تعداد: {voucher.Items.Sum(item => item.Quantity).ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}    وزن تخمینی: {voucher.TotalWeight.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}    ارزش تخمینی: {voucher.EstimatedValue.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}"))
-        { FontSize = 14, FontWeight = FontWeights.Bold, Foreground = accent, TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 14, 0, 4) });
+        table.RowGroups.Add(group);
+        document.Blocks.Add(table);
+        var totals = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+        totals.Children.Add(new TextBlock { Text = $"جمع تعداد اقلام: {voucher.Items.Sum(item => item.Quantity).ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}",
+            FontSize = 13, FontWeight = FontWeights.Bold, Foreground = accent, Margin = new Thickness(0, 0, 0, 5) });
+        totals.Children.Add(new TextBlock { Text = $"وزن تخمینی: {voucher.TotalWeight.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}    •    ارزش تخمینی: {voucher.EstimatedValue.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}",
+            FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)), TextWrapping = TextWrapping.Wrap });
+        document.Blocks.Add(new BlockUIContainer(new Border { Width = 660, Background = soft, BorderBrush = accent,
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(14),
+            Margin = new Thickness(0, 14, 0, 4), Child = totals }));
         try
         {
             var payload = string.IsNullOrWhiteSpace(voucher.QrCode)
