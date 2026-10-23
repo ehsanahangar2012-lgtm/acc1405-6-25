@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: windows-native-wpf-${{ github.ref }}
@@ -69,166 +69,39 @@ jobs:
             }
           }
 
-      - name: Publish self-contained Windows x64 package
+      - name: Smoke-test locally built WPF executable startup
         shell: pwsh
         run: |
-          $publishDir = Join-Path $env:RUNNER_TEMP 'ashkghalam-windows-native'
-          dotnet publish windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj `
-            --configuration Release --runtime win-x64 --self-contained true `
-            -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=true -o $publishDir
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          Copy-Item 'windows-native-dotnet/QUICKSTART.md' (Join-Path $publishDir 'راهنمای-شروع.txt')
-          Copy-Item 'windows-native-dotnet/src/AshkeGhalam.Windows/Assets/Fonts/OFL.txt' (Join-Path $publishDir 'Vazirmatn-OFL.txt')
-          Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath (Join-Path $env:RUNNER_TEMP 'AshkeGhalam-Windows-Native.zip') -Force
-
-      - name: Smoke-test published executable startup
-        shell: pwsh
-        run: |
-          $exe = Join-Path $env:RUNNER_TEMP 'ashkghalam-windows-native/AshkeGhalam.Windows.exe'
-          if (-not (Test-Path -LiteralPath $exe)) { throw "Published executable was not found at $exe" }
-          $startupLog = Join-Path $env:LOCALAPPDATA 'AshkeGhalam\WindowsNative\startup-error.log'
-          if (Test-Path -LiteralPath $startupLog) { Remove-Item -LiteralPath $startupLog -Force }
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'windows-native-dotnet/src/AshkeGhalam.Windows/bin/Release/net10.0-windows/AshkeGhalam.Windows.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "Build output was not found at $exe" }
           $startedAt = Get-Date
           $process = Start-Process -FilePath $exe -PassThru
-          Start-Sleep -Seconds 5
-          $process.Refresh()
-          if ($process.HasExited) {
-            $diagnostics = @()
-            if (Test-Path -LiteralPath $startupLog) {
-              $diagnostics += Get-Content -LiteralPath $startupLog -Raw
-            }
-            try {
-              $events = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $startedAt.AddSeconds(-2) } -ErrorAction SilentlyContinue |
-                Where-Object { $_.ProviderName -in @('.NET Runtime', 'Application Error', 'Windows Error Reporting') } |
-                Select-Object -First 4
-              foreach ($event in $events) { $diagnostics += "Event $($event.Id): $($event.Message)" }
-            } catch {}
-            throw "Native WPF process exited during startup smoke test (exit code $($process.ExitCode)). $($diagnostics -join [Environment]::NewLine)"
-          }
-          # Capture the real WPF window for visual review without requiring a local download.
-          $previewImage = Join-Path $env:RUNNER_TEMP 'AshkeGhalam-Windows-Native-Dashboard.png'
           try {
-            Add-Type -AssemblyName System.Drawing
-            Add-Type -TypeDefinition @'
-          using System;
-          using System.Runtime.InteropServices;
-          public static class AshkeWindowCapture {
-            [StructLayout(LayoutKind.Sequential)]
-            public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-            [DllImport("user32.dll", SetLastError=true)] public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-            [DllImport("user32.dll", SetLastError=true)] public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint flags);
-            [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-            [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int command);
-          }
-          '@
-            $hwnd = $process.MainWindowHandle
-            if ($hwnd -eq [IntPtr]::Zero) {
-              $process.Refresh()
-              $hwnd = $process.MainWindowHandle
+            Start-Sleep -Seconds 5
+            $process.Refresh()
+            if ($process.HasExited) {
+              $diagnostics = @()
+              try {
+                $events = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $startedAt.AddSeconds(-2) } -ErrorAction SilentlyContinue |
+                  Where-Object { $_.ProviderName -in @('.NET Runtime', 'Application Error', 'Windows Error Reporting') } |
+                  Select-Object -First 3
+                foreach ($event in $events) { $diagnostics += "Event $($event.Id): $($event.Message)" }
+              } catch {}
+              throw "WPF exited during its startup smoke test (exit code $($process.ExitCode)). $($diagnostics -join [Environment]::NewLine)"
             }
-            if ($hwnd -eq [IntPtr]::Zero) { throw 'WPF main window handle is unavailable for screenshot capture.' }
-            [void][AshkeWindowCapture]::ShowWindow($hwnd, 5)
-            [void][AshkeWindowCapture]::SetForegroundWindow($hwnd)
-            Start-Sleep -Seconds 2
-            $rect = [AshkeWindowCapture+RECT]::new()
-            if (-not [AshkeWindowCapture]::GetWindowRect($hwnd, [ref]$rect)) { throw 'GetWindowRect failed for the WPF window.' }
-            $width = $rect.Right - $rect.Left
-            $height = $rect.Bottom - $rect.Top
-            if ($width -lt 500 -or $height -lt 350) { throw "Unexpected WPF window bounds: ${width}x${height}" }
-            $bitmap = [System.Drawing.Bitmap]::new($width, $height)
-            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-            try {
-              $hdc = $graphics.GetHdc()
-              try { $captured = [AshkeWindowCapture]::PrintWindow($hwnd, $hdc, 2) }
-              finally { $graphics.ReleaseHdc($hdc) }
-              if (-not $captured) {
-                $graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bitmap.Size)
-              }
-              $bitmap.Save($previewImage, [System.Drawing.Imaging.ImageFormat]::Png)
-            } finally {
-              $graphics.Dispose()
-              $bitmap.Dispose()
-            }
-            if ((Get-Item -LiteralPath $previewImage).Length -lt 20000) { throw 'Captured WPF screenshot is unexpectedly small.' }
-            Write-Host "Captured actual WPF window screenshot: $previewImage"
-          } catch {
-            Write-Warning "Native WPF screenshot could not be captured in this CI session: $($_.Exception.Message)"
-            Remove-Item -LiteralPath $previewImage -Force -ErrorAction SilentlyContinue
+            Write-Host 'Locally built WPF executable stayed alive for the startup smoke-test window.'
+          } finally {
+            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
           }
-          Stop-Process -Id $process.Id -Force
-          Write-Host 'Published WPF executable stayed alive for the startup smoke-test window.'
 
-      # GitHub Actions artifact storage is at quota. Publish one current package on a
-      # separate download branch instead of creating a release or touching the main branch.
-      - name: Publish tested package to isolated download branch
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+      - name: Report verification scope
         shell: pwsh
         run: |
-          $package = Join-Path $env:RUNNER_TEMP 'AshkeGhalam-Windows-Native.zip'
-          if (-not (Test-Path -LiteralPath $package)) { throw "Published package was not found at $package" }
-
-          # A branch-scoped concurrency group cancels older branch builds before they
-          # can overwrite the download package. Never check out or modify the source branch here.
-          $size = (Get-Item -LiteralPath $package).Length
-          if ($size -ge 100MB) { throw "Package is $size bytes; GitHub rejects regular Git files of 100 MB or more." }
-
-          $repoRoot = $env:GITHUB_WORKSPACE
-          $zipName = 'AshkeGhalam-Windows-Native.zip'
-          $buildInfo = @"
-          AshkeGhalam native Windows WPF parallel build
-          Source branch: feature/windows-native-dotnet
-          Tested commit: $env:GITHUB_SHA
-          GitHub Actions run: $env:GITHUB_RUN_ID
-          Build number: $env:GITHUB_RUN_NUMBER
-
-          This is a parallel evaluation build, not a declaration of full parity with every source module.
-          Existing application versions and main branch remain unchanged.
-          "@
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch --orphan windows-native-download
-          if ($LASTEXITCODE -ne 0) { throw "Could not create the isolated binary download branch." }
-          # An orphan branch has an empty index; remove the original checkout files as untracked.
-          git clean -fdx
-          if ($LASTEXITCODE -ne 0) { throw "Could not clear the isolated download branch worktree." }
-          Copy-Item -LiteralPath $package -Destination (Join-Path $repoRoot $zipName) -Force
-          $buildInfo | Set-Content -LiteralPath (Join-Path $repoRoot 'BUILD-INFO.txt') -Encoding utf8
-          $screenshotName = 'AshkeGhalam-Windows-Native-Dashboard.png'
-          $screenshotSource = Join-Path $env:RUNNER_TEMP $screenshotName
-          $screenshotPublished = $false
-          if (Test-Path -LiteralPath $screenshotSource) {
-            Copy-Item -LiteralPath $screenshotSource -Destination (Join-Path $repoRoot $screenshotName) -Force
-            $screenshotPublished = $true
-          }
-          git add -- $zipName BUILD-INFO.txt
-          if ($screenshotPublished) { git add -- $screenshotName }
-          git commit -m "build(wpf): publish verified package $env:GITHUB_RUN_NUMBER"
-          if ($LASTEXITCODE -ne 0) { throw "Could not commit the verified package." }
-          git push --force origin HEAD:refs/heads/windows-native-download
-          if ($LASTEXITCODE -ne 0) { throw "Could not publish the binary to the isolated download branch." }
-
-          $download = "https://github.com/$env:GITHUB_REPOSITORY/raw/refs/heads/windows-native-download/$zipName"
           @"
-          ### Native WPF package
+          ## Native WPF validation
 
-          Build: $env:GITHUB_RUN_NUMBER
-          Tested commit: $env:GITHUB_SHA
-
-          [Download the self-contained Windows x64 package]($download)
-
-          The ZIP includes the executable and Persian quick-start guide. This is a parallel build; existing versions remain unchanged.
+          - Source commit: $env:GITHUB_SHA
+          - WPF build and domain tests: passed if this run succeeds.
+          - Startup smoke test: checks that the locally built WPF process remains alive briefly.
+          - No release package, ZIP, screenshot, or download-branch publication is created by this workflow.
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
-          if ($screenshotPublished) {
-            $previewUrl = "https://github.com/$env:GITHUB_REPOSITORY/raw/refs/heads/windows-native-download/$screenshotName"
-            @"
-
-          ### Actual WPF window screenshot
-
-          ![Actual screenshot of the native WPF window]($previewUrl)
-
-          [Open the screenshot at full size]($previewUrl)
-          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
-            Write-Host "Published actual WPF screenshot: $previewUrl"
-          }
