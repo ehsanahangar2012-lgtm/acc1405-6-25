@@ -194,6 +194,12 @@ public static class NativeOperationalPostingService
                 credit = "1120";
             }
         }
+        else if (status == "TRANSFERRED" && received)
+        {
+            // Endorsing/spending a received cheque converts the cheque asset into a reduction of payables.
+            debit = "2110";
+            credit = wasDeposited ? "1150" : "1140";
+        }
         else if (status == "BOUNCED")
         {
             if (received)
