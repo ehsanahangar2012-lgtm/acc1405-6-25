@@ -2733,14 +2733,29 @@ public partial class MainWindow : Window
             tabs.SelectedIndex = nativeTabIndex;
             if (nativeTabIndex == 15)
             {
-                // The company profile and invoice/accounting preferences share one native page.
-                // Direct menu navigation should bring the requested section into view even when
-                // the same tab was already selected.
+                // The settings page is shared by company, standard settings, and advanced settings.
+                // Scroll after the tab content is realized so this also works when the same tab is
+                // already active or the page is being created for the first time.
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
                 {
                     if (!IsLoaded) return;
-                    FrameworkElement target = key == "companies" ? CompanyProfileSelector : SettingsTaxRate;
-                    target.BringIntoView();
+                    AccountingSettingsScrollViewer.UpdateLayout();
+                    if (key == "companies")
+                    {
+                        AccountingSettingsScrollViewer.ScrollToHome();
+                        CompanyProfileSelector.BringIntoView();
+                    }
+                    else if (key == "advanced-settings")
+                    {
+                        AdvancedSettingsSection.BringIntoView();
+                        if (!AdvancedSettingsSection.IsLoaded)
+                            AccountingSettingsScrollViewer.ScrollToEnd();
+                    }
+                    else
+                    {
+                        AccountingSettingsScrollViewer.ScrollToHome();
+                        SettingsTaxRate.BringIntoView();
+                    }
                 }));
             }
             if (FindName("FooterStatus") is TextBlock footer)
