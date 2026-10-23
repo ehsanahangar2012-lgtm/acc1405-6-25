@@ -15,6 +15,7 @@ namespace AshkeGhalam.Windows;
 public partial class MainWindow : Window
 {
     private readonly LocalDataStore _store = new();
+    private readonly NativeLicenseStore _licenseStore = new();
     private AccountingData _data = new();
     private bool _canWrite;
 
@@ -33,6 +34,7 @@ public partial class MainWindow : Window
             StorageStatus.Text = "ذخیره‌سازی محلی آماده";
             FooterStatus.Text = "ذخیره‌سازی خودکار روی این رایانه فعال است؛ پشتیبان رمزگذاری‌شده تهیه کنید.";
             RefreshAll();
+            RefreshLicensePanel();
         }
         catch (Exception ex)
         {
@@ -47,7 +49,9 @@ public partial class MainWindow : Window
 
     private void MainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (e.OriginalSource == MainTabs) RefreshAll();
+        if (e.OriginalSource != MainTabs) return;
+        RefreshAll();
+        if (MainTabs.SelectedIndex == 11) RefreshLicensePanel();
     }
 
     private bool RequireWritable()
@@ -283,6 +287,125 @@ public partial class MainWindow : Window
 
     private sealed record TrialBalanceGridRow(
         string Code, string Name, string TypeLabel, decimal Debit, decimal Credit, decimal Balance);
+
+    private void RefreshLicensePanel()
+    {
+        try
+        {
+            LicenseHardwareId.Text = HardwareIdentityService.GetHardwareId();
+        }
+        catch
+        {
+            LicenseHardwareId.Text = "";
+            LicenseStatusText.Text = "شناسه دستگاه خوانده نشد؛ برای حفظ امنیت، وضعیت مجوز نامشخص است.";
+            LicensePlanText.Text = "طرح: —";
+            LicenseQuotaText.Text = "سهمیه: —";
+            LicenseFeaturesText.Text = "امکانات: —";
+            return;
+        }
+
+        try
+        {
+            var state = _licenseStore.Load();
+            if (state is null)
+            {
+                LicenseStatusText.Text = "هیچ رسید لایسنس در این حساب ویندوز ذخیره نشده است. برای فعال‌سازی، اتصال آنلاین لازم است.";
+                LicensePlanText.Text = "طرح: —";
+                LicenseQuotaText.Text = "سهمیه: —";
+                LicenseFeaturesText.Text = "امکانات: —";
+                return;
+            }
+
+            if (!string.Equals(state.HardwareId, LicenseHardwareId.Text, StringComparison.OrdinalIgnoreCase))
+            {
+                LicenseStatusText.Text = "رسید ذخیره‌شده متعلق به شناسه دستگاه دیگری است. مجوز این دستگاه تأیید نشده است.";
+                LicensePlanText.Text = "طرح: —";
+                LicenseQuotaText.Text = "سهمیه: —";
+                LicenseFeaturesText.Text = "امکانات: —";
+                return;
+            }
+
+            LicenseStatusText.Text =
+                $"رسید رمزگذاری‌شده موجود است؛ آخرین بررسی آنلاین: {state.VerifiedAtUtc.ToLocalTime():yyyy/MM/dd HH:mm}. " +
+                "این اطلاعات به‌تنهایی تأیید زنده یا وضعیت فعلی سرور را ثابت نمی‌کند.";
+            LicensePlanText.Text =
+                $"طرح ذخیره‌شده: {state.Payload.Plan}  •  شرکت: {(string.IsNullOrWhiteSpace(state.CompanyName) ? "ثبت نشده" : state.CompanyName)}  •  انقضا: {(state.Payload.IsUnlimited ? "نامحدود" : state.Payload.ExpireDate)}";
+            LicenseQuotaText.Text =
+                $"سقف مشتریان: {QuotaLabel(state.Payload.MaxCustomers)}  •  سقف اسناد: {QuotaLabel(state.Payload.MaxDocuments)}  •  سقف کاربران: {QuotaLabel(state.Payload.MaxUsers)}";
+            LicenseFeaturesText.Text =
+                "امکانات درج‌شده در رسید: " +
+                (state.Payload.Features.Count == 0 ? "در رسید ذکر نشده" : string.Join("، ", state.Payload.Features.Take(30))) +
+                (state.Payload.Features.Count > 30 ? "، ..." : "");
+        }
+        catch (Exception)
+        {
+            LicenseStatusText.Text = "فایل وضعیت لایسنس محلی قابل رمزگشایی یا اعتبارسنجی نیست. هیچ مجوزی فعال فرض نمی‌شود؛ اتصال آنلاین را دوباره انجام دهید.";
+            LicensePlanText.Text = "طرح: —";
+            LicenseQuotaText.Text = "سهمیه: —";
+            LicenseFeaturesText.Text = "امکانات: —";
+        }
+    }
+
+    private static string QuotaLabel(int limit) => limit switch
+    {
+        -1 => "نامحدود",
+        >= 0 => limit.ToString("N0", CultureInfo.CurrentCulture),
+        _ => "نامعتبر"
+    };
+
+    private void CopyHardwareId_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(LicenseHardwareId.Text))
+                throw new InvalidOperationException("شناسه دستگاه آماده نیست.");
+            Clipboard.SetText(LicenseHardwareId.Text);
+            FooterStatus.Text = "شناسه سخت‌افزاری این رایانه کپی شد.";
+        }
+        catch
+        {
+            MessageBox.Show(this, "شناسه دستگاه قابل کپی نیست.", "شناسه دستگاه", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void VerifyLicense_Click(object sender, RoutedEventArgs e)
+    {
+        NativeLicenseState? existing = null;
+        try { existing = _licenseStore.Load(); }
+        catch (Exception ex)
+        {
+            if (MessageBox.Show(this,
+                    "فایل لایسنس قبلی خوانده نشد. می‌توانید دوباره با سرور تأیید کنید؛ پس از تأیید موفق، فایل رمزگذاری‌شده جایگزین می‌شود. ادامه می‌دهید؟",
+                    "وضعیت لایسنس محلی", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+        }
+
+        LicenseActivationDialog dialog;
+        try { dialog = new LicenseActivationDialog(this, existing); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "پنجره فعال‌سازی باز نشد. " + ex.Message, "فعال‌سازی لایسنس", MessageBoxButton.OK, MessageBoxImage.Error);
+            return;
+        }
+
+        if (dialog.ShowDialog() != true || dialog.VerifiedState is not NativeLicenseState verified)
+            return;
+
+        try
+        {
+            _licenseStore.Save(verified);
+            RefreshLicensePanel();
+            FooterStatus.Text = "رسید امضاشدهٔ لایسنس پس از تأیید آنلاین، رمزگذاری و ذخیره شد. اعمال سهمیه در همهٔ ماژول‌ها هنوز کامل نیست.";
+            MessageBox.Show(this,
+                "رسید لایسنس با سرور و امضای RSA-SHA256 تأیید و برای حساب جاری ویندوز ذخیره شد. این تغییر هنوز به معنی اعمال کامل سقف‌ها و مجوزهای لایسنس در تمام ماژول‌های نسخهٔ بومی نیست.",
+                "تأیید سرور انجام شد", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "لایسنس آنلاین تأیید شد اما ذخیره امن وضعیت آن انجام نشد. دوباره تلاش کنید. " + ex.Message,
+                "خطا در ذخیره امن", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
 
     private void AddCustomer_Click(object sender, RoutedEventArgs e)
     {
@@ -859,7 +982,7 @@ public partial class MainWindow : Window
             ["sms-center"] = new("پنل پیامک هوشمند", "خدمات تجاری و ابری", "/sms-center", null),
             ["multi-user-lan"] = new("شبکه محلی چندکاربره", "خدمات تجاری و ابری", "/multi-user-lan", null),
             ["client-broadcast"] = new("اطلاعیه‌ها", "خدمات تجاری و ابری", "/client-broadcast", null),
-            ["activation"] = new("اتصال سرور و فعال‌سازی لایسنس", "خدمات تجاری و ابری", "/install-android (فقط اتصال/فعال‌سازی کلاینت)", null),
+            ["activation"] = new("اتصال سرور و فعال‌سازی لایسنس", "خدمات تجاری و ابری", "/install-android (فقط اتصال/فعال‌سازی کلاینت)", 11),
             ["mobile-catalog"] = new("کاتالوگ ویزیتوری همراه", "خدمات تجاری و ابری", "/mobile-catalog", null),
             ["catalog"] = new("کاتالوگ محصول", "خدمات تجاری و ابری", "/catalog", null),
             ["support-sla"] = new("پشتیبانی و تمدید", "خدمات تجاری و ابری", "/support-sla", null),
