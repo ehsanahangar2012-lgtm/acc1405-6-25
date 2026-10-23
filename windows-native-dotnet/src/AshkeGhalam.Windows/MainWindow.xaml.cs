@@ -180,6 +180,7 @@ public partial class MainWindow : Window
         ReportCash.Text = (salesReceipts - purchasePayments - expenses).ToString("N2", CultureInfo.CurrentCulture);
         RefreshLedger();
         RefreshFinancialReports();
+        RefreshDueCalendar();
     }
 
     private void RefreshLedger()
@@ -321,6 +322,55 @@ public partial class MainWindow : Window
             .ToList();
     }
 
+    private void RefreshDueCalendar_Click(object sender, RoutedEventArgs e) =>
+        RefreshDueCalendar();
+
+    private void RefreshDueCalendar()
+    {
+        var items = DueCalendarService.GetItems(_data);
+        var rows = items.Select(item => new DueCalendarGridRow(
+            FormatPersianDate(item.DueDate),
+            item.Kind,
+            item.DocumentNumber,
+            item.Contact,
+            item.Amount,
+            item.Status,
+            item.DaysFromDue < 0
+                ? $"{-item.DaysFromDue:N0} روز معوق"
+                : item.DaysFromDue == 0 ? "امروز" : $"{item.DaysFromDue:N0} روز مانده",
+            item.DaysFromDue < 0 ? "معوق"
+                : item.DaysFromDue == 0 ? "امروز"
+                : item.DaysFromDue <= 3 ? "فوری"
+                : item.DaysFromDue <= 7 ? "نزدیک" : "آینده"))
+            .ToList();
+
+        DueCalendarGrid.ItemsSource = null;
+        DueCalendarGrid.ItemsSource = rows;
+        var overdue = items.Where(item => item.DaysFromDue < 0).ToList();
+        DueCalendarSummary.Text =
+            $"تعداد تعهدها: {items.Count:N0}  •  موارد معوق: {overdue.Count:N0}  •  " +
+            $"مبلغ معوق: {overdue.Sum(item => item.Amount).ToString("N2", CultureInfo.CurrentCulture)}";
+    }
+
+    private void ExportDueCalendar_Click(object sender, RoutedEventArgs e)
+    {
+        var items = DueCalendarService.GetItems(_data);
+        ExportCsv("due-calendar.csv",
+            new[] { "DueDate", "Kind", "DocumentNumber", "Contact", "Amount", "Status", "DaysFromDue", "ReferenceType", "ReferenceId" },
+            items.Select(item => new[]
+            {
+                FormatPersianDate(item.DueDate),
+                item.Kind,
+                item.DocumentNumber,
+                item.Contact,
+                item.Amount.ToString(CultureInfo.InvariantCulture),
+                item.Status,
+                item.DaysFromDue.ToString(CultureInfo.InvariantCulture),
+                item.ReferenceType,
+                item.ReferenceId
+            }));
+    }
+
     private void ExportFinancialReports_Click(object sender, RoutedEventArgs e)
     {
         var report = FinancialReportsService.Build(_data);
@@ -385,6 +435,10 @@ public partial class MainWindow : Window
     private sealed record JournalEntryGridRow(
         string DisplayNumber, string Date, string Description, string DebitAccount, string CreditAccount,
         decimal Amount, string DocumentTypeLabel, string StatusLabel);
+
+    private sealed record DueCalendarGridRow(
+        string DueDate, string Kind, string DocumentNumber, string Contact,
+        decimal Amount, string Status, string Days, string Priority);
 
     private sealed record TrialBalanceGridRow(
         string Code, string Name, string TypeLabel, decimal Debit, decimal Credit, decimal Balance);
