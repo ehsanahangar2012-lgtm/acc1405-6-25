@@ -1,4 +1,7 @@
 using System.Net.Http;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
@@ -124,7 +127,7 @@ public sealed class ServerLicenseClient
         }
     }
 
-    private static async Task<ServerLicenseReceipt?> RequestReceiptAsync(
+    private async Task<ServerLicenseReceipt?> RequestReceiptAsync(
         string licenseKey, string workspaceId, string hardwareId, CancellationToken cancellationToken)
     {
         var body = JsonSerializer.Serialize(new
@@ -165,7 +168,7 @@ public sealed class ServerLicenseClient
         return null;
     }
 
-    private static async Task<VerifiedServerLicense?> VerifyReceiptAsync(
+    private async Task<VerifiedServerLicense?> VerifyReceiptAsync(
         string licenseKey, string workspaceId, string hardwareId, ServerLicenseReceipt receipt,
         CancellationToken cancellationToken)
     {
@@ -254,7 +257,7 @@ public sealed class ServerLicenseClient
         return new VerifiedServerLicense { Payload = payload, Receipt = receipt };
     }
 
-    private static async Task<RSA> GetPublicKeyAsync(CancellationToken cancellationToken)
+    private async Task<RSA> GetPublicKeyAsync(CancellationToken cancellationToken)
     {
         if (_cachedPublicKey is not null) return _cachedPublicKey;
         await _keyLock.WaitAsync(cancellationToken);
