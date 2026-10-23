@@ -67,6 +67,6 @@ assert.equal(verifyLocalBackupRecord(legacyRecord).integrityVerified, false);
 assert.throws(() => verifyLocalBackupRecord({
   ...localRecord,
   data: JSON.stringify({ invoices: 'not-an-array' })
-}), /ساختار دادهٔ بکاپ/);
+}), /سازگار نیست/);
 
 console.log('Local backup integrity checks passed: checksum, tamper rejection, legacy warning state, structure validation.');

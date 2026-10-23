@@ -170,12 +170,15 @@ class AutoBackupService {
             return valid;
         }
 
-        return (await this.readLegacyLocalBackups()).map(item => ({
-            ...item,
-            label: item.checksumAlgorithm === 'sha256' && typeof item.checksum === 'string'
-                ? item.label
-                : item.label.replace('بکاپ محلی رمزگذاری‌شده', 'بکاپ قدیمی مرورگر؛ رمزگذاری در حالت سکون تأیید نشده')
-        }));
+        return (await this.readLegacyLocalBackups()).map(item => {
+            const originalLabel = typeof item.label === 'string' ? item.label : 'بکاپ محلی قدیمی';
+            return {
+                ...item,
+                label: item.checksumAlgorithm === 'sha256' && typeof item.checksum === 'string'
+                    ? originalLabel
+                    : originalLabel.replace('بکاپ محلی رمزگذاری‌شده', 'بکاپ قدیمی مرورگر؛ رمزگذاری در حالت سکون تأیید نشده')
+            };
+        });
     }
 
     private async removeLegacyLocalBackupCopies(): Promise<void> {
