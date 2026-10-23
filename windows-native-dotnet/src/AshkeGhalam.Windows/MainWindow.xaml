@@ -29,6 +29,38 @@
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Margin" Value="0,5,0,0"/>
         </Style>
+        <Style x:Key="NavButton" TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="#172033"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Margin" Value="0,3"/>
+            <Setter Property="Padding" Value="12,10"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}" CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="Background" Value="#26364E"/></Trigger>
+                            <Trigger Property="IsPressed" Value="True"><Setter TargetName="Surface" Property="Background" Value="#0F766E"/></Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="NavSectionLabel" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="#94A3B8"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="7,15,7,5"/>
+        </Style>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions><RowDefinition Height="76"/><RowDefinition Height="*"/><RowDefinition Height="30"/></Grid.RowDefinitions>
@@ -37,14 +69,22 @@
                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
                 <StackPanel VerticalAlignment="Center">
                     <TextBlock Text="اشک قلم" Foreground="#F8FAFC" FontSize="22" FontWeight="Bold"/>
-                    <TextBlock Text="حسابداری بومی ویندوز • نسخهٔ محلی قابل استفاده" Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0"/>
+                    <TextBlock x:Name="CurrentModuleText" Text="پیشخوان • نسخهٔ بومی در کنار نسخهٔ اصلی" Foreground="#94A3B8" FontSize="12" Margin="0,3,0,0"/>
                 </StackPanel>
                 <Border Grid.Column="1" VerticalAlignment="Center" Background="#1E293B" BorderBrush="#334155" BorderThickness="1" CornerRadius="18" Padding="12,7">
                     <TextBlock x:Name="StorageStatus" Text="در حال بارگذاری..." Foreground="#E2E8F0" FontSize="12"/>
                 </Border>
             </Grid>
         </Border>
-        <TabControl x:Name="MainTabs" Grid.Row="1" Margin="18" Padding="10" SelectionChanged="MainTabs_SelectionChanged">
+                <Grid Grid.Row="1" Margin="18">
+            <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="282"/></Grid.ColumnDefinitions>
+            <Grid Grid.Column="0">
+                <TabControl x:Name="MainTabs" Margin="0,0,14,0" Padding="0" SelectionChanged="MainTabs_SelectionChanged">
+                    <TabControl.Template>
+                        <ControlTemplate TargetType="{x:Type TabControl}">
+                            <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </ControlTemplate>
+                    </TabControl.Template>
             <TabItem Header="نمای کلی">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="8">
@@ -250,7 +290,99 @@
                                TextWrapping="Wrap" FontSize="12" Foreground="#64748B" Margin="0,18,0,0"/>
                 </StackPanel>
             </TabItem>
-        </TabControl>
+                </TabControl>
+                <Border x:Name="MigrationPanel" Visibility="Collapsed" Background="#F1F5F9" CornerRadius="14" Padding="28">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel VerticalAlignment="Top" MaxWidth="850" HorizontalAlignment="Right">
+                            <TextBlock Text="مهاجرت نسخهٔ بومی اشک قلم" FontSize="12" FontWeight="Bold" Foreground="#0F766E"/>
+                            <TextBlock x:Name="MigrationPageTitle" Text="ماژول" FontSize="30" FontWeight="Bold" Foreground="#0F172A" Margin="0,12,0,0"/>
+                            <TextBlock x:Name="MigrationPageGroup" Text="گروه و مسیر" FontSize="12" Foreground="#64748B" Margin="0,8,0,20" TextWrapping="Wrap"/>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="14" Padding="20">
+                                <StackPanel>
+                                    <TextBlock Text="این بخش در نسخهٔ اصلی اشک قلم موجود است." FontSize="17" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="قرار است منطق، اطلاعات، فرم‌ها، قواعد و ارتباطات همین بخش به کد بومی C# و WPF منتقل شود؛ این پنجره فعلاً صفحهٔ عملیاتی جعلی جایگزین آن نمی‌سازد." TextWrapping="Wrap" FontSize="13" Foreground="#475569" Margin="0,8,0,0"/>
+                                    <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,18,0,0">
+                                        <StackPanel>
+                                            <TextBlock x:Name="MigrationPageState" Text="وضعیت: هنوز پیاده‌سازی و با نسخهٔ اصلی آزمون تطبیقی نشده است." FontWeight="Bold" Foreground="#9A3412" TextWrapping="Wrap"/>
+                                            <TextBlock Text="تا زمان تکمیل و آزمون، برای این عملیات از نسخهٔ اصلی قبلی استفاده کنید. این نسخه به‌صورت مستقل و در کنار آن توسعه می‌یابد." Foreground="#7C2D12" FontSize="12" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Button Content="بازگشت به پیشخوان بومی" Click="ReturnToDashboard_Click" HorizontalAlignment="Right" Margin="0,18,0,0" Background="#0F766E" Foreground="White"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+            <Border Grid.Column="1" Background="#0F172A" CornerRadius="15" Padding="10">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="NavigationRoot">
+                        <Border Background="#111F35" CornerRadius="12" Padding="13" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="اشک قلم" Foreground="#F8FAFC" FontSize="21" FontWeight="Bold"/>
+                                <TextBlock Text="نسخهٔ بومی ویندوز" Foreground="#CBD5E1" FontSize="12" Margin="0,4,0,0"/>
+                                <TextBlock Text="مهاجرت مستقل از نسخهٔ اصلی" Foreground="#94A3B8" FontSize="10" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="منوی اصلی" Style="{StaticResource NavSectionLabel}"/>
+                        <Button x:Name="NavigationDashboardButton" Tag="dashboard" Content="پیشخوان" Style="{StaticResource NavButton}" Background="#0F766E" Click="NavigateModule_Click"/>
+                        <Button Tag="invoices" Content="فاکتورها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="inventory" Content="انبارداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="checks" Content="مدیریت چک" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="finance" Content="امور مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="customers" Content="اشخاص" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="reports" Content="گزارشات عمومی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="users" Content="کاربران و سطح دسترسی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="عملیات محلی موجود" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="payments" Content="دریافت‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="expenses" Content="هزینه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="backup" Content="پشتیبان‌گیری محلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="مدیریت کسب‌وکار" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="projects" Content="پروژه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="contracts" Content="قراردادها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="assets" Content="دارایی‌های ثابت" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="budget" Content="بودجه‌بندی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="marketing" Content="بازاریابی و سئو" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="import-center" Content="مرکز واردات اسناد" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="حسابداری پیشرفته" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="accounting" Content="حسابداری دوبل" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="cashflow-predictor" Content="پیش‌بینی جریان نقدینگی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="cashflow" Content="جریان نقدینگی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="tax" Content="مدیریت مالیات" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="loans" Content="وام‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="due-calendar" Content="تقویم سررسید و اقساط" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="bank-reconciliation" Content="تطبیق بانکی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="currency" Content="مدیریت چندارزی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="workflow-rules" Content="قواعد گردش مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="گزارشات و تحلیل" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="financial-reports" Content="گزارشات مالی پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="ai-assistant" Content="دستیار هوشمند مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="امضای دیجیتال" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="signature-dashboard" Content="داشبورد امضا" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="signature-management" Content="مدیریت امضا" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="خدمات تجاری و ابری" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="moadian" Content="سامانه مؤدیان مالیاتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="pos-terminal" Content="کارتخوان بانکی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="cloud-vault" Content="پشتیبان ابری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="sms-center" Content="پنل پیامک هوشمند" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="multi-user-lan" Content="شبکه محلی چندکاربره" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="client-broadcast" Content="اطلاعیه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="activation" Content="اتصال و فعال‌سازی لایسنس" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="mobile-catalog" Content="کاتالوگ ویزیتوری همراه" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="catalog" Content="کاتالوگ محصول" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="support-sla" Content="پشتیبانی و تمدید" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="تنظیمات و سیستم" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="fiscal-year" Content="سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="security" Content="امنیت داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="data-sync" Content="همگام‌سازی داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="advanced-settings" Content="تنظیمات پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="settings" Content="تنظیمات عمومی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="updates" Content="مرکز به‌روزرسانی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="help" Content="آموزش و راهنما" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
         <Border Grid.Row="2" Background="#E2E8F0" Padding="12,4">
             <TextBlock x:Name="FooterStatus" Text="اطلاعات محلی — ذخیره‌سازی خودکار پس از هر عملیات" FontSize="11" Foreground="#475569"/>
         </Border>
