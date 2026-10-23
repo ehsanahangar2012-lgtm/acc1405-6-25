@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import Sidebar from './components/Sidebar';
 import MobileNav from './components/MobileNav';
 import QuickActionFAB from './components/QuickActionFAB';
@@ -43,9 +43,9 @@ import { AccountingLogo } from './components/AccountingLogo';
 import { dialogService } from './services/dialogService';
 import { UpdateCenter } from './pages/UpdateCenter';
 import { workspaceService } from './services/workspaceService';
-import { isDesktopApp, isAndroidApp } from './utils';
+import { isDesktopApp, isAndroidApp, isMotherWebPortal } from './utils';
 import { FEATURES } from './config';
-import { Lock, User as UserIcon, LogIn, PenTool, Loader2, WifiOff, Cloud, RefreshCw, KeyRound, ShieldCheck } from 'lucide-react';
+import { Lock, User as UserIcon, LogIn, PenTool, Loader2, WifiOff, Cloud, RefreshCw, KeyRound, ShieldCheck, ArrowRight } from 'lucide-react';
 
 // Helper to retry lazy loaded components on dynamic import failure
 const lazyWithRetry = <T extends React.ComponentType<any>>(factory: () => Promise<{ default: T }>) =>
@@ -146,13 +146,46 @@ const ConnectionStatus = () => {
 };
 
 const LoginPage = () => {
-    const { login } = useStore();
+    const { login, users, addUser, updateUser } = useStore();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncMessage, setSyncMessage] = useState<string | null>(null);
     const [showRecoveryModal, setShowRecoveryModal] = useState(false);
+    const [setupFullName, setSetupFullName] = useState('');
+    const [setupUsername, setSetupUsername] = useState('');
+    const [setupEmail, setSetupEmail] = useState('');
+    const [setupPassword, setSetupPassword] = useState('');
+    const [setupPasswordConfirm, setSetupPasswordConfirm] = useState('');
+    const [setupMessage, setSetupMessage] = useState('');
+    const [usersHydrated, setUsersHydrated] = useState(() => useStore.persist.hasHydrated());
+
+    // Do not offer first-run setup until the asynchronous persisted store has loaded.
+    useEffect(() => {
+        if (useStore.persist.hasHydrated()) {
+            setUsersHydrated(true);
+            return;
+        }
+        return useStore.persist.onFinishHydration(() => setUsersHydrated(true));
+    }, []);
+
+    // Remove only the exact legacy demo accounts created with the known default password.
+    // User-created administrator accounts with a different password are preserved.
+    useEffect(() => {
+        if (!usersHydrated || workspaceService.isRemoteCloudConfigured()) return;
+        const storedUsers = useStore.getState().users || [];
+        const legacyDefaultHash = securityService.hashPassword('123');
+        const safeUsers = storedUsers.filter(user => {
+            const cleanUsername = (user.username || '').trim().toLowerCase();
+            const seededName = cleanUsername === 'admin' || cleanUsername === 'user';
+            const seededPassword = user.password === '123' || user.hashedPassword === legacyDefaultHash;
+            return !(seededName && seededPassword);
+        });
+        if (safeUsers.length !== storedUsers.length) {
+            useStore.setState({ users: safeUsers });
+        }
+    }, [usersHydrated]);
 
     // همگام‌سازی خودکار حساب‌های کاربری با سرور مرکزی ابری هنگام بارگذاری (صرفاً در صورت اتصال و پیکربندی صریح سرور)
     useEffect(() => {
@@ -176,6 +209,69 @@ const LoginPage = () => {
         return () => { isMounted = false; };
     }, []);
 
+    const needsInitialSetup = usersHydrated && users.length === 0 && !workspaceService.isRemoteCloudConfigured();
+
+    const handleCreateInitialAdmin = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        setSetupMessage('');
+
+        const cleanUsername = setupUsername.trim();
+        const cleanName = setupFullName.trim();
+        const cleanEmail = setupEmail.trim();
+
+        if (!cleanName) {
+            setError('نام کامل مدیر را وارد کنید.');
+            return;
+        }
+        if (cleanUsername.length < 4 || /\s/.test(cleanUsername)) {
+            setError('نام کاربری باید حداقل ۴ نویسه و بدون فاصله باشد.');
+            return;
+        }
+        if (setupPassword.length < 12) {
+            setError('برای حساب مدیر، رمز عبور باید حداقل ۱۲ نویسه داشته باشد.');
+            return;
+        }
+        if (setupPassword !== setupPasswordConfirm) {
+            setError('رمز عبور و تکرار آن یکسان نیستند.');
+            return;
+        }
+        if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+            setError('قالب ایمیل معتبر نیست.');
+            return;
+        }
+        if ((useStore.getState().users || []).length > 0) {
+            setError('حساب کاربری از قبل ایجاد شده است؛ صفحه را تازه‌سازی کنید و وارد شوید.');
+            return;
+        }
+
+        const adminRole = useStore.getState().roles.find((role: any) => role.id === 'admin');
+        if (!adminRole) {
+            setError('نقش مدیر سیستم یافت نشد. تنظیمات اولیه را بررسی کنید.');
+            return;
+        }
+
+        try {
+            const createdUser = AuthService.createUser({
+                username: cleanUsername,
+                fullName: cleanName || 'مدیر سیستم',
+                roleId: 'admin',
+                permissions: adminRole.permissions,
+                is_active: true,
+                email: cleanEmail || undefined,
+                password: setupPassword
+            });
+            addUser(createdUser);
+            setUsername(cleanUsername);
+            setPassword('');
+            setSetupPassword('');
+            setSetupPasswordConfirm('');
+            setSetupMessage('حساب مدیر ساخته شد. اکنون با رمز انتخاب‌شده وارد شوید. اگر ایمیل بازیابی ثبت نکرده‌اید، آن را از تنظیمات کاربر تکمیل کنید.');
+        } catch {
+            setError('ساخت حساب مدیر انجام نشد؛ لطفاً دوباره تلاش کنید.');
+        }
+    };
+
     const handleManualSync = async () => {
         if (!workspaceService.isRemoteCloudConfigured()) {
             setSyncMessage('برنامه در حالت محلی مستقل و خام است (جهت اتصال، ابتدا آدرس سرور و توکن را وارد نمایید)');
@@ -188,7 +284,7 @@ const LoginPage = () => {
             if (ok) {
                 setSyncMessage('کاربران و اطلاعات با موفقیت از هاست دریافت شدند');
             } else {
-                setSyncMessage('دسترسی به سرور برقرار است');
+                setSyncMessage('همگام‌سازی تأیید نشد؛ وضعیت اتصال و پاسخ سرور را بررسی کنید.');
             }
         } catch (e) {
             setSyncMessage('خطا در ارتباط با سرور ابری');
@@ -216,6 +312,15 @@ const LoginPage = () => {
             }
 
             if (user) {
+                const existingUser = useStore.getState().users.find(u => u.id === user!.id);
+                if (existingUser && (!securityService.isPasswordHashV2(existingUser.hashedPassword) || existingUser.password)) {
+                    updateUser(existingUser.id, { password });
+                    user = useStore.getState().users.find(u => u.id === existingUser.id) || user;
+                }
+                if (user.password) {
+                    const { password: _legacyPassword, ...safeUser } = user;
+                    user = safeUser as typeof user;
+                }
                 login(user);
                 // بارگذاری تمام فاکتورها، حساب‌ها و اسناد تنها در صورت پیکربندی و اتصال صریح به سرور
                 if (workspaceService.isRemoteCloudConfigured()) {
@@ -232,16 +337,16 @@ const LoginPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#111827] flex items-center justify-center p-6 relative overflow-hidden font-sans" dir="rtl">
-            <div className="fixed top-4 left-4 z-50">
+        <div className="min-h-screen min-h-dvh bg-[#111827] flex items-start sm:items-center justify-center p-3 sm:p-6 pb-8 relative overflow-x-hidden overflow-y-auto overscroll-y-contain font-sans" dir="rtl">
+            <div className="hidden sm:block fixed top-4 left-4 z-50">
                 <SmartSectionGuide customPath="/login" />
             </div>
 
-            <div className="absolute -top-[20%] -right-[10%] w-[700px] h-[700px] bg-teal-900/20 rounded-full blur-[100px] opacity-40"></div>
-            <div className="w-full max-w-md bg-slate-900/60 border border-white/10 backdrop-blur-3xl p-8 sm:p-10 rounded-[2.5rem] shadow-2xl animate-fade-in relative z-10">
+            <div className="hidden sm:block absolute -top-[20%] -right-[10%] w-[700px] h-[700px] bg-teal-900/20 rounded-full blur-[100px] opacity-40"></div>
+            <div className="w-full max-w-md bg-slate-900 border border-white/20 p-5 sm:p-8 rounded-3xl shadow-2xl animate-fade-in relative z-10 mb-4">
                 <div className="flex flex-col items-center mb-8">
                     <AccountingLogo size="lg" className="mb-4" />
-                    <h1 className="text-3xl font-black text-white tracking-tight">اشک قلم کلود</h1>
+                    <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">اشک قلم کلود</h1>
                     <p className="text-teal-400 text-xs mt-2 font-bold uppercase tracking-widest flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-teal-400 animate-pulse"></span>
                         سامانه متمرکز چند دستگاهی و ابری
@@ -253,7 +358,9 @@ const LoginPage = () => {
                     <div className="flex items-center gap-2 overflow-hidden">
                         <Cloud size={16} className={isSyncing ? "text-amber-400 animate-pulse" : "text-teal-400"} />
                         <span className="truncate text-[11px]">
-                            {syncMessage || 'همگام‌سازی ابری فعال است'}
+                            {syncMessage || (workspaceService.isRemoteCloudConfigured()
+                                ? 'آدرس سرور تنظیم شده است؛ اتصال هنگام همگام‌سازی بررسی می‌شود'
+                                : 'حالت محلی؛ اتصال سرور هنوز پیکربندی نشده است')}
                         </span>
                     </div>
                     <button
@@ -268,15 +375,65 @@ const LoginPage = () => {
                     </button>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-5">
+                {setupMessage && (
+                    <div className="mb-4 p-3 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-300 text-xs font-bold">
+                        {setupMessage}
+                    </div>
+                )}
+
+                {!usersHydrated && !workspaceService.isRemoteCloudConfigured() ? (
+                    <div className="flex items-center justify-center gap-3 py-10 text-slate-300 text-sm">
+                        <Loader2 size={20} className="animate-spin text-teal-400" />
+                        <span>در حال بررسی حساب‌های ذخیره‌شده…</span>
+                    </div>
+                ) : needsInitialSetup ? (
+                    <form onSubmit={handleCreateInitialAdmin} className="space-y-3.5 sm:space-y-4">
+                        <div className="rounded-xl p-3.5 bg-slate-950 border border-teal-400/40 space-y-1">
+                            <p className="text-sm font-extrabold text-white">راه‌اندازی اولیه مدیر</p>
+                            <p className="text-sm leading-6 text-slate-200">این فرم فقط برای ساخت اولین حساب مدیر است. هیچ نام کاربری یا رمز عبور پیش‌فرضی وجود ندارد.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-fullname" className="block text-sm font-extrabold text-white">نام کامل مدیر (الزامی)</label>
+                            <input id="setup-admin-fullname" type="text" autoComplete="name" className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20" placeholder="مثلاً: علی رضایی" value={setupFullName} required onChange={e => setSetupFullName(e.target.value)} />
+                            <p className="text-sm leading-6 text-slate-300">نامی که در حساب کاربری و سوابق مدیریتی نمایش داده می‌شود.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-username" className="block text-sm font-extrabold text-white">نام کاربری (الزامی)</label>
+                            <input id="setup-admin-username" type="text" autoComplete="username" minLength={4} className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 font-mono" placeholder="حداقل ۴ نویسه؛ برای ورود استفاده می‌شود" value={setupUsername} onChange={e => setSetupUsername(e.target.value)} required />
+                            <p className="text-sm leading-6 text-slate-300">شناسه ورود مدیر است؛ آن را به دیگران ندهید.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-email" className="block text-sm font-extrabold text-white">ایمیل بازیابی (اختیاری)</label>
+                            <input id="setup-admin-email" type="email" autoComplete="email" className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20" placeholder="name@example.com" value={setupEmail} onChange={e => setSetupEmail(e.target.value)} />
+                            <p className="text-sm leading-6 text-slate-300">برای بازیابی دسترسی لازم است؛ اگر وارد نکنید، بعداً از تنظیمات تکمیلش کنید.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-password" className="block text-sm font-extrabold text-white">رمز عبور مدیر (الزامی)</label>
+                            <input id="setup-admin-password" type="password" autoComplete="new-password" minLength={12} className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 font-mono" placeholder="حداقل ۱۲ نویسه" value={setupPassword} onChange={e => setSetupPassword(e.target.value)} required />
+                            <p className="text-sm leading-6 text-slate-300">حداقل ۱۲ نویسه و ترجیحاً عبارت عبور طولانی و منحصربه‌فرد انتخاب کنید.</p>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label htmlFor="setup-admin-password-confirm" className="block text-sm font-extrabold text-white">تکرار رمز عبور (الزامی)</label>
+                            <input id="setup-admin-password-confirm" type="password" autoComplete="new-password" minLength={12} className="w-full bg-slate-950 border border-white/35 rounded-2xl p-3.5 min-h-12 text-base text-white placeholder:text-slate-300 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 font-mono" placeholder="رمز انتخاب‌شده را دوباره وارد کنید" value={setupPasswordConfirm} onChange={e => setSetupPasswordConfirm(e.target.value)} required />
+                            <p className="text-sm leading-6 text-slate-300">باید دقیقاً با رمز عبور بالا یکسان باشد.</p>
+                        </div>
+                        {error && <div className="text-rose-400 text-xs text-center font-bold bg-rose-500/10 py-3 px-4 rounded-xl border border-rose-500/20">{error}</div>}
+                        <button type="submit" className="w-full bg-teal-600 hover:bg-teal-500 text-white py-4 rounded-2xl font-black text-lg shadow-xl shadow-teal-900/30 transition-all flex items-center justify-center gap-2">
+                            <ShieldCheck size={20} />
+                            <span>ایجاد حساب امن مدیر</span>
+                        </button>
+                    </form>
+                ) : (
+                    <form onSubmit={handleLogin} className="space-y-5">
                     <div className="space-y-2">
-                        <label className="text-xs text-slate-400 pr-2 font-bold flex items-center gap-1.5">
-                            <UserIcon size={14} className="text-teal-400" />
+                        <label htmlFor="login-username" className="text-sm text-slate-200 pr-2 font-bold flex items-center gap-1.5">
+                            <UserIcon size={16} className="text-teal-400" />
                             نام کاربری
                         </label>
                         <input 
+                            id="login-username"
                             type="text" 
-                            className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-teal-500 font-mono transition-all text-left placeholder:text-slate-600" 
+                            className="w-full bg-slate-950/90 border border-white/30 rounded-2xl p-4 min-h-12 text-white outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30 font-mono transition-all text-left placeholder:text-slate-400" 
                             placeholder="username"
                             value={username} 
                             onChange={e => setUsername(e.target.value)} 
@@ -284,13 +441,14 @@ const LoginPage = () => {
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-xs text-slate-400 pr-2 font-bold flex items-center gap-1.5">
-                            <Lock size={14} className="text-teal-400" />
+                        <label htmlFor="login-password" className="text-sm text-slate-200 pr-2 font-bold flex items-center gap-1.5">
+                            <Lock size={16} className="text-teal-400" />
                             رمز عبور
                         </label>
                         <input 
+                            id="login-password"
                             type="password" 
-                            className="w-full bg-slate-950/90 border border-white/10 rounded-2xl p-4 text-white outline-none focus:border-teal-500 font-mono transition-all text-left placeholder:text-slate-600" 
+                            className="w-full bg-slate-950/90 border border-white/30 rounded-2xl p-4 min-h-12 text-white outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-400/30 font-mono transition-all text-left placeholder:text-slate-400" 
                             placeholder="••••••••"
                             value={password} 
                             onChange={e => setPassword(e.target.value)} 
@@ -321,7 +479,8 @@ const LoginPage = () => {
                             </>
                         )}
                     </button>
-                </form>
+                    </form>
+                )}
 
                 {/* پیوند بازیابی هوشمند رمز عبور */}
                 <div className="mt-5 text-center">
@@ -337,7 +496,7 @@ const LoginPage = () => {
 
                 <div className="mt-6 pt-4 border-t border-white/5 text-center flex flex-col items-center gap-1">
                     <p className="text-[11px] text-slate-400">امکان اتصال همزمان چندین سیستم • پشتیبان‌گیری ابری و آفلاین</p>
-                    <p className="text-[10px] text-teal-400 font-black tracking-wide">دپارتمان IT اشک قلم | www.ashkghalam.ir</p>
+                    <p className="text-[10px] text-teal-400 font-semibold tracking-wide"><a href="https://ashkghalam.ir" target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">ashkghalam.ir</a></p>
                 </div>
             </div>
 
@@ -388,6 +547,16 @@ const useSmartRoutePreloader = () => {
 
     useEffect(() => {
         const path = location.pathname;
+
+        // On phones and native Android WebView, background-prefetching several large
+        // accounting modules competes with first paint and makes startup feel slow.
+        // Let mobile load only the route the user actually opened.
+        if (
+            typeof window !== 'undefined' &&
+            (isAndroidApp() || window.matchMedia('(max-width: 768px)').matches)
+        ) {
+            return;
+        }
 
         switch (path) {
             case '/':
@@ -454,7 +623,25 @@ const useSmartRoutePreloader = () => {
 const MainAppLayout: React.FC = () => {
     const { isMaxTableMode } = useResponsiveLayout();
     const { theme } = useTheme();
+    const location = useLocation();
+    const navigate = useNavigate();
     const isLight = theme.mode === 'light';
+
+    const handlePageBack = () => {
+        const historyIndex = Number((window.history.state as { idx?: number } | null)?.idx ?? 0);
+        if (historyIndex > 0) navigate(-1);
+        else navigate('/');
+    };
+
+    useEffect(() => {
+        const handleNativeBack = () => {
+            const historyIndex = Number((window.history.state as { idx?: number } | null)?.idx ?? 0);
+            if (historyIndex > 0) navigate(-1);
+            else navigate('/');
+        };
+        window.addEventListener('ashk-app-back', handleNativeBack);
+        return () => window.removeEventListener('ashk-app-back', handleNativeBack);
+    }, [navigate, location.key]);
 
     // اجرای پیش‌بارگذاری هوشمند وابسته به مسیر فعلی
     useSmartRoutePreloader();
@@ -470,6 +657,19 @@ const MainAppLayout: React.FC = () => {
                     ? 'p-1.5 sm:p-2.5 pt-10 md:mr-64 md:p-6 md:pt-11' 
                     : 'p-3 sm:p-4 pt-10 md:p-10 md:pt-11 md:mr-64'
             }`}>
+                {location.pathname !== '/' && (
+                    <div className="mb-3 flex items-center justify-start no-print">
+                        <button
+                            type="button"
+                            onClick={handlePageBack}
+                            aria-label="بازگشت به صفحه قبلی"
+                            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-2 text-sm font-bold text-slate-200 shadow-sm transition hover:bg-slate-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        >
+                            <ArrowRight size={17} />
+                            <span>بازگشت</span>
+                        </button>
+                    </div>
+                )}
                 <TrialDataProtectionWarningBanner />
                 <ErrorBoundary>
                     <Suspense fallback={<LoadingFallback />}>
@@ -509,8 +709,8 @@ const MainAppLayout: React.FC = () => {
                             <Route path="/marketing" element={<MarketingHub />} />
                             <Route path="/catalog" element={<CatalogPage />} />
                             <Route path="/import-center" element={<ImportCenter />} />
-                            <Route path="/debug-center" element={isDesktopApp() ? <Navigate to="/" replace /> : <DebugCenter />} />
-                            <Route path="/license-manager" element={isDesktopApp() ? <Navigate to="/" replace /> : <LicenseManager />} />
+                            <Route path="/debug-center" element={isMotherWebPortal() ? <DebugCenter /> : <Navigate to="/" replace />} />
+                            <Route path="/license-manager" element={isMotherWebPortal() ? <LicenseManager /> : <Navigate to="/" replace />} />
                             <Route path="/client-broadcast" element={<ClientBroadcastHub />} />
                             
                             {/* ماژول‌های تجاری و ابری */}
@@ -670,25 +870,17 @@ const App = () => {
     });
 
     // پایش هوشمند پیام‌های چت پشتیبانی و نوتیفیکیشن زنده برای ادمین و سیستم
-    if (currentUser) {
-      adminChatNotificationService.startMonitoring(12000);
+    // Standalone desktop builds should not poll the hosted support API every 12 seconds.
+    // Live support notifications start only when the owner explicitly configured a remote workspace.
+    if (currentUser && workspaceService.isRemoteCloudConfigured()) {
+      adminChatNotificationService.startMonitoring(isAndroidApp() ? 12000 : 30000);
     }
 
-    // شروع پردازش دوره‌ای صف سینک - هر ۲ دقیقه (صرفاً در صورت اتصال به سرور)
-    const queueTimer = setInterval(() => {
-      if (navigator.onLine && workspaceService.isRemoteCloudConfigured()) {
-        syncQueue.processQueue().catch(() => {});
-      }
-    }, 2 * 60 * 1000); // هر ۲ دقیقه
-
-    // پردازش فوری هنگام اولیه در صورت اتصال به سرور
-    if (workspaceService.isRemoteCloudConfigured()) {
-      setTimeout(() => syncQueue.processQueue().catch(() => {}), 3000);
-    }
+    // صف همگام‌سازی توسط autoSyncService در چرخهٔ مرکزی پردازش می‌شود؛
+    // تایمر جداگانهٔ App حذف شده تا درخواست‌های تکراری ایجاد نشود.
     
     return () => {
       clearTimeout(initConnection);
-      clearInterval(queueTimer);
       autoBackupService.stop();
       if (FEATURES.ENABLE_CROSS_DEVICE_SYNC) {
         crossDeviceSync.stopAutoSync();
@@ -703,9 +895,10 @@ const App = () => {
   }, [currentUser]);
 
   const [showActivationModal, setShowActivationModal] = useState(false);
+  const [activationPrefill, setActivationPrefill] = useState<{ licenseKey?: string; companyName?: string; workspaceId?: string }>({});
   const [showAndroidCommercialModal, setShowAndroidCommercialModal] = useState(false);
   const [showTrialLimitModal, setShowTrialLimitModal] = useState(false);
-  const [trialLimitReason, setTrialLimitReason] = useState<'CUSTOMERS_LIMIT' | 'DOCUMENTS_LIMIT' | 'MANUAL'>('MANUAL');
+  const [trialLimitReason, setTrialLimitReason] = useState<'CUSTOMERS_LIMIT' | 'DOCUMENTS_LIMIT' | 'USERS_LIMIT' | 'MANUAL'>('MANUAL');
   const [showSetupWizard, setShowSetupWizard] = useState(() => {
     if (typeof window === 'undefined') return false;
     if (!isDesktopApp()) {
@@ -721,6 +914,14 @@ const App = () => {
   });
   const [showSplash, setShowSplash] = useState(() => {
     if (typeof window === 'undefined') return false;
+
+    // Mobile users should enter the app immediately instead of waiting through
+    // the 2–3 second animated welcome screen on a smaller/less powerful device.
+    if (isAndroidApp() || window.matchMedia('(max-width: 768px)').matches) {
+      sessionStorage.setItem('ashk_splash_seen', 'true');
+      return false;
+    }
+
     const sessionSeen = sessionStorage.getItem('ashk_splash_seen');
     if (!sessionSeen) {
       sessionStorage.setItem('ashk_splash_seen', 'true');
@@ -729,24 +930,16 @@ const App = () => {
     return false;
   });
 
-  // پیش‌بارگذاری بهینه کامپوننت‌های اصلی برای حذف کامل لگ در تعویض صفحات
-  useEffect(() => {
-    const preloadTimer = setTimeout(() => {
-      import('./pages/Dashboard').catch(() => {});
-      import('./pages/Invoices').catch(() => {});
-      import('./pages/Inventory').catch(() => {});
-      import('./pages/Checks').catch(() => {});
-      import('./pages/Finance').catch(() => {});
-      import('./pages/Customers').catch(() => {});
-      import('./pages/Help').catch(() => {});
-      import('./pages/MoadianTaxHub').catch(() => {});
-      import('./pages/PosTerminalManagement').catch(() => {});
-    }, 1500);
-    return () => clearTimeout(preloadTimer);
-  }, []);
+  // Route-aware preloading is handled by useSmartRoutePreloader on desktop.
+  // Avoid importing nine large financial modules during initial startup; mobile WebView
+  // should spend its bandwidth and CPU on the active screen only.
 
   useEffect(() => {
-    const handleOpenActivation = () => setShowActivationModal(true);
+    const handleOpenActivation = (event: Event) => {
+      const detail = (event as CustomEvent<{ licenseKey?: string; companyName?: string; workspaceId?: string }>).detail;
+      setActivationPrefill(detail && typeof detail === 'object' ? detail : {});
+      setShowActivationModal(true);
+    };
     const handleOpenAndroidCommercial = () => setShowAndroidCommercialModal(true);
     const handleOpenTrialLimit = (e: any) => {
       if (e.detail?.reason) setTrialLimitReason(e.detail.reason);
@@ -792,6 +985,9 @@ const App = () => {
                 <ActivationDashboard 
                   isOpen={showActivationModal} 
                   onClose={() => setShowActivationModal(false)}
+                  initialLicenseKey={activationPrefill.licenseKey}
+                  initialCompanyName={activationPrefill.companyName}
+                  initialWorkspaceId={activationPrefill.workspaceId}
                 />
               )}
               {showAndroidCommercialModal && (

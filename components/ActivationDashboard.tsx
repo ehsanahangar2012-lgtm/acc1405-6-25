@@ -1,7 +1,8 @@
 // Activation Dashboard Component (داشبورد فعال‌سازی، لایسنس و قفل سخت‌افزاری HWID)
-// امکان فعال‌سازی آنلاین و آفلاین بدون نیاز به اتصال به اینترنت، مدیریت AppManifest و اسکوپ داده‌ها
+// فعال‌سازی آنلاین با تأیید امضای دیجیتال سرور و مدیریت AppManifest
 
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
+import { useAndroidBackButtonHandler } from '../useMobile';
 import { 
     ShieldCheck, 
     KeyRound, 
@@ -26,31 +27,51 @@ import {
 import { hardwareIdService, DeviceInfo } from '../services/hardwareIdService';
 import { encryptedStorageService, AppManifest } from '../services/encryptedStorageService';
 import { idbService } from '../services/indexedDBService';
+import { workspaceService } from '../services/workspaceService';
+import { verifyServerLicenseReceipt } from '../services/serverLicenseReceiptService';
+import { HOST_BASE_URL } from '../config';
 
 interface ActivationDashboardProps {
     isOpen?: boolean;
     onClose?: () => void;
     onActivationSuccess?: (manifest: AppManifest) => void;
+    initialLicenseKey?: string;
+    initialCompanyName?: string;
+    initialWorkspaceId?: string;
 }
 
 export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
     isOpen = true,
     onClose,
-    onActivationSuccess
+    onActivationSuccess,
+    initialLicenseKey,
+    initialCompanyName,
+    initialWorkspaceId
 }) => {
     const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
     const [manifest, setManifest] = useState<AppManifest | null>(null);
     const [licenseKey, setLicenseKey] = useState('');
-    const [activationCode, setActivationCode] = useState('');
-    const [companyName, setCompanyName] = useState('');
+        const [companyName, setCompanyName] = useState('');
     const [workspaceId, setWorkspaceId] = useState('default');
-    const [serverUrl, setServerUrl] = useState('');
+    const [serverUrl, setServerUrl] = useState(() => workspaceService.getConfig().customServerUrl || HOST_BASE_URL);
     const [isLoading, setIsLoading] = useState(false);
     const [copiedHwid, setCopiedHwid] = useState(false);
     const [copiedSig, setCopiedSig] = useState(false);
-    const [activeTab, setActiveTab] = useState<'online' | 'offline' | 'manifest'>('offline');
+    const [activeTab, setActiveTab] = useState<'online' | 'manifest'>('online');
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
     const [showGuideModal, setShowGuideModal] = useState(false);
+
+    const handleAndroidBack = useCallback(() => {
+        if (!isOpen) return false;
+        if (showGuideModal) {
+            setShowGuideModal(false);
+            return true;
+        }
+        onClose?.();
+        return true;
+    }, [isOpen, onClose, showGuideModal]);
+
+    useAndroidBackButtonHandler(handleAndroidBack, isOpen);
 
     useEffect(() => {
         loadStatus();
@@ -65,9 +86,13 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
             const activeManifest = await encryptedStorageService.getAppManifest();
             if (activeManifest) {
                 setManifest(activeManifest);
-                setLicenseKey(activeManifest.licenseKey || '');
-                setCompanyName(activeManifest.companyName || '');
-                setWorkspaceId(activeManifest.workspaceId || 'default');
+                setLicenseKey(initialLicenseKey?.trim() || activeManifest.licenseKey || '');
+                setCompanyName(initialCompanyName || activeManifest.companyName || '');
+                setWorkspaceId(initialWorkspaceId || (
+                    initialLicenseKey?.trim()
+                        ? `ws_${initialLicenseKey.replace(/[^A-Z0-9]/gi, '').toLowerCase()}`
+                        : activeManifest.workspaceId || 'default'
+                ));
             }
         } catch (e) {
             console.error('Error loading activation status:', e);
@@ -95,103 +120,138 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
 
         try {
             const hwid = deviceInfo?.hwid || await hardwareIdService.getHardwareId();
-            
-            // ارسال درخواست اعتبارسنجی به هاست
-            const targetApi = serverUrl.trim() 
-                ? `${serverUrl.replace(/\/$/, '')}/host-backend/tenant-manager.php`
-                : '/host-backend/tenant-manager.php';
+            const cleanWorkspaceId = workspaceId.trim();
+            const cleanLicenseKey = licenseKey.trim();
+            const resolvedServerUrl = (serverUrl.trim() || HOST_BASE_URL).replace(/\/+$/, '');
+            const activationServerUrl = HOST_BASE_URL.replace(/\/+$/, '');
 
-            const response = await fetch(targetApi, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    action: 'verify_license',
-                    workspace_id: workspaceId,
-                    token: licenseKey.trim(),
-                    hwid
-                })
+            if (!cleanWorkspaceId || ['default', 'main'].includes(cleanWorkspaceId) || !cleanLicenseKey) {
+                setMessage({ type: 'error', text: 'برای فعال‌سازی آنلاین، شناسه فضای کاری اختصاصی ثبت‌شده و کلید لایسنس لازم است؛ default/main برای پرتال مادر رزرو شده‌اند.' });
+                return;
+            }
+
+            // Accept only a response from a registered tenant entry in the server registry.
+            const requestBody = JSON.stringify({
+                action: 'verify_license',
+                workspace_id: cleanWorkspaceId,
+                token: cleanLicenseKey,
+                hwid
             });
+            // Commercial license authority is fixed by app configuration; the user-entered host is for data sync only.
+            const apiCandidates = [
+                `${activationServerUrl}/tenant-manager.php`,
+                `${activationServerUrl}/host-backend/tenant-manager.php`
+            ];
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+            let response: Response | null = null;
+            let data: any = null;
+            try {
+                for (const targetApi of apiCandidates) {
+                    try {
+                        const candidate = await fetch(targetApi, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: requestBody,
+                            signal: controller.signal,
+                            cache: 'no-store'
+                        });
+                        response = candidate;
+                        data = await candidate.json().catch(() => null);
+                        if (candidate.status !== 404) break;
+                    } catch (error) {
+                        if (controller.signal.aborted) throw error;
+                    }
+                }
+            } finally {
+                clearTimeout(timeoutId);
+            }
 
-            const data = await response.json();
-
-            if (data && (data.allowed || data.success)) {
+            if (response?.ok && data?.allowed === true && data?.status === 'ACTIVE') {
+                const verifiedReceipt = await verifyServerLicenseReceipt({
+                    hostUrl: activationServerUrl,
+                    licenseKey: cleanLicenseKey,
+                    workspaceId: cleanWorkspaceId,
+                    hwid,
+                    receipt: data.license_receipt
+                });
+                if (!verifiedReceipt) {
+                    throw new Error('امضای دیجیتال پاسخ لایسنس معتبر نیست؛ کلاینت فعال نشد.');
+                }
+                const receiptPayload = verifiedReceipt.payload;
+                const resolvedCompany = receiptPayload.company_name || data.title || companyName || 'مشتری مجاز هاست';
+                const resolvedExpireDate = receiptPayload.expire_date;
+                const resolvedUnlimited = receiptPayload.is_unlimited === true;
+                const resolvedFeatures = receiptPayload.features.filter((feature: unknown) => typeof feature === 'string') as string[];
+                const resolvedPlan = receiptPayload.plan;
                 const newManifest = encryptedStorageService.createManifestObject({
-                    licenseKey: licenseKey.trim(),
+                    licenseKey: cleanLicenseKey,
                     hardwareId: hwid,
-                    workspaceId,
-                    workspaceToken: licenseKey.trim(),
-                    companyName: data.title || companyName || 'مشتری مجاز هاست',
-                    expireDate: data.expire_date || '1410-12-29',
-                    isUnlimited: !!data.is_unlimited,
-                    customApiBaseUrl: serverUrl
+                    workspaceId: cleanWorkspaceId,
+                    workspaceToken: cleanLicenseKey,
+                    companyName: resolvedCompany,
+                    expireDate: resolvedExpireDate,
+                    isUnlimited: resolvedUnlimited,
+                    standaloneOfflineMode: false,
+                    customApiBaseUrl: resolvedServerUrl,
+                    features: resolvedFeatures
                 });
 
                 await encryptedStorageService.saveAppManifest(newManifest);
-                idbService.setScope({ workspaceId, licenseKey: licenseKey.trim() });
+                idbService.setScope({ workspaceId: cleanWorkspaceId, licenseKey: cleanLicenseKey });
+                localStorage.setItem('ashk_license_status', 'ACTIVATED');
+                localStorage.setItem('ashk_license_key', cleanLicenseKey);
+                localStorage.removeItem('ashk_activation_code');
+                localStorage.setItem('ashk_license_type', resolvedUnlimited ? 'UNLIMITED' : 'LIMITED');
+                localStorage.setItem('ashk_license_plan', resolvedPlan);
+                localStorage.setItem('ashk_server_license_data', JSON.stringify({
+                    serverVerified: true,
+                    workspaceId: cleanWorkspaceId,
+                    licenseKey: cleanLicenseKey,
+                    licenseReceipt: data.license_receipt,
+                    hwid,
+                    companyName: resolvedCompany,
+                    plan: resolvedPlan,
+                    expireDate: resolvedExpireDate,
+                    isUnlimited: resolvedUnlimited,
+                    hostUrl: resolvedServerUrl,
+                    licenseAuthorityUrl: activationServerUrl,
+                    syncToken: cleanLicenseKey,
+                    workspaceToken: cleanLicenseKey,
+                    maxCustomers: receiptPayload.max_customers,
+                    maxDocuments: receiptPayload.max_documents,
+                    features: resolvedFeatures,
+                    verifiedAt: new Date().toISOString()
+                }));
+                localStorage.setItem('ashk_host_url', resolvedServerUrl);
+                localStorage.setItem('ashk_custom_server_url', resolvedServerUrl);
+                localStorage.setItem('ashk_host_sync_token', cleanLicenseKey);
+                localStorage.setItem('ashk_cloud_token', cleanLicenseKey);
+                await workspaceService.updateConfig({
+                    workspaceId: cleanWorkspaceId,
+                    workspaceToken: cleanLicenseKey,
+                    customServerUrl: resolvedServerUrl,
+                    licenseKey: cleanLicenseKey,
+                    standaloneOfflineMode: false
+                });
 
+                window.dispatchEvent(new CustomEvent('ashk-license-updated'));
                 setManifest(newManifest);
-                setMessage({ type: 'success', text: 'فعال‌سازی آنلاین با موفقیت انجام شد و مانیفست دستگاه ذخیره گردید.' });
+                setMessage({ type: 'success', text: 'امضای دیجیتال و اعتبار لایسنس از سرور تأیید شد؛ اتصال ثبت گردید.' });
                 if (onActivationSuccess) onActivationSuccess(newManifest);
             } else {
-                setMessage({ type: 'error', text: data.message || 'اعتبارسنجی لایسنس در سرور با خطا مواجه شد.' });
+                setMessage({ type: 'error', text: data?.message || 'سرور، فضای کاری یا کلید لایسنس را تأیید نکرد. لایسنس فعال نشد.' });
             }
         } catch (err: any) {
-            // در صورت عدم دسترسی به اینترنت، پیشنهاد فعال‌سازی آفلاین
-            setMessage({ 
-                type: 'error', 
-                text: 'ارتباط با سرور برقرار نشد (محیط آفلاین یا فیلترینگ). لطفاً از تب فعال‌سازی آفلاین استفاده کنید.' 
+            setMessage({
+                type: 'error',
+                text: err?.message || 'ارتباط امن با سرور برقرار نشد؛ لایسنس فعال نشد.'
             });
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleOfflineActivation = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!licenseKey.trim()) {
-            setMessage({ type: 'error', text: 'لطفاً شماره لایسنس را وارد کنید.' });
-            return;
-        }
-
-        if (!activationCode.trim()) {
-            setMessage({ type: 'error', text: 'لطفاً کد فعال‌سازی آفلاین را وارد کنید.' });
-            return;
-        }
-
-        setIsLoading(true);
-        setMessage(null);
-
-        try {
-            const hwid = deviceInfo?.hwid || await hardwareIdService.getHardwareId();
-            const verification = hardwareIdService.verifyOfflineActivationCode(licenseKey, hwid, activationCode);
-
-            if (verification.valid && verification.payload) {
-                const p = verification.payload;
-                const newManifest = encryptedStorageService.createManifestObject({
-                    licenseKey: p.licenseKey || licenseKey.trim(),
-                    hardwareId: hwid,
-                    workspaceId: p.workspaceId || workspaceId || 'default',
-                    companyName: p.companyName || companyName || 'کاربر آفلاین اشک قلم',
-                    expireDate: p.expireDate || '1410-12-29',
-                    isUnlimited: p.isUnlimited ?? true,
-                    standaloneOfflineMode: true
-                });
-
-                await encryptedStorageService.saveAppManifest(newManifest);
-                idbService.setScope({ workspaceId: newManifest.workspaceId, licenseKey: newManifest.licenseKey });
-
-                setManifest(newManifest);
-                setMessage({ type: 'success', text: 'فعال‌سازی آفلاین کاملاً معتبر و موفقیت‌آمیز بود! مانیفست دستگاه ثبت گردید.' });
-                if (onActivationSuccess) onActivationSuccess(newManifest);
-            } else {
-                setMessage({ type: 'error', text: verification.error || 'کد فعال‌سازی آفلاین معتبر نمی‌باشد.' });
-            }
-        } catch (e: any) {
-            setMessage({ type: 'error', text: e.message || 'خطا در پردازش کد فعال‌سازی آفلاین.' });
-        } finally {
-            setIsLoading(false);
-        }
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md dir-rtl text-right font-sans">
@@ -284,18 +344,6 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                     {/* Tabs */}
                     <div className="flex border-b border-slate-800 text-xs font-bold gap-2">
                         <button
-                            onClick={() => setActiveTab('offline')}
-                            className={`pb-3 px-4 flex items-center gap-2 border-b-2 transition ${
-                                activeTab === 'offline' 
-                                    ? 'border-teal-400 text-teal-300' 
-                                    : 'border-transparent text-slate-400 hover:text-slate-200'
-                            }`}
-                        >
-                            <Lock className="w-4 h-4" />
-                            <span>فعال‌سازی آفلاین (پیش‌فرض ایران)</span>
-                        </button>
-
-                        <button
                             onClick={() => setActiveTab('online')}
                             className={`pb-3 px-4 flex items-center gap-2 border-b-2 transition ${
                                 activeTab === 'online' 
@@ -321,60 +369,6 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                             </button>
                         )}
                     </div>
-
-                    {/* Offline Tab */}
-                    {activeTab === 'offline' && (
-                        <form onSubmit={handleOfflineActivation} className="space-y-4">
-                            <p className="text-xs text-slate-400 leading-relaxed bg-slate-950/40 p-3 rounded-xl border border-slate-800">
-                                به دلیل محدودیت‌های اینترنت، این سامانه می‌تواند کاملاً آفلاین و بدون اتصال به سرور فعال شود. کافیست شناسه HWID بالا را برای پشتیبانی ارسال کرده و کد فعال‌سازی آفلاین دریافت کنید.
-                            </p>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-300 mb-1.5">شماره لایسنس (License Key):</label>
-                                    <input 
-                                        type="text"
-                                        value={licenseKey}
-                                        onChange={(e) => setLicenseKey(e.target.value)}
-                                        placeholder="مثال: LIC-2026-98765"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-teal-500 outline-none dir-ltr text-left"
-                                        required
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-300 mb-1.5">نام شرکت / کسب‌وکار:</label>
-                                    <input 
-                                        type="text"
-                                        value={companyName}
-                                        onChange={(e) => setCompanyName(e.target.value)}
-                                        placeholder="نام برند یا فروشگاه"
-                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:border-teal-500 outline-none"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-300 mb-1.5">کد فعال‌سازی آفلاین (Activation Code):</label>
-                                <textarea
-                                    value={activationCode}
-                                    onChange={(e) => setActivationCode(e.target.value)}
-                                    placeholder="کد فعال‌سازی دریافتی از پشتیبانی را اینجا پیست کنید..."
-                                    rows={3}
-                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-teal-300 font-mono focus:border-teal-500 outline-none dir-ltr text-left resize-none"
-                                    required
-                                />
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-lg shadow-teal-900/30 disabled:opacity-50"
-                            >
-                                {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                                <span>ثبت و فعال‌سازی آفلاین لایسنس</span>
-                            </button>
-                        </form>
-                    )}
 
                     {/* Online Tab */}
                     {activeTab === 'online' && (
@@ -492,9 +486,9 @@ export const ActivationDashboard: React.FC<ActivationDashboardProps> = ({
                             </button>
                         </div>
                         <div className="text-xs text-slate-300 space-y-2 leading-relaxed">
-                            <p>۱. <strong>شناسه HWID:</strong> یک کد یکتا و غیرقابل دستکاری است که از ترکیب سخت‌افزار دستگاه شما (پردازنده، کارت شبکه و...) تولید می‌شود.</p>
+                            <p>۱. <strong>شناسه HWID:</strong> شناسه این نصب برای ثبت و پشتیبانی است؛ به‌تنهایی گواه امنیتی محسوب نمی‌شود.</p>
                             <p>۲. <strong>اسکوپ‌بندی داده‌ها (Database Scoping):</strong> با وارد کردن لایسنس، دیتابیس دستگاه شما ایزوله شده و هیچ تداخلی با سایر لایسنس‌ها یا مشتریان نخواهد داشت.</p>
-                            <p>۳. <strong>کارکرد ۱۰۰٪ آفلاین:</strong> کد فعال‌سازی آفلاین امکان فعال نمودن سیستم را بدون نیاز به اینترنت فراهم می‌سازد.</p>
+                            <p>۳. <strong>تأیید تجاری:</strong> لایسنس تجاری تنها با بررسی آنلاین امضای دیجیتال و وضعیت جاری آن در سرور معتبر است.</p>
                         </div>
                         <button
                             onClick={() => setShowGuideModal(false)}

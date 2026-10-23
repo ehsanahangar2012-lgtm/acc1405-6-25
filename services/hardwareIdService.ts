@@ -1,6 +1,12 @@
 // Hardware Identifier Service (HWID)
 // شناسایی و قفل سخت‌افزاری دستگاه جهت استقلال داده‌های مشتریان، تفکیک لایسنس و اجرای آفلاین
 import CryptoJS from 'crypto-js';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+interface AshkDeviceIdentifierPlugin {
+    getId(): Promise<{ id: string }>;
+}
+const ashkDeviceIdentifier = registerPlugin<AshkDeviceIdentifierPlugin>('AshkDeviceIdentifier');
 
 export interface DeviceInfo {
     hwid: string;
@@ -26,7 +32,7 @@ export interface ActivationPayload {
 }
 
 const HWID_CACHE_KEY = 'ashk_device_hwid_v1';
-const MASTER_SIGNING_SALT = 'ASHK_MASTER_HWID_CRYPT_SALT_2026_IR';
+// Do not embed a signing secret in distributed clients. Commercial licenses are server-verified.
 
 class HardwareIdService {
     private cachedHwid: string | null = null;
@@ -62,7 +68,27 @@ class HardwareIdService {
             }
         }
 
-        // ۲. محاسبه اثرانگشت سخت‌افزاری مرورگر / کلاینت وب (Web HWID Fingerprint)
+        // Android native builds use ANDROID_ID via a local Capacitor plugin instead of a copyable localStorage fingerprint.
+        if (typeof window !== 'undefined' && Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android') {
+            if (!Capacitor.isPluginAvailable('AshkDeviceIdentifier')) {
+                throw new Error('افزونه شناسه امن دستگاه اندروید در دسترس نیست؛ فعال‌سازی تجاری متوقف شد.');
+            }
+            const result = await ashkDeviceIdentifier.getId();
+            const nativeHwid = String(result?.id || '').trim().toUpperCase();
+            if (!/^ASHK-ANDROID-[A-F0-9]{64}$/.test(nativeHwid)) {
+                throw new Error('شناسه امن دستگاه اندروید معتبر نیست؛ فعال‌سازی متوقف شد.');
+            }
+            this.cachedHwid = nativeHwid;
+            this.cachedInfo = {
+                hwid: nativeHwid,
+                platform: 'Android',
+                isDesktop: false,
+                generatedAt: new Date().toISOString()
+            };
+            return nativeHwid;
+        }
+
+        // ۲. Web/PWA fallback fingerprint. It is not used by the native Android or Electron clients.
         try {
             if (typeof window !== 'undefined' && window.localStorage) {
                 const storedHwid = localStorage.getItem(HWID_CACHE_KEY);
@@ -99,7 +125,7 @@ class HardwareIdService {
                 scr.colorDepth || 24,
                 Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Tehran',
                 canvasSignature,
-                MASTER_SIGNING_SALT
+                'ASHK-HWID-SCHEMA-V2'
             ].join('###');
 
             const hash = CryptoJS.SHA256(rawComponents).toString().toUpperCase();
@@ -144,85 +170,22 @@ class HardwareIdService {
     /**
      * تولید کد امضای فعال‌سازی آفلاین برای یک دستگاه و لایسنس مشخص
      */
-    generateActivationSignature(payload: Omit<ActivationPayload, 'signature'>): string {
-        const dataStr = `${payload.licenseKey.trim().toUpperCase()}::${payload.hwid.trim().toUpperCase()}::${payload.workspaceId}::${payload.expireDate}::${payload.isUnlimited ? 'UNLIMITED' : 'LIMITED'}::${MASTER_SIGNING_SALT}`;
-        return CryptoJS.HmacSHA256(dataStr, MASTER_SIGNING_SALT).toString().toUpperCase();
+    generateActivationSignature(_payload: Omit<ActivationPayload, 'signature'>): string {
+        // Security boundary: a key kept in a web/desktop/mobile client is not a secret.
+        // Offline signatures must be produced by the server's private key, never here.
+        return '';
     }
 
     /**
      * بررسی و اعتبارسنجی کد فعال‌سازی آفلاین بدون نیاز به اتصال به اینترنت
      */
-    verifyOfflineActivationCode(licenseKey: string, hwid: string, activationCode: string): { valid: boolean; payload?: Partial<ActivationPayload>; error?: string } {
-        try {
-            if (!activationCode || !licenseKey || !hwid) {
-                return { valid: false, error: 'اطلاعات فعال‌سازی ناقص است.' };
-            }
-
-            const cleanCode = activationCode.trim();
-
-            // الف) اگر کد فعال‌سازی بصورت JSON رمزگذاری شده با Base64 باشد
-            try {
-                const decodedStr = CryptoJS.enc.Utf8.stringify(CryptoJS.enc.Base64.parse(cleanCode));
-                if (decodedStr && decodedStr.includes('signature')) {
-                    const parsed: ActivationPayload = JSON.parse(decodedStr);
-                    if (parsed.hwid.toUpperCase() !== hwid.toUpperCase()) {
-                        return { valid: false, error: 'این لایسنس مختص این رایانه یا دستگاه صادر نشده است (عدم تطابق HWID).' };
-                    }
-                    if (parsed.licenseKey.toUpperCase() !== licenseKey.toUpperCase()) {
-                        return { valid: false, error: 'شماره لایسنس با کد فعال‌سازی تطابق ندارد.' };
-                    }
-                    
-                    const expectedSig = this.generateActivationSignature(parsed);
-                    if (parsed.signature !== expectedSig) {
-                        return { valid: false, error: 'امضای رمزنگاری شده لایسنس نامعتبر یا دستکاری شده است.' };
-                    }
-
-                    // بررسی تاریخ انقضا
-                    if (!parsed.isUnlimited && parsed.expireDate) {
-                        const today = new Date().toISOString().split('T')[0];
-                        if (today > parsed.expireDate) {
-                            return { valid: false, error: `مهلت لایسنس در تاریخ ${parsed.expireDate} به پایان رسیده است.` };
-                        }
-                    }
-
-                    return { valid: true, payload: parsed };
-                }
-            } catch {}
-
-            // ب) الگوریتم اعتبارسنجی کد فعال‌سازی هش سریع (Fast Hash Code e.g. ACT-XXXX-XXXX-XXXX)
-            const cleanKey = licenseKey.trim().toUpperCase();
-            const cleanHwid = hwid.trim().toUpperCase();
-            
-            // تولید امضاهای مجاز برای بازه‌های استاندارد (یک‌ساله، ۵ ساله، نامحدود)
-            const checkUnlimited = CryptoJS.HmacSHA256(`${cleanKey}::${cleanHwid}::default::9999-12-30::UNLIMITED::${MASTER_SIGNING_SALT}`, MASTER_SIGNING_SALT).toString().toUpperCase();
-            const checkOneYear = CryptoJS.HmacSHA256(`${cleanKey}::${cleanHwid}::default::${new Date().getFullYear() + 1}-12-30::LIMITED::${MASTER_SIGNING_SALT}`, MASTER_SIGNING_SALT).toString().toUpperCase();
-            const checkStandard = CryptoJS.SHA256(`${cleanKey}-${cleanHwid}-${MASTER_SIGNING_SALT}`).toString().toUpperCase();
-
-            const codeNorm = cleanCode.replace(/[^A-F0-9]/gi, '').toUpperCase();
-            
-            if (codeNorm.startsWith(checkUnlimited.substring(0, 16)) || 
-                codeNorm.startsWith(checkOneYear.substring(0, 16)) || 
-                codeNorm.startsWith(checkStandard.substring(0, 16)) ||
-                cleanCode.toUpperCase() === `ACT-${checkStandard.substring(0, 4)}-${checkStandard.substring(4, 8)}-${checkStandard.substring(8, 12)}`) {
-                return {
-                    valid: true,
-                    payload: {
-                        licenseKey: cleanKey,
-                        hwid: cleanHwid,
-                        workspaceId: 'default',
-                        companyName: 'کاربر مجاز اشک قلم',
-                        expireDate: '1410-12-29',
-                        isUnlimited: true,
-                        maxUsers: 20,
-                        features: ['ALL_MODULES', 'OFFLINE_STORAGE', 'UNLIMITED_INVOICES', 'SCOPED_DB']
-                    }
-                };
-            }
-
-            return { valid: false, error: 'کد فعال‌سازی وارد شده صحیح نمی‌باشد.' };
-        } catch (e: any) {
-            return { valid: false, error: e.message || 'خطا در بررسی لایسنس' };
-        }
+    verifyOfflineActivationCode(_licenseKey: string, _hwid: string, _activationCode: string): { valid: boolean; payload?: Partial<ActivationPayload>; error?: string } {
+        // Legacy ACT codes used a client-embedded HMAC key and could be forged.
+        // Fail closed until a server-issued asymmetric signature flow is deployed.
+        return {
+            valid: false,
+            error: 'فعال‌سازی آفلاین قدیمی از نظر امنیتی معتبر نیست. برای فعال‌سازی تجاری، از اتصال آنلاین به سرور مادر استفاده کنید.'
+        };
     }
 }
 

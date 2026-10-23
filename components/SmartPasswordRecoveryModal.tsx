@@ -22,7 +22,6 @@ import {
 import { useStore } from '../store';
 import { AppUser } from '../types';
 import { recoveryService } from '../services/recoveryService';
-import { securityService } from '../services/securityService';
 import { auditTrail } from '../services/auditTrailService';
 
 interface SmartPasswordRecoveryModalProps {
@@ -103,68 +102,18 @@ export const SmartPasswordRecoveryModal: React.FC<SmartPasswordRecoveryModalProp
         setErrorMsg('');
         const trimmed = identifier.trim().toLowerCase();
         if (!trimmed) {
-            setErrorMsg('لطفاً نام کاربری یا ایمیل ثبت شده را وارد نمایید.');
+            setErrorMsg('لطفاً نام کاربری یا ایمیل ثبت‌شده را وارد کنید.');
             return;
         }
 
-        let storeUsers = useStore.getState().users || [];
-        let found = storeUsers.find(u => 
-            (u.username && u.username.toLowerCase() === trimmed) || 
-            (u.email && u.email.toLowerCase() === trimmed) ||
-            trimmed === 'admin' ||
-            trimmed === 'مدیر'
+        const found = (useStore.getState().users || []).find(user =>
+            (user.username && user.username.trim().toLowerCase() === trimmed) ||
+            (user.email && user.email.trim().toLowerCase() === trimmed)
         );
-
-        if (!found) {
-            const defaultPerms = {
-                dashboard: { view: true, create: true, edit: true, delete: true },
-                invoices: { view: true, create: true, edit: true, delete: true },
-                inventory: { view: true, create: true, edit: true, delete: true },
-                checks: { view: true, create: true, edit: true, delete: true },
-                finance: { view: true, create: true, edit: true, delete: true },
-                customers: { view: true, create: true, edit: true, delete: true },
-                reports: { view: true, create: true, edit: true, delete: true },
-                settings: { view: true, create: true, edit: true, delete: true },
-                users: { view: true, create: true, edit: true, delete: true }
-            };
-
-            // ایجاد یا بازیابی هوشمند حساب ادمین پیش‌فرض
-            const adminUser = storeUsers.find(u => u.username === 'admin') || {
-                id: 'admin-1',
-                username: 'admin',
-                hashedPassword: securityService.hashPassword('123'),
-                fullName: 'مدیر کل',
-                roleId: 'admin',
-                permissions: defaultPerms,
-                is_active: true,
-                email: 'ehsanahangar2010@gmail.com',
-                recoveryKey: 'ASHK-REC-9988-7711',
-                securityQuestion: 'نام اولین کسب‌وکار یا شرکت شما چیست؟',
-                securityAnswerHash: securityService.hashPassword('اشک قلم'.toLowerCase())
-            };
-            
-            if (!adminUser.email) {
-                adminUser.email = 'ehsanahangar2010@gmail.com';
-            }
-            if (!adminUser.recoveryKey) {
-                adminUser.recoveryKey = 'ASHK-REC-9988-7711';
-            }
-
-            if (!storeUsers.some(u => u.id === adminUser.id || u.username === 'admin')) {
-                storeUsers.push(adminUser);
-                useStore.setState({ users: [...storeUsers] });
-            }
-
-            found = adminUser;
+        if (!found || found.is_active === false) {
+            setErrorMsg('حساب فعال با این نام کاربری یا ایمیل پیدا نشد.');
+            return;
         }
-
-        if (!found.email) {
-            found.email = 'ehsanahangar2010@gmail.com';
-        }
-        if (!found.recoveryKey) {
-            found.recoveryKey = 'ASHK-REC-9988-7711';
-        }
-
         setTargetUser(found);
         setStep('CHOOSE_METHOD');
     };
@@ -177,11 +126,15 @@ export const SmartPasswordRecoveryModal: React.FC<SmartPasswordRecoveryModalProp
         
         try {
             const { code, email } = recoveryService.generateOTP(targetUser);
-            await recoveryService.dispatchRecoveryEmail(targetUser, code, email);
-            setOtpTimer(120); // ۲ دقیقه تایمر
-            setOtpInput(''); // کادر خالی - کاربر باید کد دریافتی از ایمیل را وارد کند
+            const sent = await recoveryService.dispatchRecoveryEmail(targetUser, code, email);
+            if (!sent) {
+                setErrorMsg('ارسال کد از سرور اصلی تأیید نشد. تنظیمات سرویس ایمیل و اتصال امن را بررسی کنید.');
+                return;
+            }
+            setOtpTimer(300);
+            setOtpInput('');
             setStep('VERIFY_OTP');
-            setSuccessMsg(`کد اعتبارسنجی ۶ رقمی به آدرس ${recoveryService.maskEmail(email)} ارسال گردید. لطفاً صندوق ورودی (Inbox و Spam) جیمیل را بررسی نموده و کد را وارد فرمایید.`);
+            setSuccessMsg(`کد تأیید به ایمیل ثبت‌شده ${recoveryService.maskEmail(email)} ارسال شد.`);
         } catch (err: any) {
             setErrorMsg(err.message || 'خطا در ارسال ایمیل اعتبارسنجی. لطفاً اتصال اینترنت را بررسی نمایید.');
         } finally {
@@ -240,65 +193,35 @@ export const SmartPasswordRecoveryModal: React.FC<SmartPasswordRecoveryModalProp
         if (!targetUser) return;
         setErrorMsg('');
 
-        if (newPassword.length < 3) {
-            setErrorMsg('رمز عبور جدید باید حداقل ۳ کاراکتر باشد.');
+        if (newPassword.length < 12) {
+            setErrorMsg('رمز عبور جدید باید حداقل ۱۲ نویسه داشته باشد.');
             return;
         }
-
         if (newPassword !== confirmPassword) {
-            setErrorMsg('رمز عبور جدید و تکرار آن با یکدیگر مطابقت ندارند.');
+            setErrorMsg('رمز عبور جدید و تکرار آن یکسان نیستند.');
             return;
         }
 
         try {
-            const hashedNewPassword = securityService.hashPassword(newPassword);
-            const currentUsers = useStore.getState().users || [];
-            
-            let userFound = false;
-            const updatedUsers = currentUsers.map(u => {
-                if (u.id === targetUser.id || (u.username && u.username.toLowerCase() === targetUser.username.toLowerCase())) {
-                    userFound = true;
-                    return {
-                        ...u,
-                        password: newPassword,
-                        hashedPassword: hashedNewPassword,
-                        is_active: true,
-                        updatedAt: new Date().toISOString()
-                    };
-                }
-                return u;
-            });
-
-            if (!userFound) {
-                updatedUsers.push({
-                    ...targetUser,
-                    password: newPassword,
-                    hashedPassword: hashedNewPassword,
-                    is_active: true,
-                    updatedAt: new Date().toISOString()
-                });
+            const currentUser = (useStore.getState().users || []).find(user => user.id === targetUser.id);
+            if (!currentUser) {
+                setErrorMsg('حساب کاربری هنگام بازیابی پیدا نشد. لطفاً دوباره تلاش کنید.');
+                return;
             }
-
-            useStore.setState({ users: updatedUsers });
-            updateUser(targetUser.id, { password: newPassword });
+            // Hashing and removal of plaintext password are handled centrally by updateUser.
+            updateUser(targetUser.id, { password: newPassword, is_active: true });
 
             try {
                 localStorage.setItem('ashk_last_recovered_user', targetUser.username);
             } catch {}
 
             auditTrail.log(
-                targetUser.id,
-                targetUser.fullName,
-                'UPDATE',
-                'user',
-                targetUser.id,
-                undefined,
-                `رمز عبور کاربر ${targetUser.username} با موفقیت بازیابی و تغییر داده شد.`,
-                'HIGH'
+                targetUser.id, targetUser.fullName, 'UPDATE', 'user', targetUser.id, undefined,
+                `رمز عبور کاربر ${targetUser.username} با موفقیت بازیابی شد.`, 'HIGH'
             ).catch(() => {});
 
             setStep('SUCCESS');
-        } catch (err) {
+        } catch {
             setErrorMsg('خطا در ذخیره‌سازی رمز عبور جدید.');
         }
     };
@@ -428,7 +351,8 @@ export const SmartPasswordRecoveryModal: React.FC<SmartPasswordRecoveryModalProp
                                 لطفاً یکی از کانال‌های امن زیر را برای احراز هویت انتخاب نمایید:
                             </div>
 
-                            {/* گزینه ۱: ارسال ایمیل کد OTP به جیمیل */}
+                            {/* ارسال OTP فقط در صورت ثبت ایمیل واقعی */}
+                            {Boolean(recoveryService.getEffectiveEmail(targetUser)) && (
                             <button
                                 type="button"
                                 onClick={handleSendOTP}
@@ -450,8 +374,10 @@ export const SmartPasswordRecoveryModal: React.FC<SmartPasswordRecoveryModalProp
                                 </div>
                                 <ArrowRight size={16} className="text-slate-500 group-hover:text-teal-400 group-hover:-translate-x-1 transition" />
                             </button>
+                            )}
 
-                            {/* گزینه ۲: کلید پشتیبان اضطراری (Master Backup Recovery Key) */}
+                            {/* کلید بازیابی فقط در صورت تنظیم اختصاصی */}
+                            {Boolean(recoveryService.getEffectiveRecoveryKey(targetUser)) && (
                             <button
                                 type="button"
                                 onClick={() => setStep('VERIFY_KEY')}
@@ -463,7 +389,7 @@ export const SmartPasswordRecoveryModal: React.FC<SmartPasswordRecoveryModalProp
                                     </div>
                                     <div>
                                         <div className="text-xs font-black text-white group-hover:text-teal-300 transition">
-                                            استفاده از کلید پشتیبان اضطراری (Master Key)
+                                            استفاده از کلید بازیابی اختصاصی
                                         </div>
                                         <div className="text-[11px] text-slate-400 mt-0.5">
                                             کد بازیابی اختصاصی صادرشده در زمان ساخت اکانت
@@ -472,9 +398,18 @@ export const SmartPasswordRecoveryModal: React.FC<SmartPasswordRecoveryModalProp
                                 </div>
                                 <ArrowRight size={16} className="text-slate-500 group-hover:text-teal-400 group-hover:-translate-x-1 transition" />
                             </button>
+                            )}
 
-                            {/* گزینه ۳: پاسخ به سوال امنیتی */}
-                            {targetUser.securityQuestion && (
+                            {!recoveryService.getEffectiveEmail(targetUser) &&
+                             !recoveryService.getEffectiveRecoveryKey(targetUser) &&
+                             !(targetUser.securityQuestion && targetUser.securityAnswerHash) && (
+                                <p className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                                    برای این حساب روش بازیابی ثبت نشده است. مدیر سامانه باید پس از ورود، ایمیل یا روش بازیابی اختصاصی تنظیم کند.
+                                </p>
+                            )}
+
+                            {/* گزینه ۳: پاسخ امنیتی ثبت‌شده */}
+                            {targetUser.securityQuestion && targetUser.securityAnswerHash && (
                                 <button
                                     type="button"
                                     onClick={() => setStep('VERIFY_QUESTION')}
@@ -583,7 +518,7 @@ export const SmartPasswordRecoveryModal: React.FC<SmartPasswordRecoveryModalProp
                             <div className="space-y-2">
                                 <label className="text-xs text-slate-300 font-bold flex items-center gap-2">
                                     <KeyRound size={15} className="text-teal-400" />
-                                    کلید اضطراری (Master Recovery Key)
+                                    کلید بازیابی اختصاصی
                                 </label>
                                 <input
                                     type="text"

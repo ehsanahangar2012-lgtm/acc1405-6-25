@@ -5,26 +5,32 @@
   "author": "Ehsan Ahangar",
   "main": "electron/main.cjs",
   "private": true,
-  "version": "16.54.0",
+  "version": "16.55.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "lint": "tsc --noEmit",
-    "build": "vite build && node prepare-dist.js && node scripts/build-windows.js && node scripts/build-apk.js && node scripts/create-host-zip.js",
-    "build:native-secure": "vite build && node scripts/build-native-obfuscated.js",
+    "build": "npm run build:web && node prepare-dist.js && node scripts/create-host-zip.js",
+    "build:native-secure": "npm run build:web && node scripts/obfuscate-release.js",
     "build:zip": "node prepare-dist.js && node scripts/create-host-zip.js",
-    "build:installer": "node scripts/build-windows.js",
-    "build:exe": "node scripts/build-windows.js",
-    "build:portable": "node scripts/build-windows.js",
-    "build:all": "vite build && node prepare-dist.js && node scripts/build-windows.js && node scripts/build-apk.js && node scripts/create-host-zip.js",
-    "build:apk": "node scripts/build-apk.js",
-    "apk": "node scripts/build-apk.js",
+    "build:installer": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js nsis --client-build",
+    "build:exe": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js portable --client-build",
+    "build:portable": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js portable --client-build",
+    "build:all": "npm run build && npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js all --client-build && npm run build:apk",
+    "build:apk": "vite build --mode android && node prepare-dist.js --client-build && node scripts/build-apk.js",
+    "apk": "npm run build:apk",
     "prepare-dist": "node prepare-dist.js",
     "diagnose:android": "node scripts/diagnose-android-assets.js",
     "cleanup:builds": "node scripts/cleanup-builds.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:web": "vite build",
+    "build:web:desktop": "vite build --mode desktop",
+    "build:browser-preview": "vite build --mode browser-preview && node scripts/sanitize-client-build.js dist",
+    "build:windows": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js all --client-build",
+    "test:backup-encryption": "bun run scripts/test-backup-encryption.ts"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
     "@capacitor/camera": "^8.2.4",
     "@capacitor/core": "^8.5.2",
     "@capacitor/local-notifications": "^8.3.1",
@@ -42,6 +48,7 @@
     "qrcode": "^1.5.4",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "react-is": "^19.3.0",
     "react-router-dom": "^7.13.0",
     "react-signature-canvas": "^1.1.0-alpha.2",
     "recharts": "^3.7.0",
@@ -70,6 +77,8 @@
   "build": {
     "appId": "ir.ashkghalam.acc",
     "productName": "AshkeGhalam",
+    "asar": true,
+    "compression": "maximum",
     "directories": {
       "output": "dist_electron"
     },
@@ -91,7 +100,11 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "AshkeGhalam",
-      "deleteAppDataOnUninstall": false
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "AshkeGhalam-Setup-v${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "AshkeGhalam-Portable-v${version}.${ext}"
     }
   }
 }

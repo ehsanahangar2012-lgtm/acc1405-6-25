@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { Person, Product, Invoice, Check, Voucher, CompanyProfile, SystemConfig, AppUser, ModulePermission, Role, UserPermissions, Transaction, CheckTransfer, LogisticsProfile, Salary, InvoiceType, Notification, OfflineOperation, Contract } from './types';
-import { generateId, getPersianDate, generateTrackingCode, toPersianDigits, downloadJSON } from './utils';
+import { generateId, getPersianDate, generateTrackingCode, toPersianDigits } from './utils';
+import { saveEncryptedBackupFile } from './services/nativeBackupFileService';
 import { ImportBatch, ImportMappingConfig } from './types-import';
 import { backupService } from './services/backupService';
+import { backupEncryptionService } from './services/backupEncryptionService';
 import { autoBackupService } from './services/autoBackupService';
 import { backupMigrationService } from './services/backupMigrationService';
 import { securityService } from './services/securityService';
@@ -12,6 +14,7 @@ import { hostDB } from './services/hostDatabaseService';
 import { auditTrail } from './services/auditTrailService';
 import { rbacService, PREDEFINED_ROLES } from './services/rbacService';
 import { AccountingEngine } from './services/accountingEngine';
+import { useFinancialStore } from './store-financial';
 import PersonLedgerService from './services/personLedgerService';
 import { dataBridge } from './services/dataBridge';
 import { idbService } from './services/indexedDBService';
@@ -19,6 +22,17 @@ import { persistentStorage } from './services/persistentStorage';
 import { deletedRecordsRegistry } from './services/deletedRecordsRegistry';
 import { licenseQuotaService } from './services/licenseQuotaService';
 import { desktopDatabaseService } from './services/desktopDatabaseService';
+import { APP_VERSION } from './config';
+import { isNativeAndroidSecureStorage, getAndroidEncryptedItem, setAndroidEncryptedItem, removeAndroidEncryptedItem } from './services/androidSecureStorage';
+import { hasNativeBackupStorage } from './services/nativeBackupStorage';
+async function localStorageRemoveLegacy(name: string): Promise<void> {
+    try {
+        localStorage.removeItem(name);
+        localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
+        localStorage.removeItem('ashke-ghalam-currency');
+    } catch {}
+}
+
 
 const emptyPerm = (val: boolean = false): ModulePermission => ({ view: val, create: val, edit: val, delete: val });
 
@@ -28,6 +42,75 @@ const fullPermissions = (): UserPermissions => ({
     reports: emptyPerm(true),
     settings: emptyPerm(true), users: emptyPerm(true)
 });
+
+// Prefer immutable product IDs; names are only a legacy fallback and may be duplicated.
+function findInventoryProduct(products: Product[], item: { productId?: string; productName?: string }): Product | undefined {
+  if (item.productId) {
+    const byId = products.find(product => product.id === item.productId);
+    if (byId) return byId;
+  }
+  return products.find(product => product.name === item.productName);
+}
+
+function findInventoryProductIndex(products: Product[], item: { productId?: string; productName?: string }): number {
+  if (item.productId) {
+    const byId = products.findIndex(product => product.id === item.productId);
+    if (byId >= 0) return byId;
+  }
+  return products.findIndex(product => product.name === item.productName);
+}
+
+// Single source of truth for stock movement semantics, including both return directions.
+function voucherStockDelta(voucher: Voucher, quantity: number): number {
+  if (voucher.type === 'IN') return quantity;
+  if (voucher.type === 'OUT') return -quantity;
+  return voucher.movementType === 'RETURN_RECEIPT' ? quantity : -quantity;
+}
+
+function validateVoucherInventoryChange(
+  products: Product[],
+  operations: Array<{ voucher: Voucher; multiplier?: 1 | -1 }>,
+  validateAfterEachOperation = true
+): string | null {
+  const projectedStock = new Map<string, number>();
+  for (const product of products) {
+    const stock = Number(product.stock ?? 0);
+    if (!Number.isFinite(stock)) {
+      return `موجودی ثبت‌شدهٔ کالای «${product.name}» نامعتبر است؛ ابتدا موجودی کالا را اصلاح کنید.`;
+    }
+    projectedStock.set(product.id, stock);
+  }
+
+  for (const operation of operations) {
+    const { voucher, multiplier = 1 } = operation;
+    for (const item of voucher.items || []) {
+      const quantity = Number(item.quantity);
+      if (!Number.isFinite(quantity) || quantity <= 0) {
+        return `تعداد کالای «${item.productName || 'نامشخص'}» در حواله باید عددی معتبر و بزرگ‌تر از صفر باشد.`;
+      }
+
+      const product = findInventoryProduct(products, item);
+      if (!product) continue; // Non-catalog items do not have a stock counter here.
+
+      const current = projectedStock.get(product.id) ?? 0;
+      const next = current + (voucherStockDelta(voucher, quantity) * multiplier);
+      projectedStock.set(product.id, next);
+      if (validateAfterEachOperation && next < 0) {
+        return `موجودی کالای «${product.name}» کافی نیست. موجودی پس از این حواله به ${next} می‌رسد.`;
+      }
+    }
+  }
+
+  if (!validateAfterEachOperation) {
+    for (const product of products) {
+      const next = projectedStock.get(product.id) ?? 0;
+      if (next < 0) {
+        return `این تغییر موجودی کالای «${product.name}» را منفی می‌کند (${next}). ابتدا گردش‌های مرتبط را اصلاح کنید.`;
+      }
+    }
+  }
+  return null;
+}
 
 const DEFAULT_ROLES: Role[] = [
     { id: 'admin', name: 'مدیر سیستم', description: 'دسترسی کامل به تمام بخش‌ها', permissions: fullPermissions() }
@@ -90,9 +173,9 @@ interface AppState {
   updatePerson: (id: string, up: Partial<Person>) => void;
   deletePerson: (id: string) => void;
   
-  addInvoice: (i: Invoice) => void;
+  addInvoice: (i: Invoice) => boolean;
   deleteInvoice: (id: string) => void;
-  updateInvoice: (id: string, updated: Invoice) => void;
+  updateInvoice: (id: string, updated: Invoice) => boolean;
   setInvoiceSignature: (id: string, signature: string, role?: 'warehouse' | 'sales' | 'customer' | 'driver') => void;
   
   addCheck: (c: Check, personId?: string) => void;
@@ -154,8 +237,9 @@ interface AppState {
 export const useStore = create<AppState>()(
   persist(
     (set, get) => {
-      // Expose store to window for external access
-      if (typeof window !== 'undefined') {
+      // Expose the store only during local development for debugging.
+      // Production renderers must not receive a write-capable global state handle.
+      if (import.meta.env.DEV && typeof window !== 'undefined') {
         (window as any).__ZUSTAND_STORE__ = { getState: get, setState: set };
       }
 
@@ -172,32 +256,8 @@ export const useStore = create<AppState>()(
       
       return {
       currentUser: null,
-      users: [
-        { 
-          id: 'admin-1', 
-          username: 'admin', 
-          hashedPassword: securityService.hashPassword('123'), 
-          fullName: 'مدیر کل', 
-          roleId: 'admin', 
-          permissions: fullPermissions(), 
-          is_active: true,
-          email: 'ehsanahangar2010@gmail.com',
-          recoveryKey: 'ASHK-REC-9988-7711',
-          securityQuestion: 'نام اولین کسب‌وکار یا شرکت شما چیست؟',
-          securityAnswerHash: securityService.hashPassword('اشک قلم'.toLowerCase())
-        },
-        { 
-          id: 'user-1', 
-          username: 'user', 
-          hashedPassword: securityService.hashPassword('123'), 
-          fullName: 'کاربر عادی', 
-          roleId: 'user', 
-          permissions: {...fullPermissions(), settings: emptyPerm(false), users: emptyPerm(false)}, 
-          is_active: true,
-          email: 'user@ashkeghalam.ir',
-          recoveryKey: 'ASHK-REC-4433-2211'
-        }
-      ],
+      // Fresh installations require the owner to create an administrator account.
+      users: [],
       roles: PREDEFINED_ROLES as any,
       companies: [{ 
           id: 'default', 
@@ -358,9 +418,22 @@ export const useStore = create<AppState>()(
       },
       
       addUser: (user) => set(s => {
+          const alreadyExists = s.users.some(existing =>
+              existing.id === user.id ||
+              String(existing.username || '').trim().toLowerCase() === String(user.username || '').trim().toLowerCase()
+          );
+          if (!alreadyExists) {
+              const quotaCheck = licenseQuotaService.canAddUser(s.users.length);
+              if (!quotaCheck.allowed) {
+                  return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف کاربران نسخه فعلی تکمیل شده است.' }] };
+              }
+          }
           const { password, ...rest } = user;
-          const hashedPassword = password ? securityService.hashPassword(password) : securityService.hashPassword('123');
+          const hashedPassword = password
+              ? securityService.hashPasswordV2(password)
+              : (user.hashedPassword || '');
           const stampedUser = { ...rest, hashedPassword, updatedAt: new Date().toISOString() };
+          delete (stampedUser as any).password;
           const newUsers = [...s.users.filter(u => u.id !== user.id && u.username !== user.username), stampedUser];
           persistentStorage.saveData('users', newUsers).catch(() => {});
           return { users: newUsers };
@@ -368,11 +441,14 @@ export const useStore = create<AppState>()(
       updateUser: (id, up) => set(s => {
           const { password, ...rest } = up;
           const updateObj = { ...rest } as any;
-          if (password) {
-              updateObj.hashedPassword = securityService.hashPassword(password);
-          }
+          if (password) updateObj.hashedPassword = securityService.hashPasswordV2(password);
           updateObj.updatedAt = new Date().toISOString();
-          const updatedUsers = s.users.map(u => u.id === id ? {...u, ...updateObj} : u);
+          const updatedUsers = s.users.map(u => {
+              if (u.id !== id) return u;
+              const updated = { ...u, ...updateObj } as any;
+              delete updated.password;
+              return updated;
+          });
           persistentStorage.saveData('users', updatedUsers).catch(() => {});
           return { users: updatedUsers };
       }),
@@ -523,7 +599,9 @@ export const useStore = create<AppState>()(
           };
       }),
 
-      addInvoice: (i) => set(s => {
+      addInvoice: (i) => {
+          let saved = false;
+          set(s => {
           if (s.currentUser && !s.currentUser.permissions.invoices.create) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ثبت فاکتور را ندارید.' }] };
           }
@@ -533,13 +611,23 @@ export const useStore = create<AppState>()(
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.' }] };
           }
           const updated = [...s.invoices, i];
-          hostDB.save('invoices', i).catch(() => {});
-          
+
+          // فاکتور تنها پس از ثبت موفق سند حسابداری پذیرفته و ذخیره می‌شود.
           try {
               AccountingEngine.postInvoice(i);
           } catch (err) {
               console.error('AccountingEngine error in addInvoice:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return {
+                  notifications: [...s.notifications, {
+                      id: generateId(),
+                      type: 'error',
+                      message: `ثبت فاکتور انجام نشد: ${reason}`
+                  }]
+              };
           }
+
+          hostDB.save('invoices', i).catch(() => {});
           
           let newTransactions = [...s.transactions];
           const personIndex = s.people.findIndex(p => p.id === i.personId);
@@ -609,14 +697,31 @@ export const useStore = create<AppState>()(
               });
           }
 
+          const invoiceChecks = (i.checks || []).map(check => ({
+              ...check,
+              personId: i.personId,
+              personName: i.personName,
+              relatedInvoiceId: i.id
+          }));
+          const updatedChecks = [
+              ...s.checks.filter(existing => !invoiceChecks.some(check => check.id === existing.id)),
+              ...invoiceChecks
+          ];
+          invoiceChecks.forEach(check => hostDB.save('checks', check).catch(() => {}));
+          persistentStorage.saveData('checks', updatedChecks).catch(() => {});
+
+          saved = true;
           triggerAutoBackup(`ثبت فاکتور ${i.number}`);
           return { 
               invoices: updated, 
+              checks: updatedChecks,
               people: updatedPeople,
               transactions: newTransactions,
               notifications: [...s.notifications, { id: generateId(), type: 'success', message: 'فاکتور و تراکنش‌های مالی ثبت شد.' }]
           };
-      }),
+          });
+          return saved;
+      },
 
       deleteInvoice: (id) => set(s => {
           if (s.currentUser && !s.currentUser.permissions.invoices.delete) {
@@ -625,27 +730,39 @@ export const useStore = create<AppState>()(
           const inv = s.invoices.find(v => v.id === id);
           if (!inv) return {};
 
-          deletedRecordsRegistry.registerDeletion(id, 'invoice');
+          const relatedTrans = s.transactions.filter(t => t.referenceId === id || t.relatedInvoiceId === id);
 
+          // Reverse invoice-day entries and every linked payment journal atomically.
+          try {
+              AccountingEngine.reverseInvoiceAndPayments(inv, relatedTrans);
+          } catch (err) {
+              console.error('AccountingEngine error in deleteInvoice:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return {
+                  notifications: [...s.notifications, {
+                      id: generateId(),
+                      type: 'error',
+                      message: `ابطال فاکتور انجام نشد؛ فاکتور حفظ شد: ${reason}`
+                  }]
+              };
+          }
+
+          deletedRecordsRegistry.registerDeletion(id, 'invoice');
           if (s.currentUser) {
               auditTrail.log(s.currentUser.id, s.currentUser.fullName, 'DELETE', 'invoice', id, inv, undefined, 'HIGH').catch(() => {});
           }
-
           hostDB.deleteFromHost('invoices', id).catch(() => {});
-          persistentStorage.saveData('invoices', s.invoices.filter(v => v.id !== id)).catch(() => {});
-
-          try {
-              AccountingEngine.postStornoReversal(id, 'INVOICE');
-              if (inv.personId) {
-                  PersonLedgerService.removeByReference(inv.personId, id);
-              }
-          } catch (err) {
-              console.error('AccountingEngine error in deleteInvoice:', err);
-          }
-
           const nextInvoices = s.invoices.filter(v => v.id !== id);
-          const relatedTrans = s.transactions.filter(t => t.referenceId === id || t.relatedInvoiceId === id);
-          const reversalTransactions = relatedTrans.map(t => ({
+          persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
+
+          if (inv.personId) {
+              PersonLedgerService.removeByReference(inv.personId, id);
+          }
+          // سند اصلی فاکتور پس از حذف، دیگر از آرایه فاکتورها محاسبه نمی‌شود؛
+          // پس برگشت جداگانه‌ی تراکنش نوع فاکتور، مانده را دوباره معکوس می‌کند.
+          const reversalTransactions = relatedTrans
+              .filter(t => t.type !== 'INVOICE_SALE' && t.type !== 'INVOICE_PURCHASE' && t.type !== 'REVERSAL')
+              .map(t => ({
               id: generateId(),
               date: getPersianDate(),
               type: 'REVERSAL',
@@ -673,16 +790,52 @@ export const useStore = create<AppState>()(
           };
       }),
 
-      updateInvoice: (id, updated) => set(s => {
+      updateInvoice: (id, updated) => {
+          let saved = false;
+          set(s => {
           if (s.currentUser && !s.currentUser.permissions.invoices.edit) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ویرایش فاکتور را ندارید.' }] };
           }
           
           const oldInvoice = s.invoices.find(v => v.id === id);
-          const finalUpdated = { ...updated, id };
+          if (!oldInvoice) return {};
+          // The editor may omit payment history and other metadata; merge with the stored record.
+          const finalUpdated = { ...oldInvoice, ...updated, id };
+          const separatelyPostedPaymentIds = new Set(
+              (finalUpdated.payments || []).filter(payment => payment.accountingPosted === true).map(payment => payment.id)
+          );
+          const separatelyPostedCash = (finalUpdated.payments || [])
+              .filter(payment => payment.accountingPosted === true && payment.method !== 'CHECK')
+              .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+          const separatelyPostedChecks = (finalUpdated.payments || [])
+              .filter(payment => payment.accountingPosted === true && payment.method === 'CHECK')
+              .reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+          const embeddedCashAmount = Math.max(0, Number(finalUpdated.cashAmount || 0) - separatelyPostedCash);
+          const embeddedCheckAmount = Math.max(0, Number(finalUpdated.checkAmount || 0) - separatelyPostedChecks);
           const nextInvoices = s.invoices.map(v => v.id === id ? finalUpdated : v);
 
-          // پاکسازی کامل کش‌های مرورگر و سشن مربوط به این فاکتور
+          // Cache cleanup is intentionally deferred until accounting succeeds.
+          // If posting fails, the previous invoice and its cached ledger must remain intact.
+          const affectedPersonIds = new Set<string>();
+          if (oldInvoice?.personId) affectedPersonIds.add(oldInvoice.personId);
+          if (finalUpdated?.personId) affectedPersonIds.add(finalUpdated.personId);
+
+          // ویرایش فقط پس از ثبت موفق سند حسابداری ادامه پیدا می‌کند.
+          try {
+              AccountingEngine.postInvoice(finalUpdated);
+          } catch (err) {
+              console.error('AccountingEngine error in updateInvoice:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return {
+                  notifications: [...s.notifications, {
+                      id: generateId(),
+                      type: 'error',
+                      message: `ویرایش فاکتور انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}`
+                  }]
+              };
+          }
+
+          // Invalidate transient invoice previews only after accounting posting succeeds.
           if (typeof sessionStorage !== 'undefined') {
               try {
                   sessionStorage.removeItem(`invoice_preview_${id}`);
@@ -690,27 +843,11 @@ export const useStore = create<AppState>()(
               } catch {}
           }
 
-          // پاکسازی کش کاردکس اشخاص درگیر
-          const affectedPersonIds = new Set<string>();
-          if (oldInvoice?.personId) affectedPersonIds.add(oldInvoice.personId);
-          if (finalUpdated?.personId) affectedPersonIds.add(finalUpdated.personId);
-
-          affectedPersonIds.forEach(pid => {
-              try {
-                  localStorage.removeItem(`ledger-${pid}`);
-              } catch {}
-              PersonLedgerService.removeByReference(pid, id);
+          // Rebuild invoice-day summary rows, but keep actual dated payment transactions.
+          const filteredTransactions = s.transactions.filter(t => {
+              if (t.referenceId !== id && t.relatedInvoiceId !== id) return true;
+              return separatelyPostedPaymentIds.has(t.id);
           });
-
-          // ثبت در موتور حسابداری (سند قبلی حذف و سند جدید کامپیوتر می‌شود)
-          try {
-              AccountingEngine.postInvoice(finalUpdated);
-          } catch (err) {
-              console.error('AccountingEngine error in updateInvoice:', err);
-          }
-
-          // بازتولید تراکنش‌های مرتبط با فاکتور
-          const filteredTransactions = s.transactions.filter(t => t.referenceId !== id && t.relatedInvoiceId !== id);
           const newTransList: Transaction[] = [];
 
           if (finalUpdated.personId && finalUpdated.type !== InvoiceType.PROFORMA) {
@@ -728,12 +865,12 @@ export const useStore = create<AppState>()(
                   trackingCode: finalUpdated.trackingCode
               });
 
-              if (finalUpdated.cashAmount > 0) {
+              if (embeddedCashAmount > 0) {
                   newTransList.push({
                       id: generateId(),
                       date: finalUpdated.date,
                       type: 'CASH_PAYMENT',
-                      amount: finalUpdated.cashAmount,
+                      amount: embeddedCashAmount,
                       personId: finalUpdated.personId,
                       personName: finalUpdated.personName,
                       description: `دریافت نقدی بابت فاکتور ${finalUpdated.number}`,
@@ -745,13 +882,13 @@ export const useStore = create<AppState>()(
                   });
               }
 
-              if (finalUpdated.checkAmount > 0 && finalUpdated.checks && finalUpdated.checks.length > 0) {
-                  const checkNumbers = finalUpdated.checks.map(c => c.checkNumber || c.sayadId || 'چک').join('، ');
+              if (embeddedCheckAmount > 0) {
+                  const checkNumbers = finalUpdated.checks?.map(c => c.checkNumber || c.sayadId || 'چک').join('، ') || 'چک';
                   newTransList.push({
                       id: generateId(),
                       date: finalUpdated.date,
                       type: 'CHECK_INFO',
-                      amount: finalUpdated.checkAmount,
+                      amount: embeddedCheckAmount,
                       personId: finalUpdated.personId,
                       personName: finalUpdated.personName,
                       description: `چک ${checkNumbers} - محاسبه شده در فاکتور ${finalUpdated.number}`,
@@ -782,19 +919,35 @@ export const useStore = create<AppState>()(
               newTransList.forEach(t => t.balanceAfter = exactBal);
           }
 
+          const invoiceChecks = (finalUpdated.checks || []).map(check => ({
+              ...check,
+              personId: finalUpdated.personId,
+              personName: finalUpdated.personName,
+              relatedInvoiceId: id
+          }));
+          const nextChecks = [
+              ...s.checks.filter(existing => !invoiceChecks.some(check => check.id === existing.id)),
+              ...invoiceChecks
+          ];
+          invoiceChecks.forEach(check => hostDB.save('checks', check).catch(() => {}));
+          persistentStorage.saveData('checks', nextChecks).catch(() => {});
           hostDB.save('invoices', finalUpdated).catch(() => {});
           persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
           persistentStorage.saveData('people', updatedPeople).catch(() => {});
           persistentStorage.saveData('transactions', nextTransactions).catch(() => {});
 
+          saved = true;
           triggerAutoBackup(`ویرایش فاکتور ${finalUpdated.number}`);
           return { 
               invoices: nextInvoices, 
+              checks: nextChecks,
               transactions: nextTransactions,
               people: updatedPeople,
               notifications: [...s.notifications, { id: generateId(), type: 'success', message: 'فاکتور با موفقیت اصلاح شد؛ سند قبلی ابطال و سند جدید جایگزین شد.' }] 
           };
-      }),
+          });
+          return saved;
+      },
 
       setInvoiceSignature: (id, signature, role = 'customer') => set(s => {
           const updated = s.invoices.map(inv => inv.id === id ? { 
@@ -825,14 +978,15 @@ export const useStore = create<AppState>()(
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.' }] };
           }
           const targetPersonId = personId || c.personId;
-          hostDB.save('checks', {...c, personId: targetPersonId}).catch(() => {});
-          
           try {
               AccountingEngine.postCheck(c, targetPersonId);
           } catch (err) {
               console.error('AccountingEngine error in addCheck:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `ثبت چک انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}` }] };
           }
 
+          hostDB.save('checks', {...c, personId: targetPersonId}).catch(() => {});
           const exactBalance = targetPersonId ? PersonLedgerService.getBalance(targetPersonId) : 0;
           const updatedPeople = s.people.map(p => p.id === targetPersonId ? { ...p, balance: exactBalance } : p);
 
@@ -855,6 +1009,8 @@ export const useStore = create<AppState>()(
               AccountingEngine.postCheckStatusChange(check, status);
           } catch (err) {
               console.error('AccountingEngine error in updateCheckStatus:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `تغییر وضعیت چک ثبت نشد؛ وضعیت قبلی حفظ شد: ${reason}` }] };
           }
 
           const targetPersonId = check.personId;
@@ -896,17 +1052,26 @@ export const useStore = create<AppState>()(
 
       addCheckTransfer: (t) => set(s => {
           const updatedChecks = s.checks.map(c => t.checkIds.includes(c.id) ? { ...c, status: 'TRANSFERRED' as const } : c);
-          
+          const totalAmount = t.items?.reduce((sum: number, item: any) => sum + (item.amount || 0), 0) || 0;
+          if (totalAmount > 0) {
+              const totalDocs = s.invoices.length + s.vouchers.length + s.transactions.length + s.checks.length;
+              const quotaCheck = licenseQuotaService.canAddDocument(totalDocs);
+              if (!quotaCheck.allowed) {
+                  return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف اسناد نسخه فعلی تکمیل شده است؛ واگذاری چک ثبت نشد.' }] };
+              }
+          }
+
           try {
               AccountingEngine.postCheckTransfer(t);
           } catch (err) {
               console.error('AccountingEngine error in addCheckTransfer:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `واگذاری چک ثبت نشد؛ اطلاعات قبلی حفظ شد: ${reason}` }] };
           }
 
           const exactBalance = t.personId ? PersonLedgerService.getBalance(t.personId) : 0;
           const updatedPeople = s.people.map(p => p.id === t.personId ? { ...p, balance: exactBalance } : p);
 
-          let totalAmount = t.items?.reduce((sum: number, item: any) => sum + (item.amount || 0), 0) || 0;
           let newTransactions = [...s.transactions];
 
           if (totalAmount > 0) {
@@ -950,21 +1115,18 @@ export const useStore = create<AppState>()(
           const transfer = s.checkTransfers.find(t => t.id === id);
           if (!transfer) return {};
 
+          // Reverse all related accounting entries as one operation before deleting the source record.
+          try {
+              AccountingEngine.reverseCheckTransfer(transfer);
+          } catch (err) {
+              console.error('AccountingEngine error in deleteCheckTransfer:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `ابطال واگذاری انجام نشد؛ سند حفظ شد: ${reason}` }] };
+          }
+
           deletedRecordsRegistry.registerDeletion(id, 'checkTransfer');
           hostDB.deleteFromHost('check_transfers', id).catch(() => {});
           persistentStorage.saveData('check_transfers', s.checkTransfers.filter(t => t.id !== id)).catch(() => {});
-
-          try {
-              AccountingEngine.postStornoReversal(id, 'CHECK_TRANSFER');
-              transfer.checkIds.forEach(cid => {
-                  AccountingEngine.postStornoReversal(cid, 'CHECK_STATUS');
-              });
-              if (transfer.personId) {
-                  PersonLedgerService.removeByReference(transfer.personId, id);
-              }
-          } catch (err) {
-              console.error('AccountingEngine error in deleteCheckTransfer:', err);
-          }
 
           const updatedChecks = s.checks.map(c => transfer.checkIds.includes(c.id) ? { ...c, status: 'PENDING' as const } : c);
           const exactBalance = transfer.personId ? PersonLedgerService.getBalance(transfer.personId) : 0;
@@ -1004,10 +1166,16 @@ export const useStore = create<AppState>()(
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ثبت حواله انبار را ندارید.' }] };
           }
           const totalDocs = s.invoices.length + s.vouchers.length + s.transactions.length + s.checks.length;
-          const quotaCheck = licenseQuotaService.canAddDocument(totalDocs);
+          const createsLedgerInfo = Boolean(v.personId && s.people.some(person => person.id === v.personId));
+          const quotaCheck = licenseQuotaService.canAddDocument(totalDocs + (createsLedgerInfo ? 1 : 0));
           if (!quotaCheck.allowed) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.' }] };
           }
+          const stockError = validateVoucherInventoryChange(s.products, [{ voucher: v }]);
+          if (stockError) {
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `حواله ثبت نشد: ${stockError}` }] };
+          }
+
           hostDB.save('vouchers', v).catch(() => {});
           let updatedPeople = [...s.people];
           let newTransactions = [...s.transactions];
@@ -1036,9 +1204,9 @@ export const useStore = create<AppState>()(
           // به‌روزرسانی موجودی انبار کالاها
           let updatedProducts = [...s.products];
           v.items.forEach(item => {
-              const pIndex = updatedProducts.findIndex(p => p.id === item.productId || p.name === item.productName);
+              const pIndex = findInventoryProductIndex(updatedProducts, item);
               if (pIndex !== -1) {
-                  const change = v.type === 'IN' ? item.quantity : v.type === 'OUT' ? -item.quantity : 0;
+                  const change = voucherStockDelta(v, item.quantity);
                   updatedProducts[pIndex] = {
                       ...updatedProducts[pIndex],
                       stock: (updatedProducts[pIndex].stock || 0) + change
@@ -1064,13 +1232,22 @@ export const useStore = create<AppState>()(
           }
           const oldVoucher = s.vouchers.find(v => v.id === id);
           if (!oldVoucher) return {};
+          const finalUpdated: Voucher = { ...updated, id };
+
+          const stockError = validateVoucherInventoryChange(s.products, [
+              { voucher: oldVoucher, multiplier: -1 },
+              { voucher: finalUpdated, multiplier: 1 }
+          ], false);
+          if (stockError) {
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `ویرایش حواله انجام نشد: ${stockError}` }] };
+          }
 
           let updatedProducts = [...s.products];
           // خنثی کردن تغییرات قدیم
           oldVoucher.items.forEach(item => {
-              const pIndex = updatedProducts.findIndex(p => p.id === item.productId || p.name === item.productName);
+              const pIndex = findInventoryProductIndex(updatedProducts, item);
               if (pIndex !== -1) {
-                  const change = oldVoucher.type === 'IN' ? -item.quantity : oldVoucher.type === 'OUT' ? item.quantity : 0;
+                  const change = -voucherStockDelta(oldVoucher, item.quantity);
                   updatedProducts[pIndex] = {
                       ...updatedProducts[pIndex],
                       stock: (updatedProducts[pIndex].stock || 0) + change
@@ -1079,10 +1256,10 @@ export const useStore = create<AppState>()(
           });
 
           // اعمال تغییرات جدید
-          updated.items.forEach(item => {
-              const pIndex = updatedProducts.findIndex(p => p.id === item.productId || p.name === item.productName);
+          finalUpdated.items.forEach(item => {
+              const pIndex = findInventoryProductIndex(updatedProducts, item);
               if (pIndex !== -1) {
-                  const change = updated.type === 'IN' ? item.quantity : updated.type === 'OUT' ? -item.quantity : 0;
+                  const change = voucherStockDelta(finalUpdated, item.quantity);
                   updatedProducts[pIndex] = {
                       ...updatedProducts[pIndex],
                       stock: (updatedProducts[pIndex].stock || 0) + change
@@ -1094,12 +1271,15 @@ export const useStore = create<AppState>()(
           updatedProducts.forEach(p => {
               hostDB.save('products', p).catch(() => {});
           });
-          hostDB.save('vouchers', updated).catch(() => {});
+          hostDB.save('vouchers', finalUpdated).catch(() => {});
+          const nextVouchers = s.vouchers.map(v => v.id === id ? finalUpdated : v);
+          persistentStorage.saveData('products', updatedProducts).catch(() => {});
+          persistentStorage.saveData('vouchers', nextVouchers).catch(() => {});
 
-          triggerAutoBackup(`ویرایش حواله انبار ${updated.number}`);
+          triggerAutoBackup(`ویرایش حواله انبار ${finalUpdated.number}`);
           return { 
               products: updatedProducts,
-              vouchers: s.vouchers.map(v => v.id === id ? updated : v),
+              vouchers: nextVouchers,
               notifications: [...s.notifications, { id: generateId(), type: 'success', message: 'حواله انبار ویرایش و موجودی به‌روزرسانی شد.' }]
           };
       }),
@@ -1111,15 +1291,22 @@ export const useStore = create<AppState>()(
           const voucher = s.vouchers.find(x => x.id === id);
           if (!voucher) return {};
 
+          const stockError = validateVoucherInventoryChange(s.products, [
+              { voucher, multiplier: -1 }
+          ], false);
+          if (stockError) {
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `حذف حواله انجام نشد: ${stockError}` }] };
+          }
+
           deletedRecordsRegistry.registerDeletion(id, 'voucher');
           hostDB.deleteFromHost('vouchers', id).catch(() => {});
           persistentStorage.saveData('vouchers', s.vouchers.filter(x => x.id !== id)).catch(() => {});
 
           let updatedProducts = [...s.products];
           voucher.items.forEach(item => {
-              const pIndex = updatedProducts.findIndex(p => p.id === item.productId || p.name === item.productName);
+              const pIndex = findInventoryProductIndex(updatedProducts, item);
               if (pIndex !== -1) {
-                  const change = voucher.type === 'IN' ? -item.quantity : voucher.type === 'OUT' ? item.quantity : 0;
+                  const change = -voucherStockDelta(voucher, item.quantity);
                   updatedProducts[pIndex] = {
                       ...updatedProducts[pIndex],
                       stock: (updatedProducts[pIndex].stock || 0) + change
@@ -1177,6 +1364,14 @@ export const useStore = create<AppState>()(
           const batch = s.importBatches.find(b => b.id === batchId);
           if (!batch || batch.status !== 'PENDING_VAL') return {};
 
+          const stockError = validateVoucherInventoryChange(
+              s.products,
+              batch.vouchers.map(voucher => ({ voucher }))
+          );
+          if (stockError) {
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `ثبت نهایی واردات لغو شد: ${stockError}` }] };
+          }
+
           const updatedBatches = s.importBatches.map(b => 
               b.id === batchId ? { ...b, status: 'COMMITTED' as const } : b
           );
@@ -1214,22 +1409,14 @@ export const useStore = create<AppState>()(
 
               // 3. Update stock of products
               v.items.forEach(item => {
-                  const pIndex = updatedProducts.findIndex(p => p.name === item.productName || p.id === item.productId);
+                  const pIndex = findInventoryProductIndex(updatedProducts, item);
                   if (pIndex !== -1) {
                       const qty = item.quantity;
-                      let stockChange = 0;
-                      if (v.type === 'IN') {
-                          stockChange = qty;
-                      } else if (v.type === 'OUT') {
-                          stockChange = -qty;
-                      } else if (v.type === 'RETURN') {
-                          // Return receipt increases stock, Return issue decreases it
-                          stockChange = v.movementType === 'RETURN_RECEIPT' ? qty : -qty;
-                      }
+                      const stockChange = voucherStockDelta(v, qty);
                       
                       updatedProducts[pIndex] = {
                           ...updatedProducts[pIndex],
-                          stock: Math.max(0, updatedProducts[pIndex].stock + stockChange)
+                          stock: Number(updatedProducts[pIndex].stock ?? 0) + stockChange
                       };
                       
                       // Save product update to Host DB (simulated)
@@ -1284,22 +1471,14 @@ export const useStore = create<AppState>()(
           let updatedProducts = [...s.products];
           batch.vouchers.forEach(v => {
               v.items.forEach(item => {
-                  const pIndex = updatedProducts.findIndex(p => p.name === item.productName || p.id === item.productId);
+                  const pIndex = findInventoryProductIndex(updatedProducts, item);
                   if (pIndex !== -1) {
                       const qty = item.quantity;
-                      let stockChange = 0;
-                      // Rollback does the opposite: if it was IN, we subtract. If it was OUT, we add.
-                      if (v.type === 'IN') {
-                          stockChange = -qty;
-                      } else if (v.type === 'OUT') {
-                          stockChange = qty;
-                      } else if (v.type === 'RETURN') {
-                          stockChange = v.movementType === 'RETURN_RECEIPT' ? -qty : qty;
-                      }
+                      const stockChange = -voucherStockDelta(v, qty);
                       
                       updatedProducts[pIndex] = {
                           ...updatedProducts[pIndex],
-                          stock: Math.max(0, updatedProducts[pIndex].stock + stockChange)
+                          stock: Number(updatedProducts[pIndex].stock ?? 0) + stockChange
                       };
                       hostDB.save('products', updatedProducts[pIndex]).catch(() => {});
                   }
@@ -1336,98 +1515,124 @@ export const useStore = create<AppState>()(
       }),
 
       addGeneralFinance: (type, amount, desc, personId, signature, relatedInvoiceId, receiptImage) => {
-          const { currentUser } = get();
-          if (currentUser && !currentUser.permissions.finance.create) {
-              set(s => ({ notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ثبت تراکنش مالی را ندارید.' }] }));
-              return {} as Transaction;
-          }
           const s = get();
+          const notifyError = (message: string) => {
+              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message }] }));
+              return {} as Transaction;
+          };
+          if (s.currentUser && !s.currentUser.permissions.finance.create) {
+              return notifyError('خطا: شما مجوز ثبت تراکنش مالی را ندارید.');
+          }
           const totalDocs = s.invoices.length + s.vouchers.length + s.transactions.length + s.checks.length;
           const quotaCheck = licenseQuotaService.canAddDocument(totalDocs);
           if (!quotaCheck.allowed) {
-              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message: quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.' }] }));
-              return {} as Transaction;
+              return notifyError(quotaCheck.reason || 'سقف نسخه پایه (۲۰۰ سند) پر شده است.');
           }
+          if (!Number.isFinite(amount) || amount <= 0) {
+              return notifyError('مبلغ تراکنش مالی باید عددی معتبر و بزرگ‌تر از صفر باشد.');
+          }
+
+          const relatedInvoice = relatedInvoiceId
+              ? s.invoices.find(invoice => invoice.id === relatedInvoiceId)
+              : undefined;
+          if (relatedInvoiceId && !relatedInvoice) {
+              return notifyError('فاکتور مرتبط یافت نشد؛ تراکنش ثبت نشد.');
+          }
+          if (relatedInvoice && (
+              (type === 'INCOME' && relatedInvoice.type !== InvoiceType.SALE) ||
+              (type === 'EXPENSE' && relatedInvoice.type !== InvoiceType.PURCHASE)
+          )) {
+              return notifyError('نوع دریافت/پرداخت با نوع فاکتور مرتبط سازگار نیست.');
+          }
+          if (relatedInvoice && personId && personId !== relatedInvoice.personId) {
+              return notifyError('طرف‌حساب تراکنش با طرف‌حساب فاکتور یکسان نیست.');
+          }
+
+          const effectivePersonId = relatedInvoice?.personId || personId || '';
+          const effectivePersonName = relatedInvoice?.personName ||
+              ((get().people || []).find(p => p && p.id === effectivePersonId)?.name || '');
           const transId = generateId();
-          const trackingCode = generateId().slice(0,8);
-          const newTrans: Transaction = { 
-              id: transId, 
-              date: getPersianDate(), 
-              type: type === 'INCOME' ? 'GENERAL_INCOME' : 'EXPENSE', 
-              amount, 
-              personId: personId || '', 
-              personName: personId ? ((get().people || []).find(p => p && p.id === personId)?.name || '') : '',
-              description: desc, 
+          const trackingCode = generateId().slice(0, 8);
+          const transactionDate = getPersianDate();
+          const newTrans: Transaction = {
+              id: transId,
+              date: transactionDate,
+              type: relatedInvoice
+                  ? (type === 'INCOME' ? 'INVOICE_RECEIPT' : 'CASH_PAYMENT')
+                  : (type === 'INCOME' ? 'GENERAL_INCOME' : 'EXPENSE'),
+              amount,
+              personId: effectivePersonId,
+              personName: effectivePersonName,
+              description: desc,
               balanceAfter: 0,
-              isDebit: type === 'EXPENSE', 
-              relatedInvoiceId: relatedInvoiceId,
-              referenceId: relatedInvoiceId,
-              signature, 
+              isDebit: type === 'EXPENSE',
+              relatedInvoiceId,
+              referenceId: relatedInvoice ? transId : undefined,
+              signature,
               receiptImage,
-              trackingCode 
+              trackingCode
           };
 
-          const nextTransactions = [...s.transactions, newTrans];
           let nextInvoices = s.invoices;
-
-          // اگر دریافتی یا هزینه به فاکتور مرتبط است، فاکتور را نیز به‌روزرسانی کن
-          if (relatedInvoiceId) {
-              nextInvoices = s.invoices.map(inv => {
-                  if (inv.id === relatedInvoiceId) {
-                      const updatedCash = (inv.cashAmount || 0) + amount;
-                      const paymentEntry = {
-                          id: transId,
-                          date: getPersianDate(),
-                          amount,
-                          method: 'CASH' as const,
-                          trackingCode,
-                          description: desc
-                      };
-                      return {
-                          ...inv,
-                          cashAmount: updatedCash,
-                          payments: [...(inv.payments || []), paymentEntry]
-                      };
-                  }
-                  return inv;
-              });
-              const targetInv = nextInvoices.find(v => v.id === relatedInvoiceId);
-              if (targetInv) {
-                  hostDB.save('invoices', targetInv).catch(() => {});
-                  persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
-              }
+          let updatedInvoice: Invoice | undefined;
+          if (relatedInvoice) {
+              const paymentEntry = {
+                  id: transId,
+                  date: transactionDate,
+                  amount,
+                  method: 'CASH' as const,
+                  trackingCode,
+                  description: desc,
+                  accountingPosted: true
+              };
+              updatedInvoice = {
+                  ...relatedInvoice,
+                  cashAmount: (relatedInvoice.cashAmount || 0) + amount,
+                  payments: [...(relatedInvoice.payments || []), paymentEntry]
+              };
+              nextInvoices = s.invoices.map(invoice => invoice.id === relatedInvoice.id ? updatedInvoice! : invoice);
           }
 
-          if (personId) {
-              try {
-                  localStorage.removeItem(`ledger-${personId}`);
-              } catch {}
-          }
-
+          // A linked invoice receipt/payment gets its own dated journal, not a second
+          // generic transaction journal. Standalone finance items retain the generic flow.
           try {
-              AccountingEngine.postGeneralTransaction(newTrans);
+              if (updatedInvoice) {
+                  AccountingEngine.postInvoicePayment(updatedInvoice, newTrans, 'CASH');
+              } else {
+                  AccountingEngine.postGeneralTransaction(newTrans);
+              }
           } catch (err) {
               console.error('AccountingEngine error in addGeneralFinance:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return notifyError(`ثبت تراکنش مالی انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}`);
           }
 
-          const exactBalance = personId ? PersonLedgerService.getBalance(personId, nextInvoices, nextTransactions, s.checks) : 0;
+          const nextTransactions = [...s.transactions, newTrans];
+          const exactBalance = effectivePersonId
+              ? PersonLedgerService.getBalance(effectivePersonId, nextInvoices, nextTransactions, s.checks)
+              : 0;
           newTrans.balanceAfter = exactBalance;
+          const updatedPeople = effectivePersonId
+              ? s.people.map(p => p.id === effectivePersonId ? { ...p, balance: exactBalance } : p)
+              : s.people;
 
-          const updatedPeople = personId 
-              ? get().people.map(p => p.id === personId ? { ...p, balance: exactBalance } : p)
-              : get().people;
-
+          if (updatedInvoice) hostDB.save('invoices', updatedInvoice).catch(() => {});
           hostDB.save('transactions', newTrans).catch(() => {});
+          if (updatedInvoice) persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
           persistentStorage.saveData('transactions', nextTransactions).catch(() => {});
-          if (personId) {
-              persistentStorage.saveData('people', updatedPeople).catch(() => {});
-          }
+          if (effectivePersonId) persistentStorage.saveData('people', updatedPeople).catch(() => {});
 
-          set(s => ({ 
+          set(state => ({
               invoices: nextInvoices,
-              transactions: nextTransactions, 
-              people: updatedPeople, 
-              notifications: [...s.notifications, { id: generateId(), type: 'success', message: type === 'INCOME' ? 'دریافتی از مشتری ثبت و در کاردکس طرف‌حساب و محاسبات اعمال شد.' : 'پرداختی مالی ثبت و در کاردکس شخص اعمال شد.' }] 
+              transactions: nextTransactions,
+              people: updatedPeople,
+              notifications: [...state.notifications, {
+                  id: generateId(),
+                  type: 'success',
+                  message: updatedInvoice
+                      ? (type === 'INCOME' ? 'دریافتی فاکتور ثبت شد و سند آن در تاریخ دریافت صادر گردید.' : 'پرداخت فاکتور ثبت شد و سند آن در تاریخ پرداخت صادر گردید.')
+                      : (type === 'INCOME' ? 'دریافتی مالی ثبت و در کاردکس طرف‌حساب اعمال شد.' : 'پرداختی مالی ثبت و در کاردکس شخص اعمال شد.')
+              }]
           }));
           triggerAutoBackup(type === 'INCOME' ? 'دریافتی مالی' : 'پرداختی مالی');
           return newTrans;
@@ -1435,33 +1640,75 @@ export const useStore = create<AppState>()(
 
       addInvoicePayment: (invoiceId, payment) => {
           const s = get();
-          if (s.currentUser && !s.currentUser.permissions.finance.create) {
-              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز ثبت دریافت مالی را ندارید.' }] }));
+          const notifyError = (message: string) => {
+              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message }] }));
               return null;
+          };
+
+          if (s.currentUser && !s.currentUser.permissions.finance.create) {
+              return notifyError('خطا: شما مجوز ثبت دریافت مالی را ندارید.');
           }
 
           const invoice = s.invoices.find(inv => inv.id === invoiceId);
-          if (!invoice) {
-              set(state => ({ notifications: [...state.notifications, { id: generateId(), type: 'error', message: 'فاکتور مورد نظر یافت نشد.' }] }));
-              return null;
+          if (!invoice) return notifyError('فاکتور مورد نظر یافت نشد.');
+          if (invoice.type !== InvoiceType.SALE && invoice.type !== InvoiceType.PURCHASE) {
+              return notifyError('برای پیش‌فاکتور یا سند غیرمالی نمی‌توان پرداخت ثبت کرد.');
+          }
+          if (!Number.isFinite(payment.amount) || payment.amount <= 0) {
+              return notifyError('مبلغ پرداخت باید عددی معتبر و بزرگ‌تر از صفر باشد.');
+          }
+          if (typeof payment.date !== 'string' || !payment.date.trim()) {
+              return notifyError('تاریخ پرداخت الزامی است.');
+          }
+
+          const amountAlreadyPaid = Number(invoice.cashAmount || 0) + Number(invoice.checkAmount || 0);
+          const remainingBalance = Number(invoice.finalTotal || 0) - amountAlreadyPaid;
+          if (!Number.isFinite(remainingBalance) || remainingBalance <= 0) {
+              return notifyError('این فاکتور ماندهٔ قابل پرداخت ندارد؛ از ثبت پرداخت تکراری جلوگیری شد.');
+          }
+          if (payment.amount > remainingBalance) {
+              return notifyError(`مبلغ پرداخت از ماندهٔ فاکتور بیشتر است. مانده: ${Math.max(0, remainingBalance).toLocaleString('fa-IR')}`);
+          }
+
+          const isSale = invoice.type === InvoiceType.SALE;
+          const isCheck = payment.method === 'CHECK';
+          if (isCheck && (!payment.checkDetails || !payment.checkDetails.checkNumber.trim())) {
+              return notifyError('برای پرداخت با چک، شماره چک و مشخصات آن الزامی است.');
+          }
+          if (isCheck && payment.checkDetails?.sayadId && payment.checkDetails.sayadId.replace(/\D/g, '').length !== 16) {
+              return notifyError('شناسه صیادی چک باید دقیقاً ۱۶ رقم باشد.');
+          }
+
+          const totalDocs = s.invoices.length + s.vouchers.length + s.transactions.length + s.checks.length;
+          const createsTwoDocuments = payment.method === 'CHECK';
+          const quotaCheck = licenseQuotaService.canAddDocument(totalDocs + (createsTwoDocuments ? 1 : 0));
+          if (!quotaCheck.allowed) {
+              return notifyError(quotaCheck.reason || 'سقف اسناد نسخه فعلی تکمیل شده است؛ پرداخت ثبت نشد.');
           }
 
           const transId = generateId();
-          const isSale = invoice.type === InvoiceType.SALE;
-          const trackingCode = payment.trackingCode || (payment.method === 'CHECK' ? payment.checkDetails?.checkNumber : ('RCV-' + Date.now().toString().slice(-6)));
-          
+          const trackingCode = payment.trackingCode ||
+              (isCheck ? payment.checkDetails?.checkNumber : ('RCV-' + Date.now().toString().slice(-6)));
+          const methodTitle = payment.method === 'CASH' ? 'نقدی' :
+              payment.method === 'POS' ? 'کارتخوان' :
+              payment.method === 'CARD' ? 'کارت به کارت' : 'چک صیادی';
+          const defaultDesc = isSale
+              ? `دریافت ${methodTitle} بابت فاکتور فروش شماره ${invoice.number}`
+              : `پرداخت ${methodTitle} بابت فاکتور خرید شماره ${invoice.number}`;
+          const description = payment.description || defaultDesc;
+
           let checkToSave: Check | null = null;
           let nextChecks = s.checks;
-
-          if (payment.method === 'CHECK' && payment.checkDetails) {
+          if (isCheck && payment.checkDetails) {
+              // Reuse the payment ID so deleting the payment can also remove its check record.
               checkToSave = {
-                  id: generateId(),
+                  id: transId,
                   bankName: payment.checkDetails.bankName,
                   amount: payment.amount,
                   dueDate: payment.checkDetails.dueDate,
                   issueDate: payment.date,
                   sayadId: payment.checkDetails.sayadId || '',
-                  checkNumber: payment.checkDetails.checkNumber,
+                  checkNumber: payment.checkDetails.checkNumber.trim(),
                   holderName: invoice.personName || 'نامشخص',
                   personId: invoice.personId,
                   personName: invoice.personName,
@@ -1470,15 +1717,7 @@ export const useStore = create<AppState>()(
                   relatedInvoiceId: invoice.id
               };
               nextChecks = [...s.checks, checkToSave];
-              hostDB.save('checks', checkToSave).catch(() => {});
-              persistentStorage.saveData('checks', nextChecks).catch(() => {});
           }
-
-          const isCheck = payment.method === 'CHECK';
-          const methodTitle = payment.method === 'CASH' ? 'نقدی' : payment.method === 'POS' ? 'کارتخوان' : payment.method === 'CARD' ? 'کارت به کارت' : 'چک صیادی';
-          const defaultDesc = isSale 
-              ? `دریافت ${methodTitle} بابت فاکتور فروش شماره ${invoice.number}`
-              : `پرداخت ${methodTitle} بابت فاکتور خرید شماره ${invoice.number}`;
 
           const newTrans: Transaction = {
               id: transId,
@@ -1487,22 +1726,21 @@ export const useStore = create<AppState>()(
               amount: payment.amount,
               personId: invoice.personId,
               personName: invoice.personName,
-              description: payment.description || defaultDesc,
+              description,
               balanceAfter: 0,
-              isDebit: !isSale, // دریافتی فاکتور فروش = بستانکار شخص (isDebit: false)
-              referenceId: invoice.id,
+              isDebit: !isSale,
+              // Give the payment its own reference; invoice linkage remains in relatedInvoiceId.
+              referenceId: transId,
               relatedInvoiceId: invoice.id,
               trackingCode,
               metadata: {
                   invoiceNumber: invoice.number,
                   invoiceId: invoice.id,
-                  paymentMethod: payment.method
+                  paymentMethod: payment.method,
+                  checkId: checkToSave?.id
               }
           };
 
-          const nextTransactions = [...s.transactions, newTrans];
-
-          // به‌روزرسانی مبالغ دریافتی و تاریخچه پرداخت‌های فاکتور
           const updatedInvoice = {
               ...invoice,
               cashAmount: !isCheck ? ((invoice.cashAmount || 0) + payment.amount) : (invoice.cashAmount || 0),
@@ -1516,35 +1754,39 @@ export const useStore = create<AppState>()(
                       amount: payment.amount,
                       method: payment.method,
                       trackingCode,
-                      description: payment.description || defaultDesc
+                      description,
+                      accountingPosted: true
                   }
               ]
           };
 
-          const nextInvoices = s.invoices.map(inv => inv.id === invoiceId ? updatedInvoice : inv);
-
-          if (invoice.personId) {
-              try {
-                  localStorage.removeItem(`ledger-${invoice.personId}`);
-              } catch {}
+          // Post the real dated journal before changing any source records or caches.
+          try {
+              AccountingEngine.postInvoicePayment(updatedInvoice, newTrans, payment.method);
+          } catch (err) {
+              console.error('AccountingEngine error in addInvoicePayment:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return notifyError(`ثبت پرداخت انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}`);
           }
 
-          const exactBalance = invoice.personId 
-              ? PersonLedgerService.getBalance(invoice.personId, nextInvoices, nextTransactions, nextChecks) 
+          const nextInvoices = s.invoices.map(inv => inv.id === invoiceId ? updatedInvoice : inv);
+          const nextTransactions = [...s.transactions, newTrans];
+
+          const exactBalance = invoice.personId
+              ? PersonLedgerService.getBalance(invoice.personId, nextInvoices, nextTransactions, nextChecks)
               : 0;
           newTrans.balanceAfter = exactBalance;
-
-          const updatedPeople = invoice.personId 
+          const updatedPeople = invoice.personId
               ? s.people.map(p => p.id === invoice.personId ? { ...p, balance: exactBalance } : p)
               : s.people;
 
+          if (checkToSave) hostDB.save('checks', checkToSave).catch(() => {});
           hostDB.save('invoices', updatedInvoice).catch(() => {});
           hostDB.save('transactions', newTrans).catch(() => {});
+          persistentStorage.saveData('checks', nextChecks).catch(() => {});
           persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
           persistentStorage.saveData('transactions', nextTransactions).catch(() => {});
-          if (invoice.personId) {
-              persistentStorage.saveData('people', updatedPeople).catch(() => {});
-          }
+          if (invoice.personId) persistentStorage.saveData('people', updatedPeople).catch(() => {});
 
           set(state => ({
               invoices: nextInvoices,
@@ -1556,7 +1798,7 @@ export const useStore = create<AppState>()(
                   {
                       id: generateId(),
                       type: 'success',
-                      message: `دریافتی به مبلغ ${payment.amount.toLocaleString('fa-IR')} برای فاکتور شماره ${invoice.number} ثبت شد و در کاردکس طرف‌حساب منظور گردید.`
+                      message: `پرداخت ${payment.amount.toLocaleString('fa-IR')} برای فاکتور شماره ${invoice.number} ثبت شد و سند حسابداری آن در تاریخ پرداخت صادر گردید.`
                   }
               ]
           }));
@@ -1564,38 +1806,95 @@ export const useStore = create<AppState>()(
           triggerAutoBackup(`پرداخت فاکتور ${invoice.number}`);
           return newTrans;
       },
+
       deleteTransaction: (id) => set(s => {
           if (s.currentUser && !s.currentUser.permissions.finance.delete) {
               return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: 'خطا: شما مجوز حذف تراکنش مالی را ندارید.' }] };
           }
           const trans = s.transactions.find(t => t.id === id);
           if (!trans) return {};
-          
-          deletedRecordsRegistry.registerDeletion(id, 'transaction');
-          hostDB.deleteFromHost('transactions', id).catch(() => {});
-          
-          const filteredTransactions = s.transactions.filter(t => t.id !== id);
-          persistentStorage.saveData('transactions', filteredTransactions).catch(() => {});
 
+          const linkedInvoice = trans.relatedInvoiceId
+              ? s.invoices.find(invoice => invoice.id === trans.relatedInvoiceId)
+              : undefined;
+          const paymentRecord = linkedInvoice?.payments?.find(payment => payment.id === trans.id);
+          const checkIdFromMetadata = (trans.metadata as any)?.checkId;
+          const linkedCheck = s.checks.find(check =>
+              check.id === trans.id ||
+              (checkIdFromMetadata && check.id === checkIdFromMetadata) ||
+              (trans.relatedInvoiceId &&
+                  (trans.metadata as any)?.paymentMethod === 'CHECK' &&
+                  check.relatedInvoiceId === trans.relatedInvoiceId &&
+                  check.amount === trans.amount &&
+                  check.checkNumber === trans.trackingCode)
+          ) || linkedInvoice?.checks?.find(check =>
+              check.id === trans.id ||
+              (checkIdFromMetadata && check.id === checkIdFromMetadata) ||
+              (trans.relatedInvoiceId &&
+                  (trans.metadata as any)?.paymentMethod === 'CHECK' &&
+                  check.amount === trans.amount &&
+                  check.checkNumber === trans.trackingCode)
+          );
+
+          // Reverse journals before deleting either the transaction or its linked check.
           try {
-              AccountingEngine.postStornoReversal(id, 'TRANSACTION');
-              if (trans.personId) {
-                  PersonLedgerService.removeByReference(trans.personId, id);
-                  try {
-                      localStorage.removeItem(`ledger-${trans.personId}`);
-                  } catch {}
-              }
+              AccountingEngine.reverseTransactionAndCheck(trans, linkedCheck);
           } catch (err) {
               console.error('AccountingEngine error in deleteTransaction:', err);
+              const reason = err instanceof Error ? err.message : 'خطای نامشخص حسابداری';
+              return { notifications: [...s.notifications, { id: generateId(), type: 'error', message: `حذف تراکنش انجام نشد؛ اطلاعات قبلی حفظ شد: ${reason}` }] };
           }
 
-          const exactBalance = trans.personId ? PersonLedgerService.getBalance(trans.personId, s.invoices, filteredTransactions, s.checks) : 0;
-          const updatedPeople = s.people.map(p => p.id === trans.personId ? { ...p, balance: exactBalance } : p);
+          deletedRecordsRegistry.registerDeletion(id, 'transaction');
+          hostDB.deleteFromHost('transactions', id).catch(() => {});
+          const filteredTransactions = s.transactions.filter(t => t.id !== id);
 
-          return { 
-              transactions: filteredTransactions, 
-              people: updatedPeople, 
-              notifications: [...s.notifications, { id: generateId(), type: 'info', message: 'تراکنش حذف و مانده کاردکس شخص اصلاح شد.' }] 
+          let nextChecks = s.checks;
+          if (linkedCheck) {
+              deletedRecordsRegistry.registerDeletion(linkedCheck.id, 'check');
+              hostDB.deleteFromHost('checks', linkedCheck.id).catch(() => {});
+              nextChecks = s.checks.filter(check => check.id !== linkedCheck.id);
+          }
+
+          let nextInvoices = s.invoices;
+          if (linkedInvoice && paymentRecord) {
+              const isCheckPayment = paymentRecord.method === 'CHECK';
+              const updatedInvoice = {
+                  ...linkedInvoice,
+                  cashAmount: isCheckPayment
+                      ? (linkedInvoice.cashAmount || 0)
+                      : Math.max(0, (linkedInvoice.cashAmount || 0) - paymentRecord.amount),
+                  checkAmount: isCheckPayment
+                      ? Math.max(0, (linkedInvoice.checkAmount || 0) - paymentRecord.amount)
+                      : (linkedInvoice.checkAmount || 0),
+                  payments: (linkedInvoice.payments || []).filter(payment => payment.id !== trans.id),
+                  checks: (linkedInvoice.checks || []).filter(check =>
+                      check.id !== trans.id &&
+                      check.id !== checkIdFromMetadata &&
+                      (!linkedCheck || check.id !== linkedCheck.id)
+                  )
+              };
+              nextInvoices = s.invoices.map(invoice => invoice.id === linkedInvoice.id ? updatedInvoice : invoice);
+              hostDB.save('invoices', updatedInvoice).catch(() => {});
+              persistentStorage.saveData('invoices', nextInvoices).catch(() => {});
+          }
+
+          persistentStorage.saveData('transactions', filteredTransactions).catch(() => {});
+          persistentStorage.saveData('checks', nextChecks).catch(() => {});
+
+          const personId = trans.personId || linkedCheck?.personId;
+          const exactBalance = personId
+              ? PersonLedgerService.getBalance(personId, nextInvoices, filteredTransactions, nextChecks)
+              : 0;
+          const updatedPeople = s.people.map(p => p.id === personId ? { ...p, balance: exactBalance } : p);
+          if (personId) persistentStorage.saveData('people', updatedPeople).catch(() => {});
+
+          return {
+              invoices: nextInvoices,
+              transactions: filteredTransactions,
+              checks: nextChecks,
+              people: updatedPeople,
+              notifications: [...s.notifications, { id: generateId(), type: 'info', message: 'تراکنش حذف شد؛ اسناد حسابداری معکوس و ماندهٔ فاکتور/چک باز‌محاسبه شد.' }]
           };
       }),
       
@@ -1654,6 +1953,25 @@ export const useStore = create<AppState>()(
       }),
       setOnlineStatus: (isOnline) => set({ isOnline }),
       hydrateStore: (data) => {
+          const restoreFinancialData = (source: any) => {
+              const incoming = source?.financialData;
+              if (!incoming || typeof incoming !== 'object') return;
+              const keys = [
+                  'accountingEntries', 'chartOfAccounts', 'taxConfigs', 'taxReports',
+                  'cashFlowEntries', 'projects', 'projectTransactions', 'fixedAssets',
+                  'budgets', 'budgetLines', 'loans', 'loanInstallments', 'bankAccounts',
+                  'bankTransactions', 'currencies', 'auditLogs', 'fiscalPeriods',
+                  'aiInsights', 'ocrDocuments'
+              ];
+              const patch: Record<string, any[]> = {};
+              keys.forEach(key => {
+                  if (Array.isArray(incoming[key])) patch[key] = incoming[key];
+              });
+              if (Object.keys(patch).length > 0) {
+                  useFinancialStore.setState(patch as any);
+              }
+          };
+
           try {
               if (data && typeof data === 'object') {
                   const hasBackupTables = 
@@ -1710,12 +2028,16 @@ export const useStore = create<AppState>()(
                           }
                       });
 
-                      // ۳. ذخیره در IndexedDB به عنوان نسخه پشتیبان پایدار
-                      idbService.save('backups', {
-                          id: 'ashke-ghalam-rbac-v15-accounting',
-                          data: JSON.stringify(migrated)
-                      }).catch(() => {});
+                      // Native apps already persist through Android Keystore or Electron safeStorage.
+                      // Avoid creating a second full-state copy in browser IndexedDB on those builds.
+                      if (!hasNativeBackupStorage()) {
+                          idbService.save('backups', {
+                              id: 'ashke-ghalam-rbac-v15-accounting',
+                              data: JSON.stringify(migrated)
+                          }).catch(() => {});
+                      }
 
+                      restoreFinancialData(data);
                       set(s => ({ ...s, ...migrated }));
                       return;
                   }
@@ -1723,14 +2045,18 @@ export const useStore = create<AppState>()(
           } catch (e) {
               console.error('Error in hydrateStore migration:', e);
           }
-          set(s => ({ ...s, ...data }));
+          restoreFinancialData(data);
+          const operationalData: any = { ...(data as any) };
+          delete operationalData.financialData;
+          set(s => ({ ...s, ...operationalData }));
       },
       exportBackup: () => {
           const state = get();
           const allBranches = (state.companies || []).flatMap(c => (c.branches || []).map(b => ({ ...b, companyId: c.id })));
           const backupData: any = {
               timestamp: new Date().toISOString(),
-              version: '16.22.0',
+              version: APP_VERSION,
+              backupFormatVersion: 2,
               companies: state.companies,
               branches: allBranches,
               products: state.products,
@@ -1747,127 +2073,241 @@ export const useStore = create<AppState>()(
               roles: state.roles,
               importConfigs: state.importConfigs,
               importBatches: state.importBatches,
+              // Accounting has its own Zustand store; include it or a backup cannot restore the financial ledger.
+              financialData: useFinancialStore.getState(),
               signature: ''
           };
           backupData.signature = securityService.signBackup(backupData);
-          downloadJSON(backupData, `AshkeGhalam-Backup-${getPersianDate().replace(/\//g, '-')}`);
-          backupService.backupData('full-export', backupData).catch(() => {});
+          const passphrase = typeof window !== 'undefined'
+              ? window.prompt('برای خروجی قابل‌حمل رمز حداقل ۱۲ نویسه‌ای وارد کنید. رمز را جدا از فایل نگه دارید.')
+              : null;
+          if (!passphrase || passphrase.trim().length < 12) {
+              if (typeof window !== 'undefined') alert('خروجی لغو شد؛ برای محافظت از داده‌ها رمز حداقل ۱۲ نویسه‌ای لازم است.');
+              return;
+          }
+          const encryptedText = backupEncryptionService.encryptJson(backupData, passphrase);
+          const fileName = `AshkeGhalam-ManualBackup-${Date.now()}.json`;
+          // No plaintext full-export copy is uploaded by this action.
+          void saveEncryptedBackupFile(fileName, encryptedText).then(result => {
+              if (result.cancelled) return;
+              if (!result.success) throw new Error('ذخیره فایل پشتیبان رمزگذاری‌شده تأیید نشد.');
+              const message = result.method === 'desktop'
+                  ? 'فایل پشتیبان رمزگذاری‌شده روی دیسک ذخیره شد: ' + result.location
+                  : result.method === 'android'
+                      ? 'فایل پشتیبان رمزگذاری‌شده در مسیر انتخابی ذخیره شد.'
+                      : 'فایل پشتیبان رمزگذاری‌شده برای دانلود ارسال شد؛ رمز را جدا از فایل نگه دارید.';
+              get().addNotification('success', message);
+          }).catch(error => {
+              console.error('Portable backup export failed:', error);
+              get().addNotification('error', 'صدور فایل پشتیبان ناموفق بود: ' + (error?.message || 'خطای نامشخص'));
+          });
       }
     };
     },
     {
       name: 'ashke-ghalam-rbac-v15-accounting',
+      version: 2,
+      migrate: (persistedState: any) => {
+          if (!persistedState || typeof persistedState !== 'object') return persistedState;
+          const migrated: any = { ...persistedState };
+          const legacyWeakHash = securityService.hashPassword('123');
+          const knownRecoveryKeys = new Set([
+              'ASHK-REC-9988-7711',
+              'ASHK-REC-4433-2211',
+              'ASHK-SUPER-MASTER-EMERGENCY-2026'
+          ]);
+          if (Array.isArray(migrated.users)) {
+              migrated.users = migrated.users
+                  .filter((user: any) => {
+                      if (!user || typeof user !== 'object') return false;
+                      const username = String(user.username || '').trim().toLowerCase();
+                      const defaultCredential = user.password === '123' || user.hashedPassword === legacyWeakHash;
+                      return !(['admin', 'user'].includes(username) && defaultCredential);
+                  })
+                  .map((user: any) => {
+                      const next = { ...user };
+                      if (typeof next.password === 'string' && next.password && !next.hashedPassword) {
+                          next.hashedPassword = securityService.hashPassword(next.password);
+                      }
+                      delete next.password;
+                      if (knownRecoveryKeys.has(String(next.recoveryKey || '').trim().toUpperCase())) {
+                          delete next.recoveryKey;
+                      }
+                      return next;
+                  });
+          }
+          // Do not restore an authenticated session from persisted application state.
+          migrated.currentUser = null;
+          return migrated;
+      },
       storage: createJSONStorage(() => ({
         getItem: async (name) => {
-            // ۱. اولویت نخست در محیط ویندوز: بارگذاری مستقیم از فایل پایگاه داده دیسک (.db)
+            // Native Android: main accounting state must live in Android Keystore-backed storage.
+            if (isNativeAndroidSecureStorage()) {
+                const protectedValue = await getAndroidEncryptedItem(name);
+                if (protectedValue !== null) return protectedValue;
+
+                // Migrate older copies once. If native encryption fails, do not fall back to plaintext.
+                let legacyValue: string | null = null;
+                try {
+                    let record = await idbService.get('backups', name);
+                    if (!record || !record.data) {
+                        record = await idbService.get('backups', 'ashke-ghalam-rbac-v14-accounting');
+                    }
+                    if (record && typeof record.data === 'string') legacyValue = record.data;
+                } catch (error) {
+                    console.warn('[Store] Legacy Android IndexedDB migration check failed:', error);
+                }
+                if (legacyValue === null) {
+                    legacyValue = localStorage.getItem(name) ?? localStorage.getItem('ashke-ghalam-rbac-v14-accounting');
+                }
+                if (legacyValue === null) return null;
+
+                let migratedValue = legacyValue;
+                if (!legacyValue.trim().startsWith('{')) {
+                    const decrypted = securityService.decrypt(legacyValue);
+                    if (decrypted && decrypted.trim().startsWith('{')) migratedValue = decrypted;
+                }
+                await setAndroidEncryptedItem(name, migratedValue);
+                await localStorageRemoveLegacy(name);
+                await idbService.remove(name).catch(() => {});
+                await idbService.remove('ashke-ghalam-rbac-v14-accounting').catch(() => {});
+                return migratedValue;
+            }
+
+            // Native Windows local state is read through OS-backed encryption in Electron.
+            const nativeDesktopStorage = desktopDatabaseService.isDesktopDatabaseAvailable();
             try {
                 const desktopData = await desktopDatabaseService.loadFromDatabase();
                 if (desktopData) {
                     if (desktopData.trim().startsWith('{')) return desktopData;
-                    try {
-                        return securityService.decrypt(desktopData);
-                    } catch {
-                        return desktopData;
-                    }
+                    const decrypted = securityService.decrypt(desktopData);
+                    return decrypted && decrypted.trim().startsWith('{') ? decrypted : desktopData;
                 }
             } catch (e) {
-                console.warn('[Store] Desktop database read fallback:', e);
+                console.warn('[Store] Desktop database read failed:', e);
             }
 
+            // Older web/PWA/desktop fallback migration.
             try {
-                // Try reading from IndexedDB first (v15 then v14 fallback)
                 let record = await idbService.get('backups', name);
-                if (!record || !record.data) {
-                    record = await idbService.get('backups', 'ashke-ghalam-rbac-v14-accounting');
-                }
+                if (!record || !record.data) record = await idbService.get('backups', 'ashke-ghalam-rbac-v14-accounting');
                 if (record && record.data) {
                     const val = record.data;
-                    try {
-                        if (val.trim().startsWith('{')) return val;
-                        return securityService.decrypt(val);
-                    } catch (e) {
-                        return val;
+                    const decrypted = typeof val === 'string' && val.trim().startsWith('{')
+                        ? val
+                        : securityService.decrypt(val);
+                    const portableState = typeof decrypted === 'string' && decrypted.trim().startsWith('{')
+                        ? decrypted
+                        : val;
+
+                    if (nativeDesktopStorage && typeof portableState === 'string' && portableState.trim().startsWith('{')) {
+                        // Migrate existing desktop IDB/localStorage state only after an
+                        // OS-encrypted write succeeds. Keep the old copy if migration fails.
+                        const saved = await desktopDatabaseService.saveToDatabase(portableState, true);
+                        if (saved) {
+                            await idbService.remove(name).catch(() => {});
+                            await idbService.remove('ashke-ghalam-rbac-v14-accounting').catch(() => {});
+                            localStorage.removeItem(name);
+                            localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
+                        } else {
+                            console.warn('[Store] Legacy desktop state could not be migrated to OS-encrypted storage yet.');
+                        }
                     }
+                    return portableState;
                 }
             } catch (e) {
-                console.error('Error reading from IndexedDB:', e);
+                console.error('Error reading legacy state from IndexedDB:', e);
             }
 
-            // Fallback to localStorage if not found in IndexedDB
             let val = localStorage.getItem(name);
-            if (!val) {
-                val = localStorage.getItem('ashke-ghalam-rbac-v14-accounting');
-            }
+            if (!val) val = localStorage.getItem('ashke-ghalam-rbac-v14-accounting');
             if (!val) return null;
-
-            // Migrate to IndexedDB asynchronously to free up localStorage space
+            if (nativeDesktopStorage) {
+                const portableState = val.trim().startsWith('{') ? val : securityService.decrypt(val);
+                if (typeof portableState === 'string' && portableState.trim().startsWith('{')) {
+                    const saved = await desktopDatabaseService.saveToDatabase(portableState, true);
+                    if (saved) {
+                        localStorage.removeItem(name);
+                        localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
+                        await idbService.remove(name).catch(() => {});
+                        await idbService.remove('ashke-ghalam-rbac-v14-accounting').catch(() => {});
+                    } else {
+                        console.warn('[Store] Legacy state stays in its original location because OS encryption migration failed.');
+                    }
+                    // Never copy a legacy plaintext Windows state into IndexedDB when
+                    // the OS-encrypted file write fails. Preserve the source for recovery.
+                    return portableState;
+                }
+                console.warn('[Store] Legacy Windows state could not be decrypted; preserving the original copy.');
+                return val;
+            }
             try {
                 await idbService.set(name, val);
                 localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
                 localStorage.removeItem(name);
-                console.log('[Store] Successfully migrated state to v15 in IndexedDB!');
             } catch (e) {
-                console.error('[Store] Error migrating state to IndexedDB:', e);
+                console.error('Error migrating legacy state to IndexedDB:', e);
             }
-
-            try {
-                if (val.trim().startsWith('{')) return val;
-                return securityService.decrypt(val);
-            } catch (e) {
-                return val;
-            }
+            if (val.trim().startsWith('{')) return val;
+            const decrypted = securityService.decrypt(val);
+            return decrypted && decrypted.trim().startsWith('{') ? decrypted : val;
         },
         setItem: async (name, value) => {
-            // ۱. ذخیره‌سازی ایزوله در فایل پایگاه داده SQL دسکتاپ و اسکریپت رابطه‌ای
-            desktopDatabaseService.saveToDatabase(value).catch(() => {});
+            // Android: persist the primary application state only using Android Keystore AES-GCM.
+            if (isNativeAndroidSecureStorage()) {
+                await setAndroidEncryptedItem(name, value);
+                localStorage.removeItem(name);
+                localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
+                localStorage.removeItem('ashke-ghalam-currency');
+                await idbService.remove(name).catch(() => {});
+                await idbService.remove('ashke-ghalam-rbac-v14-accounting').catch(() => {});
+                return;
+            }
 
-            // ۲. ذخیره‌سازی ناهمگام در IndexedDB
+            // Windows Electron keeps the main full-state snapshot encrypted by OS safeStorage.
+            if (desktopDatabaseService.isDesktopDatabaseAvailable()) {
+                const saved = await desktopDatabaseService.saveToDatabase(value);
+                if (!saved) throw new Error('SECURE_DESKTOP_DATABASE_WRITE_FAILED');
+                localStorage.removeItem(name);
+                localStorage.removeItem('ashke-ghalam-currency');
+                return;
+            }
+
+            // Browser/PWA fallback: IndexedDB is retained for compatibility, but is not
+            // claimed to provide hardware-backed at-rest encryption.
             try {
                 await idbService.set(name, value);
                 localStorage.removeItem(name);
-
-                // ذخیره کش سریع واحد پول جهت محاسبات سریع و بدون لگ
                 try {
                     const parsed = JSON.parse(value);
                     const currency = parsed?.state?.config?.currency;
-                    if (currency) {
-                        localStorage.setItem('ashke-ghalam-currency', currency);
-                    }
+                    if (currency) localStorage.setItem('ashke-ghalam-currency', currency);
                 } catch {}
             } catch (e) {
+                // Legacy web mode only. Never use this plaintext fallback in native apps.
                 console.error('Error saving state to IndexedDB:', e);
-                // Fallback to localStorage on IndexedDB failure
-                try {
-                    localStorage.setItem(name, value);
-                } catch (lsError: any) {
-                    if (lsError && (lsError.name === 'QuotaExceededError' || lsError.code === 22 || lsError.number === -2147024882)) {
-                        console.warn('[Store] LocalStorage quota exceeded. Clearing cache keys...');
-                        const keys = Object.keys(localStorage);
-                        keys.forEach(key => {
-                            if (key.startsWith('cache-') || key.startsWith('local-')) {
-                                localStorage.removeItem(key);
-                            }
-                        });
-                        try {
-                            localStorage.setItem(name, value);
-                        } catch {}
-                    }
-                }
+                localStorage.setItem(name, value);
             }
         },
         removeItem: async (name) => {
+            if (isNativeAndroidSecureStorage()) {
+                await removeAndroidEncryptedItem(name);
+                localStorage.removeItem(name);
+            }
             try {
                 await idbService.remove(name);
             } catch (e) {
                 console.error('Error removing state from IndexedDB:', e);
             }
             localStorage.removeItem(name);
+            localStorage.removeItem('ashke-ghalam-rbac-v14-accounting');
             localStorage.removeItem('ashke-ghalam-currency');
         }
       })),
       partialize: (state) => Object.fromEntries(
         Object.entries(state).filter(([key, val]) => 
-          typeof val !== 'function' && !['notifications', 'isOnline'].includes(key)
+          typeof val !== 'function' && !['notifications', 'isOnline', 'currentUser'].includes(key)
         )
       ),
     }

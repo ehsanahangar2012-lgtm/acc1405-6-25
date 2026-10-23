@@ -29,8 +29,12 @@ import {
     Key
 } from 'lucide-react';
 import { useStore } from '../store';
+import { useFinancialStore } from '../store-financial';
+import { backupEncryptionService } from '../services/backupEncryptionService';
+import { backupMigrationService } from '../services/backupMigrationService';
 import { androidCommercialService, BusinessProfile } from '../services/androidCommercialService';
 import { licenseQuotaService, MAX_ANDROID_DEFAULT_DOCUMENTS, MAX_ANDROID_DEFAULT_CUSTOMERS } from '../services/licenseQuotaService';
+import { workspaceService } from '../services/workspaceService';
 import { isAndroidApp, toPersianDigits, getPersianDate, formatCurrency } from '../utils';
 import { useAndroidBackButtonHandler } from '../useMobile';
 
@@ -63,6 +67,10 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
     const [linkSuccessMsg, setLinkSuccessMsg] = useState<string | null>(null);
     const [targetHostUrl, setTargetHostUrl] = useState(() => localStorage.getItem('ashk_host_url') || localStorage.getItem('ashk_custom_server_url') || '');
     const [targetSyncToken, setTargetSyncToken] = useState(() => localStorage.getItem('ashk_host_sync_token') || localStorage.getItem('ashk_cloud_token') || '');
+    const [targetWorkspaceId, setTargetWorkspaceId] = useState(() => workspaceService.getWorkspaceId());
+    const [backupPassphrase, setBackupPassphrase] = useState('');
+    const [backupMessage, setBackupMessage] = useState<string | null>(null);
+    const [backupBusy, setBackupBusy] = useState(false);
 
     const isAndroid = isAndroidApp();
     const totalDocs = invoices.length + vouchers.length + transactions.length + checks.length;
@@ -79,13 +87,13 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
         return () => unsub();
     }, [invoices]);
 
-    const handleLinkPwaAndActivate = async () => {
+    const handleConnectToServer = async () => {
         setIsLinking(true);
         setLinkSuccessMsg(null);
         try {
-            const res = await androidCommercialService.linkToPwaAndActivate(targetHostUrl, targetSyncToken);
+            const res = await androidCommercialService.connectToServer(targetHostUrl, targetSyncToken, targetWorkspaceId);
             if (res.success) {
-                setIsLicensed(true);
+                setIsLicensed(licenseQuotaService.isFullyLicensedSync());
                 setLinkSuccessMsg(res.message);
             } else {
                 alert(res.message);
@@ -124,30 +132,102 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
         }
     };
 
-    const handleExportBackup = () => {
-        const storeState = useStore.getState();
-        androidCommercialService.createOfflineBackupFile(storeState);
+    const handleExportBackup = async () => {
+        setBackupMessage(null);
+        if (backupPassphrase.trim().length < 12) {
+            setBackupMessage('برای رمزگذاری فایل، رمز پشتیبان حداقل ۱۲ نویسه‌ای وارد کنید.');
+            return;
+        }
+
+        setBackupBusy(true);
+        try {
+            const currentState = useStore.getState();
+            const { currentUser: _currentUser, notifications: _notifications, isOnline: _isOnline, ...portableState } = currentState as any;
+            const safeState = {
+                ...portableState,
+                currentUser: null,
+                notifications: [],
+                isOnline: false,
+                financialData: useFinancialStore.getState()
+            };
+            const result = await androidCommercialService.createOfflineBackupFile(safeState, backupPassphrase);
+            if (result.cancelled) {
+                setBackupMessage('ذخیره فایل لغو شد؛ هیچ فایلی ذخیره نشد.');
+            } else if (result.success) {
+                setBackupMessage(result.location
+                    ? 'فایل پشتیبان رمزگذاری‌شده در مسیر انتخاب‌شده ذخیره شد.'
+                    : 'فایل پشتیبان رمزگذاری‌شده برای دانلود آماده شد.');
+            }
+        } catch (error: any) {
+            setBackupMessage(error?.message || 'ساخت فایل پشتیبان ناموفق بود.');
+        } finally {
+            setBackupBusy(false);
+        }
     };
 
-    const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImportBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        setBackupMessage(null);
+        setBackupBusy(true);
 
-        const reader = new FileReader();
-        reader.onload = (event) => {
-            try {
-                const parsed = JSON.parse(event.target?.result as string);
-                if (parsed.data) {
-                    useStore.setState(parsed.data);
-                    alert('اطلاعات با موفقیت از فایل پشتیبان بازگردانی شد.');
-                } else {
-                    alert('ساختار فایل پشتیبان نامعتبر است.');
+        try {
+            const text = await file.text();
+            let parsed: any;
+            try { parsed = JSON.parse(text); }
+            catch { throw new Error('فایل انتخاب‌شده ساختار JSON قابل خواندن ندارد.'); }
+
+            let payload: any;
+            if (backupEncryptionService.isEncryptedEnvelope(parsed)) {
+                if (backupPassphrase.trim().length < 12) {
+                    throw new Error('برای بازکردن فایل رمزگذاری‌شده، همان رمز پشتیبان را وارد کنید.');
                 }
-            } catch (err) {
-                alert('خطا در خواندن فایل پشتیبان.');
+                payload = backupEncryptionService.decryptJson(text, backupPassphrase);
+            } else {
+                const proceed = window.confirm(
+                    'این فایل رمزگذاری‌شده نیست و ممکن است اطلاعات مالی را به‌صورت خوانا در خود داشته باشد. فقط اگر منبع آن را می‌شناسید ادامه دهید. آیا می‌خواهید فایل قدیمی را بررسی کنید؟'
+                );
+                if (!proceed) return;
+                payload = parsed;
             }
-        };
-        reader.readAsText(file);
+
+            const sourceData = payload?.system === 'AshkeGhalam Accounting' && payload?.data
+                ? payload.data
+                : (payload?.state && typeof payload.state === 'object' ? payload.state : payload);
+            if (!sourceData || typeof sourceData !== 'object' || Array.isArray(sourceData)) {
+                throw new Error('ساختار اطلاعات داخل فایل پشتیبان معتبر نیست.');
+            }
+            const collectionKeys = ['companies', 'products', 'people', 'invoices', 'vouchers', 'checks', 'transactions', 'contracts', 'salaries', 'users', 'roles'];
+            const arraysFound = collectionKeys.filter(key => Array.isArray(sourceData[key]));
+            const invalidCollections = collectionKeys.filter(key => sourceData[key] !== undefined && !Array.isArray(sourceData[key]));
+            if (arraysFound.length < 3 || invalidCollections.length > 0) {
+                throw new Error('فایل پشتیبان شامل ساختار کافی و معتبر برای اطلاعات حسابداری نیست.');
+            }
+
+            const confirmed = window.confirm(
+                'بازیابی اطلاعات فعلی دستگاه را با داده‌های این فایل جایگزین می‌کند. پیش از ادامه، از داشتن یک نسخه پشتیبان فعلی مطمئن شوید. آیا ادامه می‌دهید؟'
+            );
+            if (!confirmed) return;
+
+            const { financialData, currentUser: _savedSession, notifications: _savedNotifications, isOnline: _savedOnline, ...restoredState } = sourceData;
+            const migrated = backupMigrationService.migrateBackupData({
+                ...restoredState,
+                currentUser: null,
+                notifications: [],
+                isOnline: useStore.getState().isOnline
+            });
+            useStore.getState().hydrateStore(migrated);
+            if (financialData && typeof financialData === 'object' && !Array.isArray(financialData)) {
+                useFinancialStore.setState(financialData);
+            }
+            setBackupMessage('بازیابی انجام شد. برای بررسی کامل داده‌ها، بخش‌های مالی و اسناد را بازبینی کنید.');
+            window.dispatchEvent(new CustomEvent('ashk-backup-restored'));
+        } catch (error: any) {
+            setBackupMessage(error?.message || 'بازیابی فایل پشتیبان ناموفق بود.');
+        } finally {
+            setBackupBusy(false);
+            e.target.value = '';
+        }
     };
 
     if (!isOpen) return null;
@@ -340,17 +420,17 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-black text-white flex items-center gap-1.5">
                                                 <Globe className="w-4 h-4 text-teal-400" />
-                                                <span>اتصال به سرور اختصاصی و فعال‌سازی با مشخصات لایسنس</span>
+                                                <span>اتصال به سرور پس از تأیید لایسنس</span>
                                             </span>
                                             <span className="text-[10px] bg-teal-500/20 text-teal-300 px-2 py-0.5 rounded-full font-bold border border-teal-500/30">
-                                                سقف ۵۰ سند ➔ نامحدود
+                                                لایسنس معتبر الزامی است
                                             </span>
                                         </div>
                                         <p className="text-xs text-slate-300 leading-relaxed">
-                                            در حالت پیش‌فرض و نصب خام، برنامه بدون اتصال به هیچ سروری با داده‌های محلی و سقف ۵۰ سند کار می‌کند. جهت اتصال به سرور مورد نظر، مشخصات زیر را وارد کرده و پیوند را برقرار فرمایید:
+                                            ابتدا لایسنس دستگاه را فعال کنید. سپس شناسه فضای کاری ثبت‌شده، آدرس سرور و توکن اختصاصی را وارد کنید. اتصال موفق، به‌تنهایی سقف اسناد را حذف یا لایسنس را فعال نمی‌کند:
                                         </p>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                                             <div className="space-y-1">
                                                 <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
                                                     <Globe size={12} className="text-teal-400" />
@@ -367,14 +447,28 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                             <div className="space-y-1">
                                                 <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
                                                     <Key size={12} className="text-amber-400" />
-                                                    <span>توکن ابری همگام‌سازی (Sync Token):</span>
+                                                    <span>شناسه فضای کاری (Workspace ID):</span>
                                                 </label>
                                                 <input
                                                     type="text"
+                                                    value={targetWorkspaceId}
+                                                    onChange={(e) => setTargetWorkspaceId(e.target.value)}
+                                                    placeholder="client_rahimi"
+                                                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-amber-500"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1">
+                                                    <Key size={12} className="text-violet-400" />
+                                                    <span>توکن اختصاصی سرور:</span>
+                                                </label>
+                                                <input
+                                                    type="password"
+                                                    autoComplete="off"
                                                     value={targetSyncToken}
                                                     onChange={(e) => setTargetSyncToken(e.target.value)}
-                                                    placeholder="AG-HOST-VAULT-9821-SYNC-X72A"
-                                                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-amber-500"
+                                                    placeholder="توکن اختصاصی این مشتری"
+                                                    className="w-full bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-violet-500"
                                                 />
                                             </div>
                                         </div>
@@ -382,19 +476,19 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                         <div className="flex flex-col sm:flex-row items-center gap-2 pt-2 border-t border-slate-800">
                                             <button
                                                 type="button"
-                                                onClick={handleLinkPwaAndActivate}
+                                                onClick={handleConnectToServer}
                                                 disabled={isLinking}
                                                 className="w-full sm:w-auto flex-1 py-3 px-4 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-black text-xs transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/30 disabled:opacity-50"
                                             >
                                                 {isLinking ? (
                                                     <>
                                                         <Loader2 className="w-4 h-4 animate-spin" />
-                                                        <span>در حال اتصال و اعمال لایسنس سرور...</span>
+                                                        <span>در حال بررسی اتصال و مجوز فضای کاری...</span>
                                                     </>
                                                 ) : (
                                                     <>
                                                         <RefreshCw className="w-4 h-4" />
-                                                        <span>🔗 اتصال به سرور و رفع محدودیت اسناد</span>
+                                                        <span>🔗 آزمون اتصال سرور</span>
                                                     </>
                                                 )}
                                             </button>
@@ -639,9 +733,15 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                     <HardDriveDownload className="w-4 h-4 text-sky-400" />
                                     <span>استقلال کامل داده‌ها و پشتیبان‌گیری آفلاین در حافظه گوشی</span>
                                 </h4>
-                                <p className="text-xs text-slate-400 leading-relaxed mb-6">
-                                    داده‌های شما ۱۰۰٪ در پایگاه داده محلی گوشی قرار دارد. بدون نیاز به اینترنت و بدون کوچک‌ترین ریسک، با یک کلیک نسخه پشتیبان کامل را دانلود و نگه‌داری نمایید.
+                                <p className="text-sm text-slate-300 leading-6 mb-4">
+                                    داده‌های نسخه مستقل روی همین دستگاه نگهداری می‌شوند. فایل خروجی با رمز انتخابی رمزگذاری می‌شود؛ رمز را فراموش نکنید و جدا از فایل نگه دارید. این کار از فایل پشتیبان محافظت می‌کند، اما به‌تنهایی رمزگذاری کامل پایگاه داده زنده یا حفاظت ۱۰۰٪ را تضمین نمی‌کند.
                                 </p>
+                                <div className="space-y-1.5 mb-5">
+                                    <label htmlFor="android-backup-passphrase" className="block text-sm font-bold text-white">رمز فایل پشتیبان (حداقل ۱۲ نویسه)</label>
+                                    <input id="android-backup-passphrase" type="password" autoComplete="new-password" minLength={12} value={backupPassphrase} onChange={e => setBackupPassphrase(e.target.value)} placeholder="یک عبارت عبور قوی انتخاب کنید" className="w-full min-h-12 rounded-xl bg-slate-950 border border-white/30 px-3 py-3 text-base text-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-teal-400/40" />
+                                    <p className="text-sm text-slate-300 leading-6">برای بازیابی روی همین یا دستگاه دیگر، همین رمز لازم است. بدون آن، فایل قابل بازگشایی نیست.</p>
+                                </div>
+                                {backupMessage && <div role="status" className="mb-4 rounded-xl border border-sky-400/30 bg-sky-950/50 p-3 text-sm text-sky-100 leading-6">{backupMessage}</div>}
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     {/* Export Card */}
@@ -651,17 +751,18 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                                 <HardDriveDownload className="w-4 h-4 text-emerald-400" />
                                                 <span>خروجی فایل پشتیبان (Backup)</span>
                                             </h5>
-                                            <p className="text-[11px] text-slate-400 leading-relaxed mb-4">
-                                                شامل کلیه فاکتورها، انبار، چک‌ها، مانده حساب‌ها و مشتریان با برچسب نسخه ۱۶.۲۵.۰ و تاریخ شمسی.
+                                            <p className="text-sm text-slate-300 leading-6 mb-4">
+                                                شامل اطلاعات حسابداری، کاربران، تنظیمات و دفتر مالی؛ محتوای فایل با رمز بالا قابل خواندن می‌شود.
                                             </p>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={handleExportBackup}
-                                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-950/40"
+                                            disabled={backupBusy}
+                                            className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-3 rounded-xl text-sm flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-emerald-950/40 disabled:opacity-50"
                                         >
                                             <HardDriveDownload className="w-4 h-4" />
-                                            <span>دانلود فایل پشتیبان آفلاین</span>
+                                            <span>{backupBusy ? 'در حال آماده‌سازی...' : 'ذخیره فایل پشتیبان رمزگذاری‌شده'}</span>
                                         </button>
                                     </div>
 
@@ -672,16 +773,16 @@ export const AndroidCommercialHubModal: React.FC<AndroidCommercialHubModalProps>
                                                 <HardDriveUpload className="w-4 h-4 text-sky-400" />
                                                 <span>بازیابی اطلاعات از فایل پشتیبان (Restore)</span>
                                             </h5>
-                                            <p className="text-[11px] text-slate-400 leading-relaxed mb-4">
-                                                جهت انتقال اطلاعات به دستگاه جدید یا بازگردانی فایل‌های پشتیبان قبلی بدون نیاز به شبکه.
+                                            <p className="text-sm text-slate-300 leading-6 mb-4">
+                                                برای فایل‌های جدید، رمز بالا را وارد کنید. فایل‌های قدیمیِ بدون رمز فقط پس از هشدار و تأیید منبع بازیابی می‌شوند.
                                             </p>
                                         </div>
                                         <label className="w-full bg-sky-600 hover:bg-sky-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-2 transition cursor-pointer shadow-lg shadow-sky-950/40 text-center">
                                             <HardDriveUpload className="w-4 h-4" />
-                                            <span>انتخاب فایل و بازیابی</span>
+                                            <span>{backupBusy ? 'در حال پردازش...' : 'انتخاب و بازیابی فایل'}</span>
                                             <input
                                                 type="file"
-                                                accept=".json"
+                                                accept=".json,.agbak"
                                                 onChange={handleImportBackup}
                                                 className="hidden"
                                             />

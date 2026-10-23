@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, ShieldCheck, Database, Zap, CheckCircle2, Megaphone, Tag, AlertTriangle, Laptop, X } from 'lucide-react';
 import { toPersianDigits, isDesktopApp } from '../utils';
+import { APP_VERSION } from '../config';
 import { AccountingLogo } from './AccountingLogo';
 
 interface SplashScreenProps {
@@ -175,7 +176,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
               </span>
             </div>
             <p className="text-xs text-teal-400 font-black mt-1">
-              طراحی و توسعه: دپارتمان IT اشک قلم | www.ashkghalam.ir • نسخه ۱۶.۲۲.۰
+              <a href="https://ashkghalam.ir" target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">ashkghalam.ir</a> • نسخه {APP_VERSION}
             </p>
           </div>
         </div>

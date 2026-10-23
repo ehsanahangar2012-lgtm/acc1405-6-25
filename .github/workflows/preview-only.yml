@@ -1,0 +1,72 @@
+name: Browser Preview Only
+
+on:
+  push:
+    branches: [ fix/core-data-integrity ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-preview-only
+  cancel-in-progress: true
+
+jobs:
+  build-browser-preview:
+    name: Build and validate browser preview
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout approved branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check and run backup safety regressions
+        run: bun run lint && bun run test:backup-encryption && node scripts/test-desktop-backup-safety.mjs
+
+      - name: Build sanitized browser preview only
+        env:
+          VITE_BASE_PATH: /acc1405-6-25/
+        run: bun run build:browser-preview
+
+      - name: Stamp preview version and check client isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '{"sha":"%s"}\n' "$GITHUB_SHA" > dist/version.json
+          node scripts/sanitize-client-build.js dist --verify-only
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload browser preview for Pages
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: ./dist
+
+  deploy-browser-preview:
+    name: Deploy browser preview to GitHub Pages
+    needs: build-browser-preview
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy preview
+        id: deployment
+        uses: actions/deploy-pages@v4

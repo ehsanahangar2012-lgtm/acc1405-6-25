@@ -293,6 +293,8 @@ export interface Invoice {
         method: 'CASH' | 'POS' | 'CARD' | 'CHECK';
         trackingCode?: string;
         description?: string;
+        /** True only when the payment has its own dated journal entry. */
+        accountingPosted?: boolean;
     }>;
     description?: string;
     attachments?: string[];

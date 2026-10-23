@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { idbService } from './indexedDBService';
 import { API_CONFIG } from '../config';
 import { persistentStorage } from './persistentStorage';
+import { workspaceService } from './workspaceService';
 
 export interface DeletedRecord {
   id: string;
@@ -99,14 +100,18 @@ class DeletedRecordsRegistry {
 
       // تلاش اول: از طریق deleted-records-api.php
       try {
+        const secureHeaders = await workspaceService.getSecureHeaders();
         const response = await fetch(`${API_CONFIG.BASE_URL}/deleted-records-api.php?action=list`, {
           cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' }
+          headers: { 'Cache-Control': 'no-cache', ...secureHeaders }
         });
         if (response.ok) {
           const text = await response.text();
           if (!text.trim().startsWith('<?php') && !text.trim().startsWith('<')) {
-            serverDeleted = JSON.parse(text);
+            const parsed = JSON.parse(text);
+            serverDeleted = Array.isArray(parsed)
+              ? parsed
+              : (parsed?.success && Array.isArray(parsed?.records) ? parsed.records : []);
           }
         }
       } catch (err) {
@@ -153,11 +158,13 @@ class DeletedRecordsRegistry {
     try {
       // 1. آپلود به deleted-records-api.php
       try {
+        const secureHeaders = await workspaceService.getSecureHeaders();
         await fetch(`${API_CONFIG.BASE_URL}/deleted-records-api.php`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...secureHeaders },
           body: JSON.stringify({
             action: 'register',
+            workspace_id: workspaceService.getWorkspaceId(),
             records,
           }),
         });

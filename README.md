@@ -1,20 +1,23 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# سامانه حسابداری اشک قلم
 
-# Run and deploy your AI Studio app
+مخزن توسعهٔ نرم‌افزار حسابداری، انبارداری، صدور فاکتور و مدیریت مالی اشک قلم.
 
-This contains everything you need to run your app locally.
+## محیط توسعه
 
-View your app in AI Studio: https://ai.studio/apps/drive/1ZSgl93pZGx8xDXOT8cDQOU2Zt2VdmJ2p
+پیش‌نیازها: Node.js 22 و Bun.
 
-## Run Locally
+```bash
+bun install --frozen-lockfile
+bun run lint
+bun run dev
+```
 
-**Prerequisites:**  Node.js
+## ساخت نسخه‌های توزیعی
 
+- پیش‌نمایش وب: `bun run build:browser-preview`
+- نصب‌کننده و نسخهٔ قابل‌حمل ویندوز: `bun run build:windows`
+- APK اندروید: `bun run build:apk`
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+ساخت‌های ویندوز و اندروید کد JavaScript نهایی را مبهم‌سازی می‌کنند و فایل‌های source map را از خروجی حذف می‌کنند. امضای اندروید و ویندوز برای انتشار رسمی به کلید/گواهی خصوصی خود ناشر نیاز دارد؛ روش پیکربندی در `docs/RELEASE-HARDENING.md` آمده است.
+
+**توجه امنیتی:** هیچ روش عمومی‌ای مهندسی معکوس را به‌طور قطعی ناممکن نمی‌کند. برای اعتبارسنجی لایسنسِ قابل‌اتکا، کلید خصوصی صدور باید بیرون از برنامهٔ مشتری و روی سرور یا ابزار صدور جداگانه نگهداری شود؛ هرگز آن را داخل JavaScript، APK یا EXE قرار ندهید.

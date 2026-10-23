@@ -1,4 +1,5 @@
 // AshkeGhalam Android Hardware Back Button & Gesture Handler (موتور کنترل دکمه بازگشت فیزیکی اندروید)
+import { App } from '@capacitor/app';
 import { isAndroidApp } from '../utils';
 
 type BackHandler = () => boolean; // return true if handled, false to delegate
@@ -12,11 +13,13 @@ class AndroidBackButtonService {
         if (typeof window === 'undefined' || this.initialized) return;
         this.initialized = true;
 
-        // شنود رویداد بازگشت Capacitor در اندروید نیتیو
-        const cap = (window as any).Capacitor;
-        if (cap && cap.Plugins && cap.Plugins.App) {
-            cap.Plugins.App.addListener('backButton', ({ canGoBack }: { canGoBack: boolean }) => {
+        // Use the official Capacitor App plugin; Capacitor 8 does not guarantee
+        // the legacy window.Capacitor.Plugins registry is available.
+        if (isAndroidApp()) {
+            App.addListener('backButton', ({ canGoBack }) => {
                 this.handleBackPress(canGoBack, showExitToast);
+            }).catch((error) => {
+                console.error('[AndroidBackButton] Native listener could not be registered:', error);
             });
         }
 
@@ -56,20 +59,20 @@ class AndroidBackButtonService {
             return;
         }
 
-        // ۲. اگر داخل تاریخچه ناوبری صفحه داخلی است، یک گام به عقب برود
+        // ۲. روی صفحه داخلی از React Router بخواه تا به عقب برگردد؛
+        // این کار حتی وقتی WebView تاریخچه مرورگر ندارد به صفحه سفید ختم نمی‌شود.
         const currentHash = window.location.hash;
         if (currentHash && currentHash !== '#/' && currentHash !== '#') {
-            window.history.back();
+            window.dispatchEvent(new CustomEvent('ashk-app-back'));
             return;
         }
 
         // ۳. اگر در صفحه اصلی است: خروج با ۲ بار فشردن متوالی دکمه
         const now = Date.now();
         if (now - this.lastBackPressTime < 2000) {
-            const cap = (window as any).Capacitor;
-            if (cap && cap.Plugins && cap.Plugins.App) {
-                cap.Plugins.App.exitApp();
-            }
+            void App.exitApp().catch((error) => {
+                console.error('[AndroidBackButton] App exit request failed:', error);
+            });
         } else {
             this.lastBackPressTime = now;
             if (showExitToast) {

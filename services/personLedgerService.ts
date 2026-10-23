@@ -78,6 +78,19 @@ class PersonLedgerService {
             return true;
         });
 
+        // Build indexes once. Re-filtering every transaction list for every invoice
+        // made posting progressively slower as a customer's history grew.
+        const transactionsByInvoice = new Map<any, any[]>();
+        const transactionReferenceIds = new Set<any>();
+        personTransactions.forEach((transaction: any) => {
+            transactionReferenceIds.add(transaction.referenceId);
+            if (transaction.relatedInvoiceId !== undefined && transaction.relatedInvoiceId !== null) {
+                const related = transactionsByInvoice.get(transaction.relatedInvoiceId) || [];
+                related.push(transaction);
+                transactionsByInvoice.set(transaction.relatedInvoiceId, related);
+            }
+        });
+
         personTransactions.forEach((t: any) => {
             // تعیین بدهکار / بستانکار بر اساس استاندارد حسابداری ایران
             let isDebit = false;
@@ -111,65 +124,100 @@ class PersonLedgerService {
             });
         });
 
-        // ۳. بررسی فاکتورهایی که مبلغ نقدی یا چک درون خود فاکتور دارند ولی در آرایه تراکنش‌ها ثبت جداگانه ندارند
+        // ۳. Reconcile embedded invoice settlements against dated transactions.
+        // An existing transaction for one payment must not suppress any unpaid legacy
+        // amount still embedded in cashAmount/checkAmount.
         personInvoices.forEach((inv: any) => {
             const isSale = inv.type === InvoiceType.SALE;
             const timestamp = inv.createdAt ? new Date(inv.createdAt).getTime() : 1;
+            const invoiceTransactions = transactionsByInvoice.get(inv.id) || [];
+            let checkTransactionTotal = 0;
+            let cashTransactionTotal = 0;
 
-            if (inv.cashAmount && inv.cashAmount > 0) {
-                const hasExistingTrans = personTransactions.some((t: any) => 
-                    t.relatedInvoiceId === inv.id && (t.type === 'CASH_PAYMENT' || t.type === 'INVOICE_RECEIPT')
-                );
-                if (!hasExistingTrans) {
-                    entries.push({
-                        id: `cash-${inv.id}`,
-                        date: inv.date,
-                        type: 'PAYMENT',
-                        referenceId: inv.id,
-                        referenceNumber: `CSH-${inv.number}`,
-                        description: isSale ? `دریافت نقدی بابت فاکتور فروش ${inv.number}` : `پرداخت نقدی بابت فاکتور خرید ${inv.number}`,
-                        debit: !isSale ? inv.cashAmount : 0, // خرید نقدی = بدهکار، فروش نقدی = بستانکار
-                        credit: isSale ? inv.cashAmount : 0,
-                        balance: 0,
-                        timestamp: timestamp + 1,
-                        relatedInvoiceId: inv.id,
-                        isChild: true
-                    });
+            // Tally both payment types in one pass instead of allocating and reducing
+            // multiple filtered arrays for each historical invoice.
+            invoiceTransactions.forEach((t: any) => {
+                const amount = Math.max(0, Number(t.amount) || 0);
+                const isCheckTransaction =
+                    t.type === 'CHECK_INFO' ||
+                    t.type === 'CHECK' ||
+                    t.metadata?.paymentMethod === 'CHECK';
+                if (isCheckTransaction) {
+                    checkTransactionTotal += amount;
                 }
+
+                const isCashTransaction =
+                    (t.type === 'CASH_PAYMENT' ||
+                     t.type === 'INVOICE_RECEIPT' ||
+                     t.type === 'GENERAL_INCOME' ||
+                     t.type === 'EXPENSE' ||
+                     ['CASH', 'POS', 'CARD'].includes(t.metadata?.paymentMethod)) &&
+                    t.type !== 'CHECK_INFO' &&
+                    t.type !== 'CHECK' &&
+                    t.metadata?.paymentMethod !== 'CHECK';
+                if (isCashTransaction) {
+                    cashTransactionTotal += amount;
+                }
+            });
+
+            const missingCheckAmount = Math.max(0, Number(inv.checkAmount || 0) - checkTransactionTotal);
+            const missingCashAmount = Math.max(0, Number(inv.cashAmount || 0) - cashTransactionTotal);
+
+            if (missingCashAmount > 0) {
+                entries.push({
+                    id: `cash-${inv.id}`,
+                    date: inv.date,
+                    type: 'PAYMENT',
+                    referenceId: inv.id,
+                    referenceNumber: `CSH-${inv.number}`,
+                    description: isSale
+                        ? `دریافت نقدی بابت فاکتور فروش ${inv.number}`
+                        : `پرداخت نقدی بابت فاکتور خرید ${inv.number}`,
+                    debit: !isSale ? missingCashAmount : 0,
+                    credit: isSale ? missingCashAmount : 0,
+                    balance: 0,
+                    timestamp: timestamp + 1,
+                    relatedInvoiceId: inv.id,
+                    isChild: true
+                });
             }
 
-            if (inv.checkAmount && inv.checkAmount > 0) {
-                const hasExistingTrans = personTransactions.some((t: any) => 
-                    t.relatedInvoiceId === inv.id && (t.type === 'CHECK_INFO' || t.type === 'CHECK')
-                );
-                if (!hasExistingTrans) {
-                    const checkNos = inv.checks?.map((c: any) => c.checkNumber || c.sayadId || 'چک').join('، ') || 'چک';
-                    const firstCheckImg = inv.checks?.find((c: any) => c.imageUrl)?.imageUrl;
-                    entries.push({
-                        id: `chk-inv-${inv.id}`,
-                        date: inv.date,
-                        type: 'CHECK',
-                        referenceId: inv.id,
-                        referenceNumber: `CHK-${inv.number}`,
-                        description: isSale ? `چک دریافتی (${checkNos}) بابت فاکتور ${inv.number}` : `چک پرداختی (${checkNos}) بابت فاکتور ${inv.number}`,
-                        debit: !isSale ? inv.checkAmount : 0,
-                        credit: isSale ? inv.checkAmount : 0,
-                        balance: 0,
-                        timestamp: timestamp + 2,
-                        relatedInvoiceId: inv.id,
-                        isChild: true,
-                        imageUrl: firstCheckImg
-                    });
-                }
+            if (missingCheckAmount > 0) {
+                const checkNos = inv.checks?.map((c: any) => c.checkNumber || c.sayadId || 'چک').join('، ') || 'چک';
+                const firstCheckImg = inv.checks?.find((c: any) => c.imageUrl)?.imageUrl;
+                entries.push({
+                    id: `chk-inv-${inv.id}`,
+                    date: inv.date,
+                    type: 'CHECK',
+                    referenceId: inv.id,
+                    referenceNumber: `CHK-${inv.number}`,
+                    description: isSale
+                        ? `چک دریافتی (${checkNos}) بابت فاکتور ${inv.number}`
+                        : `چک پرداختی (${checkNos}) بابت فاکتور ${inv.number}`,
+                    debit: !isSale ? missingCheckAmount : 0,
+                    credit: isSale ? missingCheckAmount : 0,
+                    balance: 0,
+                    timestamp: timestamp + 2,
+                    relatedInvoiceId: inv.id,
+                    isChild: true,
+                    imageUrl: firstCheckImg
+                });
             }
         });
 
+        // Index invoice-linked check IDs once; avoid scanning every invoice and
+        // every transaction again for each standalone check.
+        const invoiceCheckIds = new Set<any>();
+        personInvoices.forEach((inv: any) => {
+            (inv.checks || []).forEach((invoiceCheck: any) => invoiceCheckIds.add(invoiceCheck.id));
+        });
+
         // ۴. چک‌های مستقل ثبت‌شده برای شخص (خارج از فاکتورها و تراکنش‌ها)
-        const personChecks = checks.filter((c: any) => 
-            c.personId === personId && 
+        const personChecks = checks.filter((c: any) =>
+            c.personId === personId &&
             !c.relatedInvoiceId &&
-            !personInvoices.some((inv: any) => inv.checks?.some((ic: any) => ic.id === c.id)) &&
-            !personTransactions.some((t: any) => t.referenceId === c.id)
+            !invoiceCheckIds.has(c.id) &&
+            !transactionReferenceIds.has(c.id)
         );
 
         personChecks.forEach((c: any) => {

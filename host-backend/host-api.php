@@ -2,59 +2,55 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
+header('Access-Control-Allow-Headers: Content-Type, X-Workspace-ID, X-Workspace-Token, X-Device-HWID');
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    http_response_code(200);
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    http_response_code(204);
     exit();
 }
 
-function getEnvVar($key, $default = '') {
-    $envFile = __DIR__ . '/.env.local';
-    if (file_exists($envFile)) {
-        $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        foreach ($lines as $line) {
-            if (strpos(trim($line), '#') === 0) continue;
-            $parts = explode('=', $line, 2);
-            if (count($parts) === 2 && trim($parts[0]) === $key) {
-                return trim($parts[1]);
-            }
-        }
+// This legacy global-data API is reserved for the authenticated mother portal.
+// Do not use VITE_API_TOKEN or any credential embedded in browser code.
+$requestHeaders = function_exists('getallheaders') ? getallheaders() : [];
+$headerValue = static function (string $name) use ($requestHeaders): string {
+    foreach ($requestHeaders as $key => $value) {
+        if (strcasecmp((string)$key, $name) === 0) return (string)$value;
     }
-    return getenv($key) ?: $default;
+    $serverKey = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
+    return isset($_SERVER[$serverKey]) ? (string)$_SERVER[$serverKey] : '';
+};
+
+$workspaceId = trim($headerValue('X-Workspace-ID'));
+$workspaceToken = trim($headerValue('X-Workspace-Token'));
+$deviceHwid = trim($headerValue('X-Device-HWID'));
+
+if ($workspaceId === '' || $workspaceToken === '') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'AUTH_REQUIRED']);
+    exit();
 }
 
-$expectedToken = getEnvVar('VITE_API_TOKEN');
+require_once __DIR__ . '/license_validator.php';
+$isMotherWorkspace = in_array($workspaceId, ['default', 'main'], true);
+$access = LicenseValidator::validateAccess(
+    $workspaceId,
+    $workspaceToken,
+    $isMotherWorkspace ? null : $deviceHwid
+);
 
-$authHeader = '';
-$headers = getallheaders();
-if (is_array($headers)) {
-    foreach ($headers as $name => $value) {
-        if (strcasecmp($name, 'Authorization') === 0) {
-            $authHeader = $value;
-            break;
-        }
-    }
-}
-if (empty($authHeader) && isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    $authHeader = $_SERVER['HTTP_AUTHORIZATION'];
-}
-if (empty($authHeader) && isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-    $authHeader = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-}
-
-$providedToken = '';
-if (!empty($authHeader)) {
-    if (preg_match('/Bearer\s(\S+)/i', $authHeader, $matches)) {
-        $providedToken = $matches[1];
-    } else {
-        $providedToken = str_replace('Bearer ', '', $authHeader);
-    }
+if (empty($access['allowed'])) {
+    http_response_code(403);
+    echo json_encode([
+        'success' => false,
+        'error' => 'ACCESS_DENIED',
+        'status' => $access['status'] ?? 'FORBIDDEN'
+    ]);
+    exit();
 }
 
-if (empty($expectedToken) || $providedToken !== $expectedToken) {
-    http_response_code(401);
-    echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+if (!$isMotherWorkspace || ($access['role'] ?? '') !== 'SUPER_ADMIN') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'MOTHER_PORTAL_ONLY']);
     exit();
 }
 

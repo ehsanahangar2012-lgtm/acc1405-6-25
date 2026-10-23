@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import { useFinancialStore } from '../store-financial';
 import { generateId, toPersianDigits, formatCurrency, isDesktopApp, isAndroidApp } from '../utils';
+import { APP_VERSION } from '../config';
 import { 
     Settings as SettingsIcon, Building2, Landmark, ShieldCheck, Palette, 
     Plus, Coins, Database, X, Save, 
@@ -76,7 +77,7 @@ const Settings = () => {
                         <div className="flex items-center gap-3 flex-wrap">
                             <h1 className="text-xl md:text-2xl font-black text-white">پلتفرم جامع تنظیمات و مدیریت سامانه</h1>
                             <span className="text-xs bg-teal-500/30 text-teal-200 font-extrabold px-3 py-1 rounded-full border border-teal-400">
-                                نسخه ۱۶.۳۵.۰
+                                نسخه {APP_VERSION}
                             </span>
                             <button
                                 type="button"
@@ -312,7 +313,8 @@ const Settings = () => {
                                             onChange={(e) => updateConfig({ appTheme: e.target.value as any })}
                                             className="w-full bg-slate-900 border-2 border-slate-600 rounded-xl p-3.5 text-white text-xs font-black outline-none focus:border-teal-400"
                                         >
-                                            <option value="DARK">حالت تیره حرفه‌ای با کنتراست بالا (پیش‌فرض)</option>
+                                            <option value="DARK">حالت تیره فعلی اشک قلم (پیش‌فرض)</option>
+                                            <option value="LIGHT">تم روشن حرفه‌ای (نمای جدید مدیریتی)</option>
                                             <option value="SYSTEM">تطبیق خودکار با سیستم عامل</option>
                                         </select>
                                     </div>
@@ -697,14 +699,14 @@ const Settings = () => {
                                         <Server size={20} className="text-cyan-400" />
                                         مرکز اتصال، ثبت لایسنس و هاست
                                     </h2>
-                                    <p className="text-xs text-slate-300 font-bold mt-1">وضعیت لایسنس آفلاین، کلید فعال‌سازی و ارتباط با هاست مادر</p>
+                                    <p className="text-xs text-slate-300 font-bold mt-1">وضعیت نسخه آزمایشی، کلید لایسنس و ارتباط با هاست مادر</p>
                                 </div>
 
                                 {((isDesktopApp() || isAndroidApp()) && !licenseQuotaService.isFullyLicensedSync()) ? (
                                     <div className="p-6 bg-amber-500/10 border-2 border-amber-400 rounded-2xl space-y-4">
                                         <div className="flex items-center gap-2 text-amber-300 text-sm font-black">
                                             <ShieldCheck size={20} />
-                                            <span>حالت آفلاین فعال است (ثبت کلید لایسنس نرم‌افزار)</span>
+                                            <span>نیاز به فعال‌سازی آنلاین لایسنس</span>
                                         </div>
                                         <p className="text-xs text-amber-200 font-bold leading-relaxed">
                                             در این حالت، تا سقف ۵۰ سند می‌توانید به رایگان ثبت کنید. برای دسترسی نامحدود و حذف محدودیت‌ها، کلید لایسنس معتبر خود را وارد نمایید.
@@ -720,16 +722,19 @@ const Settings = () => {
                                             <button 
                                                 type="button"
                                                 onClick={() => {
-                                                    if (!licenseInputKey.trim()) return;
-                                                    licenseQuotaService.activateWithServerLicense({ 
-                                                        licenseKey: licenseInputKey.trim(), 
-                                                        companyName: activeCompany?.name || 'مجموعه تجاری' 
-                                                    });
-                                                    addNotification('success', 'لایسنس با موفقیت فعال شد و تمام محدودیت‌ها برداشته شد.');
+                                                    const cleanKey = licenseInputKey.trim().toUpperCase();
+                                                    if (!cleanKey) return;
+                                                    window.dispatchEvent(new CustomEvent('open-activation-dashboard', {
+                                                        detail: {
+                                                            licenseKey: cleanKey,
+                                                            companyName: activeCompany?.name || 'مجموعه تجاری',
+                                                            workspaceId: `ws_${cleanKey.replace(/[^A-Z0-9]/gi, '').toLowerCase()}`
+                                                        }
+                                                    }));
                                                 }}
                                                 className="bg-teal-500 hover:bg-teal-400 text-slate-950 px-5 py-3 rounded-xl font-black text-xs cursor-pointer border border-teal-300"
                                             >
-                                                ثبت و فعال‌سازی
+                                                تأیید آنلاین
                                             </button>
                                         </div>
                                     </div>
@@ -956,7 +961,7 @@ const Settings = () => {
 
                     <footer className="mt-10 pt-4 border-t-2 border-slate-700 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-300 font-bold gap-2">
                         <span>نرم‌افزار جامع حسابداری و اتوماسیون اشک قلم</span>
-                        <span className="text-teal-300 font-black">طراحی و توسعه: دپارتمان IT | نسخه ۱۶.۳۵.۰</span>
+                        <span className="text-teal-300 font-black"><a href="https://ashkghalam.ir" target="_blank" rel="noreferrer" className="hover:underline underline-offset-2">ashkghalam.ir</a> · نسخه {APP_VERSION}</span>
                     </footer>
                 </main>
             </div>

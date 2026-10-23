@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' file: https://esm.sh https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' file: https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' file: data: https://cdn.jsdelivr.net https://fonts.gstatic.com; img-src 'self' file: data: blob: https:; connect-src 'self' file: https: wss:; worker-src 'self' blob: file:;" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' file: data: blob: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' file:; style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com; font-src 'self' file: data: https://fonts.gstatic.com; img-src 'self' file: data: blob: https:; connect-src 'self' file: https: wss:; worker-src 'self' blob: file:; object-src 'none'; base-uri 'self'; form-action 'self';" />
     <meta name="theme-color" content="#111827" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -11,9 +11,9 @@
     <meta name="format-detection" content="telephone=no">
     <link rel="manifest" href="./manifest.json">
     <title>سامانه ابری حسابداری و مدیریت اشک قلم</title>
-    <meta name="description" content="سامانه یکپارچه حسابداری، انبارداری، نسخه تجاری همراه، پل پیامک اندروید، کاتالوگ ویزیتوری، پیش‌بینی نقدینگی و بک‌آپ ۳ گانه نسخه ۱۶.۲۷.۰" />
+    <meta name="description" content="سامانه یکپارچه حسابداری، انبارداری، صدور فاکتور و گزارش‌های مالی اشک قلم" />
     <meta property="og:title" content="سامانه ابری حسابداری و مدیریت اشک قلم" />
-    <meta property="og:description" content="سامانه یکپارچه حسابداری، انبارداری، نسخه تجاری همراه، پل پیامک اندروید، کاتالوگ ویزیتوری، پیش‌بینی نقدینگی و بک‌آپ ۳ گانه نسخه ۱۶.۲۷.۰" />
+    <meta property="og:description" content="سامانه یکپارچه حسابداری، انبارداری، صدور فاکتور و گزارش‌های مالی اشک قلم" />
     <link href="./vazir-font.css" rel="stylesheet">
     <style>
       body {
@@ -61,30 +61,58 @@
         .print-container { position: absolute; top: 0; left: 0; width: 100%; display: block !important; z-index: 9999; }
       }
     </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
-    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
-    "recharts": "https://esm.sh/recharts@^3.7.0",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "@google/genai": "https://esm.sh/@google/genai@^1.38.0",
-    "zustand/": "https://esm.sh/zustand@^5.0.10/",
-    "zustand": "https://esm.sh/zustand@^5.0.10",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.48.1",
-    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
-    "react-dom": "https://esm.sh/react-dom@^19.2.4"
-  }
-}
-</script>
 </head>
   <body>
+    <div id="browser-preview-notice" hidden role="status">پیش‌نمایش مرورگری · اتصال به سرور اصلی غیرفعال است · داده‌ها فقط محلی‌اند</div>
+    <script>
+      if ((window.location.hostname === '127.0.0.1' && window.location.port === '4173') ||
+          window.location.hostname.endsWith('.github.io')) {
+        document.getElementById('browser-preview-notice')?.removeAttribute('hidden');
+      }
+    </script>
+    <style>
+      #browser-preview-notice[hidden] { display: none; }
+      #browser-preview-notice {
+        position: fixed; top: 8px; right: 8px; z-index: 2147483647;
+        max-width: calc(100% - 16px); padding: 6px 10px; border-radius: 8px;
+        background: rgba(124, 45, 18, .96); color: #fff;
+        font: 12px/1.5 Tahoma, Arial, sans-serif; box-shadow: 0 2px 10px #0003;
+        pointer-events: none;
+      }
+    </style>
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
   <script>
-    if ('serviceWorker' in navigator) {
+    const isBrowserPreviewHost =
+      (window.location.hostname === '127.0.0.1' && window.location.port === '4173') ||
+      window.location.hostname.endsWith('.github.io');
+    const isNativeAndroid = /AshkeGhalam-Android-Native/i.test(navigator.userAgent);
+
+    // Keep local / hosted preview and Capacitor builds isolated from stale PWA caches.
+    if (isBrowserPreviewHost || isNativeAndroid) {
+      const cleanupTasks = [];
+      if ('serviceWorker' in navigator) {
+        cleanupTasks.push(navigator.serviceWorker.getRegistrations().then(registrations => {
+          if (registrations.length) {
+            return Promise.all(registrations.map(registration => registration.unregister())).then(() => true);
+          }
+          return false;
+        }));
+      }
+      if ('caches' in window) {
+        cleanupTasks.push(caches.keys().then(keys => {
+          const staleKeys = keys.filter(key => /^(static|dynamic|images|api)-v/i.test(key));
+          return Promise.all(staleKeys.map(key => caches.delete(key))).then(() => staleKeys.length > 0);
+        }));
+      }
+      Promise.all(cleanupTasks).then(results => {
+        const cleanupKey = 'ashk-preview-cache-reset-v1';
+        if (results.some(Boolean) && sessionStorage.getItem(cleanupKey) !== '1') {
+          sessionStorage.setItem(cleanupKey, '1');
+          window.location.reload();
+        }
+      }).catch(() => {});
+    } else if ('serviceWorker' in navigator) {
       window.addEventListener('load', async () => {
         try {
           const reg = await navigator.serviceWorker.register('/sw.js');

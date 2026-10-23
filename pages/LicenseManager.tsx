@@ -38,6 +38,7 @@ import {
     PLAN_CONFIGS 
 } from '../services/licenseGeneratorService';
 import { hardwareIdService } from '../services/hardwareIdService';
+import { HOST_BASE_URL } from '../config';
 
 const LicenseManager: React.FC = () => {
     const [licenses, setLicenses] = useState<LicenseRecord[]>([]);
@@ -49,7 +50,7 @@ const LicenseManager: React.FC = () => {
     const [clientPhone, setClientPhone] = useState('');
     const [clientHwid, setClientHwid] = useState('');
     const [selectedPlan, setSelectedPlan] = useState<LicensePlan>('GOLD');
-    const [expireDate, setExpireDate] = useState('1410-12-29');
+    const [expireDate, setExpireDate] = useState(() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().slice(0, 10); });
     const [pricePaid, setPricePaid] = useState<number>(PLAN_CONFIGS.GOLD.defaultPrice);
     const [notes, setNotes] = useState('');
     
@@ -59,6 +60,10 @@ const LicenseManager: React.FC = () => {
     const [copiedKey, setCopiedKey] = useState(false);
     const [copiedCode, setCopiedCode] = useState(false);
     const [currentHwid, setCurrentHwid] = useState('');
+    const [licenseServerUrl] = useState(HOST_BASE_URL);
+    const [adminSecret, setAdminSecret] = useState('');
+    const [isIssuing, setIsIssuing] = useState(false);
+    const [issueError, setIssueError] = useState('');
 
     useEffect(() => {
         loadLicenses();
@@ -66,57 +71,222 @@ const LicenseManager: React.FC = () => {
     }, []);
 
     const loadLicenses = () => {
-        const list = licenseGeneratorService.getAllLicenses();
-        setLicenses(list);
+        setLicenses(licenseGeneratorService.getAllLicenses());
+    };
+
+    const getSecureServerBaseUrl = (_value: string) => {
+        const base = HOST_BASE_URL.replace(/\/+$/, '');
+        const parsed = new URL(base);
+        if (parsed.protocol !== 'https:') {
+            throw new Error('برای عملیات مدیریتی لایسنس، نشانی سرور مرکزی باید HTTPS باشد.');
+        }
+        return base;
+    };
+
+    const handleLoadServerLicenses = async () => {
+        let baseUrl = '';
+        try { baseUrl = getSecureServerBaseUrl(licenseServerUrl); } catch (error: any) {
+            setIssueError(error?.message || 'نشانی سرور امن نیست.');
+            return;
+        }
+        const secret = adminSecret.trim();
+        if (!secret) {
+            setIssueError('برای خواندن دفتر ثبت سرور، کلید مدیریت سرور را وارد کنید.');
+            return;
+        }
+        try {
+            let response: Response | null = null;
+            let data: any = null;
+            for (const endpoint of [baseUrl + '/tenant-manager.php', baseUrl + '/host-backend/tenant-manager.php']) {
+                const candidate = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': secret },
+                    body: JSON.stringify({ action: 'list' }),
+                    cache: 'no-store'
+                });
+                response = candidate;
+                data = await candidate.json().catch(() => null);
+                if (candidate.status !== 404) break;
+            }
+            if (!response?.ok || data?.success !== true || !Array.isArray(data.workspaces)) {
+                throw new Error(data?.message || 'دفتر ثبت لایسنس از سرور دریافت نشد.');
+            }
+            // Keep the validated mother-portal credential only in this tab's session for protected master-storage APIs.
+            try { window.sessionStorage.setItem('ashk_mother_admin_secret', secret); } catch {}
+            const localRecords = licenseGeneratorService.getAllLicenses();
+            const today = new Date().toISOString().slice(0, 10);
+            const serverRecords: LicenseRecord[] = data.workspaces
+                .filter((item: any) => item?.workspace_id && !['default', 'main'].includes(String(item.workspace_id)))
+                .map((item: any) => {
+                    const workspaceId = String(item.workspace_id);
+                    const prior = localRecords.find(record => record.workspaceId === workspaceId);
+                    const rawPlan = String(item.plan || 'TRIAL');
+                    const plan = (Object.prototype.hasOwnProperty.call(PLAN_CONFIGS, rawPlan) ? rawPlan : 'TRIAL') as LicensePlan;
+                    const expireDate = String(item.expire_date || '');
+                    const isUnlimited = item.is_unlimited === true || item.is_unlimited === 1 || item.is_unlimited === '1';
+                    const isExpired = !isUnlimited && /^\d{4}-\d{2}-\d{2}$/.test(expireDate) && expireDate < today;
+                    const status: LicenseRecord['status'] = isExpired || item.status === 'EXPIRED'
+                        ? 'EXPIRED' : item.status === 'ACTIVE' ? 'ACTIVE' : 'REVOKED';
+                    const maxCustomers = Number(item.max_customers ?? prior?.maxCustomers ?? PLAN_CONFIGS[plan].maxCustomers);
+                    const maxDocuments = Number(item.max_documents ?? prior?.maxDocuments ?? PLAN_CONFIGS[plan].maxDocuments);
+                    return {
+                        id: 'LIC-SERVER-' + workspaceId,
+                        licenseKey: String(item.token || ''),
+                        activationCode: '',
+                        workspaceId,
+                        serverUrl: baseUrl,
+                        clientName: String(item.title || item.contact_person || prior?.clientName || 'مشتری'),
+                        clientPhone: String(item.phone || prior?.clientPhone || ''),
+                        hwid: String(item.hwid || prior?.hwid || ''),
+                        plan,
+                        maxCustomers: Number.isFinite(maxCustomers) ? maxCustomers : PLAN_CONFIGS[plan].maxCustomers,
+                        maxDocuments: Number.isFinite(maxDocuments) ? maxDocuments : PLAN_CONFIGS[plan].maxDocuments,
+                        isUnlimited,
+                        issueDate: String(item.created_at || prior?.issueDate || new Date().toISOString()).slice(0, 10),
+                        expireDate,
+                        pricePaid: Number(item.price_paid ?? prior?.pricePaid) || 0,
+                        notes: String(item.notes || prior?.notes || ''),
+                        status
+                    } satisfies LicenseRecord;
+                });
+            const serverWorkspaceIds = new Set(serverRecords.map(record => record.workspaceId));
+            const removedRecords = localRecords.filter(record => Boolean(record.workspaceId) && !serverWorkspaceIds.has(record.workspaceId))
+                .map(record => ({ ...record, status: 'REVOKED' as const }));
+            const legacyOfflineRecords = localRecords.filter(record => !record.workspaceId)
+                .map(record => ({ ...record, status: 'REVOKED' as const }));
+            const reconciledRecords = [...serverRecords, ...removedRecords, ...legacyOfflineRecords];
+            licenseGeneratorService.replaceAllLicenses(reconciledRecords);
+            setLicenses(reconciledRecords);
+            setIssueError('');
+        } catch (error: any) {
+            setIssueError(error?.message || 'خطا در دریافت دفتر ثبت سرور.');
+        }
     };
 
     const handlePlanChange = (plan: LicensePlan) => {
         setSelectedPlan(plan);
         setPricePaid(PLAN_CONFIGS[plan].defaultPrice);
         if (PLAN_CONFIGS[plan].isUnlimited) {
-            setExpireDate('1410-12-29');
+            setExpireDate('9999-12-31');
         } else {
-            const nextYear = new Date().getFullYear() + 1;
-            setExpireDate(`${nextYear}-12-29`);
+            const d = new Date();
+            d.setDate(d.getDate() + PLAN_CONFIGS[plan].validityDays);
+            setExpireDate(d.toISOString().slice(0, 10));
         }
     };
 
-    const handleGenerateLicense = (e: React.FormEvent) => {
+    const handleGenerateLicense = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!clientName.trim() || !clientHwid.trim()) {
-            alert('لطفاً نام خریدار و شناسه سخت‌افزاری (HWID) را وارد کنید.');
+            alert('نام خریدار و HWID ثبت‌شده از دستگاه مشتری الزامی است.');
+            return;
+        }
+        let resolvedServerUrl = '';
+        try { resolvedServerUrl = getSecureServerBaseUrl(licenseServerUrl); } catch (error: any) {
+            setIssueError(error?.message || 'نشانی سرور امن نیست.');
+            return;
+        }
+        const cleanAdminSecret = adminSecret.trim();
+        if (!resolvedServerUrl || !cleanAdminSecret) {
+            setIssueError('برای صدور تجاری، نشانی سرور مادر و کلید مدیریت سرور را وارد کنید.');
             return;
         }
 
-        const newLicenseKey = licenseGeneratorService.generateLicenseKey();
-        const activationCode = licenseGeneratorService.generateActivationCode(
-            newLicenseKey,
-            clientHwid.trim(),
-            selectedPlan,
-            expireDate
-        );
+        setIsIssuing(true);
+        setIssueError('');
+        try {
+            const newLicenseKey = licenseGeneratorService.generateLicenseKey();
+            const workspaceId = `ws_${newLicenseKey.replace(/[^A-Z0-9]/gi, '').toLowerCase()}`;
+            const planConfig = PLAN_CONFIGS[selectedPlan];
+            const effectiveExpireDate = planConfig.isUnlimited ? '9999-12-31' : expireDate;
+            if (!planConfig.isUnlimited) {
+                const parsedExpiry = new Date(`${effectiveExpireDate}T00:00:00Z`);
+                if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveExpireDate) || Number.isNaN(parsedExpiry.getTime()) || parsedExpiry.toISOString().slice(0, 10) !== effectiveExpireDate) {
+                    throw new Error('تاریخ انقضا باید یک تاریخ معتبر میلادی با فرمت YYYY-MM-DD باشد.');
+                }
+            }
 
-        const newRecord: LicenseRecord = {
-            id: `LIC-${Date.now()}`,
-            licenseKey: newLicenseKey,
-            activationCode,
-            clientName: clientName.trim(),
-            clientPhone: clientPhone.trim(),
-            hwid: clientHwid.trim(),
-            plan: selectedPlan,
-            maxCustomers: PLAN_CONFIGS[selectedPlan].maxCustomers,
-            maxDocuments: PLAN_CONFIGS[selectedPlan].maxDocuments,
-            isUnlimited: PLAN_CONFIGS[selectedPlan].isUnlimited,
-            issueDate: new Date().toLocaleDateString('fa-IR'),
-            expireDate,
-            pricePaid,
-            notes,
-            status: 'ACTIVE'
-        };
+            const payload = {
+                action: 'add',
+                workspace_id: workspaceId,
+                title: clientName.trim(),
+                token: newLicenseKey,
+                expire_date: effectiveExpireDate,
+                status: 'ACTIVE',
+                is_unlimited: planConfig.isUnlimited,
+                max_users: selectedPlan === 'ENTERPRISE' ? 50 : 5,
+                plan: selectedPlan,
+                max_customers: planConfig.maxCustomers,
+                max_documents: planConfig.maxDocuments,
+                price_paid: pricePaid,
+                features: planConfig.isUnlimited
+                    ? ['ALL_MODULES', 'OFFLINE_STORAGE', 'UNLIMITED_CUSTOMERS', 'UNLIMITED_DOCUMENTS']
+                    : ['BASIC_MODULES'],
+                hwid: clientHwid.trim(),
+                contact_person: clientName.trim(),
+                phone: clientPhone.trim(),
+                notes: notes.trim()
+            };
 
-        licenseGeneratorService.saveLicenseRecord(newRecord);
-        setGeneratedRecord(newRecord);
-        loadLicenses();
+            const apiCandidates = [
+                `${resolvedServerUrl}/tenant-manager.php`,
+                `${resolvedServerUrl}/host-backend/tenant-manager.php`
+            ];
+            let response: Response | null = null;
+            let data: any = null;
+            for (const apiUrl of apiCandidates) {
+                try {
+                    const candidate = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Admin-Secret': cleanAdminSecret
+                        },
+                        body: JSON.stringify(payload),
+                        cache: 'no-store'
+                    });
+                    response = candidate;
+                    data = await candidate.json().catch(() => null);
+                    if (candidate.status !== 404) break;
+                } catch (error) {
+                    if (apiUrl === apiCandidates[apiCandidates.length - 1]) throw error;
+                }
+            }
+
+            if (!response?.ok || data?.success !== true) {
+                throw new Error(data?.message || 'ثبت لایسنس در سرور ناموفق بود. تنظیمات سرور و کلید مدیریت را بررسی کنید.');
+            }
+
+            const newRecord: LicenseRecord = {
+                id: 'LIC-SERVER-' + workspaceId,
+                licenseKey: newLicenseKey,
+                activationCode: '',
+                workspaceId,
+                serverUrl: resolvedServerUrl,
+                clientName: clientName.trim(),
+                clientPhone: clientPhone.trim(),
+                hwid: clientHwid.trim(),
+                plan: selectedPlan,
+                maxCustomers: planConfig.maxCustomers,
+                maxDocuments: planConfig.maxDocuments,
+                isUnlimited: planConfig.isUnlimited,
+                issueDate: new Date().toISOString().slice(0, 10),
+                expireDate: effectiveExpireDate,
+                pricePaid,
+                notes,
+                status: 'ACTIVE'
+            };
+
+            try { window.sessionStorage.setItem('ashk_mother_admin_secret', cleanAdminSecret); } catch {}
+            licenseGeneratorService.saveLicenseRecord(newRecord);
+            setGeneratedRecord(newRecord);
+            await handleLoadServerLicenses();
+            loadLicenses();
+        } catch (error: any) {
+            setIssueError(error?.message || 'ثبت امن لایسنس روی سرور انجام نشد.');
+        } finally {
+            setIsIssuing(false);
+        }
     };
 
     const handleCopyCustomerMessage = (rec: LicenseRecord) => {
@@ -126,10 +296,39 @@ const LicenseManager: React.FC = () => {
         setTimeout(() => setCopiedMessage(false), 2500);
     };
 
-    const handleRevoke = (id: string) => {
-        if (window.confirm('آیا از غیرفعال‌سازی این لایسنس اطمینان دارید؟')) {
+    const handleRevoke = async (id: string) => {
+        const record = licenses.find(item => item.id === id);
+        if (!record) return;
+        if (!window.confirm('آیا از غیرفعال‌سازی این لایسنس در سرور مطمئن هستید؟')) return;
+        if (!adminSecret.trim()) {
+            alert('ابتدا کلید مدیریت سرور را در بخش اتصال پرتال وارد کنید.');
+            return;
+        }
+        if (!record.workspaceId || !record.serverUrl) {
+            alert('این رکورد قدیمی فقط در حافظه مرورگر ثبت شده و شناسه سروری ندارد؛ ابطال سروری برای آن ممکن نیست.');
+            return;
+        }
+        try {
+            const baseUrl = getSecureServerBaseUrl(record.serverUrl);
+            let response: Response | null = null;
+            let data: any = null;
+            for (const apiUrl of [`${baseUrl}/tenant-manager.php`, `${baseUrl}/host-backend/tenant-manager.php`]) {
+                const candidate = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Secret': adminSecret.trim() },
+                    body: JSON.stringify({ action: 'revoke_license', workspace_id: record.workspaceId }),
+                    cache: 'no-store'
+                });
+                response = candidate;
+                data = await candidate.json().catch(() => null);
+                if (candidate.status !== 404) break;
+            }
+            if (!response?.ok || data?.success !== true) throw new Error(data?.message || 'ابطال سروری انجام نشد.');
             licenseGeneratorService.revokeLicense(id);
-            loadLicenses();
+            await handleLoadServerLicenses();
+            alert('لایسنس در سرور نیز غیرفعال شد.');
+        } catch (error: any) {
+            alert(error?.message || 'خطا در ارتباط با سرور مادر.');
         }
     };
 
@@ -168,7 +367,7 @@ const LicenseManager: React.FC = () => {
                             </span>
                         </div>
                         <p className="text-xs text-slate-400 mt-1">
-                            تولید لایسنس‌های متصل به سخت‌افزار، فعال‌سازی آفلاین و رصد مشتریان اشک قلم
+                            صدور، ثبت و ابطال لایسنس‌ها در سرور مادر؛ کلاینت‌ها فقط فعال‌سازی آنلاین دارند
                         </p>
                     </div>
                 </div>
@@ -188,6 +387,38 @@ const LicenseManager: React.FC = () => {
                 </div>
             </div>
 
+            {/* Server-only licensing controls: these settings exist only in the mother web portal. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-900 border border-amber-500/30 rounded-2xl p-5">
+                <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-200">سرور مرکزی لایسنس (ثابت در تنظیمات پروژه)</label>
+                    <input
+                        type="url"
+                        value={licenseServerUrl}
+                        readOnly
+                        placeholder="https://acc.ashkghalam.ir"
+                        required
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono text-left"
+                        dir="ltr"
+                    />
+                </div>
+                <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-200">کلید مدیریت سرور (Admin Secret)</label>
+                    <input
+                        type="password"
+                        autoComplete="current-password"
+                        value={adminSecret}
+                        onChange={e => setAdminSecret(e.target.value)}
+                        placeholder="از فایل سمت سرور workspaces_auth.json"
+                        className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs text-white font-mono text-left"
+                        dir="ltr"
+                    />
+                </div>
+                <p className="md:col-span-2 text-[11px] text-slate-400 leading-relaxed">
+                    کلید مدیریت فقط در درخواست‌های احراز هویت‌شده به سرور مرکزی ارسال می‌شود و در رکورد لایسنس ذخیره نمی‌شود. نشانی سرور ثابت است تا کلید به میزبان دیگری ارسال نشود. بدون تأیید سرور، صدور لایسنس متوقف خواهد شد.
+                </p>
+                {issueError && <p className="md:col-span-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-xl p-3">{issueError}</p>}
+            </div>
+
             {/* Navigation Tabs */}
             <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
                 <button
@@ -199,7 +430,7 @@ const LicenseManager: React.FC = () => {
                     }`}
                 >
                     <Plus className="w-4 h-4" />
-                    <span>صدور لایسنس و کد فعال‌سازی جدید</span>
+                    <span>صدور لایسنس و ثبت در سرور</span>
                 </button>
 
                 <button
@@ -238,7 +469,7 @@ const LicenseManager: React.FC = () => {
                                 <KeyRound className="w-5 h-5 text-teal-400" />
                                 <span>مشخصات خریدار و پارامترهای قفل سخت‌افزاری</span>
                             </h2>
-                            <span className="text-[11px] text-slate-400">تولید خودکار کد با امضای HMAC</span>
+                            <span className="text-[11px] text-slate-400">ثبت امن لایسنس در سرور مادر</span>
                         </div>
 
                         <form onSubmit={handleGenerateLicense} className="space-y-4">
@@ -361,35 +592,35 @@ const LicenseManager: React.FC = () => {
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                         <button
                                             type="button"
-                                            onClick={() => setExpireDate('1404-01-30')}
+                                            onClick={() => setExpireDate(new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10))}
                                             className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] transition cursor-pointer"
                                         >
                                             ۱ ماهه
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setExpireDate('1404-03-31')}
+                                            onClick={() => setExpireDate(new Date(Date.now() + 90 * 86400000).toISOString().slice(0, 10))}
                                             className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] transition cursor-pointer"
                                         >
                                             ۳ ماهه
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setExpireDate('1404-06-31')}
+                                            onClick={() => setExpireDate(new Date(Date.now() + 180 * 86400000).toISOString().slice(0, 10))}
                                             className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] transition cursor-pointer"
                                         >
                                             ۶ ماهه
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setExpireDate('1404-12-29')}
+                                            onClick={() => setExpireDate(new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10))}
                                             className="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] transition cursor-pointer"
                                         >
                                             ۱ ساله
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setExpireDate('1410-12-29')}
+                                            onClick={() => setExpireDate('9999-12-31')}
                                             className="px-2 py-0.5 rounded-lg bg-teal-500/20 text-teal-300 border border-teal-500/30 text-[10px] font-bold transition cursor-pointer"
                                         >
                                             مادام‌العمر (دائمی)
@@ -398,12 +629,12 @@ const LicenseManager: React.FC = () => {
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-1.5">
-                                        <label className="text-xs font-bold text-slate-300">تاریخ انقضا (جلالی):</label>
+                                        <label className="text-xs font-bold text-slate-300">تاریخ انقضا (میلادی، YYYY-MM-DD):</label>
                                         <input
                                             type="text"
                                             value={expireDate}
                                             onChange={e => setExpireDate(e.target.value)}
-                                            placeholder="1410-12-29"
+                                            placeholder="2027-10-19"
                                             className="w-full bg-slate-950 border border-slate-700/80 rounded-2xl p-3 text-white text-xs outline-none focus:border-teal-500 font-mono transition text-left"
                                             dir="ltr"
                                         />
@@ -427,10 +658,11 @@ const LicenseManager: React.FC = () => {
 
                             <button
                                 type="submit"
-                                className="w-full py-4 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs shadow-lg shadow-teal-900/30 transition flex items-center justify-center gap-2 cursor-pointer mt-2"
+                                disabled={isIssuing}
+                                className="w-full py-4 rounded-2xl disabled:opacity-50 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white font-black text-xs shadow-lg shadow-teal-900/30 transition flex items-center justify-center gap-2 cursor-pointer mt-2"
                             >
                                 <Sparkles className="w-4 h-4" />
-                                <span>صدور لایسنس و تولید کد فعال‌سازی آفلاین</span>
+                                <span>{isIssuing ? 'در حال ثبت امن روی سرور…' : 'ثبت لایسنس در سرور مادر'}</span>
                             </button>
                         </form>
                     </div>
@@ -445,7 +677,7 @@ const LicenseManager: React.FC = () => {
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-bold text-white">لایسنس با موفقیت صادر گردید!</h3>
-                                        <p className="text-xs text-slate-400">کدهای زیر آماده تحویل به خریدار هستند</p>
+                                        <p className="text-xs text-slate-400">اطلاعات زیر پس از ثبت سروری آماده تحویل به مشتری هستند</p>
                                     </div>
                                 </div>
 
@@ -457,9 +689,9 @@ const LicenseManager: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="pt-2 border-t border-slate-800">
-                                        <div className="text-[11px] text-slate-400">کد فعال‌سازی آفلاین دستگاه (Activation Code):</div>
+                                        <div className="text-[11px] text-slate-400">شناسه فضای کاری ثبت‌شده در سرور:</div>
                                         <div className="font-mono font-bold text-emerald-400 text-sm mt-0.5 tracking-wider select-all">
-                                            {generatedRecord.activationCode}
+                                            {generatedRecord.workspaceId || '—'}
                                         </div>
                                     </div>
                                 </div>
@@ -486,7 +718,7 @@ const LicenseManager: React.FC = () => {
                                 </div>
 
                                 <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 text-[11px] text-slate-400 leading-relaxed">
-                                    💡 کاربر این دو کد را در نسخه دسکتاپ خود وارد کرده و بلافاصله سقف ۲۰ مشتری و ۲۰۰ سند به صورت دائمی برداشته خواهد شد.
+                                    💡 فعال‌سازی فقط پس از تأیید سرور مادر و مطابق پلن ثبت‌شده انجام می‌شود؛ کد آفلاین قابل جعل دیگر تولید نمی‌شود.
                                 </div>
                             </div>
                         ) : (
@@ -497,7 +729,7 @@ const LicenseManager: React.FC = () => {
                                 <div className="space-y-1">
                                     <h3 className="text-sm font-bold text-white">هنوز لایسنسی صادر نشده است</h3>
                                     <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-                                        اطلاعات خریدار و شناسه سخت‌افزاری (HWID) او را در فرم روبرو وارد کنید تا کد لایسنس و فعال‌سازی فوری تولید شود.
+                                        اطلاعات خریدار را وارد کنید؛ لایسنس فقط پس از ثبت موفق در سرور مادر صادر می‌شود.
                                     </p>
                                 </div>
                             </div>
@@ -523,6 +755,14 @@ const LicenseManager: React.FC = () => {
                         </div>
 
                         <button
+                            onClick={() => void handleLoadServerLicenses()}
+                            className="bg-cyan-700 hover:bg-cyan-600 text-white px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer"
+                        >
+                            <RefreshCw className="w-4 h-4" />
+                            <span>بارگذاری از سرور مادر</span>
+                        </button>
+
+                        <button
                             onClick={handleExportBackup}
                             className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-4 py-2.5 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer"
                         >
@@ -541,7 +781,7 @@ const LicenseManager: React.FC = () => {
                                     <th className="p-3.5">پلن لایسنس</th>
                                     <th className="p-3.5">شناسه دستگاه (HWID)</th>
                                     <th className="p-3.5">شماره لایسنس</th>
-                                    <th className="p-3.5">کد فعال‌سازی</th>
+                                    <th className="p-3.5">شناسه فضای کاری</th>
                                     <th className="p-3.5">تاریخ صدور / انقضا</th>
                                     <th className="p-3.5">مبلغ</th>
                                     <th className="p-3.5 text-center">عملیات</th>
@@ -568,7 +808,7 @@ const LicenseManager: React.FC = () => {
                                                 {rec.hwid}
                                             </td>
                                             <td className="p-3.5 font-mono text-slate-200">{rec.licenseKey}</td>
-                                            <td className="p-3.5 font-mono text-emerald-400">{rec.activationCode}</td>
+                                            <td className="p-3.5 font-mono text-emerald-400">{rec.workspaceId || 'قدیمی/ثبت‌نشده'}</td>
                                             <td className="p-3.5 text-slate-400 text-[11px]">
                                                 <div>صدور: {rec.issueDate}</div>
                                                 <div className="text-[10px] text-slate-500">انقضا: {rec.isUnlimited ? 'دائمی' : rec.expireDate}</div>

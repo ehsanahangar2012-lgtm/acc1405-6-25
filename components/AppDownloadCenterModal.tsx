@@ -18,35 +18,36 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
   if (!isOpen) return null;
 
   const RELEASE_DATE_SHAMSI = APP_RELEASE_DATE;
+  const releaseBase = 'https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download';
 
   const downloadPackages = [
     {
       id: 'win-installer',
       title: 'نرم‌افزار نسخه ویندوز (فایل نصبی Setup)',
       filename: `AshkeGhalam-Setup-v${APP_VERSION}.exe`,
-      url: `/downloads/AshkeGhalam-Setup-v${APP_VERSION}.exe`,
-      platform: 'ویندوز ۷، ۱۰، ۱۱ (مستقل C++ / WebView2)',
-      description: 'نصب خودکار، ایجاد میانبر دسکتاپ، تفکیک امن دیتابیس در AppData بدون پاک شدن در آپدیت',
+      url: `${releaseBase}/AshkeGhalam-Setup-v${APP_VERSION}.exe`,
+      platform: 'ویندوز ۱۰ و ۱۱ (Electron؛ بسته مستقل دسکتاپ)',
+      description: 'نصب خودکار و ایجاد میانبر؛ داده‌های کاربر در مسیر داده برنامه نگهداری می‌شوند.',
       icon: Monitor,
       badge: 'پیشنهادی دسکتاپ',
-      size: 'نسخه سبک بومی C++'
+      size: 'نصب‌کننده ویندوز'
     },
     {
       id: 'win-portable-zip',
       title: 'بسته جامع و مستقل ویندوز (ZIP - یک کلیک)',
       filename: `AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`,
-      url: `/downloads/AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`,
-      platform: 'ویندوز ۷، ۱۰، ۱۱ (استخراج و اجرای فوری با Run-AshkeGhalam.bat)',
-      description: 'بسته کامل شامل فرانت‌اند، کلاینت بومی C++، اسکریپت‌های ۱-کلیک و ایزولاسیون کامل دیتابیس در AppData',
+      url: `${releaseBase}/AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`,
+      platform: 'ویندوز ۱۰ و ۱۱ (Portable EXE داخل ZIP)',
+      description: 'آرشیو شامل نسخه Portable ویندوز و راهنمای اجرا؛ برای جابه‌جایی یا نگهداری آسان.',
       icon: HardDrive,
-      badge: '۱۰۰٪ تضمینی بدون پیش‌نیاز',
+      badge: 'بدون نصب',
       size: 'بسته کامل نرم‌افزار'
     },
     {
       id: 'android-apk',
       title: 'اپلیکیشن اختصاصی اندروید (فایل نصبی APK)',
       filename: `AshkeGhalam-v${APP_VERSION}.apk`,
-      url: `/downloads/AshkeGhalam-v${APP_VERSION}.apk`,
+      url: `${releaseBase}/AshkeGhalam-v${APP_VERSION}.apk`,
       platform: 'اندروید ۷.۰ به بالا (گوشی، تبلت و پوز اندرویدی)',
       description: 'اسکن بارکد با دوربین، ثبت فاکتور ویزیتوری، کاردکس آفلاین و ارسال پیامک سیم‌کارتی',
       icon: Smartphone,
@@ -57,7 +58,7 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
       id: 'host-zip',
       title: 'بسته جامع استقرار روی هاست اشتراکی (ZIP)',
       filename: `ashke-ghalam-host-v${APP_VERSION}.zip`,
-      url: `/downloads/ashke-ghalam-host-v${APP_VERSION}.zip`,
+      url: `${releaseBase}/ashke-ghalam-host-v${APP_VERSION}.zip`,
       platform: 'وب‌سرور آپاچی / لایت‌اسپید / لینوکس cPanel',
       description: 'محتوای کامل فرانت‌اند و بک‌اند PHP به همراه .htaccess و ساختار جداول دیتابیس',
       icon: Server,
@@ -67,7 +68,7 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
   ];
 
   const handleCopyLink = (url: string, id: string) => {
-    const fullUrl = window.location.origin + url;
+    const fullUrl = /^https?:\/\//i.test(url) ? url : new URL(url, window.location.origin).toString();
     navigator.clipboard.writeText(fullUrl);
     setCopiedLink(id);
     setTimeout(() => setCopiedLink(null), 2500);
@@ -91,7 +92,7 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5">
-                تاریخ انتشار: {RELEASE_DATE_SHAMSI} | معماری بومی C++/WebView2 بدون نیاز به الکترون
+                تاریخ انتشار: {RELEASE_DATE_SHAMSI} | ویندوز فعلی: Electron · اندروید فعلی: Capacitor/WebView
               </p>
             </div>
           </div>
@@ -129,7 +130,7 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
                 <span>راهنمای هوشمند انتخاب و راه‌اندازی نسخه‌های اجرایی</span>
               </div>
               <ul className="text-xs text-amber-100/90 space-y-1.5 list-disc list-inside leading-relaxed">
-                <li><strong>ویندوز نصبی (Setup):</strong> مبتنی بر C++ و وب‌ویو نیتیو، بدون سنگینی الکترون، با حفظ صددرصدی داده‌های مالی در AppData هنگام آپدیت.</li>
+                <li><strong>ویندوز نصبی (Setup):</strong> نسخه فعلی با Electron بسته‌بندی می‌شود؛ مهاجرت به ‎.NET/SQLite در نقشه‌راه آینده است.</li>
                 <li><strong>ویندوز پرتابل (Portable):</strong> بدون نیاز به نصب، مستقیماً از روی فلش مموری یا هر پوشه‌ای با کلیک اجرا می‌شود.</li>
                 <li><strong>اندروید (APK):</strong> فایل نصبی به طور کامل تمامی موتورهای آفلاین، اسکنر بارکد و ثبت اسناد مالی را درون خود دارد و مستقل از گوگل پلی کار می‌کند.</li>
                 <li><strong>پکیج هاست (ZIP):</strong> برای استقرار نسخه ابری مرکزی سازمان بر روی هاست اشتراکی لینوکسی.</li>
@@ -141,10 +142,20 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
           <div className="bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-4 flex items-start gap-3">
             <ShieldCheck className="w-6 h-6 text-emerald-400 shrink-0 mt-0.5" />
             <div className="text-xs text-emerald-200/90 leading-relaxed">
-              <strong className="text-emerald-300 block mb-1">معماری بومی بدون الکترون و تضمین امنیت در شرایط محدودیت اینترنت:</strong>
-              کلیه فایل‌های زیر بسته‌های باینری کامپایل‌شده نهایی هستند. هیچ‌گونه فایل سورس‌کد خام در این بخش وجود ندارد و کلیه فرآیندها به صورت مستقل و ۱۰۰٪ آفلاین عمل می‌کنند.
+              <strong className="text-emerald-300 block mb-1">وضعیت فعلی بسته‌های اجرایی:</strong>
+              پیوندهای دانلود رسمی پس از انتشار نسخه امضاشده فعال می‌شوند. ساخت فعلی ویندوز بدون گواهی ناشر و APK با امضای debug/test تولید شده است؛ این بسته‌ها فقط برای آزمون داخلی هستند، نه توزیع تجاری. خروجی آزمایشی را از Actions دریافت کنید.
             </div>
           </div>
+
+            <a
+              href="https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/actions/workflows/build-apk.yml"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 hover:text-emerald-200 underline underline-offset-4"
+            >
+              مشاهده اجراهای ساخت و بخش Artifacts در GitHub Actions
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
 
           {/* Download Packages Cards */}
           <div className="space-y-3.5">
@@ -225,10 +236,10 @@ export const AppDownloadCenterModal: React.FC<AppDownloadCenterModalProps> = ({ 
           <div className="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4 text-xs text-slate-300 leading-relaxed space-y-2">
             <div className="font-bold text-slate-200 flex items-center gap-1.5">
               <Cpu className="w-4 h-4 text-cyan-400" />
-              <span>موتور اجرای بومی و مستقل C++ اشک قلم</span>
+              <span>موتور اجرای فعلی دسکتاپ: Electron</span>
             </div>
             <p>
-              کلیه فایل‌های نصبی و خروجی بالا در شاخه کدهای پروژه و همچنین در مسیر <code className="text-emerald-400 font-mono">/downloads</code> قرار گرفته‌اند تا بدون نیاز به کامپایل مجدد، مستقیماً توسط کاربران دانلود و اجرا گردند.
+              برای انتشار عمومی، نسخه باید با برچسب v{APP_VERSION} منتشر و بسته‌های ویندوز و اندروید با گواهی/کلید ناشر امضا شوند. خروجی‌های unsigned یا debug فقط برای آزمون داخلی‌اند.
             </p>
           </div>
 

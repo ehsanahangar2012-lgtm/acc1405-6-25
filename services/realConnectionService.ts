@@ -1,5 +1,6 @@
 // سرویس تشخیص اتصال واقعی به هاست
-import { API_CONFIG } from '../config';
+import { API_CONFIG, IS_BROWSER_PREVIEW } from '../config';
+import { workspaceService } from './workspaceService';
 
 class RealConnectionService {
   private isHostOnline = false;
@@ -38,7 +39,7 @@ class RealConnectionService {
 
   // چک اتصال واقعی به هاست
   private async checkHostConnection(): Promise<boolean> {
-    if (typeof window === 'undefined') return false;
+    if (IS_BROWSER_PREVIEW || typeof window === 'undefined' || !workspaceService.isRemoteCloudConfigured()) return false;
     
     try {
       const controller = new AbortController();
@@ -62,10 +63,23 @@ class RealConnectionService {
 
   // چک همزمان اتصال
   private async checkConnections() {
+    if (IS_BROWSER_PREVIEW) {
+      this.isHostOnline = false;
+      this.updateStatus(false);
+      return;
+    }
     if (typeof navigator === 'undefined') return;
     
     if (!navigator.onLine) {
       this.updateStatus(false);
+      return;
+    }
+
+    // Standalone Windows/Android clients should not contact the hosted health endpoint.
+    // Their online indicator follows the device network state until a remote workspace is configured.
+    if (!workspaceService.isRemoteCloudConfigured()) {
+      this.isHostOnline = false;
+      this.updateStatus(true);
       return;
     }
 
@@ -88,6 +102,7 @@ class RealConnectionService {
 
   // وضعیت فعلی
   isOnline(): boolean {
+    if (IS_BROWSER_PREVIEW) return false;
     if (typeof window === 'undefined' || typeof navigator === 'undefined') return false;
     return this.isHostOnline || navigator.onLine;
   }

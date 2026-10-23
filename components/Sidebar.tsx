@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { useStore } from '../store';
 import { UserPermissions } from '../types';
-import { isDesktopApp } from '../utils';
+import { isDesktopApp, isAndroidApp, isMotherWebPortal } from '../utils';
 import { AccountingLogo } from './AccountingLogo';
 import { PlatformCopyService } from '../services/platformCopyService';
 import { AppDownloadCenterModal } from './AppDownloadCenterModal';
@@ -43,6 +43,8 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isDesktop = isDesktopApp();
+  const isNativeClient = isDesktop || isAndroidApp();
+  const isMotherPortal = isMotherWebPortal();
 
   const navRef = useRef<HTMLElement>(null);
   const [canScrollDown, setCanScrollDown] = useState(false);
@@ -119,14 +121,14 @@ const Sidebar = () => {
       icon: Sparkles,
       perm: 'settings',
       items: [
-        ...(!isDesktop ? [{ to: '/license-manager', icon: KeyRound, label: 'تولید لایسنس و فعال‌سازی کلاینت‌ها (HWID)', perm: 'settings' }] : []),
+        ...(isMotherPortal ? [{ to: '/license-manager', icon: KeyRound, label: 'صدور لایسنس و مدیریت کلاینت‌ها (پرتال مدیر)', perm: 'settings' }] : []),
         { to: '/moadian', icon: Landmark, label: 'سامانه مؤدیان مالیاتی', perm: 'finance' },
         { to: '/pos-terminal', icon: CreditCard, label: 'کارتخوان بانکی (PC-POS)', perm: 'finance' },
         { to: '/cloud-vault', icon: Cloud, label: 'پشتیبان ابری (Cloud Vault)', perm: 'settings' },
         { to: '/sms-center', icon: MessageSquare, label: 'پنل پیامک هوشمند', perm: 'finance' },
         { to: '/multi-user-lan', icon: Network, label: 'شبکه محلی چندکاربره', perm: 'settings' },
         { to: '/client-broadcast', icon: Megaphone, label: isDesktop ? 'اطلاعیه‌ها و تخفیف‌ها' : 'انتشار اطلاعیه به کلاینت‌ها', perm: 'settings' },
-        { to: '/install-android', icon: Smartphone, label: 'تولید برنامه مستقل (ویندوز / اندروید)', badge: 'مستقل' },
+        { to: '/install-android', icon: Smartphone, label: isMotherPortal ? 'ساخت نسخه‌ها و مدیریت اتصال' : 'اتصال سرور و فعال‌سازی لایسنس', badge: isMotherPortal ? 'پرتال' : 'کلاینت' },
         { to: '/mobile-catalog', icon: BookOpen, label: 'کاتالوگ ویزیتوری همراه + امضای لمسی', badge: 'ویزیتور' },
         { to: '/catalog', icon: BookOpen, label: 'کاتالوگ و معرفی محصول', badge: 'کاتالوگ' },
         { to: '/support-sla', icon: Headphones, label: 'پشتیبانی و تمدید سالانه', perm: 'settings' },
@@ -147,7 +149,7 @@ const Sidebar = () => {
   ];
 
   const bottomItems: SidebarNavItem[] = [
-    ...(!isDesktop ? [{ to: '/debug-center', icon: FileCode2, label: 'مرکز دیباگ سیستم', perm: 'settings' }] : []),
+    ...(isMotherPortal ? [{ to: '/debug-center', icon: FileCode2, label: 'مرکز دیباگ سیستم', perm: 'settings' }] : []),
     { to: '/updates', icon: DownloadCloud, label: 'مرکز آپدیت (OTA)', badge: 'جدید' },
     { to: '/settings', icon: Settings, label: 'تنظیمات عمومی', perm: 'settings', shortcut: 'Alt+9', keyCombo: ['Alt', '9'] },
     { to: '/help', icon: HelpCircle, label: 'آموزش و راهنما' },
@@ -414,17 +416,19 @@ const Sidebar = () => {
             سیستم و تنظیمات
           </div>
           {bottomItems.map(item => renderLink(item))}
-          
-          {/* Download App Package Button */}
-          <button
-            type="button"
-            onClick={() => setIsDownloadModalOpen(true)}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all duration-200 text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-500/30 group mt-2 font-bold text-xs"
-            title="دانلود نسخه‌های مستقل نصبی ویندوز، اندروید و هاست"
-          >
-            <FolderArchive className="w-4 h-4 shrink-0 text-emerald-400 group-hover:scale-110 transition-transform" />
-            <span className="truncate">مرکز دانلود نرم‌افزار (EXE / APK)</span>
-          </button>
+
+          {/* Download App Package Button: owner web portal only */}
+          {isMotherPortal && (
+            <button
+              type="button"
+              onClick={() => setIsDownloadModalOpen(true)}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl transition-all duration-200 text-emerald-400 hover:text-emerald-300 bg-emerald-950/40 hover:bg-emerald-950/70 border border-emerald-500/30 group mt-2 font-bold text-xs"
+              title="دانلود نسخه‌های مستقل نصبی ویندوز، اندروید و هاست"
+            >
+              <FolderArchive className="w-4 h-4 shrink-0 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span className="truncate">مرکز دانلود نرم‌افزار (EXE / APK)</span>
+            </button>
+          )}
         </div>
       </nav>
 

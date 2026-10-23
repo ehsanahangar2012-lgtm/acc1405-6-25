@@ -10,12 +10,15 @@ import { hardwareIdService } from '../services/hardwareIdService';
 import { androidCommercialService } from '../services/androidCommercialService';
 import { workspaceService } from '../services/workspaceService';
 import { APP_VERSION, APP_RELEASE_DATE } from '../config';
+import { isAndroidApp, isDesktopApp, isMotherWebPortal } from '../utils';
 
 const InstallAndroid: React.FC = () => {
     const { addNotification } = useStore();
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isInstalled, setIsInstalled] = useState(false);
-    const [activeTab, setActiveTab] = useState<'windows' | 'apk' | 'pwa' | 'sync' | 'license'>('windows');
+    const isNativeClient = isDesktopApp() || isAndroidApp();
+    const isMotherPortal = isMotherWebPortal();
+    const [activeTab, setActiveTab] = useState<'windows' | 'apk' | 'pwa' | 'sync' | 'license'>(() => isMotherPortal ? 'windows' : isNativeClient ? 'sync' : 'pwa');
     const [copiedAppUrl, setCopiedAppUrl] = useState(false);
     const [copiedBatContent, setCopiedBatContent] = useState(false);
     const [copiedWinBatContent, setCopiedWinBatContent] = useState(false);
@@ -32,6 +35,7 @@ const InstallAndroid: React.FC = () => {
         if (typeof window === 'undefined') return '';
         return localStorage.getItem('ashk_host_sync_token') || localStorage.getItem('ashk_cloud_token') || '';
     });
+    const [workspaceId, setWorkspaceId] = useState(() => workspaceService.getWorkspaceId());
 
     useEffect(() => {
         if (typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches) {
@@ -69,20 +73,26 @@ const InstallAndroid: React.FC = () => {
     const handleSaveAndroidSync = async () => {
         const trimmedUrl = hostUrl.trim();
         const trimmedToken = syncToken.trim();
-        if (trimmedUrl) {
-            localStorage.setItem('ashk_host_url', trimmedUrl);
-            localStorage.setItem('ashk_custom_server_url', trimmedUrl);
+        const trimmedWorkspaceId = workspaceId.trim();
+
+        if (!trimmedUrl || !trimmedToken || !trimmedWorkspaceId) {
+            addNotification('error', 'آدرس سرور، شناسه فضای کاری و توکن اختصاصی را کامل وارد کنید.');
+            return;
         }
-        if (trimmedToken) {
-            localStorage.setItem('ashk_host_sync_token', trimmedToken);
-            localStorage.setItem('ashk_cloud_token', trimmedToken);
+
+        const result = await androidCommercialService.connectToServer(
+            trimmedUrl,
+            trimmedToken,
+            trimmedWorkspaceId
+        );
+        if (result.success) {
+            setHostUrl(trimmedUrl);
+            setSyncToken(trimmedToken);
+            setWorkspaceId(trimmedWorkspaceId);
+            addNotification('success', result.message);
+        } else {
+            addNotification('error', result.message);
         }
-        await workspaceService.updateConfig({
-            customServerUrl: trimmedUrl,
-            workspaceToken: trimmedToken,
-            standaloneOfflineMode: false
-        }).catch(() => {});
-        addNotification('success', 'تنظیمات ارتباط با سرور با موفقیت ذخیره شد.');
     };
 
     const currentLiveUrl = typeof window !== 'undefined' ? window.location.origin : 'https://acc.ashkghalam.ir';
@@ -101,7 +111,7 @@ title AshkeGhalam Accounting - Windows Standalone Launcher v${APP_VERSION}
 cls
 echo ================================================================
 echo   نرم افزار حسابداری و مدیریت مالی اشک قلم - نگارش ${APP_VERSION}
-echo   معماری بومی بدون نیاز به الکترون (Native C++ / WebView2)
+echo   نسخه فعلی Electron؛ مهاجرت ‎.NET/SQLite در نقشه‌راه آینده
 echo ================================================================
 echo.
 
@@ -115,15 +125,19 @@ echo.
 
 if exist "AshkeGhalam-Portable-v${APP_VERSION}.exe" (
     start "" "AshkeGhalam-Portable-v${APP_VERSION}.exe"
-) else if exist "AshkeGhalam-Setup-v${APP_VERSION}.exe" (
+    exit /b 0
+)
+if exist "AshkeGhalam-Setup-v${APP_VERSION}.exe" (
     start "" "AshkeGhalam-Setup-v${APP_VERSION}.exe"
-) else (
-    echo [اطلاعیه] در حال راه اندازی پرتابل از فایل های محلی...
-    start "" index.html
+    exit /b 0
 )
 
-echo برنامه با موفقیت اجرا شد.
-exit /b 0`;
+echo [خطا] فایل اجرایی نسخه ${APP_VERSION} کنار این اسکریپت پیدا نشد.
+echo این اسکریپت فقط لانچر است؛ index.html جایگزین EXE مستقل نیست.
+echo بسته‌های آزمون را از بخش Artifacts در GitHub Actions دریافت کنید:
+echo https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/actions/workflows/build-apk.yml
+pause
+exit /b 1`;
 
     // اسکریپت بات اختصاصی بیلد اندروید
     const apkBatCode = `@echo off
@@ -144,8 +158,15 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-echo [1/2] پاکسازی نسخه های قدیمی و پکیج بندی جدید...
-node scripts/build-apk.js
+if not exist node_modules (
+echo [خطا] وابستگی‌های پروژه نصب نیستند.
+echo ابتدا در ریشه پروژه دستور bun install --frozen-lockfile را اجرا کنید.
+pause
+exit /b 1
+)
+
+echo [1/2] بازسازی رابط کاربری و ساخت APK...
+npm run build:apk
 if %errorlevel% neq 0 (
     echo.
     echo [خطا] در فرآیند پکیج بندی خطایی رخ داد.
@@ -154,7 +175,7 @@ if %errorlevel% neq 0 (
 )
 
 echo.
-echo [2/2] فایل نهایی AshkeGhalam-v${APP_VERSION}.apk در ریشه پروژه و پوشه downloads تولید شد.
+echo [2/2] خروجی APK در پوشه downloads تولید شد؛ برای انتشار رسمی، keystore امضای انتشار لازم است.
 echo.
 pause`;
 
@@ -211,71 +232,33 @@ pause`;
                 </div>
             </div>
 
-            {/* Navigation Tabs */}
+            {/* Build tools are owner-portal-only; installed clients only need connection and activation. */}
             <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto custom-scrollbar">
-                <button
-                    onClick={() => setActiveTab('windows')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'windows'
-                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <Monitor className="w-4 h-4" />
-                    <span>مرحله ۱: تولید بسته مستقل ویندوز (EXE / Portable)</span>
+                {isMotherPortal && (
+                    <button onClick={() => setActiveTab('windows')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'windows' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                        <Monitor className="w-4 h-4" /><span>ساخت نسخه ویندوز</span>
+                    </button>
+                )}
+                {isMotherPortal && (
+                    <button onClick={() => setActiveTab('apk')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'apk' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                        <Smartphone className="w-4 h-4" /><span>ساخت APK اندروید</span>
+                    </button>
+                )}
+                {!isNativeClient && (
+                    <button onClick={() => setActiveTab('pwa')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'pwa' ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                        <Download className="w-4 h-4" /><span>نصب PWA</span>
+                    </button>
+                )}
+                <button onClick={() => setActiveTab('sync')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'sync' ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                    <ArrowLeftRight className="w-4 h-4" /><span>اتصال سرور و همگام‌سازی</span>
                 </button>
-
-                <button
-                    onClick={() => setActiveTab('apk')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'apk'
-                            ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <Smartphone className="w-4 h-4" />
-                    <span>مرحله ۲: تولید فایل نصبی اندروید (APK) و ابزارهای ابری</span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('pwa')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'pwa'
-                            ? 'bg-teal-600 text-white shadow-lg shadow-teal-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <Download className="w-4 h-4" />
-                    <span>مرحله ۳: نصب مستقل فوری (PWA Standalone)</span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('sync')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'sync'
-                            ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <ArrowLeftRight className="w-4 h-4" />
-                    <span>مرحله ۴: پیوند همگام‌سازی ۳ سویه (ویندوز 🔄 اندروید 🔄 هاست)</span>
-                </button>
-
-                <button
-                    onClick={() => setActiveTab('license')}
-                    className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer ${
-                        activeTab === 'license'
-                            ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/30'
-                            : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                    }`}
-                >
-                    <Key className="w-4 h-4" />
-                    <span>مرحله ۵: قفل سخت‌افزاری و صدور لایسنس مستقل</span>
+                <button onClick={() => setActiveTab('license')} className={`px-5 py-3 rounded-2xl text-xs font-bold transition flex items-center gap-2 shrink-0 ${activeTab === 'license' ? 'bg-amber-600 text-white shadow-lg shadow-amber-900/30' : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'}`}>
+                    <Key className="w-4 h-4" /><span>فعال‌سازی لایسنس</span>
                 </button>
             </div>
 
             {/* TAB 1: WINDOWS STANDALONE PIPELINE */}
-            {activeTab === 'windows' && (
+            {isMotherPortal && activeTab === 'windows' && (
                 <div className="space-y-6 animate-fade-in">
                     {/* Step-by-Step Interactive Workflow */}
                     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
@@ -289,7 +272,7 @@ pause`;
                                     <span>مراحل تولید و راه‌اندازی بسته مستقل ویندوز (بدون نیاز به نصب نرم‌افزار جانبی)</span>
                                 </h2>
                                 <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                                    نرم‌افزار با معماری بومی C++ و وب‌ویو نیتیو کامپایل شده است؛ سبک و سریع با نگهداری دائمی دیتابیس در AppData.
+                                    نسخه فعلی به‌صورت برنامه مستقل دسکتاپ با Electron بسته‌بندی می‌شود؛ داده‌ها محلی نگهداری می‌شوند. مهاجرت به Tauri یا ‎.NET/SQLite هنوز انجام نشده و پس از آزمون کارایی برنامه‌ریزی می‌شود.
                                 </p>
                             </div>
 
@@ -318,11 +301,11 @@ pause`;
                             <div className={`p-5 rounded-2xl border transition-all ${activeGuideStep === 2 ? 'bg-indigo-950/60 border-indigo-500 shadow-lg' : 'bg-slate-950/70 border-white/5'}`} onClick={() => setActiveGuideStep(2)}>
                                 <div className="flex items-center justify-between mb-3">
                                     <span className="w-7 h-7 rounded-lg bg-teal-600 text-white flex items-center justify-center font-black text-xs">۲</span>
-                                    <span className="text-[10px] text-teal-400 font-bold">لانچر بومی C++</span>
+                                    <span className="text-[10px] text-teal-400 font-bold">بسته‌بندی فعلی Electron</span>
                                 </div>
-                                <h4 className="text-xs font-bold text-white mb-1.5">حذف وابستگی الکترون</h4>
+                                <h4 className="text-xs font-bold text-white mb-1.5">اجرای مستقل دسکتاپ</h4>
                                 <p className="text-[11px] text-slate-400 leading-relaxed">
-                                    اتصال مستقیم به موتور WebView2 سیستم‌عامل ویندوز با مصرف رم کمتر از ۱۰۰ مگابایت و سرعت اجرای آنی.
+                                    ساخت فعلی از Electron و Chromium استفاده می‌کند؛ بنابراین ادعای مصرف RAM زیر ۱۰۰ مگابایت یا اجرای آنی تأیید نشده است. نسخه WebView2/Tauri یا ‎.NET/SQLite باید جداگانه ساخته و با داده‌های واقعی بنچمارک شود.
                                 </p>
                             </div>
 
@@ -369,7 +352,7 @@ pause`;
                                         </p>
                                     </div>
                                     <a
-                                        href={`/downloads/AshkeGhalam-Setup-v${APP_VERSION}.exe`}
+                                        href={`https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download/AshkeGhalam-Setup-v${APP_VERSION}.exe`}
                                         download={`AshkeGhalam-Setup-v${APP_VERSION}.exe`}
                                         className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md"
                                     >
@@ -390,7 +373,7 @@ pause`;
                                         </p>
                                     </div>
                                     <a
-                                        href={`/downloads/AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`}
+                                        href={`https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download/AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`}
                                         download={`AshkeGhalam-Windows-Portable-v${APP_VERSION}.zip`}
                                         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md"
                                     >
@@ -411,7 +394,7 @@ pause`;
                                         </p>
                                     </div>
                                     <a
-                                        href={`/downloads/AshkeGhalam-Portable-v${APP_VERSION}.exe`}
+                                        href={`https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download/AshkeGhalam-Portable-v${APP_VERSION}.exe`}
                                         download={`AshkeGhalam-Portable-v${APP_VERSION}.exe`}
                                         className="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-2 px-3 rounded-lg text-xs transition flex items-center justify-center gap-2 shadow-md"
                                     >
@@ -460,7 +443,7 @@ pause`;
             )}
 
             {/* TAB 2: ANDROID STANDALONE PIPELINE (APK) */}
-            {activeTab === 'apk' && (
+            {isMotherPortal && activeTab === 'apk' && (
                 <div className="space-y-6 animate-fade-in">
                     {/* SECTION 1: Online Instant APK Builders */}
                     <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-indigo-500/20 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
@@ -575,7 +558,7 @@ pause`;
                                     </p>
                                 </div>
                                 <a
-                                    href={`/downloads/AshkeGhalam-v${APP_VERSION}.apk`}
+                                    href={`https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/releases/latest/download/AshkeGhalam-v${APP_VERSION}.apk`}
                                     download={`AshkeGhalam-v${APP_VERSION}.apk`}
                                     className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow"
                                 >
@@ -645,7 +628,7 @@ pause`;
             )}
 
             {/* TAB 3: PWA STANDALONE */}
-            {activeTab === 'pwa' && (
+            {!isNativeClient && activeTab === 'pwa' && (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 animate-fade-in">
                     <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
                         <div className="space-y-2">
@@ -710,23 +693,23 @@ pause`;
                         <span className="text-[10px] text-teal-400 font-black uppercase tracking-wider bg-teal-500/10 px-3 py-1 rounded-full border border-teal-500/20">
                             🔄 همگام‌سازی ابری و محلی ۳ سویه
                         </span>
-                        <h2 className="text-xl font-black text-white">ارتباط دائمی موبایل با ویندوز و هاست</h2>
+                        <h2 className="text-xl font-black text-white">اتصال کلاینت به سرور و سایر دستگاه‌ها</h2>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                            اطلاعات ثبت‌شده روی موبایل هنگام دسترسی به اینترنت یا شبکه محلی با دیتابیس مرکزی و نرم‌افزار ویندوز تبادل می‌شود.
+                            ابتدا لایسنس معتبر دستگاه را فعال کنید. سپس شناسه فضای کاری ثبت‌شده، آدرس سرور و توکن اختصاصی آن را وارد کنید. اتصال فقط پس از تأیید سرور ذخیره می‌شود؛ اتصال به‌تنهایی لایسنس را فعال یا سهمیه را افزایش نمی‌دهد.
                         </p>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                                 <Globe size={14} className="text-teal-400" />
-                                <span>آدرس هاست مرکزی یا سرور محلی (Host URL):</span>
+                                <span>آدرس سرور (Host URL):</span>
                             </label>
                             <input
-                                type="text"
+                                type="url"
                                 value={hostUrl}
                                 onChange={(e) => setHostUrl(e.target.value)}
-                                placeholder="https://acc.ashkghalam.ir"
+                                placeholder="https://acc.yourdomain.ir"
                                 className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-teal-500"
                             />
                         </div>
@@ -734,14 +717,29 @@ pause`;
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                                 <Key size={14} className="text-amber-400" />
-                                <span>توکن امنیتی همگام‌سازی (Sync Token):</span>
+                                <span>شناسه فضای کاری (Workspace ID):</span>
                             </label>
                             <input
                                 type="text"
+                                value={workspaceId}
+                                onChange={(e) => setWorkspaceId(e.target.value)}
+                                placeholder="client_rahimi"
+                                className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-amber-500"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                                <Key size={14} className="text-violet-400" />
+                                <span>توکن اختصاصی سرور:</span>
+                            </label>
+                            <input
+                                type="password"
+                                autoComplete="off"
                                 value={syncToken}
                                 onChange={(e) => setSyncToken(e.target.value)}
-                                placeholder="AG-HOST-VAULT-9821-SYNC-X72A"
-                                className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-amber-500"
+                                placeholder="توکن اختصاصی این مشتری"
+                                className="w-full bg-slate-950 border border-white/10 rounded-xl px-4 py-3 text-xs text-white font-mono dir-ltr focus:outline-none focus:border-violet-500"
                             />
                         </div>
                     </div>
@@ -752,7 +750,7 @@ pause`;
                             className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-xl text-xs font-black transition flex items-center gap-2 cursor-pointer shadow-lg shadow-teal-900/30"
                         >
                             <RefreshCw size={16} />
-                            <span>ذخیره تنظیمات و برقراری پیوند همگام‌سازی ۳ سویه</span>
+                            <span>تأیید لایسنس و آزمون اتصال</span>
                         </button>
 
                         <div className="text-[11px] text-slate-400 flex items-center gap-2">
@@ -771,7 +769,7 @@ pause`;
                         </span>
                         <h2 className="text-xl font-black text-white">فعال‌سازی لایسنس تجاری روی کلاینت‌ها</h2>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                            شناسه سخت‌افزاری اختصاصی دستگاه استخراج شده و کد فعال‌سازی آفلاین با امضای دیجیتال HMAC-SHA256 تولید می‌گردد.
+                            فعال‌سازی تجاری فقط با پاسخ دارای امضای دیجیتال RSA از سرور مادر انجام می‌شود؛ کدهای آفلاین قدیمی به دلیل ضعف رمزنگاری پذیرفته نمی‌شوند. کلید خصوصی امضا فقط روی سرور نگهداری می‌شود.
                         </p>
                     </div>
 
@@ -799,29 +797,22 @@ pause`;
                         <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-white flex items-center gap-2">
                                 <Globe size={18} className="text-teal-400" />
-                                <span>پیوند مستقیم با سیستم PWA و فعال‌سازی با لایسنس سرور اصلی</span>
+                                <span>ورود کد لایسنس دستگاه</span>
                             </span>
                             <span className="text-[10px] bg-teal-500/20 text-teal-300 px-3 py-1 rounded-full font-bold border border-teal-500/30">
-                                نسخه ۵۰ سندی ➔ نامحدود
+                                فقط پس از اعتبارسنجی کد مجاز است
                             </span>
                         </div>
                         <p className="text-xs text-slate-300 leading-relaxed">
-                            با برقراری پیوند، مشخصات لایسنس فعال در سرور اصلی روی این دستگاه اعمال شده و محدودیت سند و مشتری به طور کامل حذف می‌گردد.
+                            آدرس سرور و توکن را در تب «اتصال سرور و همگام‌سازی» وارد کنید. اتصال به سرور به‌تنهایی لایسنس تجاری را فعال نمی‌کند؛ کد فعال‌سازی دستگاه را از مسیر تأیید لایسنس وارد کنید.
                         </p>
                         <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
                             <button
-                                onClick={async () => {
-                                    const res = await androidCommercialService.linkToPwaAndActivate(hostUrl, syncToken);
-                                    if (res.success) {
-                                        addNotification('success', res.message);
-                                    } else {
-                                        addNotification('error', res.message);
-                                    }
-                                }}
+                                onClick={() => window.dispatchEvent(new CustomEvent('open-activation-dashboard'))}
                                 className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-900/30 w-full sm:w-auto"
                             >
                                 <RefreshCw size={16} />
-                                <span>پیوند به سیستم PWA و فعال‌سازی با لایسنس سرور</span>
+                                <span>ورود و اعتبارسنجی کد لایسنس</span>
                             </button>
 
                             <button
@@ -866,10 +857,10 @@ pause`;
                             <div className="bg-slate-950 p-4 rounded-2xl border border-white/5 space-y-1.5">
                                 <h4 className="font-bold text-indigo-400 flex items-center gap-1.5">
                                     <Monitor size={16} />
-                                    <span>۱. مزیت نسخه مستقل ویندوز C++/WebView2:</span>
+                                    <span>۱. نسخه مستقل ویندوز فعلی (Electron):</span>
                                 </h4>
                                 <p>
-                                    به جای استفاده از الکترون که صدها مگابایت رم اشغال می‌کند، برنامه با کلاینت بومی C++ و وب‌ویو نیتیو سیستم‌عامل ویندوز اجرا می‌شود. دیتابیس در مسیر <code className="text-indigo-300 font-mono">%APPDATA%\AshkeGhalam</code> نگهداری شده و با حذف یا ارتقای نرم‌افزار، اطلاعات پاک نمی‌شود.
+                                    نسخه فعلی با Electron بسته‌بندی می‌شود و موتور Chromium دارد؛ بنابراین مصرف RAM و حجم بسته باید اندازه‌گیری شود، نه اینکه مصرف زیر ۱۰۰ مگابایت فرض شود. مسیر داده‌ها باید در آزمون ارتقا و حذف بررسی شود. گزینه‌های Tauri یا ‎.NET/SQLite در مرحله بعد ارزیابی می‌شوند.
                                 </p>
                             </div>
 

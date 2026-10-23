@@ -1,12 +1,11 @@
 import { API_CONFIG } from '../config';
 import { DashboardStats, Check, Product, Voucher } from "../types";
 import { idbService } from './indexedDBService';
+import { workspaceService } from './workspaceService';
 
 const AI_CACHE_STORE = 'ai_responses_cache';
 
-const getApiToken = () => {
-  return import.meta.env.VITE_API_TOKEN || 'secure_api_token_change_this';
-};
+
 
 /**
  * دریافت کش یا فراخوانی API
@@ -43,7 +42,7 @@ const getOrCallGemini = async (cacheKey: string, contents: any, responseSchema?:
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': getApiToken()
+                ...await workspaceService.getSecureHeaders()
             },
             body: JSON.stringify(payload),
             signal: controller.signal

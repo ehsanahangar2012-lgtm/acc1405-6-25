@@ -8,6 +8,7 @@ import { useStore } from '../store';
 import { notificationService } from '../services/notificationService';
 import { adminChatNotificationService, SupportChatMessage } from '../services/adminChatNotificationService';
 import { toPersianDigits } from '../utils';
+import { workspaceService } from '../services/workspaceService';
 
 interface ChatMessage {
   id: string;
@@ -15,9 +16,13 @@ interface ChatMessage {
   sender: 'user' | 'support' | 'system';
   senderName?: string;
   phone?: string;
+  workspace_id?: string;
   timestamp: string | Date;
   synced_to_mother?: boolean;
 }
+
+const getSupportHistoryKey = () => `ashk_support_chat_history:${workspaceService.getWorkspaceId()}`;
+const getSupportPhoneKey = () => `ashk_support_phone:${workspaceService.getWorkspaceId()}`;
 
 const SupportChat: React.FC = () => {
   const currentUser = useStore(state => state.currentUser);
@@ -32,10 +37,12 @@ const SupportChat: React.FC = () => {
   // بررسی وضعیت ادمین
   const isAdmin = currentUser?.roleId === 'admin' || currentUser?.username === 'admin' || currentUser?.roleId === 'MANAGER';
   const [sendAsAdmin, setSendAsAdmin] = useState<boolean>(isAdmin);
+  const isMotherPortal = ['default', 'main'].includes(workspaceService.getWorkspaceId());
+  const [replyWorkspaceId, setReplyWorkspaceId] = useState('');
 
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
-      const saved = localStorage.getItem('ashk_support_chat_history');
+      const saved = localStorage.getItem(getSupportHistoryKey());
       if (saved) return JSON.parse(saved);
     } catch {}
     return [
@@ -51,7 +58,7 @@ const SupportChat: React.FC = () => {
   });
 
   const [newMessage, setNewMessage] = useState('');
-  const [userPhone, setUserPhone] = useState(() => localStorage.getItem('ashk_support_phone') || '');
+  const [userPhone, setUserPhone] = useState(() => localStorage.getItem(getSupportPhoneKey()) || '');
   const [isSending, setIsSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +94,7 @@ const SupportChat: React.FC = () => {
   // ذخیره پیام‌ها در لوکال‌استوریج
   useEffect(() => {
     try {
-      localStorage.setItem('ashk_support_chat_history', JSON.stringify(messages));
+      localStorage.setItem(getSupportHistoryKey(), JSON.stringify(messages));
     } catch {}
   }, [messages]);
 
@@ -124,19 +131,24 @@ const SupportChat: React.FC = () => {
     }
     try {
       setIsCheckingServer(true);
+      const secureHeaders = await workspaceService.getSecureHeaders();
       const res = await fetch('/host-backend/api.php?action=support_chat', {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json', ...secureHeaders }
       });
       if (res.ok) {
         const data = await res.json();
         setServerOnline(data.status === 'online');
-        if (data.messages && Array.isArray(data.messages) && data.messages.length > 0) {
+        if (data.messages && Array.isArray(data.messages)) {
           setMessages(prev => {
             const map = new Map<string, ChatMessage>();
             prev.forEach(m => map.set(m.id, m));
             data.messages.forEach((m: ChatMessage) => map.set(m.id, m));
             return Array.from(map.values());
           });
+          if (isMotherPortal) {
+            const latestWorkspace = [...data.messages].reverse().find((m: ChatMessage) => m.workspace_id)?.workspace_id;
+            if (latestWorkspace) setReplyWorkspaceId(current => current || latestWorkspace);
+          }
         }
       } else {
         setServerOnline(false);
@@ -146,7 +158,7 @@ const SupportChat: React.FC = () => {
     } finally {
       setIsCheckingServer(false);
     }
-  }, []);
+  }, [isMotherPortal]);
 
   // بررسی دوره‌ای سرور
   useEffect(() => {
@@ -163,11 +175,16 @@ const SupportChat: React.FC = () => {
     const textToSend = newMessage.trim();
     const phoneToSave = userPhone.trim();
     if (phoneToSave) {
-      localStorage.setItem('ashk_support_phone', phoneToSave);
+      localStorage.setItem(getSupportPhoneKey(), phoneToSave);
     }
 
     const localMsgId = 'msg_' + Date.now();
-    const isSendingAsSupport = isAdmin && sendAsAdmin;
+    const isSendingAsSupport = isAdmin && sendAsAdmin && isMotherPortal;
+    if (isSendingAsSupport && !replyWorkspaceId) {
+      notificationService.notify('warning', 'برای پاسخ‌گویی، ابتدا فضای کاری مشتری را انتخاب کنید.');
+      return;
+    }
+    const workspaceId = workspaceService.getWorkspaceId();
 
     const userMsg: ChatMessage = {
       id: localMsgId,
@@ -177,6 +194,7 @@ const SupportChat: React.FC = () => {
         ? `${currentUser?.fullName || 'ادمین پشتیبانی'} (سرور مادر)`
         : (currentUser?.fullName || 'کاربر سیستم'),
       phone: phoneToSave,
+      workspace_id: isSendingAsSupport ? replyWorkspaceId : workspaceId,
       timestamp: new Date().toISOString(),
       synced_to_mother: false
     };
@@ -187,20 +205,24 @@ const SupportChat: React.FC = () => {
 
     // ارسال به وب‌سرور مادر
     try {
+      const secureHeaders = await workspaceService.getSecureHeaders();
       const res = await fetch('/host-backend/api.php?action=support_chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...secureHeaders },
         body: JSON.stringify({
+          workspace_id: workspaceId,
+          target_workspace_id: isSendingAsSupport ? replyWorkspaceId : undefined,
           text: textToSend,
           sender: isSendingAsSupport ? 'support' : 'user',
           senderName: userMsg.senderName,
           phone: phoneToSave
         })
       });
+      const result = await res.json().catch(() => null);
 
-      if (res.ok) {
+      if (res.ok && result?.success === true) {
         setServerOnline(true);
-        setMessages(prev => prev.map(m => m.id === localMsgId ? { ...m, synced_to_mother: true } : m));
+        setMessages(prev => prev.map(m => m.id === localMsgId ? { ...(result.newMessage || m), synced_to_mother: true } : m));
         notificationService.addCenterNotification(
           'info',
           isSendingAsSupport ? 'پاسخ ادمین ارسال شد' : 'پیام پشتیبانی ارسال شد',
@@ -363,6 +385,21 @@ const SupportChat: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2">
+                {isMotherPortal && (
+                  <label className="flex items-center gap-1.5 whitespace-nowrap">
+                    <span>مشتری:</span>
+                    <select
+                      value={replyWorkspaceId}
+                      onChange={(e) => setReplyWorkspaceId(e.target.value)}
+                      className="max-w-36 bg-slate-900 text-slate-100 border border-white/15 rounded-lg px-2 py-1"
+                    >
+                      <option value="">انتخاب فضای کاری</option>
+                      {Array.from(new Set(messages.map(m => m.workspace_id).filter((id): id is string => Boolean(id) && id !== 'default' && id !== 'main'))).map(id => (
+                        <option key={id} value={id}>{id}</option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <label className="flex items-center gap-1.5 cursor-pointer select-none text-[10px]">
                   <input
                     type="checkbox"
@@ -406,6 +443,9 @@ const SupportChat: React.FC = () => {
                     <span className="text-[10px] text-slate-400 font-bold">
                       {message.senderName || (isUser ? 'کاربر' : 'پشتیبانی')}
                     </span>
+                    {isAdmin && message.workspace_id && (
+                      <span className="text-[9px] text-cyan-300 border border-cyan-500/25 rounded px-1 py-0.5">{message.workspace_id}</span>
+                    )}
                     
                     {/* نمایش شماره کاربر و دکمه تماس سریع برای ادمین */}
                     {isAdmin && message.phone && (

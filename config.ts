@@ -1,6 +1,9 @@
 // آدرس ثابت هاست - همیشه به این آدرس متصل می‌شود
 const HOST_BASE_URL = 'https://acc.ashkghalam.ir';
 
+// The browser preview is intentionally local-only: no production API URLs are emitted.
+export const IS_BROWSER_PREVIEW = import.meta.env.VITE_BROWSER_PREVIEW === 'true';
+
 // تشخیص محیط اجرا
 const isLocalhost = Boolean(
   typeof window !== 'undefined' && (
@@ -14,6 +17,7 @@ export const isProduction = !isLocalhost;
 
 // Base URL برای API - همیشه از هاست اصلی استفاده می‌کند
 const getBaseUrl = () => {
+  if (IS_BROWSER_PREVIEW) return '/__browser_preview_network_disabled__';
   // اولویت اول: متغیر محیطی
   const envUrl = import.meta.env.VITE_APP_BASE_URL;
   if (envUrl) return envUrl;
@@ -51,16 +55,16 @@ export const API_CONFIG = {
 // تنظیمات ویژگی‌ها
 export const FEATURES = {
   // استفاده از API سرور - همیشه فعال
-  USE_SERVER_API: true,
+  USE_SERVER_API: !IS_BROWSER_PREVIEW,
   
   // سینک کراس دیوایس - همیشه فعال
-  ENABLE_CROSS_DEVICE_SYNC: true,
+  ENABLE_CROSS_DEVICE_SYNC: !IS_BROWSER_PREVIEW,
   
   // سینک خودکار با هاست - همیشه فعال
-  ENABLE_AUTO_SYNC: true,
+  ENABLE_AUTO_SYNC: !IS_BROWSER_PREVIEW,
   
   // پشتیبان‌گیری خودکار
-  ENABLE_AUTO_BACKUP: true,
+  ENABLE_AUTO_BACKUP: !IS_BROWSER_PREVIEW,
   
   // ذخیره‌سازی لوکال
   USE_LOCAL_STORAGE: true, // همیشه فعال برای fallback
@@ -84,8 +88,10 @@ export const ENV_MESSAGES = {
   PRODUCTION: 'حالت تولید - متصل به سرور'
 };
 
-export const CURRENT_ENV = isProduction ? 'PRODUCTION' : 'LOCAL';
-export const ENV_MESSAGE = isProduction ? ENV_MESSAGES.PRODUCTION : ENV_MESSAGES.LOCAL;
+export const CURRENT_ENV = IS_BROWSER_PREVIEW ? 'BROWSER_PREVIEW' : isProduction ? 'PRODUCTION' : 'LOCAL';
+export const ENV_MESSAGE = IS_BROWSER_PREVIEW
+  ? 'پیش‌نمایش مرورگری مستقل؛ اتصال به سرور غیرفعال است'
+  : isProduction ? ENV_MESSAGES.PRODUCTION : ENV_MESSAGES.LOCAL;
 
 // نگارش رسمی سامانه حسابداری اشک قلم و تاریخ شمسی انتشار
 export const APP_VERSION = '16.55.0';

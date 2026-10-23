@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DocumentViewer } from '../components/DocumentViewer';
+import { SignatureInterface } from '../components/RemoteSignatureInterface';
 import { remoteSignatureService } from '../services/remoteSignatureService';
 import type { SignatureRequest } from '../types-signature';
 import { CheckCircle, XCircle, Clock, Shield } from 'lucide-react';
@@ -16,6 +17,7 @@ export const RemoteSignaturePage: React.FC = () => {
   const [otpCode, setOtpCode] = useState('');
   const [otpSent, setOtpSent] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (token) {
@@ -39,6 +41,7 @@ export const RemoteSignaturePage: React.FC = () => {
         setError('مهلت امضای این سند به پایان رسیده است');
       } else {
         setRequest(data);
+        setStep(data.authMethod === 'link' ? 'view' : 'otp');
       }
     } catch (err) {
       setError('خطا در بارگذاری اطلاعات');
@@ -52,7 +55,8 @@ export const RemoteSignaturePage: React.FC = () => {
     
     try {
       setOtpError(null);
-      await remoteSignatureService.sendOTP(request.id, 'sms');
+      const otpMethod = request.authMethod === 'otp_email' ? 'email' : 'sms';
+      await remoteSignatureService.sendOTP(request.id, otpMethod, request.signatureToken);
       setOtpSent(true);
     } catch (err) {
       setOtpError('خطا در ارسال کد تأیید');
@@ -64,8 +68,9 @@ export const RemoteSignaturePage: React.FC = () => {
 
     try {
       setOtpError(null);
-      const result = await remoteSignatureService.verifyOTP(request.id, otpCode);
-      if (result.success) {
+      const result = await remoteSignatureService.verifyOTP(request.id, otpCode, request.signatureToken);
+      if (result.success && result.sessionToken) {
+        setSessionToken(result.sessionToken);
         setStep('view');
       } else {
         setOtpError('کد تأیید نادرست است');
@@ -79,18 +84,20 @@ export const RemoteSignaturePage: React.FC = () => {
     setStep('sign');
   };
 
-  const handleSign = async () => {
+  const handleSign = async (signatureData: string, signatureImage: string) => {
     if (!request) return;
 
     try {
       await remoteSignatureService.signDocument({
         requestId: request.id,
-        signatureData: 'signature',
-        signatureImage: '',
+        signatureToken: request.signatureToken,
+        sessionToken: sessionToken ?? undefined,
+        signatureData,
+        signatureImage,
       });
       setStep('success');
     } catch (err) {
-      alert('خطا در ثبت امضا');
+      alert('ثبت امضا توسط سرور تأیید نشد. لطفاً دوباره تلاش کنید.');
     }
   };
 
@@ -100,7 +107,7 @@ export const RemoteSignaturePage: React.FC = () => {
     const reason = prompt('لطفاً دلیل رد امضا را وارد کنید:');
     if (reason) {
       try {
-        await remoteSignatureService.rejectSignature(request.id, reason);
+        await remoteSignatureService.rejectSignature(request.id, reason, request.signatureToken, sessionToken ?? undefined);
         setStep('rejected');
       } catch (err) {
         alert('خطا در ثبت رد امضا');
@@ -178,7 +185,9 @@ export const RemoteSignaturePage: React.FC = () => {
                 onClick={handleSendOTP}
                 className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition"
               >
-                ارسال کد تأیید به شماره {request.signerPhone}
+                {request.authMethod === 'otp_email'
+                  ? `ارسال کد تأیید به ایمیل ${request.signerEmail || ''}`
+                  : `ارسال کد تأیید به شماره ${request.signerPhone || ''}`}
               </button>
             ) : (
               <div>
@@ -230,16 +239,12 @@ export const RemoteSignaturePage: React.FC = () => {
         )}
 
         {step === 'sign' && (
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl font-bold mb-4">امضای سند</h2>
-            <p className="text-gray-600 mb-4">این بخش در حال توسعه است</p>
-            <button
-              onClick={() => setStep('view')}
-              className="w-full bg-gray-600 text-white py-3 rounded-lg hover:bg-gray-700 transition"
-            >
-              بازگشت
-            </button>
-          </div>
+          <SignatureInterface
+            signerName={request.signerName}
+            documentTitle={request.documentTitle}
+            onSign={handleSign}
+            onCancel={() => setStep('view')}
+          />
         )}
 
         {/* Success Step */}

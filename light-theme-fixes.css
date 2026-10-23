@@ -1,0 +1,367 @@
+/* Accessible, restrained light theme overrides.
+   Loaded after index.css/mobile.css so legacy dark utility classes get a coherent palette. */
+:root.light {
+  color-scheme: light;
+  --color-background: #f3f6fb;
+  --color-surface: #ffffff;
+  --color-text: #172033;
+}
+html.light,
+body.light {
+  background: #f3f6fb !important;
+  color: #172033 !important;
+}
+body.light main,
+body.light section,
+body.light article,
+body.light [role="dialog"] {
+  color: #172033;
+}
+
+/* Convert legacy dark panels into clearly separated paper-like surfaces. Keep modal backdrops intact. */
+body.light :is([class*="bg-slate-950"], [class*="bg-slate-900"], [class*="bg-slate-800"], [class*="bg-slate-700"], [class~="bg-[#111827]"], [class~="bg-[#0f172a]"], [class~="bg-[#0d1527]"]):not(button):not(a):not(input):not(select):not(textarea):not(.fixed) {
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.07) !important;
+}
+body.light :is([class~="bg-slate-900/50"], [class~="bg-slate-950/50"], [class~="bg-slate-900/80"], [class~="bg-slate-950/40"], [class~="bg-slate-900/40"], [class~="bg-slate-900/90"], [class~="bg-slate-950/90"]) {
+  background-color: #f8fafc !important;
+  color: #172033 !important;
+  border-color: #dce4ee !important;
+}
+/* Neutral buttons remain visibly distinct from both the page and the content. */
+body.light :is(button, a)[class*="bg-slate-700"],
+body.light :is(button, a)[class*="bg-slate-800"],
+body.light :is(button, a)[class*="bg-slate-900"],
+body.light :is(button, a)[class*="bg-slate-950"],
+body.light button.bg-black,
+body.light a.bg-black {
+  background-color: #e8edf4 !important;
+  color: #172033 !important;
+  border-color: #c6d1df !important;
+}
+body.light :is(button, a)[class*="bg-slate-700"]:hover,
+body.light :is(button, a)[class*="bg-slate-800"]:hover,
+body.light :is(button, a)[class*="bg-slate-900"]:hover,
+body.light :is(button, a)[class*="bg-slate-950"]:hover,
+body.light button.bg-black:hover,
+body.light a.bg-black:hover {
+  background-color: #dce5ef !important;
+  color: #101827 !important;
+}
+body.light [class~="hover:bg-white/5"]:hover,
+body.light [class~="hover:bg-white/10"]:hover {
+  background-color: #edf2f8 !important;
+}
+
+/* A readable neutral text hierarchy. */
+body.light .text-white,
+body.light .text-slate-100,
+body.light .text-slate-200,
+body.light .text-slate-300 { color: #172033 !important; }
+body.light .text-slate-400 { color: #475569 !important; }
+body.light .text-slate-500 { color: #526176 !important; }
+body.light .text-slate-600 { color: #475569 !important; }
+body.light .text-slate-700 { color: #334155 !important; }
+
+/* Light-colored text utilities are darkened when their old dark-mode backgrounds become pale. */
+body.light :is(
+  .text-teal-50, .text-teal-100, .text-teal-200, .text-teal-300,
+  .text-emerald-50, .text-emerald-100, .text-emerald-200, .text-emerald-300,
+  .text-green-50, .text-green-100, .text-green-200, .text-green-300,
+  .text-cyan-50, .text-cyan-100, .text-cyan-200, .text-cyan-300,
+  .text-sky-50, .text-sky-100, .text-sky-200, .text-sky-300,
+  .text-blue-50, .text-blue-100, .text-blue-200, .text-blue-300,
+  .text-indigo-50, .text-indigo-100, .text-indigo-200, .text-indigo-300,
+  .text-violet-50, .text-violet-100, .text-violet-200, .text-violet-300,
+  .text-purple-50, .text-purple-100, .text-purple-200, .text-purple-300,
+  .text-rose-50, .text-rose-100, .text-rose-200, .text-rose-300,
+  .text-red-50, .text-red-100, .text-red-200, .text-red-300,
+  .text-pink-50, .text-pink-100, .text-pink-200, .text-pink-300,
+  .text-amber-50, .text-amber-100, .text-amber-200, .text-amber-300,
+  .text-yellow-50, .text-yellow-100, .text-yellow-200, .text-yellow-300,
+  .text-orange-50, .text-orange-100, .text-orange-200, .text-orange-300,
+  .text-lime-50, .text-lime-100, .text-lime-200, .text-lime-300,
+  .text-fuchsia-50, .text-fuchsia-100, .text-fuchsia-200, .text-fuchsia-300
+) { color: #334155 !important; }
+
+/* Semi-transparent status chips use matching pale fills, borders, and dark readable labels. */
+body.light [class*="bg-teal-"][class*="/"],
+body.light [class*="bg-cyan-"][class*="/"] {
+  background-color: #ecfdf9 !important; border-color: #99f6e4 !important; color: #115e59 !important;
+}
+body.light [class*="bg-emerald-"][class*="/"],
+body.light [class*="bg-green-"][class*="/"],
+body.light [class*="bg-lime-"][class*="/"] {
+  background-color: #ecfdf3 !important; border-color: #a7f3d0 !important; color: #166534 !important;
+}
+body.light [class*="bg-sky-"][class*="/"],
+body.light [class*="bg-blue-"][class*="/"] {
+  background-color: #eff6ff !important; border-color: #bfdbfe !important; color: #1e40af !important;
+}
+body.light [class*="bg-indigo-"][class*="/"],
+body.light [class*="bg-violet-"][class*="/"],
+body.light [class*="bg-purple-"][class*="/"] {
+  background-color: #f5f3ff !important; border-color: #ddd6fe !important; color: #4338ca !important;
+}
+body.light [class*="bg-rose-"][class*="/"],
+body.light [class*="bg-red-"][class*="/"],
+body.light [class*="bg-pink-"][class*="/"] {
+  background-color: #fff1f2 !important; border-color: #fecdd3 !important; color: #9f1239 !important;
+}
+body.light [class*="bg-amber-"][class*="/"],
+body.light [class*="bg-yellow-"][class*="/"],
+body.light [class*="bg-orange-"][class*="/"] {
+  background-color: #fffbeb !important; border-color: #fcd34d !important; color: #92400e !important;
+}
+/* Ensure descendants of translucent chips inherit a contrasting color despite legacy text utilities. */
+body.light [class*="bg-teal-"][class*="/"] *,
+body.light [class*="bg-cyan-"][class*="/"] * { color: #115e59 !important; }
+body.light [class*="bg-emerald-"][class*="/"] *,
+body.light [class*="bg-green-"][class*="/"] *,
+body.light [class*="bg-lime-"][class*="/"] * { color: #166534 !important; }
+body.light [class*="bg-sky-"][class*="/"] *,
+body.light [class*="bg-blue-"][class*="/"] * { color: #1e40af !important; }
+body.light [class*="bg-indigo-"][class*="/"] *,
+body.light [class*="bg-violet-"][class*="/"] *,
+body.light [class*="bg-purple-"][class*="/"] * { color: #4338ca !important; }
+body.light [class*="bg-rose-"][class*="/"] *,
+body.light [class*="bg-red-"][class*="/"] *,
+body.light [class*="bg-pink-"][class*="/"] * { color: #9f1239 !important; }
+body.light [class*="bg-amber-"][class*="/"] *,
+body.light [class*="bg-yellow-"][class*="/"] *,
+body.light [class*="bg-orange-"][class*="/"] * { color: #92400e !important; }
+
+/* Solid action colors must keep white labels (or dark text for yellow/orange). */
+body.light :is([class~="bg-teal-500"], [class~="bg-teal-600"], [class~="bg-teal-700"],
+  [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-emerald-700"],
+  [class~="bg-green-500"], [class~="bg-green-600"], [class~="bg-green-700"],
+  [class~="bg-blue-500"], [class~="bg-blue-600"], [class~="bg-blue-700"],
+  [class~="bg-sky-500"], [class~="bg-sky-600"], [class~="bg-cyan-600"],
+  [class~="bg-indigo-500"], [class~="bg-indigo-600"], [class~="bg-indigo-700"],
+  [class~="bg-violet-600"], [class~="bg-purple-600"], [class~="bg-purple-700"],
+  [class~="bg-rose-500"], [class~="bg-rose-600"], [class~="bg-red-500"], [class~="bg-red-600"],
+  [class~="bg-pink-600"], [class~="bg-fuchsia-600"]) {
+  color: #ffffff !important;
+  border-color: transparent !important;
+}
+body.light :is([class~="bg-teal-500"], [class~="bg-teal-600"], [class~="bg-teal-700"],
+  [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-emerald-700"],
+  [class~="bg-green-500"], [class~="bg-green-600"], [class~="bg-green-700"],
+  [class~="bg-blue-500"], [class~="bg-blue-600"], [class~="bg-blue-700"],
+  [class~="bg-sky-500"], [class~="bg-sky-600"], [class~="bg-cyan-600"],
+  [class~="bg-indigo-500"], [class~="bg-indigo-600"], [class~="bg-indigo-700"],
+  [class~="bg-violet-600"], [class~="bg-purple-600"], [class~="bg-purple-700"],
+  [class~="bg-rose-500"], [class~="bg-rose-600"], [class~="bg-red-500"], [class~="bg-red-600"],
+  [class~="bg-pink-600"], [class~="bg-fuchsia-600"]) * { color: #ffffff !important; }
+body.light :is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-amber-600"],
+  [class~="bg-yellow-400"], [class~="bg-yellow-500"], [class~="bg-orange-400"], [class~="bg-orange-500"]) {
+  color: #3f2d0b !important; border-color: #d97706 !important;
+}
+body.light :is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-amber-600"],
+  [class~="bg-yellow-400"], [class~="bg-yellow-500"], [class~="bg-orange-400"], [class~="bg-orange-500"]) * {
+  color: #3f2d0b !important;
+}
+
+/* Inputs, tables, and separators keep clear boundaries on white surfaces. */
+body.light input:not([type="checkbox"]):not([type="radio"]),
+body.light select,
+body.light textarea {
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border: 1px solid #c6d1df !important;
+}
+body.light input::placeholder,
+body.light textarea::placeholder { color: #64748b !important; opacity: 1 !important; }
+body.light input:focus,
+body.light select:focus,
+body.light textarea:focus {
+  border-color: #0f766e !important;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, .18) !important;
+}
+body.light table { border-color: #cbd5e1 !important; }
+body.light th { background-color: #eef2f7 !important; color: #172033 !important; border-color: #cbd5e1 !important; }
+body.light td { color: #172033 !important; border-color: #e2e8f0 !important; }
+body.light tr:nth-child(even) td { background-color: #f8fafc !important; }
+body.light tr:hover td { background-color: #edf2f8 !important; }
+body.light [class*="border-white/"],
+body.light [class*="divide-white/"] { border-color: #dce4ee !important; }
+body.light aside { background-color: #ffffff !important; border-color: #d5deea !important; }
+body.light .custom-scrollbar::-webkit-scrollbar-track,
+body.light .sidebar-scrollbar::-webkit-scrollbar-track { background: #edf2f7 !important; }
+body.light .sidebar-scrollbar { scrollbar-color: #0f766e #edf2f7 !important; }
+body.light .sidebar-scrollbar::-webkit-scrollbar-thumb { background: #0f766e !important; border-color: #cbd5e1 !important; }
+
+/* Keep official invoice/print sheets white regardless of application theme. */
+
+/* Bright teal/green fills need dark foregrounds for a stronger contrast ratio. */
+body.light :is([class~="bg-teal-500"], [class~="bg-teal-600"], [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-green-500"], [class~="bg-green-600"], [class~="bg-blue-500"], [class~="bg-sky-500"], [class~="bg-cyan-600"]) {
+  color: #102a2b !important;
+}
+body.light :is([class~="bg-teal-500"], [class~="bg-teal-600"], [class~="bg-emerald-500"], [class~="bg-emerald-600"], [class~="bg-green-500"], [class~="bg-green-600"], [class~="bg-blue-500"], [class~="bg-sky-500"], [class~="bg-cyan-600"]) * {
+  color: #102a2b !important;
+}
+
+/* Dark neutral gradients and black/gray utility surfaces also need light-theme counterparts. */
+body.light :is([class~="bg-black"], [class*="bg-gray-900"], [class*="bg-gray-800"], [class*="bg-zinc-900"], [class*="bg-zinc-800"], [class*="bg-neutral-900"], [class*="bg-neutral-800"]):not(button):not(a):not(.fixed) {
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+}
+body.light [class*="bg-gradient"]:is([class*="from-slate-"], [class*="via-slate-"], [class*="to-slate-"], [class*="from-gray-"], [class*="via-gray-"], [class*="to-gray-"], [class*="from-zinc-"], [class*="from-neutral-"], [class*="from-black"]) {
+  background-image: linear-gradient(135deg, #ffffff 0%, #f8fafc 58%, #edf2f7 100%) !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+}
+body.light [class*="bg-gradient"][class*="from-teal-600"],
+body.light [class*="bg-gradient"][class*="from-emerald-600"] {
+  color: #102a2b !important;
+}
+body.light [class*="bg-gradient"][class*="from-teal-600"] *,
+body.light [class*="bg-gradient"][class*="from-emerald-600"] * {
+  color: #102a2b !important;
+}
+body.light [class*="bg-gradient"]:is([class*="from-blue-600"], [class*="from-indigo-600"], [class*="from-violet-600"], [class*="from-purple-600"], [class*="from-rose-600"], [class*="from-red-600"]) {
+  color: #ffffff !important;
+}
+body.light [class*="bg-gradient"]:is([class*="from-blue-600"], [class*="from-indigo-600"], [class*="from-violet-600"], [class*="from-purple-600"], [class*="from-rose-600"], [class*="from-red-600"]) * {
+  color: #ffffff !important;
+}
+body.light .invoice-paper,
+body.light .sheet-a4-white,
+body.light .print-content {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+
+/* Notification surfaces: explicit light-theme colors override legacy dark utilities. */
+body.light [data-notification-surface] {
+  color: #172033 !important;
+  border-color: #d5deea !important;
+}
+body.light [data-notification-surface="drawer"],
+body.light [data-notification-surface="toast"] {
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.16) !important;
+}
+body.light [data-notification-surface] :is(.text-white, .text-slate-100, .text-slate-200) {
+  color: #172033 !important;
+}
+body.light [data-notification-surface] .text-slate-300 { color: #334155 !important; }
+body.light [data-notification-surface] .text-slate-400 { color: #475569 !important; }
+body.light [data-notification-surface] .text-slate-500,
+body.light [data-notification-surface] .text-slate-600 { color: #64748b !important; }
+body.light [data-notification-surface] :is(
+  [class*="bg-slate-950"], [class*="bg-slate-900"], [class*="bg-slate-800"],
+  [class*="bg-slate-700"]
+) {
+  background-color: #f8fafc !important;
+  color: #172033 !important;
+  border-color: #dce4ee !important;
+  box-shadow: none !important;
+}
+body.light [data-notification-surface] [class*="bg-white/"] {
+  background-color: #edf2f7 !important;
+}
+body.light [data-notification-surface] :is([class*="border-white/"], [class*="divide-white/"]) {
+  border-color: #dce4ee !important;
+}
+body.light [data-notification-surface] button[class*="bg-teal-600"] {
+  background-color: #0f766e !important;
+  color: #ffffff !important;
+}
+
+
+/* Commercial/cloud pages: normalize legacy dark hero gradients in light mode.
+   Keep action buttons/links colored; make hero/card copy readable on paper surfaces. */
+body.light main [class*="bg-gradient"][class*="from-sky-900"]:not(button):not(a),
+body.light main [class*="bg-gradient"][class*="to-indigo-950"]:not(button):not(a),
+body.light main [class*="bg-gradient"][class*="from-indigo-950"]:not(button):not(a),
+body.light main [class*="bg-gradient"][class*="from-emerald-950"]:not(button):not(a),
+body.light main [class*="bg-gradient"][class*="from-teal-950"]:not(button):not(a),
+body.light main [class*="bg-gradient"][class*="from-blue-950"]:not(button):not(a) {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08) !important;
+}
+body.light main [class*="bg-gradient"][class*="from-sky-900"] :is(.text-white, .text-slate-100, .text-slate-200, .text-sky-100),
+body.light main [class*="bg-gradient"][class*="to-indigo-950"] :is(.text-white, .text-slate-100, .text-slate-200, .text-sky-100),
+body.light main [class*="bg-gradient"][class*="from-indigo-950"] :is(.text-white, .text-slate-100, .text-slate-200, .text-indigo-100),
+body.light main [class*="bg-gradient"][class*="from-emerald-950"] :is(.text-white, .text-slate-100, .text-slate-200, .text-emerald-100),
+body.light main [class*="bg-gradient"][class*="from-teal-950"] :is(.text-white, .text-slate-100, .text-slate-200, .text-teal-100),
+body.light main [class*="bg-gradient"][class*="from-blue-950"] :is(.text-white, .text-slate-100, .text-slate-200, .text-blue-100) {
+  color: #172033 !important;
+}
+body.light main [class*="bg-gradient"][class*="-900"]:not(button):not(a) [class*="border-white/"],
+body.light main [class*="bg-gradient"][class*="-950"]:not(button):not(a) [class*="border-white/"] {
+  border-color: #d5deea !important;
+}
+
+
+/* Deep-color headers used by commercial/cloud service pages must remain readable
+   in light mode. Keep interactive buttons/links out of the descendant text override. */
+body.light main [class*="bg-gradient"]:is(
+  [class*="from-emerald-800"], [class*="to-teal-900"],
+  [class*="from-blue-900"], [class*="to-cyan-950"],
+  [class*="from-purple-900"], [class*="to-indigo-950"],
+  [class*="from-amber-900"], [class*="to-amber-950"],
+  [class*="from-slate-900"], [class*="from-teal-950"],
+  [class*="from-indigo-950"], [class*="from-emerald-950"],
+  [class*="from-purple-950"], [class*="from-blue-950"]
+):not(button):not(a) {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08) !important;
+}
+
+body.light main [class*="bg-gradient"]:is(
+  [class*="from-emerald-800"], [class*="to-teal-900"],
+  [class*="from-blue-900"], [class*="to-cyan-950"],
+  [class*="from-purple-900"], [class*="to-indigo-950"],
+  [class*="from-amber-900"], [class*="to-amber-950"],
+  [class*="from-slate-900"], [class*="from-teal-950"],
+  [class*="from-indigo-950"], [class*="from-emerald-950"],
+  [class*="from-purple-950"], [class*="from-blue-950"]
+) :is(.text-white, .text-slate-100, .text-slate-200, .text-sky-100, .text-indigo-100, .text-emerald-100, .text-teal-100, .text-amber-100, .text-blue-100, .text-slate-300, .text-slate-400):not(button *):not(a *) {
+  color: #172033 !important;
+}
+
+
+/* Consistent form and keyboard-focus contrast, including login/setup surfaces. */
+body.light input::placeholder,
+body.light textarea::placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
+}
+
+body.light :is(input, select, textarea):disabled {
+  background-color: #edf2f7 !important;
+  color: #64748b !important;
+  border-color: #cbd5e1 !important;
+  opacity: 1 !important;
+}
+
+body.light :is(button, a, [role="button"], input, select, textarea):focus-visible {
+  outline: 2px solid #2563eb !important;
+  outline-offset: 2px !important;
+}
+
+/* Normalize legacy commercial/cloud gradients on pages and overlays in light mode. */
+body.light [class*="bg-gradient"][class*="via-slate-900"]:not(button):not(a),
+body.light [class*="bg-gradient"][class*="to-slate-900"]:not(button):not(a),
+body.light [class*="bg-gradient"][class*="from-amber-950"]:not(button):not(a),
+body.light [class*="bg-gradient"][class*="from-rose-950"]:not(button):not(a) {
+  background-image: none !important;
+  background-color: #ffffff !important;
+  color: #172033 !important;
+  border-color: #d5deea !important;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08) !important;
+}

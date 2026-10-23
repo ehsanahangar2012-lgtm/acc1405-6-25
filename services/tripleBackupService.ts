@@ -7,11 +7,14 @@
  */
 
 import CryptoJS from 'crypto-js';
-import { persistentStorage } from './persistentStorage';
-import { getPersianDate, toPersianDigits } from '../utils';
+import { idbService } from './indexedDBService';
+import { hostBackupService } from './hostBackupService';
+import { hasNativeBackupStorage, getNativeBackupValue, setNativeBackupValue } from './nativeBackupStorage';
+import { useFinancialStore } from '../store-financial';
+import { getPersianDate } from '../utils';
 
 export interface BackupTierStatus {
-    tierId: 'windows_local' | 'android_storage' | 'cloud_vault';
+    tierId: 'windows_local' | 'device_file' | 'cloud_vault';
     name: string;
     description: string;
     lastBackupDate?: string;
@@ -29,58 +32,68 @@ export interface TripleBackupReport {
     sha256: string;
 }
 
-const STORAGE_KEY_TRIPLE_REPORT = 'triple_backup_report';
-const STORAGE_KEY_ANDROID_TIER = 'ashk_triple_backup_android';
-const STORAGE_KEY_CLOUD_VAULT = 'ashk_triple_backup_cloud_vault';
+const STORAGE_KEY_TRIPLE_REPORT = 'triple-backup:report';
+const STORAGE_KEY_LOCAL_BACKUP = 'triple-backup:latest';
 
 export class TripleBackupService {
     /**
      * اجرای پشتیبان‌گیری ۳ گانه همزمان
      */
     static async executeTripleBackup(accountingData: any): Promise<TripleBackupReport> {
-        const payloadString = JSON.stringify(accountingData);
+        const completeData = {
+            ...accountingData,
+            financialData: useFinancialStore.getState()
+        };
+        const payloadString = JSON.stringify(completeData);
         const hash = CryptoJS.SHA256(payloadString).toString();
         const sizeBytes = new Blob([payloadString]).size;
         const nowPersian = getPersianDate() + ' ' + new Date().toLocaleTimeString('fa-IR');
 
-        // لایه ۱: ویندوز و ذخیره‌ساز محلی (IndexedDB / LocalStorage)
+        // Tier 1 uses OS/Keystore-backed encryption on native apps. Only browser/PWA
+        // falls back to IndexedDB, which must never be described as hardware-backed encryption.
+        const nativeProtectedStore = hasNativeBackupStorage();
         let tier1Status: BackupTierStatus['status'] = 'SYNCED';
         try {
-            await persistentStorage.saveData('ashk_triple_backup_local', {
-                data: accountingData,
-                hash,
-                date: nowPersian
-            });
+            if (nativeProtectedStore) {
+                await setNativeBackupValue(STORAGE_KEY_LOCAL_BACKUP, JSON.stringify({
+                    data: payloadString,
+                    hash,
+                    date: nowPersian,
+                    updatedAt: Date.now()
+                }));
+            } else {
+                await idbService.save('backups', {
+                    id: STORAGE_KEY_LOCAL_BACKUP,
+                    data: payloadString,
+                    hash,
+                    date: nowPersian,
+                    updatedAt: Date.now()
+                });
+            }
         } catch {
             tier1Status = 'ERROR';
         }
 
-        // لایه ۲: حافظه ایزوله موبایل اندروید
-        let tier2Status: BackupTierStatus['status'] = 'SYNCED';
+        // This tier means an additional actual file, not merely an internal database copy.
+        // Android portable file export is user-initiated from the Commercial Hub, so this
+        // tier stays WAITING until a native file has actually been written by this flow.
+        let tier2Status: BackupTierStatus['status'] = 'WAITING';
+        let tier2FileSha256: string | undefined;
+        let tier2FileSizeBytes = 0;
+        let tier3Status: BackupTierStatus['status'] = 'WAITING';
         try {
-            await persistentStorage.saveData(STORAGE_KEY_ANDROID_TIER, {
-                data: accountingData,
-                hash,
-                date: nowPersian
-            });
+            const result = await hostBackupService.createBackup(accountingData, 'manual', 'پشتیبان چندمسیره');
+            tier2Status = result.localFileStatus || 'WAITING';
+            tier2FileSha256 = result.localFileSha256;
+            tier2FileSizeBytes = Number(result.localFileSizeBytes) || 0;
+            tier3Status = result.remoteStatus || (result.remoteSaved ? 'SYNCED' : 'WAITING');
         } catch {
             tier2Status = 'ERROR';
-        }
-
-        // لایه ۳: فضای ابری و مخزن متمرکز هاست
-        let tier3Status: BackupTierStatus['status'] = 'SYNCED';
-        try {
-            await persistentStorage.saveData(STORAGE_KEY_CLOUD_VAULT, {
-                data: accountingData,
-                hash,
-                date: nowPersian
-            });
-        } catch {
             tier3Status = 'ERROR';
         }
 
-        const count = Object.keys(accountingData || {}).reduce((acc, k) => {
-            return acc + (Array.isArray(accountingData[k]) ? accountingData[k].length : 1);
+        const count = Object.keys(completeData || {}).reduce((acc, key) => {
+            return acc + (Array.isArray(completeData[key]) ? completeData[key].length : 1);
         }, 0);
 
         const report: TripleBackupReport = {
@@ -91,38 +104,48 @@ export class TripleBackupService {
             tiers: [
                 {
                     tierId: 'windows_local',
-                    name: 'لایه ۱: هارد دیسک و دیتابیس محلی (ویندوز / مرورگر)',
-                    description: 'ذخیره روی دیسک سخت و حافظه دائم IndexedDB با دسترسی آفلاین 0ms',
-                    lastBackupDate: nowPersian,
+                    name: nativeProtectedStore ? 'نسخه محلی رمزگذاری‌شده روی دستگاه' : 'نسخه محلی مرورگر (IndexedDB)',
+                    description: nativeProtectedStore
+                        ? 'در نسخه نصب‌شدهٔ ویندوز/اندروید با قابلیت رمزگذاری سیستم‌عامل یا Android Keystore نگهداری می‌شود؛ بازگردانی فایل به دستگاه دیگر از مسیر رمز عبور فایل قابل‌حمل انجام می‌شود.'
+                        : 'در مخزن محلی مرورگر نگهداری می‌شود؛ ممکن است با پاک‌سازی داده‌های مرورگر یا پروفایل از دست برود و رمزگذاری سخت‌افزاری ندارد.',
+                    lastBackupDate: tier1Status === 'SYNCED' ? nowPersian : undefined,
                     status: tier1Status,
-                    itemCount: count,
-                    sha256Hash: hash.substring(0, 16) + '...',
-                    sizeBytes
+                    itemCount: tier1Status === 'SYNCED' ? count : 0,
+                    sha256Hash: tier1Status === 'SYNCED' ? hash.substring(0, 16) + '...' : undefined,
+                    sizeBytes: tier1Status === 'SYNCED' ? sizeBytes : 0
                 },
                 {
-                    tierId: 'android_storage',
-                    name: 'لایه ۲: حافظه ایزوله اپلیکیشن همراه (موبایل اندروید)',
-                    description: 'نگهداری یک نسخه مستقل در حافظه امن گوشی و تبلت برای بازیابی اضطراری',
-                    lastBackupDate: nowPersian,
+                    tierId: 'device_file',
+                    name: 'نسخه مستقل روی دیسک ویندوز',
+                    description: 'تنها پس از نوشتن یک فایل واقعی و مستقل ثبت می‌شود. در ویندوز مسیر انتخابی سیستم‌عامل استفاده می‌شود؛ در اندروید از مرکز تجاری همراه، ذخیرهٔ رمزگذاری‌شده با انتخاب مسیر انجام می‌شود و این مورد تا تأیید فایل همچنان در انتظار می‌ماند.',
+                    lastBackupDate: tier2Status === 'SYNCED' ? nowPersian : undefined,
                     status: tier2Status,
-                    itemCount: count,
-                    sha256Hash: hash.substring(0, 16) + '...',
-                    sizeBytes
+                    itemCount: tier2Status === 'SYNCED' ? count : 0,
+                    sha256Hash: tier2Status === 'SYNCED' && tier2FileSha256 ? tier2FileSha256.substring(0, 16) + '...' : undefined,
+                    sizeBytes: tier2Status === 'SYNCED' ? tier2FileSizeBytes : 0
                 },
                 {
                     tierId: 'cloud_vault',
-                    name: 'لایه ۳: مخزن رمزنگاری‌شده ابری (هاست متمرکز SaaS)',
-                    description: 'پشتیبان‌گیری در سرور ابری جهت جلوگیری از مفقودی داده‌ها در صورت آسیب فیزیکی سخت‌افزار',
-                    lastBackupDate: nowPersian,
+                    name: 'نسخه پشتیبان سرور مرکزی',
+                    description: 'فقط پس از تأیید موفق API پشتیبان‌گیری سرور ثبت می‌شود؛ رمزگذاری در حالت سکون هنوز نیازمند تنظیم و پیاده‌سازی است',
+                    lastBackupDate: tier3Status === 'SYNCED' ? nowPersian : undefined,
                     status: tier3Status,
-                    itemCount: count,
-                    sha256Hash: hash.substring(0, 16) + '...',
-                    sizeBytes
+                    itemCount: tier3Status === 'SYNCED' ? count : 0,
+                    sha256Hash: tier3Status === 'SYNCED' ? hash.substring(0, 16) + '...' : undefined,
+                    sizeBytes: tier3Status === 'SYNCED' ? sizeBytes : 0
                 }
             ]
         };
 
-        await persistentStorage.saveData(STORAGE_KEY_TRIPLE_REPORT, report);
+        try {
+            if (nativeProtectedStore) {
+                await setNativeBackupValue(STORAGE_KEY_TRIPLE_REPORT, JSON.stringify(report));
+            } else {
+                await idbService.save('backups', { id: STORAGE_KEY_TRIPLE_REPORT, report });
+            }
+        } catch (error) {
+            console.warn('Unable to save backup status report locally:', error);
+        }
         return report;
     }
 
@@ -131,10 +154,15 @@ export class TripleBackupService {
      */
     static async getLastReport(): Promise<TripleBackupReport | null> {
         try {
-            const report = await persistentStorage.loadData(STORAGE_KEY_TRIPLE_REPORT);
-            if (report && report.tiers) {
-                return report as TripleBackupReport;
+            if (hasNativeBackupStorage()) {
+                const raw = await getNativeBackupValue(STORAGE_KEY_TRIPLE_REPORT);
+                if (raw === null) return null;
+                const report = JSON.parse(raw);
+                return report && Array.isArray(report.tiers) ? report as TripleBackupReport : null;
             }
+            const saved = await idbService.get('backups', STORAGE_KEY_TRIPLE_REPORT);
+            const report = saved?.report;
+            if (report && Array.isArray(report.tiers)) return report as TripleBackupReport;
         } catch {}
         return null;
     }

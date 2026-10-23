@@ -1,7 +1,7 @@
 import { idbService } from './indexedDBService';
 import { API_CONFIG } from '../config';
 import { generateUUID, packPayloadToToken, unpackPayloadFromToken } from '../utils';
-import { persistentStorage } from './persistentStorage';
+import { workspaceService } from './workspaceService';
 
 export interface SignatureRequest {
   id: string;
@@ -20,59 +20,46 @@ export interface SignatureRequest {
 class SimpleSignatureService {
   async createRequest(documentId: string, documentType: string, documentPreview?: string): Promise<string> {
     const rawToken = generateUUID();
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 48);
-
+    const createdAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
+    const safePreview = documentPreview || JSON.stringify({ documentId, documentType, message: 'Preview unavailable' });
     const request: SignatureRequest = {
       id: generateUUID(),
       token: rawToken,
       documentId,
       documentType,
-      documentPreview,
-      createdAt: new Date().toISOString(),
-      expiresAt: expiresAt.toISOString(),
+      documentPreview: safePreview,
+      createdAt,
+      expiresAt,
       status: 'PENDING'
     };
 
-    // Pack request data into smart resilient token
+    // The payload is link metadata only. The server-held record is authoritative for signing.
     const fullToken = packPayloadToToken(rawToken, {
       id: request.id,
       docId: documentId,
       type: documentType,
-      preview: documentPreview,
-      exp: request.expiresAt,
-      created: request.createdAt
+      preview: safePreview,
+      exp: expiresAt,
+      created: createdAt
     });
-
     request.token = fullToken;
 
-    // ۱. ذخیره محلی در IndexedDB
-    await idbService.save('signature_requests', request).catch(() => {});
-
-    // ۲. ذخیره روی سرور اختصاصی امضا
-    try {
-      await fetch(API_CONFIG.SIGNATURE_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'createRequest',
-          request
-        })
-      });
-    } catch (e) {
-      console.warn('پاسخ اولیه سرور امضا ناموفق بود:', e);
+    const secureHeaders = await workspaceService.getSecureHeaders();
+    const response = await fetch(API_CONFIG.SIGNATURE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...secureHeaders },
+      body: JSON.stringify({ action: 'createRequest', request })
+    });
+    let result: any = null;
+    try { result = await response.json(); } catch {}
+    if (!response.ok || !result?.success || !result?.request?.token ||
+        result.request.token !== fullToken) {
+      throw new Error(result?.error || 'سرور درخواست امضای معتبر ایجاد نکرد');
     }
 
-    // ۳. ذخیره در مخزن امن و پایدار ابری (Persistent Cloud Storage) به عنوان کانال تضمین‌شده عمومی
-    try {
-      await persistentStorage.saveData('sig_' + rawToken, request);
-      await persistentStorage.saveData('sig_' + fullToken, request);
-      await persistentStorage.saveData('public_sig_' + rawToken, request);
-      await persistentStorage.saveData('public_sig_' + fullToken, request);
-    } catch (e) {
-      console.warn('خطا در ذخیره ابری درخواست امضا:', e);
-    }
-
+    const serverRequest = result.request as SignatureRequest;
+    await idbService.save('signature_requests', serverRequest);
     return fullToken;
   }
 
@@ -101,27 +88,6 @@ class SimpleSignatureService {
           }
         } catch (e) {
           console.warn('دریافت از signature API ناموفق بود، بررسی کانال ابری ثانویه...', e);
-        }
-      }
-
-      // ۳. بررسی کانال تضمین‌شده ابری persistentStorage جهت استفاده کاربران غیرلاگین و عمومی
-      if (!request || !request.documentPreview) {
-        try {
-          let cloudReq = await persistentStorage.loadData('sig_' + token);
-          if (!cloudReq) {
-            cloudReq = await persistentStorage.loadData('sig_' + rawUuid);
-          }
-          if (!cloudReq) {
-            cloudReq = await persistentStorage.loadData('public_sig_' + token);
-          }
-          if (!cloudReq) {
-            cloudReq = await persistentStorage.loadData('public_sig_' + rawUuid);
-          }
-          if (cloudReq && (cloudReq.documentPreview || cloudReq.token)) {
-            request = cloudReq;
-          }
-        } catch (e) {
-          console.warn('خطا در دریافت ابری امضا:', e);
         }
       }
 
@@ -163,66 +129,32 @@ class SimpleSignatureService {
 
   async signRequest(token: string, signerName: string, signatureData: string, documentId: string): Promise<boolean> {
     try {
-      // ۱. بروزرسانی محلی در IndexedDB
-      let request = await idbService.getByIndex('signature_requests', 'token', token) as SignatureRequest;
-      const signedAt = new Date().toISOString();
-      if (request) {
-        request.status = 'SIGNED';
-        request.signedAt = signedAt;
-        request.signerName = signerName;
-        request.signatureData = signatureData;
-        await idbService.save('signature_requests', request).catch(() => {});
-      } else {
-        request = {
-          id: token,
-          token,
-          documentId,
-          documentType: 'سند',
-          createdAt: signedAt,
-          expiresAt: signedAt,
-          status: 'SIGNED',
-          signedAt,
-          signerName,
-          signatureData
-        };
+      // Server acceptance is required before local/cloud state can become SIGNED.
+      const response = await fetch(API_CONFIG.SIGNATURE_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'signRequest', token, signerName, signatureData })
+      });
+      let result: any = null;
+      try { result = await response.json(); } catch {}
+      if (!response.ok || !result?.success || result?.request?.status !== 'SIGNED') {
+        console.warn('سرور امضای نهایی را نپذیرفت:', result?.error || response.status);
+        return false;
       }
 
-      // ۲. ثبت روی سرور اختصاصی امضا
-      let apiSuccess = false;
-      try {
-        const response = await fetch(API_CONFIG.SIGNATURE_API, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'signRequest',
-            token,
-            signerName,
-            signatureData
-          })
-        });
-        if (response.ok) {
-          const res = await response.json();
-          apiSuccess = res.success;
-        }
-      } catch (e) {
-        console.warn('خطا در ارسال مستقیم به signature API:', e);
-      }
-
-      // ۳. ثبت قطعی در کانال ابری persistentStorage
-      try {
-        const existing = await persistentStorage.loadData('sig_' + token) || {};
-        const updatedCloudData = {
-          ...existing,
-          ...request,
-          status: 'SIGNED',
-          signedAt,
-          signerName,
-          signatureData
-        };
-        await persistentStorage.saveData('sig_' + token, updatedCloudData);
-      } catch (e) {
-        console.warn('خطا در ذخیره ابری وضعیت امضا:', e);
-      }
+      const signedAt = result.request.signedAt || new Date().toISOString();
+      const existing = await idbService.getByIndex('signature_requests', 'token', token).catch(() => null) as SignatureRequest | null;
+      const request: SignatureRequest = {
+        ...(existing || result.request),
+        ...result.request,
+        token,
+        documentId: result.request.documentId || existing?.documentId || documentId,
+        status: 'SIGNED',
+        signedAt,
+        signerName: result.request.signerName || signerName,
+        signatureData: result.request.signatureData || signatureData
+      };
+      await idbService.save('signature_requests', request);
 
       return true;
     } catch (error) {
@@ -258,16 +190,6 @@ class SimpleSignatureService {
             }
           }
         } catch {}
-
-        // کانال دوم: persistentStorage
-        if (!signedData) {
-          try {
-            const cloudReq = await persistentStorage.loadData('sig_' + req.token);
-            if (cloudReq && cloudReq.status === 'SIGNED') {
-              signedData = cloudReq;
-            }
-          } catch {}
-        }
 
         if (signedData && signedData.status === 'SIGNED') {
           // بروزرسانی درخواست امضا در IndexedDB محلی

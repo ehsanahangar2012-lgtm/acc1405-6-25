@@ -1,20 +1,16 @@
 // Electron Main Process for Windows Standalone Executable
-const { app, BrowserWindow, shell, Menu, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, Menu, dialog, ipcMain, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const crypto = require('crypto');
 const url = require('url');
+const packageMeta = require('../package.json');
+const { isManagedBackupFileName } = require('./backupSafety.cjs');
 
-// بهینه‌سازی حداکثری پرفورمنس، رفع لگ، رندر فوق سریع و شتاب‌دهنده سخت‌افزاری GPU در ویندوز
-app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
-app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
-app.commandLine.appendSwitch('enable-gpu-rasterization');
-app.commandLine.appendSwitch('enable-zero-copy');
-app.commandLine.appendSwitch('ignore-gpu-blocklist');
-app.commandLine.appendSwitch('enable-fast-unload');
-app.commandLine.appendSwitch('renderer-process-limit', '6');
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=4096 --expose-gc');
+// Keep Chromium's platform defaults for GPU selection, process limits, and memory management.
+// Forcing unsupported GPU paths or extra renderer processes can increase crashes, RAM use, and stutter.
+// Performance changes should be based on measurements on representative Windows hardware.
 
 let mainWindow = null;
 let splashWindow = null;
@@ -68,6 +64,137 @@ function getUserDataDir() {
 function getSecureVaultPath() {
     const userData = getUserDataDir();
     return path.join(userData, '.secure_vault.dat');
+}
+
+const DESKTOP_ENCRYPTED_FORMAT = 'ASHKEGHALAM_DESKTOP_BACKUP_V1';
+const PORTABLE_ENCRYPTED_FORMAT = 'ASHKEGHALAM_ENCRYPTED_BACKUP_V1';
+
+async function encryptDesktopText(plainText) {
+    if (typeof plainText !== 'string') throw new Error('INVALID_LOCAL_DATA');
+    const available = await safeStorage.isAsyncEncryptionAvailable();
+    if (!available) throw new Error('OS_ENCRYPTION_UNAVAILABLE');
+    const encrypted = await safeStorage.encryptStringAsync(plainText);
+    return JSON.stringify({
+        format: DESKTOP_ENCRYPTED_FORMAT,
+        version: 1,
+        encryption: 'electron-safeStorage',
+        data: encrypted.toString('base64')
+    }, null, 2);
+}
+
+async function decryptDesktopEnvelope(envelope) {
+    if (!envelope || envelope.format !== DESKTOP_ENCRYPTED_FORMAT ||
+        envelope.version !== 1 || envelope.encryption !== 'electron-safeStorage' ||
+        typeof envelope.data !== 'string' || envelope.data.length < 16 ||
+        envelope.data.length > 200 * 1024 * 1024 ||
+        !/^[A-Za-z0-9+/]+={0,2}$/.test(envelope.data)) {
+        throw new Error('INVALID_DESKTOP_ENCRYPTED_FILE');
+    }
+    const available = await safeStorage.isAsyncEncryptionAvailable();
+    if (!available) throw new Error('OS_ENCRYPTION_UNAVAILABLE');
+    const result = await safeStorage.decryptStringAsync(Buffer.from(envelope.data, 'base64'));
+    const plainText = typeof result === 'string' ? result : result?.result;
+    if (typeof plainText !== 'string') throw new Error('DESKTOP_DECRYPT_FAILED');
+    return plainText;
+}
+
+function parseJsonSafely(text) {
+    try { return JSON.parse(text); } catch { return null; }
+}
+
+async function writeTextAtomically(filePath, text) {
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+    const tempPath = path.join(path.dirname(filePath), '.' + path.basename(filePath) + '.' + crypto.randomBytes(8).toString('hex') + '.tmp');
+    try {
+        await fs.promises.writeFile(tempPath, text, { encoding: 'utf-8', flag: 'wx', mode: 0o600 });
+        await fs.promises.rename(tempPath, filePath);
+    } catch (error) {
+        await fs.promises.unlink(tempPath).catch(() => {});
+        throw error;
+    }
+}
+
+async function readProtectedTextFile(filePath) {
+    const raw = await fs.promises.readFile(filePath, 'utf-8');
+    const parsed = parseJsonSafely(raw);
+    if (parsed?.format === DESKTOP_ENCRYPTED_FORMAT) {
+        return await decryptDesktopEnvelope(parsed);
+    }
+    // The passphrase-based portable envelope is deliberately not unwrapped here.
+    // Only the restore flow for a selected portable backup asks the user for its password.
+    if (parsed?.format === PORTABLE_ENCRYPTED_FORMAT) {
+        return raw;
+    }
+    // Existing releases stored ordinary JSON (or legacy CryptoJS text). Keep old data
+    // readable, then opportunistically migrate JSON state into OS-protected storage.
+    if (parsed && typeof parsed === 'object') {
+        try {
+            const migrated = await encryptDesktopText(raw);
+            await writeTextAtomically(filePath, migrated);
+        } catch (error) {
+            console.warn('Legacy local data remains readable but OS encryption migration was unavailable:', error?.message || error);
+        }
+    }
+    return raw;
+}
+
+async function readProtectedJsonFile(filePath, fallbackValue = {}) {
+    if (!fs.existsSync(filePath)) return fallbackValue;
+    const raw = await fs.promises.readFile(filePath, 'utf-8');
+    const parsed = parseJsonSafely(raw);
+    if (parsed?.format === DESKTOP_ENCRYPTED_FORMAT) {
+        const plaintext = await decryptDesktopEnvelope(parsed);
+        return JSON.parse(plaintext);
+    }
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        try {
+            const migrated = await encryptDesktopText(raw);
+            await writeTextAtomically(filePath, migrated);
+        } catch (error) {
+            console.warn('Legacy secure-store values could not be migrated to OS encryption:', error?.message || error);
+        }
+        return parsed;
+    }
+    throw new Error('SECURE_STORE_FORMAT_INVALID');
+}
+
+
+function getBackupDirectorySettingsPath() {
+    return path.join(getUserDataDir(), '.backup-directory.json');
+}
+
+function readSelectedBackupDirectory() {
+    try {
+        const settingsPath = getBackupDirectorySettingsPath();
+        if (!fs.existsSync(settingsPath)) return null;
+        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+        const requested = typeof settings.directory === 'string' ? path.resolve(settings.directory) : '';
+        if (!requested || !fs.existsSync(requested) || !fs.statSync(requested).isDirectory()) return null;
+        return fs.realpathSync(requested);
+    } catch {
+        return null;
+    }
+}
+
+function persistSelectedBackupDirectory(directory) {
+    const canonical = fs.realpathSync(directory);
+    if (!fs.statSync(canonical).isDirectory()) {
+        throw new Error('مسیر انتخاب‌شده پوشه معتبر نیست.');
+    }
+    const settingsPath = getBackupDirectorySettingsPath();
+    const tempPath = settingsPath + '.tmp.' + crypto.randomBytes(8).toString('hex');
+    try {
+        fs.writeFileSync(
+            tempPath,
+            JSON.stringify({ directory: canonical, updatedAt: new Date().toISOString() }),
+            { encoding: 'utf-8', mode: 0o600 }
+        );
+        fs.renameSync(tempPath, settingsPath);
+    } catch (error) {
+        try { fs.unlinkSync(tempPath); } catch {}
+        throw error;
+    }
+    return canonical;
 }
 
 function getAppIcon() {
@@ -225,10 +352,13 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: getPreloadPath(),
-            sandbox: false,
-            webSecurity: false,
-            allowRunningInsecureContent: true,
-            partition: 'persist:ashke-ghalam-isolated-secure'
+            sandbox: true,
+            devTools: !app.isPackaged,
+            webSecurity: true,
+            allowRunningInsecureContent: false,
+            partition: 'persist:ashke-ghalam-isolated-secure',
+            // Keep the displayed version synchronous while the preload remains sandboxed.
+            additionalArguments: [`--ashk-app-version=${app.getVersion()}`]
         },
         backgroundColor: '#111827',
         show: false
@@ -360,7 +490,7 @@ function createWindow() {
 
 // IPC Handlers
 ipcMain.handle('get-app-version', async () => {
-    return app.getVersion() || '16.22.0';
+    return app.getVersion() || packageMeta.version || '0.0.0';
 });
 
 ipcMain.handle('open-external-url', async (event, url) => {
@@ -386,49 +516,49 @@ ipcMain.handle('get-hardware-id', async () => {
 });
 
 ipcMain.handle('secure-store-set', async (event, { key, value }) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
+    if (typeof key !== 'string' || !/^[A-Za-z0-9_.:-]{1,180}$/.test(key)) {
+        return { success: false, error: 'INVALID_SECURE_STORE_KEY' };
+    }
     try {
         const vaultPath = getSecureVaultPath();
-        let data = {};
-        if (fs.existsSync(vaultPath)) {
-            try {
-                const raw = fs.readFileSync(vaultPath, 'utf-8');
-                data = JSON.parse(raw);
-            } catch {}
-        }
+        const data = await readProtectedJsonFile(vaultPath, {});
         data[key] = value;
-        fs.writeFileSync(vaultPath, JSON.stringify(data, null, 2), 'utf-8');
-        return { success: true };
+        await writeTextAtomically(vaultPath, await encryptDesktopText(JSON.stringify(data)));
+        return { success: true, encryptedAtRest: true };
     } catch (e) {
-        return { success: false, error: e.message };
+        return { success: false, error: e.message || 'SECURE_STORE_WRITE_FAILED' };
     }
 });
 
 ipcMain.handle('secure-store-get', async (event, key) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return null;
+    if (typeof key !== 'string' || !/^[A-Za-z0-9_.:-]{1,180}$/.test(key)) return null;
     try {
-        const vaultPath = getSecureVaultPath();
-        if (fs.existsSync(vaultPath)) {
-            const raw = fs.readFileSync(vaultPath, 'utf-8');
-            const data = JSON.parse(raw);
-            return data[key] !== undefined ? data[key] : null;
-        }
-        return null;
-    } catch (e) {
+        const data = await readProtectedJsonFile(getSecureVaultPath(), {});
+        return data[key] !== undefined ? data[key] : null;
+    } catch {
         return null;
     }
 });
 
 ipcMain.handle('secure-store-remove', async (event, key) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
+    if (typeof key !== 'string' || !/^[A-Za-z0-9_.:-]{1,180}$/.test(key)) {
+        return { success: false, error: 'INVALID_SECURE_STORE_KEY' };
+    }
     try {
         const vaultPath = getSecureVaultPath();
-        if (fs.existsSync(vaultPath)) {
-            const raw = fs.readFileSync(vaultPath, 'utf-8');
-            const data = JSON.parse(raw);
-            delete data[key];
-            fs.writeFileSync(vaultPath, JSON.stringify(data, null, 2), 'utf-8');
-        }
-        return { success: true };
+        const data = await readProtectedJsonFile(vaultPath, {});
+        delete data[key];
+        await writeTextAtomically(vaultPath, await encryptDesktopText(JSON.stringify(data)));
+        return { success: true, encryptedAtRest: true };
     } catch (e) {
-        return { success: false, error: e.message };
+        return { success: false, error: e.message || 'SECURE_STORE_WRITE_FAILED' };
     }
 });
 
@@ -439,7 +569,14 @@ ipcMain.handle('get-app-config', async () => {
 ipcMain.handle('save-app-config', async (event, config) => {
     try {
         const configPath = getAppConfigPath();
-        fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+        const safeConfig = config && typeof config === 'object' ? {
+            ...config,
+            workspace_token: '',
+            workspaceToken: '',
+            license_key: '',
+            licenseKey: ''
+        } : {};
+        fs.writeFileSync(configPath, JSON.stringify(safeConfig, null, 2), 'utf-8');
         if (mainWindow && config.app_title) {
             mainWindow.setTitle(config.app_title);
         }
@@ -460,19 +597,193 @@ ipcMain.handle('export-app-config', async (event, config) => {
         if (result.canceled || !result.filePath) {
             return { canceled: true };
         }
-        fs.writeFileSync(result.filePath, JSON.stringify(config, null, 2), 'utf-8');
+        const safeConfig = config && typeof config === 'object' ? {
+            ...config,
+            workspace_token: '',
+            workspaceToken: '',
+            license_key: '',
+            licenseKey: ''
+        } : {};
+        fs.writeFileSync(result.filePath, JSON.stringify(safeConfig, null, 2), 'utf-8');
         return { success: true, filePath: result.filePath };
     } catch (error) {
         return { success: false, error: error.message };
     }
 });
 
-ipcMain.handle('select-directory', async () => {
+ipcMain.handle('select-directory', async (event) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return null;
     const result = await dialog.showOpenDialog(mainWindow, {
         properties: ['openDirectory'],
         title: 'انتخاب پوشه ذخیره بک‌آپ'
     });
-    return result.canceled ? null : result.filePaths[0];
+    if (result.canceled || !result.filePaths[0]) return null;
+    try {
+        return persistSelectedBackupDirectory(result.filePaths[0]);
+    } catch (error) {
+        console.error('Unable to save selected backup directory:', error);
+        return null;
+    }
+});
+
+ipcMain.handle('get-local-backup-directory', async (event) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) return null;
+    return readSelectedBackupDirectory();
+});
+
+ipcMain.handle('write-local-backup', async (event, payload) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
+
+    const fileName = typeof payload?.fileName === 'string' ? payload.fileName : '';
+    const data = typeof payload?.data === 'string' ? payload.data : null;
+    if (!isManagedBackupFileName(fileName)) {
+        return { success: false, error: 'INVALID_BACKUP_FILENAME' };
+    }
+    if (data === null) return { success: false, error: 'INVALID_BACKUP_DATA' };
+    const originalSize = Buffer.byteLength(data, 'utf-8');
+    if (originalSize > 100 * 1024 * 1024) return { success: false, error: 'BACKUP_TOO_LARGE' };
+
+    const directory = readSelectedBackupDirectory();
+    if (!directory) return { success: false, error: 'BACKUP_DIRECTORY_NOT_SELECTED' };
+    const targetPath = path.join(directory, fileName);
+    if (path.dirname(targetPath) !== directory) return { success: false, error: 'INVALID_BACKUP_PATH' };
+
+    let tempPath = '';
+    try {
+        const directoryStat = await fs.promises.stat(directory);
+        if (!directoryStat.isDirectory()) return { success: false, error: 'BACKUP_DIRECTORY_UNAVAILABLE' };
+
+        // Portable password-encrypted files already have cross-device encryption.
+        // All other local copies use OS-backed encryption and are bound to this
+        // Windows/macOS user profile. Do not fall back to plaintext on failure.
+        const parsed = parseJsonSafely(data);
+        const fileContents = parsed?.format === PORTABLE_ENCRYPTED_FORMAT
+            ? data
+            : await encryptDesktopText(data);
+        const sizeBytes = Buffer.byteLength(fileContents, 'utf-8');
+        if (sizeBytes > 140 * 1024 * 1024) return { success: false, error: 'BACKUP_TOO_LARGE' };
+
+        tempPath = path.join(directory, '.' + fileName + '.' + crypto.randomBytes(8).toString('hex') + '.tmp');
+        await fs.promises.writeFile(tempPath, fileContents, { encoding: 'utf-8', flag: 'wx', mode: 0o600 });
+        await fs.promises.rename(tempPath, targetPath);
+        tempPath = '';
+
+        // Retain up to 100 managed backup files and prune files older than 30 days.
+        const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+        const entries = [];
+        for (const name of await fs.promises.readdir(directory)) {
+            if (!isManagedBackupFileName(name)) continue;
+            const fullPath = path.join(directory, name);
+            try {
+                const stat = await fs.promises.stat(fullPath);
+                if (!stat.isFile()) continue;
+                if (stat.mtimeMs < cutoff && fullPath !== targetPath) await fs.promises.unlink(fullPath).catch(() => {});
+                else entries.push({ fullPath, mtimeMs: stat.mtimeMs });
+            } catch {}
+        }
+        entries.sort((a, b) => b.mtimeMs - a.mtimeMs);
+        for (const old of entries.slice(100)) {
+            if (old.fullPath !== targetPath) await fs.promises.unlink(old.fullPath).catch(() => {});
+        }
+        return {
+            success: true,
+            filePath: targetPath,
+            sizeBytes,
+            encryptedAtRest: parsed?.format !== PORTABLE_ENCRYPTED_FORMAT,
+            sha256: crypto.createHash('sha256').update(fileContents, 'utf-8').digest('hex')
+        };
+    } catch (error) {
+        if (tempPath) await fs.promises.unlink(tempPath).catch(() => {});
+        console.error('Local backup write failed:', error);
+        return { success: false, error: error?.message || 'BACKUP_WRITE_FAILED' };
+    }
+});
+
+// OS-encrypted internal backup store used by automatic/offline backups.
+// Values are indexed by a hashed key; renderer never receives a filesystem path.
+function nativeBackupStorePath(key) {
+    if (typeof key !== 'string' || !/^[A-Za-z0-9_.:-]{1,180}$/.test(key)) {
+        throw new Error('INVALID_NATIVE_BACKUP_KEY');
+    }
+    const fileName = crypto.createHash('sha256').update(key, 'utf8').digest('hex') + '.json';
+    return path.join(getUserDataDir(), 'native-backups', fileName);
+}
+
+ipcMain.handle('secure-backup-store-get', async (event, payload) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
+    try {
+        const key = payload?.key;
+        const filePath = nativeBackupStorePath(key);
+        if (!fs.existsSync(filePath)) return { success: true, value: null, encryptedAtRest: true };
+
+        const raw = await fs.promises.readFile(filePath, 'utf-8');
+        const envelope = parseJsonSafely(raw);
+        const expectedKeyHash = crypto.createHash('sha256').update(key, 'utf8').digest('hex');
+        if (envelope?.format !== DESKTOP_ENCRYPTED_FORMAT ||
+            envelope?.purpose !== 'ASHKEGHALAM_NATIVE_BACKUP_STORE_V1' ||
+            envelope?.keyHash !== expectedKeyHash) {
+            return { success: false, error: 'NATIVE_BACKUP_ENVELOPE_INVALID' };
+        }
+
+        const plaintext = await decryptDesktopEnvelope(envelope);
+        let parsed;
+        try { parsed = JSON.parse(plaintext); } catch {}
+        if (!parsed || parsed.key !== key || typeof parsed.value !== 'string') {
+            return { success: false, error: 'NATIVE_BACKUP_VALUE_INVALID' };
+        }
+        return { success: true, value: parsed.value, encryptedAtRest: true };
+    } catch (error) {
+        console.error('Native encrypted backup read failed:', error);
+        return { success: false, error: error?.message || 'NATIVE_BACKUP_READ_FAILED' };
+    }
+});
+
+ipcMain.handle('secure-backup-store-set', async (event, payload) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
+    const key = payload?.key;
+    const value = payload?.value;
+    if (typeof value !== 'string' || Buffer.byteLength(value, 'utf-8') > 80 * 1024 * 1024) {
+        return { success: false, error: 'INVALID_NATIVE_BACKUP_VALUE' };
+    }
+    let filePath = '';
+    try {
+        filePath = nativeBackupStorePath(key);
+        const keyHash = crypto.createHash('sha256').update(key, 'utf8').digest('hex');
+        const serialized = JSON.stringify({ key, value });
+        const baseEnvelope = JSON.parse(await encryptDesktopText(serialized));
+        const envelope = {
+            ...baseEnvelope,
+            purpose: 'ASHKEGHALAM_NATIVE_BACKUP_STORE_V1',
+            keyHash
+        };
+        await writeTextAtomically(filePath, JSON.stringify(envelope, null, 2));
+        return { success: true, encryptedAtRest: true, sizeBytes: Buffer.byteLength(JSON.stringify(envelope), 'utf-8') };
+    } catch (error) {
+        console.error('Native encrypted backup write failed:', error);
+        return { success: false, error: error?.message || 'NATIVE_BACKUP_WRITE_FAILED' };
+    }
+});
+
+ipcMain.handle('secure-backup-store-remove', async (event, payload) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
+    try {
+        const filePath = nativeBackupStorePath(payload?.key);
+        await fs.promises.unlink(filePath).catch(error => {
+            if (error?.code !== 'ENOENT') throw error;
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Native encrypted backup delete failed:', error);
+        return { success: false, error: error?.message || 'NATIVE_BACKUP_DELETE_FAILED' };
+    }
 });
 
 ipcMain.handle('get-user-data-path', async () => {
@@ -507,7 +818,7 @@ ipcMain.handle('open-directory-path', async (event, targetPath) => {
     }
 });
 
-// --- پایگاه داده رابطه‌ای و ایزوله دسکتاپ ویندوز (SQL Database Engine) ---
+// --- Local desktop state snapshot and SQL migration export ---
 function getDatabaseDir() {
     const dbDir = path.join(getUserDataDir(), 'database');
     if (!fs.existsSync(dbDir)) {
@@ -516,25 +827,59 @@ function getDatabaseDir() {
     return dbDir;
 }
 
+// The application stores a serialized Zustand JSON snapshot, not a SQLite database.
 function getDatabaseFilePath() {
-    return path.join(getDatabaseDir(), 'ashke_ghalam.db');
+    return path.join(getDatabaseDir(), 'ashke_ghalam-state.json');
+}
+
+// Migrate the old .db-named JSON snapshot without deleting the original.
+// If its content is not JSON, return the legacy file so existing recovery logic can inspect it.
+async function getExistingDatabaseFilePath() {
+    const currentFile = getDatabaseFilePath();
+    if (fs.existsSync(currentFile)) return currentFile;
+
+    const legacyFile = path.join(getDatabaseDir(), 'ashke_ghalam.db');
+    if (!fs.existsSync(legacyFile)) return currentFile;
+
+    const raw = await fs.promises.readFile(legacyFile, 'utf-8');
+    try {
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return legacyFile;
+    } catch {
+        return legacyFile;
+    }
+
+    await fs.promises.writeFile(currentFile, raw, 'utf-8');
+    return currentFile;
 }
 
 function getSqlDumpFilePath() {
     return path.join(getDatabaseDir(), 'ashke_ghalam_dump.sql');
 }
 
-// ساخت و ذخیره اسکریپت استاندارد SQL DDL/DML سازگار با MySQL/MariaDB سی‌پنل و SQLite
+// Generate a MySQL/MariaDB dump for cPanel/phpMyAdmin.
+// The local .db file is a JSON Zustand snapshot, not a SQLite database.
 function generateRelationalSqlDump(state) {
     try {
         const parsed = typeof state === 'string' ? JSON.parse(state) : state;
-        const s = parsed.state || parsed;
+        const s = parsed && parsed.state ? parsed.state : parsed;
+        const sqlText = (value) => String(value ?? '')
+            .replace(/\\/g, '\\\\')
+            .replace(/\0/g, '')
+            .replace(/'/g, "''")
+            .replace(/\r/g, '\\r')
+            .replace(/\n/g, '\\n');
+        const sqlNumber = (value) => {
+            const number = Number(value);
+            return Number.isFinite(number) ? number : 0;
+        };
+        const sqlString = (value) => "'" + sqlText(value) + "'";
         const lines = [
             '-- =====================================================',
-            '-- پایگاه داده جامع حسابداری اشک قلم (نسخه ۱۶.۱۲.۰)',
-            '-- تولید شده به صورت ایزوله روی سیستم کاربر',
+            '-- خروجی داده‌های اشک قلم برای انتقال به MariaDB / MySQL',
+            '-- فایل محلی برنامه یک snapshot از Zustand با قالب JSON است، نه SQLite.',
             `-- تاریخ ایجاد: ${new Date().toISOString()}`,
-            '-- سازگار با MariaDB / MySQL 5.7+ / SQLite / cPanel',
+            '-- سازگار با MariaDB / MySQL و phpMyAdmin در cPanel',
             '-- =====================================================',
             '',
             'SET NAMES utf8mb4;',
@@ -617,47 +962,70 @@ function generateRelationalSqlDump(state) {
             ''
         ];
 
-        // افزودن داده‌های رکوردهای اشخاص
+        // Export account/person records.
         if (Array.isArray(s.people) && s.people.length > 0) {
             lines.push('-- رکوردهای اشخاص');
             s.people.forEach(p => {
                 if (!p || !p.id) return;
-                const safeName = (p.name || '').replace(/'/g, "''");
-                const safePhone = (p.phone || '').replace(/'/g, "''");
-                const safeCat = (p.category || '').replace(/'/g, "''");
-                const safeAddr = (p.address || '').replace(/'/g, "''");
-                const safeCode = (p.code || '').replace(/'/g, "''");
-                lines.push(`REPLACE INTO \`people\` (\`id\`, \`code\`, \`name\`, \`phone\`, \`category\`, \`balance\`, \`address\`) VALUES ('${p.id}', '${safeCode}', '${safeName}', '${safePhone}', '${safeCat}', ${Number(p.balance) || 0}, '${safeAddr}');`);
+                lines.push(`REPLACE INTO \`people\` (\`id\`, \`code\`, \`name\`, \`phone\`, \`category\`, \`balance\`, \`address\`) VALUES (${sqlString(p.id)}, ${sqlString(p.code)}, ${sqlString(p.name)}, ${sqlString(p.phone)}, ${sqlString(p.category)}, ${sqlNumber(p.balance)}, ${sqlString(p.address)});`);
             });
             lines.push('');
         }
 
-        // افزودن داده‌های رکوردهای کالاها
+        // Export inventory items.
         if (Array.isArray(s.products) && s.products.length > 0) {
             lines.push('-- رکوردهای کالاها');
             s.products.forEach(p => {
                 if (!p || !p.id) return;
-                const safeName = (p.name || '').replace(/'/g, "''");
-                const safeCode = (p.code || '').replace(/'/g, "''");
-                const safeUnit = (p.unit || 'عدد').replace(/'/g, "''");
-                const safeCat = (p.category || '').replace(/'/g, "''");
-                lines.push(`REPLACE INTO \`products\` (\`id\`, \`code\`, \`name\`, \`stock\`, \`buy_price\`, \`sell_price\`, \`unit\`, \`category\`) VALUES ('${p.id}', '${safeCode}', '${safeName}', ${Number(p.stock) || 0}, ${Number(p.buyPrice) || 0}, ${Number(p.sellPrice) || 0}, '${safeUnit}', '${safeCat}');`);
+                lines.push(`REPLACE INTO \`products\` (\`id\`, \`code\`, \`name\`, \`stock\`, \`buy_price\`, \`sell_price\`, \`unit\`, \`category\`) VALUES (${sqlString(p.id)}, ${sqlString(p.code)}, ${sqlString(p.name)}, ${sqlNumber(p.stock)}, ${sqlNumber(p.buyPrice)}, ${sqlNumber(p.sellPrice)}, ${sqlString(p.unit || 'عدد')}, ${sqlString(p.category)});`);
             });
             lines.push('');
         }
 
-        // رکوردهای فاکتورها
+        // Export invoices. String() conversion is intentional: invoice numbers are
+        // numeric in some versions and strings (with prefixes) in others.
         if (Array.isArray(s.invoices) && s.invoices.length > 0) {
             lines.push('-- رکوردهای فاکتورها');
             s.invoices.forEach(inv => {
                 if (!inv || !inv.id) return;
-                const safeNum = (inv.number || '').replace(/'/g, "''");
-                const safeType = (inv.type || '').replace(/'/g, "''");
-                const safeDate = (inv.date || '').replace(/'/g, "''");
-                const safePid = (inv.personId || '').replace(/'/g, "''");
-                const safeItems = JSON.stringify(inv.items || []).replace(/'/g, "''");
-                lines.push(`REPLACE INTO \`invoices\` (\`id\`, \`number\`, \`type\`, \`date\`, \`person_id\`, \`total\`, \`tax\`, \`discount\`, \`items_json\`) VALUES ('${inv.id}', '${safeNum}', '${safeType}', '${safeDate}', '${safePid}', ${Number(inv.total) || 0}, ${Number(inv.tax) || 0}, ${Number(inv.discount) || 0}, '${safeItems}');`);
+                lines.push(`REPLACE INTO \`invoices\` (\`id\`, \`number\`, \`type\`, \`date\`, \`person_id\`, \`total\`, \`tax\`, \`discount\`, \`items_json\`) VALUES (${sqlString(inv.id)}, ${sqlString(inv.number)}, ${sqlString(inv.type)}, ${sqlString(inv.date)}, ${sqlString(inv.personId)}, ${sqlNumber(inv.total ?? inv.finalTotal)}, ${sqlNumber(inv.tax)}, ${sqlNumber(inv.discount)}, ${sqlString(JSON.stringify(inv.items || []))});`);
             });
+            lines.push('');
+        }
+
+        // Export check records using the fields available in the current app model.
+        if (Array.isArray(s.checks) && s.checks.length > 0) {
+            lines.push('-- رکوردهای چک');
+            s.checks.forEach(check => {
+                if (!check || !check.id) return;
+                lines.push(`REPLACE INTO \`checks\` (\`id\`, \`bank_name\`, \`amount\`, \`due_date\`, \`status\`, \`sayad_id\`, \`person_id\`) VALUES (${sqlString(check.id)}, ${sqlString(check.bankName)}, ${sqlNumber(check.amount)}, ${sqlString(check.dueDate)}, ${sqlString(check.status)}, ${sqlString(check.sayadId)}, ${sqlString(check.personId)});`);
+            });
+            lines.push('');
+        }
+
+        // Export cash/treasury transactions.
+        if (Array.isArray(s.transactions) && s.transactions.length > 0) {
+            lines.push('-- تراکنش‌های مالی و خزانه‌داری');
+            s.transactions.forEach(transaction => {
+                if (!transaction || !transaction.id) return;
+                lines.push(`REPLACE INTO \`transactions\` (\`id\`, \`type\`, \`amount\`, \`date\`, \`description\`) VALUES (${sqlString(transaction.id)}, ${sqlString(transaction.type)}, ${sqlNumber(transaction.amount)}, ${sqlString(transaction.date)}, ${sqlString(transaction.description)});`);
+            });
+            lines.push('');
+        }
+
+        // Export inventory vouchers.
+        if (Array.isArray(s.vouchers) && s.vouchers.length > 0) {
+            lines.push('-- حواله‌های انبار');
+            s.vouchers.forEach(voucher => {
+                if (!voucher || !voucher.id) return;
+                lines.push(`REPLACE INTO \`vouchers\` (\`id\`, \`number\`, \`date\`, \`description\`, \`items_json\`) VALUES (${sqlString(voucher.id)}, ${sqlNumber(voucher.number)}, ${sqlString(voucher.date)}, ${sqlString(voucher.notes || voucher.returnReason || voucher.type)}, ${sqlString(JSON.stringify(voucher.items || []))});`);
+            });
+            lines.push('');
+        }
+
+        // Export system settings as one JSON row for migration/archive purposes.
+        if (s.config && typeof s.config === 'object') {
+            lines.push(`REPLACE INTO \`system_meta\` (\`key_name\`, \`value_data\`) VALUES (${sqlString('config')}, ${sqlString(JSON.stringify(s.config))});`);
             lines.push('');
         }
 
@@ -669,80 +1037,93 @@ function generateRelationalSqlDump(state) {
 }
 
 ipcMain.handle('sql-db-save', async (event, stateData) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
     try {
         const dbFile = getDatabaseFilePath();
-        const sqlFile = getSqlDumpFilePath();
-
         const serialized = typeof stateData === 'string' ? stateData : JSON.stringify(stateData);
-        // ذخیره فایل باینری دیتابیس
-        fs.writeFileSync(dbFile, serialized, 'utf-8');
-
-        // ساخت و ذخیره همزمان فایل SQL
-        const sqlDump = generateRelationalSqlDump(stateData);
-        fs.writeFileSync(sqlFile, sqlDump, 'utf-8');
-
-        return { 
-            success: true, 
-            dbPath: dbFile, 
-            sqlPath: sqlFile,
-            size: Buffer.byteLength(serialized, 'utf-8') 
+        if (typeof serialized !== 'string' || Buffer.byteLength(serialized, 'utf-8') > 100 * 1024 * 1024) {
+            return { success: false, error: 'LOCAL_STATE_TOO_LARGE' };
+        }
+        // New writes fail closed instead of silently saving financial data as plaintext.
+        const protectedText = await encryptDesktopText(serialized);
+        await writeTextAtomically(dbFile, protectedText);
+        return {
+            success: true,
+            encryptedAtRest: true,
+            dbPath: dbFile,
+            sqlPath: getSqlDumpFilePath(),
+            size: Buffer.byteLength(protectedText, 'utf-8')
         };
     } catch (e) {
-        console.error('خطا در ذخیره دیتابیس SQL:', e);
-        return { success: false, error: e.message };
+        console.error('خطا در ذخیره امن داده‌های محلی:', e);
+        return { success: false, error: e.message || 'LOCAL_STATE_WRITE_FAILED' };
     }
 });
 
-ipcMain.handle('sql-db-load', async () => {
+ipcMain.handle('sql-db-load', async (event) => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
     try {
-        const dbFile = getDatabaseFilePath();
+        const dbFile = await getExistingDatabaseFilePath();
         if (fs.existsSync(dbFile)) {
-            const raw = fs.readFileSync(dbFile, 'utf-8');
-            return { success: true, data: raw };
+            const raw = await readProtectedTextFile(dbFile);
+            return { success: true, data: raw, encryptedAtRest: parseJsonSafely(raw)?.format === DESKTOP_ENCRYPTED_FORMAT };
         }
-        return { success: false, error: 'Database file not found' };
+        return { success: false, error: 'Local state snapshot not found' };
     } catch (e) {
-        return { success: false, error: e.message };
+        return { success: false, error: e.message || 'LOCAL_STATE_READ_FAILED' };
     }
 });
 
-ipcMain.handle('sql-db-export', async (event, defaultName = 'ashke_ghalam_backup.sql') => {
+ipcMain.handle('sql-db-export', async (event, defaultName = 'ashke_ghalam_backup.json') => {
+    if (!mainWindow || event.sender !== mainWindow.webContents) {
+        return { success: false, error: 'UNAUTHORIZED_RENDERER' };
+    }
     try {
-        const sqlFile = getSqlDumpFilePath();
-        if (!fs.existsSync(sqlFile)) {
-            return { success: false, error: 'SQL dump file not generated yet' };
-        }
+        const dbFile = await getExistingDatabaseFilePath();
+        if (!fs.existsSync(dbFile)) return { success: false, error: 'فایل داده محلی هنوز ایجاد نشده است.' };
+
         const result = await dialog.showSaveDialog(mainWindow, {
-            title: 'خروجی پایگاه داده SQL استاندارد (سازگار با سی‌پنل و SQLite)',
+            title: 'خروجی داده‌های اشک قلم',
             defaultPath: defaultName,
             filters: [
-                { name: 'SQL Script (*.sql)', extensions: ['sql'] },
-                { name: 'Database File (*.db)', extensions: ['db', 'sqlite'] }
+                { name: 'Encrypted Local Snapshot (*.json)', extensions: ['json'] },
+                { name: 'SQL Script (*.sql) — plaintext export', extensions: ['sql'] }
             ]
         });
+        if (result.canceled || !result.filePath) return { canceled: true };
 
-        if (result.canceled || !result.filePath) {
-            return { canceled: true };
-        }
-
-        if (result.filePath.endsWith('.db') || result.filePath.endsWith('.sqlite')) {
-            const dbFile = getDatabaseFilePath();
-            if (fs.existsSync(dbFile)) {
-                fs.copyFileSync(dbFile, result.filePath);
-            }
+        if (path.extname(result.filePath).toLowerCase() === '.json') {
+            const raw = await fs.promises.readFile(dbFile, 'utf-8');
+            const parsed = parseJsonSafely(raw);
+            const protectedText = parsed?.format === DESKTOP_ENCRYPTED_FORMAT || parsed?.format === PORTABLE_ENCRYPTED_FORMAT
+                ? raw
+                : await encryptDesktopText(raw);
+            await writeTextAtomically(result.filePath, protectedText);
         } else {
-            fs.copyFileSync(sqlFile, result.filePath);
+            // SQL is an explicitly requested plaintext export; the destination dialog
+            // makes that choice explicit, unlike the application's automatic local state.
+            const serialized = await readProtectedTextFile(dbFile);
+            const persisted = JSON.parse(serialized);
+            const applicationState = persisted && typeof persisted === 'object' && persisted.state
+                ? persisted.state
+                : persisted;
+            const sqlDump = generateRelationalSqlDump(applicationState);
+            await writeTextAtomically(result.filePath, sqlDump);
         }
-
         return { success: true, filePath: result.filePath };
     } catch (e) {
-        return { success: false, error: e.message };
+        console.error('خطا در خروجی داده‌ها:', e);
+        return { success: false, error: e.message || 'LOCAL_EXPORT_FAILED' };
     }
 });
 
 ipcMain.handle('sql-db-info', async () => {
     try {
-        const dbFile = getDatabaseFilePath();
+        const dbFile = await getExistingDatabaseFilePath();
         const sqlFile = getSqlDumpFilePath();
         const exists = fs.existsSync(dbFile);
         let size = 0;
@@ -773,16 +1154,6 @@ ipcMain.handle('open-database-folder', async () => {
         return { success: true, path: dir };
     } catch (e) {
         return { success: false, error: e.message };
-    }
-});
-
-ipcMain.handle('save-backup-file', async (event, { filePath, data }) => {
-    try {
-        fs.writeFileSync(filePath, data, 'utf-8');
-        return { success: true };
-    } catch (error) {
-        console.error('Error saving backup file:', error);
-        return { success: false, error: error.message };
     }
 });
 

@@ -7,13 +7,20 @@ import {
     Wifi, WifiOff, Server, Code, Cpu, Eye, X
 } from 'lucide-react';
 import { useStore } from '../store';
-import { downloadJSON, getPersianDate, toPersianDigits, fetchWithTimeout } from '../utils';
+import { getPersianDate, toPersianDigits, fetchWithTimeout } from '../utils';
+import { saveEncryptedBackupFile } from '../services/nativeBackupFileService';
 import { hostBackupService, HostBackupEntry } from '../services/hostBackupService';
 import { securityService } from '../services/securityService';
+import { backupEncryptionService } from '../services/backupEncryptionService';
+import CryptoJS from 'crypto-js';
 import { autoBackupService } from '../services/autoBackupService';
 import { backupMigrationService } from '../services/backupMigrationService';
 import { smartStorage } from '../services/smartStorageService';
 import { TripleBackupService, TripleBackupReport } from '../services/tripleBackupService';
+import { useFinancialStore } from '../store-financial';
+import { APP_VERSION } from '../config';
+import { workspaceService } from '../services/workspaceService';
+import { hasNativeBackupStorage } from '../services/nativeBackupStorage';
 
 type ActiveTab = 'triple' | 'stats' | 'cloud' | 'local_snap' | 'desktop' | 'file' | 'sync' | 'diagnostics' | 'reset';
 
@@ -29,6 +36,8 @@ const BackupManager = () => {
     const [tripleLoading, setTripleLoading] = useState(false);
     const [tripleReport, setTripleReport] = useState<TripleBackupReport | null>(null);
     const [localLoading, setLocalLoading] = useState(false);
+    const [backupExportPassword, setBackupExportPassword] = useState('');
+    const [backupImportPassword, setBackupImportPassword] = useState('');
     const [cloudLoading, setCloudLoading] = useState(false);
     const [hostBackups, setHostBackups] = useState<HostBackupEntry[]>([]);
     const [localSnapshots, setLocalSnapshots] = useState<any[]>([]);
@@ -38,6 +47,7 @@ const BackupManager = () => {
     const [dragOver, setDragOver] = useState(false);
     const [wipeInput, setWipeInput] = useState('');
     const [showWipeConfirm, setShowWipeConfirm] = useState(false);
+    const hasNativeEncryptedStorage = hasNativeBackupStorage();
 
     // Storage Mode and Sync State
     const [storageMode, setStorageMode] = useState<'HOST' | 'LOCAL'>(smartStorage.getStorageMode());
@@ -60,57 +70,49 @@ const BackupManager = () => {
     const [isDesktopEnv, setIsDesktopEnv] = useState(false);
 
     useEffect(() => {
-        const checkEnv = () => {
+        const checkEnv = async () => {
             const electronAPI = (window as any).electronDesktopAPI;
             const tauriAPI = (window as any).__TAURI__;
             setIsDesktopEnv(Boolean(electronAPI) || Boolean(tauriAPI));
+
+            if (electronAPI && typeof electronAPI.invoke === 'function') {
+                try {
+                    const selectedPath = await electronAPI.invoke('get-local-backup-directory');
+                    const safePath = typeof selectedPath === 'string' ? selectedPath : '';
+                    setDesktopBackupPath(safePath);
+                    if (safePath) localStorage.setItem('desktop_auto_backup_path', safePath);
+                    else localStorage.removeItem('desktop_auto_backup_path');
+                } catch {
+                    setDesktopBackupPath('');
+                }
+            } else {
+                // A path typed or cached by the old UI is not proof of filesystem permission.
+                setDesktopBackupPath('');
+                localStorage.removeItem('desktop_auto_backup_path');
+            }
         };
-        checkEnv();
+        void checkEnv();
     }, []);
 
     const handleSelectDesktopPath = async () => {
-        // ۱. بررسی پشتیبانی از File System Access API در Edge WebView2 و مرورگرهای مدرن
-        if ('showDirectoryPicker' in window) {
-            try {
-                const dirHandle = await (window as any).showDirectoryPicker({
-                    mode: 'readwrite',
-                    startIn: 'documents'
-                });
-                if (dirHandle && dirHandle.name) {
-                    const customPath = `پوشه انتخاب‌شده: ${dirHandle.name}`;
-                    setDesktopBackupPath(customPath);
-                    localStorage.setItem('desktop_auto_backup_path', customPath);
-                    addNotification('success', `مسیر با موفقیت تنظیم شد: ${dirHandle.name}`);
-                    return;
-                }
-            } catch (err: any) {
-                if (err.name !== 'AbortError') {
-                    console.warn('Directory picker cancelled or error:', err);
-                }
-            }
-        }
-
-        // ۲. پشتیبانی از API دسکتاپ الکترون یا تائوری در صورت وجود
         const electronAPI = (window as any).electronDesktopAPI;
-        if (electronAPI && electronAPI.invoke) {
-            try {
-                const path = await electronAPI.invoke('select-directory');
-                if (path) {
-                    setDesktopBackupPath(path);
-                    localStorage.setItem('desktop_auto_backup_path', path);
-                    addNotification('success', 'مسیر بک‌آپ خودکار با موفقیت تنظیم شد');
-                    return;
-                }
-            } catch (error) {
-                console.error('Error selecting path:', error);
-            }
+        if (!electronAPI || typeof electronAPI.invoke !== 'function') {
+            addNotification('error', 'انتخاب پوشه و بکاپ مستقل خودکار فعلاً فقط در نسخه نصب‌شده ویندوز پشتیبانی می‌شود. در مرورگر از خروجی فایل پشتیبان استفاده کنید.');
+            return;
         }
 
-        // ۳. اگر دسترسی مستقیم مسدود باشد، مقداردهی پیش‌فرض هوشمند در ویندوز
-        const defaultWinPath = 'C:\\Users\\Default\\Documents\\AshkeGhalam_Backups';
-        setDesktopBackupPath(defaultWinPath);
-        localStorage.setItem('desktop_auto_backup_path', defaultWinPath);
-        addNotification('info', 'مسیر استاندارد پیش‌فرض ویندوز تنظیم گردید.');
+        try {
+            const selectedPath = await electronAPI.invoke('select-directory');
+            if (!selectedPath || typeof selectedPath !== 'string') {
+                addNotification('info', 'انتخاب پوشه لغو شد؛ تنظیم قبلی تغییر نکرد.');
+                return;
+            }
+            setDesktopBackupPath(selectedPath);
+            localStorage.setItem('desktop_auto_backup_path', selectedPath);
+            addNotification('success', 'پوشه انتخاب شد. بکاپ مستقل فقط پس از نوشتن واقعی فایل تأیید می‌شود.');
+        } catch (error: any) {
+            addNotification('error', 'انتخاب پوشه انجام نشد: ' + (error?.message || 'خطای نامشخص'));
+        }
     };
 
     // Load lists
@@ -151,10 +153,14 @@ const BackupManager = () => {
             const state = useStore.getState();
             const report = await TripleBackupService.executeTripleBackup(state);
             setTripleReport(report);
-            if (addNotification) {
-                addNotification('success', 'پشتیبان‌گیری ۳ گانه همزمان (ویندوز + اندروید + هاست) با موفقیت کامل شد.');
+            if (report.overallSuccess) {
+                if (addNotification) addNotification('success', 'همه مسیرهای پشتیبان‌گیری گزارش‌شده موفق بودند.');
+                else alert('همه مسیرهای پشتیبان‌گیری گزارش‌شده موفق بودند.');
             } else {
-                alert('پشتیبان‌گیری ۳ گانه همزمان با موفقیت انجام شد.');
+                const cloudStatus = report.tiers[2]?.status || 'WAITING';
+                const message = `پشتیبان‌گیری کامل نیست. نسخه محلی: ${report.tiers[0]?.status || 'نامشخص'}؛ نسخه مستقل فایل‌سیستم: نیازمند پیاده‌سازی؛ سرور: ${cloudStatus}.`;
+                if (addNotification) addNotification('error', message);
+                else alert(message);
             }
         } catch (error: any) {
             alert(`خطا در پشتیبان‌گیری ۳ گانه: ${error?.message || error}`);
@@ -229,7 +235,7 @@ const BackupManager = () => {
         // 2. Host API Status
         const hostStart = Date.now();
         try {
-            const res = await fetch(`${hostUrl}/host-api.php?action=status`);
+            const res = await fetch(`${hostUrl}/host-api.php?action=status`, { headers: await workspaceService.getSecureHeaders() });
             const data = await res.json();
             if (data.success) {
                 diagnostics.push({
@@ -277,7 +283,7 @@ const BackupManager = () => {
 
             const writeRes = await fetch(`${hostUrl}/host-api.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                 body: JSON.stringify({
                     action: 'save',
                     table: testTable,
@@ -296,7 +302,7 @@ const BackupManager = () => {
 
                 await fetch(`${hostUrl}/host-api.php`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                     body: JSON.stringify({
                         action: 'delete',
                         table: testTable,
@@ -345,7 +351,7 @@ const BackupManager = () => {
 
         // Load host files list
         try {
-            const res = await fetch(`${hostUrl}/host-api.php?action=list_files`);
+            const res = await fetch(`${hostUrl}/host-api.php?action=list_files`, { headers: await workspaceService.getSecureHeaders() });
             const data = await res.json();
             if (data.success) {
                 setDiagHostFiles(data.files || []);
@@ -357,7 +363,7 @@ const BackupManager = () => {
         setDiagFileLoading(true);
         const hostUrl = 'https://acc.ashkghalam.ir';
         try {
-            const res = await fetch(`${hostUrl}/host-api.php?action=read_file&file=${filename}`);
+            const res = await fetch(`${hostUrl}/host-api.php?action=read_file&file=${encodeURIComponent(filename)}`, { headers: await workspaceService.getSecureHeaders() });
             const data = await res.json();
             if (data.success) {
                 setDiagFileContent(data.content);
@@ -384,7 +390,7 @@ const BackupManager = () => {
 
             const writeRes = await fetch(`${hostUrl}/host-api.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                 body: JSON.stringify({
                     action: 'save',
                     table: table,
@@ -396,7 +402,7 @@ const BackupManager = () => {
             if (writeData.success) {
                 await fetch(`${hostUrl}/host-api.php`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', ...await workspaceService.getSecureHeaders() },
                     body: JSON.stringify({
                         action: 'delete',
                         table: table,
@@ -469,47 +475,44 @@ const BackupManager = () => {
     const { counts: entityCounts, totalRecords } = getSystemStats();
 
     // 1. Export JSON with Cryptographic Signature
-    const handleFullBackupExport = () => {
+    const handleFullBackupExport = async () => {
         setLocalLoading(true);
         try {
+            if (backupExportPassword.trim().length < 12) {
+                throw new Error('برای خروجی قابل‌حمل، یک رمز حداقل ۱۲ نویسه‌ای وارد کنید.');
+            }
             const allBranches = (companies || []).flatMap(c => (c.branches || []).map(b => ({ ...b, companyId: c.id })));
             const currentRoles = useStore.getState().roles || [];
             const backupData: any = {
                 timestamp: new Date().toISOString(),
-                version: '16.22.0',
-                companies,
-                branches: allBranches,
-                products,
-                people,
-                invoices,
-                vouchers,
-                checks,
-                transactions,
-                checkTransfers,
-                salaries,
-                contracts,
-                config,
-                users,
-                roles: currentRoles,
-                importConfigs,
-                signature: ''
+                version: APP_VERSION,
+                backupFormatVersion: 2,
+                companies, branches: allBranches, products, people, invoices, vouchers, checks,
+                transactions, checkTransfers, salaries, contracts, config, users, roles: currentRoles,
+                importConfigs, financialData: useFinancialStore.getState(), signature: ''
             };
-            
+
+            // The legacy digest detects accidental corruption only; portability and tamper
+            // detection for this file come from the password-derived encryption envelope.
             backupData.signature = securityService.signBackup(backupData);
-            const dateStr = getPersianDate().replace(/\//g, '-');
-            downloadJSON(backupData, `AshkeGhalam-Backup-Signed-${dateStr}`);
-            
-            // Log backup on background
-            backupService.backupData('full-export', backupData).catch(() => {});
-            
-            if (addNotification) {
-                addNotification('success', 'فایل پشتیبان کامل و امضا شده (شامل شعب، کاربران و نقش‌ها) با موفقیت صادر و دانلود شد.');
-            } else {
-                alert('فایل پشتیبان کامل و امضا شده با موفقیت صادر و دانلود شد.');
-            }
-        } catch (error) {
+            const encryptedText = backupEncryptionService.encryptJson(backupData, backupExportPassword);
+            // Android uses its system picker, Windows uses the personal backup directory,
+            // and browser/PWA mode downloads the already-encrypted envelope.
+            const fileName = 'AshkeGhalam-ManualBackup-' + Date.now() + '.json';
+            const result = await saveEncryptedBackupFile(fileName, encryptedText);
+            if (result.cancelled) return;
+            if (!result.success) throw new Error('ذخیره فایل پشتیبان رمزگذاری‌شده تأیید نشد.');
+            const message = result.method === 'desktop'
+                ? 'فایل پشتیبان رمزگذاری‌شده روی دیسک ذخیره شد: ' + result.location
+                : result.method === 'android'
+                    ? 'فایل پشتیبان رمزگذاری‌شده در مسیر انتخابی ذخیره شد.'
+                    : 'فایل پشتیبان رمزگذاری‌شده برای دانلود ارسال شد؛ رمز را جدا از فایل نگه دارید.';
+            if (addNotification) addNotification('success', message);
+            else alert(message);
+        } catch (error: any) {
             console.error(error);
-            alert('خطا در صدور فایل پشتیبان');
+            if (addNotification) addNotification('error', 'صدور فایل پشتیبان ناموفق بود: ' + (error?.message || 'خطای نامشخص'));
+            else alert('خطا در صدور فایل پشتیبان: ' + (error?.message || 'خطای نامشخص'));
         } finally {
             setLocalLoading(false);
         }
@@ -518,40 +521,77 @@ const BackupManager = () => {
     // 2. Import JSON file & verify signature & migrate
     const handleRestoreFile = async (file: File) => {
         try {
-            const text = await file.text();
-            const rawData = JSON.parse(text);
+            const fileText = await file.text();
+            let rawData: any;
+            try { rawData = JSON.parse(fileText); }
+            catch { throw new Error('فایل پشتیبان قابل خواندن نیست.'); }
 
-            // Structure check
+            // Portable backup files require the same passphrase. Device-local backups
+            // use the OS-protected Electron safeStorage envelope and cannot be moved to
+            // another Windows profile/device.
+            if (backupEncryptionService.isEncryptedEnvelope(rawData)) {
+                if (backupImportPassword.trim().length < 12) throw new Error('رمز فایل پشتیبان را در کادر بازیابی وارد کنید.');
+                rawData = backupEncryptionService.decryptJson(fileText, backupImportPassword);
+            } else if (rawData?.format === 'ASHKEGHALAM_DESKTOP_BACKUP_V1') {
+                const desktopAPI = (window as any).electronDesktopAPI;
+                if (!desktopAPI || typeof desktopAPI.invoke !== 'function') {
+                    throw new Error('این بکاپ با حفاظت سیستم‌عامل ویندوز ذخیره شده و فقط در همان پروفایل ویندوز قابل بازگشایی است.');
+                }
+                const decrypted = await desktopAPI.invoke('decrypt-local-backup', fileText);
+                if (!decrypted?.success || typeof decrypted.data !== 'string') {
+                    throw new Error(decrypted?.error || 'بازگشایی امن فایل دستگاهی ناموفق بود.');
+                }
+                rawData = JSON.parse(decrypted.data);
+            }
+
+            // Automatic local copies include a checksum across accounting data/assets.
+            if (rawData?.checksumAlgorithm === 'sha256' && rawData?.data && typeof rawData.data === 'object') {
+                const actualChecksum = CryptoJS.SHA256(JSON.stringify({ data: rawData.data, assets: rawData.assets ?? {} })).toString();
+                if (typeof rawData.checksum !== 'string' || actualChecksum !== rawData.checksum.toLowerCase()) {
+                    throw new Error('کنترل صحت بکاپ محلی ناموفق است؛ بازیابی متوقف شد.');
+                }
+                const restored = { ...rawData.data };
+                const assets = rawData.assets || {};
+                if (Array.isArray(assets.companies) && Array.isArray(restored.companies)) {
+                    restored.companies = restored.companies.map((company: any) => {
+                        const asset = assets.companies.find((entry: any) => entry.id === company.id);
+                        return asset ? { ...company, logo: asset.logo ?? company.logo, stamp: asset.stamp ?? company.stamp, signature: asset.signature ?? company.signature } : company;
+                    });
+                }
+                if (Array.isArray(assets.checkImages)) restored.checkImages = assets.checkImages;
+                if (Array.isArray(assets.signatures)) restored.signatures = assets.signatures;
+                rawData = restored;
+            }
+
             const hasBackupTables = !!(
-                rawData.companies || rawData.products || rawData.people || 
-                rawData.invoices || rawData.vouchers || rawData.checks || 
-                rawData.transactions || rawData.salaries || rawData.contracts ||
-                rawData.state
+                rawData.companies || rawData.products || rawData.people || rawData.invoices ||
+                rawData.vouchers || rawData.checks || rawData.transactions || rawData.salaries ||
+                rawData.contracts || rawData.state
             );
-
             if (!hasBackupTables) {
-                alert('خطا: فایل انتخاب شده ساختار معتبری از سیستم پشتیبانی ما نیست.');
+                alert('خطا: فایل انتخاب‌شده ساختار معتبری از اطلاعات حسابداری ندارد.');
                 return;
             }
 
-            // Cryptographic Verification
+            const formatVersion = Number(rawData.backupFormatVersion || 0);
             const isValid = securityService.verifyBackup(rawData);
-            if (!isValid) {
-                const proceed = confirm('⚠️ هشدار امنیتی: اصالت فایل پشتیبان تایید نشد (امضای دیجیتال معتبر نیست یا فایل دستکاری شده است).\n\nآیا با این وجود می‌خواهید با ریسک خود اقدام به وارد کردن و مهاجرت داده‌ها نمایید؟');
+            if (formatVersion >= 2 && !isValid) {
+                alert('فایل پشتیبان نسخه جدید فاقد برچسب یکپارچگی معتبر است یا پس از ایجاد تغییر کرده است. بازیابی متوقف شد.');
+                return;
+            }
+            if (formatVersion < 2 && !isValid) {
+                const proceed = confirm('این فایل پشتیبان قدیمی است یا امضای نسخه جدید را ندارد. فقط در صورتی ادامه دهید که منبع فایل را می‌شناسید. آیا می‌خواهید مسیر مهاجرت فایل قدیمی را ادامه دهید؟');
                 if (!proceed) return;
             }
 
-            if (!confirm('⚠️ تایید نهایی بازیابی:\nتمام داده‌های فعلی شما جایگزین اطلاعات این فایل خواهند شد و برنامه مجددا بارگذاری می‌شود. آیا مطمئن هستید؟')) {
-                return;
-            }
+            if (!confirm('تأیید نهایی بازیابی: اطلاعات فعلی جایگزین فایل انتخابی خواهد شد. مطمئن شوید نسخه‌ای از داده‌های فعلی دارید. ادامه می‌دهید؟')) return;
 
-            // Run migration
             const migrated = backupMigrationService.migrateBackupData(rawData);
-
-            // Hydrate state
             hydrateStore(migrated);
-            
-            alert('✅ بازیابی و مهاجرت داده‌ها با موفقیت انجام شد. برنامه مجدداً بارگذاری می‌شود...');
+            if (rawData.financialData && typeof rawData.financialData === 'object') {
+                useFinancialStore.setState(rawData.financialData);
+            }
+            alert('بازیابی و مهاجرت داده‌ها انجام شد. بخش‌های مالی و اسناد را بررسی کنید.');
             window.location.reload();
         } catch (error: any) {
             alert(`خطا در پردازش فایل پشتیبان: ${error?.message || error}`);
@@ -578,9 +618,13 @@ const BackupManager = () => {
             await autoBackupService.createLocalBackup(state);
             await loadLocalSnapshots();
             if (addNotification) {
-                addNotification('success', 'نسخه پشتیبان سریع (سنسور مرورگر) با موفقیت ثبت شد.');
+                addNotification('success', hasNativeEncryptedStorage
+                    ? 'نسخه پشتیبان محلی رمزگذاری‌شده روی دستگاه ثبت شد.'
+                    : 'نسخه محلی در مخزن مرورگر ثبت شد؛ این نسخه جای فایل پشتیبان مستقل را نمی‌گیرد.');
             } else {
-                alert('نسخه پشتیبان سریع درون مرورگر با موفقیت ثبت شد.');
+                alert(hasNativeEncryptedStorage
+                    ? 'نسخه پشتیبان محلی رمزگذاری‌شده روی دستگاه ثبت شد.'
+                    : 'نسخه محلی در مخزن مرورگر ثبت شد؛ این نسخه جای فایل پشتیبان مستقل را نمی‌گیرد.');
             }
         } catch (error: any) {
             alert(`خطا در ثبت پشتیبان مرورگر: ${error?.message || error}`);
@@ -591,15 +635,19 @@ const BackupManager = () => {
 
     // Restore Local Snapshot
     const handleLocalSnapshotRestore = async (snapshotId: string) => {
-        if (!confirm('آیا از بازیابی این نسخه پشتیبان درون مرورگر مطمئن هستید؟ داده‌های فعلی با این اطلاعات جایگزین خواهند شد.')) {
+        if (!confirm('آیا از بازیابی این نسخه پشتیبان محلی مطمئن هستید؟ داده‌های فعلی با این اطلاعات جایگزین خواهند شد. پیش از ادامه از داشتن یک فایل پشتیبان مستقل مطمئن شوید.')) {
             return;
         }
         setActionLoadingId(snapshotId);
         try {
+            const integrityVerified = await autoBackupService.verifyBackupIntegrity(snapshotId);
+            if (!integrityVerified && !confirm('این بکاپ قدیمی است و کنترل یکپارچگی زمان ایجاد ندارد. ساختار داده بررسی می‌شود، اما دستکاری قبلی آن قابل تشخیص نیست. فقط در صورت اعتماد به منبع فایل ادامه دهید.')) {
+                return;
+            }
             const data = await autoBackupService.restoreBackup(snapshotId);
             const migrated = backupMigrationService.migrateBackupData(data);
             hydrateStore(migrated);
-            alert('بازیابی داده‌های محلی با موفقیت انجام شد.');
+            alert('بازیابی داده‌های محلی انجام شد. بخش‌های مالی، فاکتورها و مانده‌حساب‌ها را بررسی کنید.');
             window.location.reload();
         } catch (error: any) {
             alert(`خطا در بازیابی پشتیبان محلی: ${error?.message || error}`);
@@ -655,6 +703,9 @@ const BackupManager = () => {
         try {
             const res = await hostBackupService.restoreFromHost(backupId);
             if (res.success && res.data) {
+                if (!res.integrityVerified && !confirm('هش کامل نسخه پشتیبان تأیید نشد (ممکن است بکاپ قدیمی باشد). آیا با مسئولیت خودت ادامه می‌دهی؟')) {
+                    return;
+                }
                 const payload = res.data;
                 const restoredData = payload.data || {};
                 const restoredAssets = payload.assets;
@@ -679,7 +730,9 @@ const BackupManager = () => {
                 const migrated = backupMigrationService.migrateBackupData(restoredData);
                 hydrateStore(migrated);
 
-                alert('✅ بازیابی اطلاعات از روی سرور مرکزی با موفقیت کامل شد.');
+                alert(res.integrityVerified
+                    ? 'بازیابی موفق شد؛ یکپارچگی فایل و داده‌های پشتیبان تأیید شد.'
+                    : 'بازیابی انجام شد؛ نسخه پشتیبان قدیمی بود یا کنترل کامل یکپارچگی قابل تأیید نبود.');
                 window.location.reload();
             } else {
                 alert(`خطا در بازیابی اطلاعات: ${res.error || 'پاسخ نامعتبر از سرور'}`);
@@ -719,17 +772,8 @@ const BackupManager = () => {
         }
 
         try {
-            // Force reset host state log if connected
-            try {
-                const baseUrl = window.location.hostname === 'localhost' ? '' : window.location.origin;
-                await fetch(`${baseUrl}/server-api-database.php`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action: 'reset_all', table: 'system' })
-                });
-            } catch (e) {
-                console.log('Skipping host reset request.');
-            }
+            // No legacy global database reset calls; server-side tenant data is managed
+            // only through the authenticated backup/recovery workflows.
 
             localStorage.clear();
             sessionStorage.clear();
@@ -911,10 +955,10 @@ const BackupManager = () => {
                             <div>
                                 <h3 className="text-white font-black text-lg flex items-center gap-2">
                                     <ShieldCheck size={22} className="text-teal-400" />
-                                    <span>پشتیبان‌گیری ۳ گانه هوشمند و ایزوله (Triple Redundancy)</span>
+                                    <span>پشتیبان‌گیری چندمسیره و وضعیت واقعی ذخیره‌سازی</span>
                                 </h3>
                                 <p className="text-xs text-slate-300 mt-1">
-                                    حفاظت پایدار در ۳ لایه مستقل: هارد ویندوز/کش مرورگر، حافظه امن اپلیکیشن موبایل، و مخزن ابری هاست متمرکز
+                                    وضعیت‌ها فقط پس از تأیید ذخیره نمایش داده می‌شوند؛ نسخه مستقل روی فایل‌سیستم و رمزگذاری بکاپ سرور هنوز کامل نشده‌اند.
                                 </p>
                             </div>
 
@@ -926,12 +970,12 @@ const BackupManager = () => {
                                 {tripleLoading ? (
                                     <>
                                         <Loader2 size={16} className="animate-spin" />
-                                        <span>در حال ذخیره در ۳ لایه...</span>
+                                        <span>در حال ذخیره و بررسی...</span>
                                     </>
                                 ) : (
                                     <>
                                         <Sparkles size={16} />
-                                        <span>اجرای پشتیبان‌گیری ۳ گانه همزمان</span>
+                                        <span>اجرای پشتیبان‌گیری و بررسی وضعیت</span>
                                     </>
                                 )}
                             </button>
@@ -947,13 +991,13 @@ const BackupManager = () => {
                                         ۱
                                     </div>
                                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-teal-500/10 text-teal-400 border border-teal-500/20">
-                                        {tripleReport?.tiers[0]?.status === 'SYNCED' ? 'همگام و ایمن ✓' : 'فعال و محلی'}
+                                        {tripleReport?.tiers[0]?.status === 'SYNCED' ? 'ثبت محلی تأیید شد ✓' : tripleReport?.tiers[0]?.status === 'ERROR' ? 'خطای ذخیره محلی' : 'وضعیت نامشخص'}
                                     </span>
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-black text-white">هارد دیسک و دیتابیس محلی</h4>
+                                    <h4 className="text-sm font-black text-white">نسخه محلی برنامه (IndexedDB)</h4>
                                     <p className="text-[11px] text-slate-400 mt-1">
-                                        ذخیره‌سازی با پاسخگویی آنی 0ms در ویندوز و مرورگر
+                                        ذخیره در همین دستگاه؛ پاک‌سازی داده‌های برنامه یا مرورگر می‌تواند این نسخه را حذف کند
                                     </p>
                                 </div>
                                 <div className="pt-2 border-t border-white/5 text-[10px] text-slate-500 space-y-1 font-mono">
@@ -970,13 +1014,13 @@ const BackupManager = () => {
                                         ۲
                                     </div>
                                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-                                        {tripleReport?.tiers[1]?.status === 'SYNCED' ? 'همگام و ایمن ✓' : 'آماده ذخیره'}
+                                        {tripleReport?.tiers[1]?.status === 'SYNCED' ? 'ثبت مستقل تأیید شد ✓' : tripleReport?.tiers[1]?.status === 'ERROR' ? 'خطای ذخیره' : 'پیاده‌سازی لازم است'}
                                     </span>
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-black text-white">حافظه ایزوله اپلیکیشن اندروید</h4>
+                                    <h4 className="text-sm font-black text-white">نسخه مستقل روی فایل‌سیستم</h4>
                                     <p className="text-[11px] text-slate-400 mt-1">
-                                        نگهداری بک‌آپ مستقل در حافظه امن گوشی برای شرایط اضطراری
+                                        نسخه جداگانه روی دیسک ویندوز یا پوشه خصوصی اندروید هنوز پیاده‌سازی نشده و موفق گزارش نمی‌شود
                                     </p>
                                 </div>
                                 <div className="pt-2 border-t border-white/5 text-[10px] text-slate-500 space-y-1 font-mono">
@@ -993,17 +1037,17 @@ const BackupManager = () => {
                                         ۳
                                     </div>
                                     <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                                        {tripleReport?.tiers[2]?.status === 'SYNCED' ? 'همگام و ایمن ✓' : 'مخزن ابری'}
+                                        {tripleReport?.tiers[2]?.status === 'SYNCED' ? 'ذخیره سرور تأیید شد ✓' : tripleReport?.tiers[2]?.status === 'ERROR' ? 'ذخیره سرور ناموفق' : 'اتصال سرور فعال نیست'}
                                     </span>
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-black text-white">مخزن ابری و هاست متمرکز</h4>
+                                    <h4 className="text-sm font-black text-white">نسخه پشتیبان سرور</h4>
                                     <p className="text-[11px] text-slate-400 mt-1">
-                                        پشتیبان‌گیری در سرور امن ابری جهت جلوگیری از مفقودی در خرابی سخت‌افزار
+                                        فقط پس از تأیید موفق API ثبت می‌شود؛ رمزگذاری بکاپ در حالت سکون هنوز فعال نشده است
                                     </p>
                                 </div>
                                 <div className="pt-2 border-t border-white/5 text-[10px] text-slate-500 space-y-1 font-mono">
-                                    <div>امنیت انتقال: <span className="text-purple-400 font-bold">SHA-256 + TLS</span></div>
+                                    <div>یکپارچگی: <span className="text-purple-400 font-bold">SHA-256؛ انتقال امن با HTTPS</span></div>
                                     <div>آخرین همگامی: <span className="text-slate-300 font-sans">{tripleReport?.persianDate || 'به‌روز'}</span></div>
                                 </div>
                             </div>
@@ -1078,11 +1122,11 @@ const BackupManager = () => {
                                     <span>تنظیم دایرکتوری ذخیره‌سازی و پشتیبان‌گیری ویندوز</span>
                                 </h3>
                                 <p className="text-[11px] text-slate-400 mt-1">
-                                    مسیر دلخواه روی هارد دیسک (مانند درایو D، هارد اکسترنال یا فلش) را جهت ذخیره خودکار و ایزوله فایل‌های مالی انتخاب یا وارد نمایید.
+                                    پوشه را از پنجره ویندوز انتخاب کنید. بکاپ خودکار فقط پس از انتخاب واقعی پوشه و تأیید نوشتن فایل فعال می‌شود؛ فایل‌های محلی در حال حاضر رمزگذاری‌شده نیستند.
                                 </p>
                             </div>
                             <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-bold">
-                                استقلال ۱۰۰٪ داده‌ها فعال ✓
+                                {isDesktopEnv ? (desktopBackupPath ? 'پوشه مستقل انتخاب شده' : 'پوشه مستقل انتخاب نشده') : 'ذخیره مستقل در این محیط غیرفعال'}
                             </span>
                         </div>
                         
@@ -1090,15 +1134,12 @@ const BackupManager = () => {
                             <div>
                                 <label className="block text-xs font-bold text-slate-300 mb-2">مسیر محلی ذخیره خودکار بک‌آپ در ویندوز</label>
                                 <div className="flex flex-col sm:flex-row gap-2">
-                                    <input 
+                                    <input
                                         type="text"
                                         value={desktopBackupPath}
-                                        onChange={(e) => {
-                                            setDesktopBackupPath(e.target.value);
-                                            localStorage.setItem('desktop_auto_backup_path', e.target.value);
-                                        }}
-                                        placeholder="مثال: D:\AshkeGhalam_Backups یا برای انتخاب کلیک کنید"
-                                        className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-teal-500 font-mono text-left"
+                                        readOnly
+                                        placeholder="ابتدا روی «انتخاب پوشه» کلیک کنید"
+                                        className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:outline-none focus:border-teal-500 font-mono text-left"
                                         dir="ltr"
                                     />
                                     <button
@@ -1112,36 +1153,15 @@ const BackupManager = () => {
                                 </div>
                             </div>
 
-                            {/* Preset Paths */}
-                            <div className="pt-2 border-t border-slate-700/50">
-                                <span className="text-[11px] text-slate-400 block mb-2 font-bold">مسیرهای سریع و پیشنهادی ویندوز:</span>
-                                <div className="flex flex-wrap gap-2">
-                                    {[
-                                        { label: 'پوشه اسناد (Documents)', path: 'C:\\Users\\Default\\Documents\\AshkeGhalam_Backups' },
-                                        { label: 'درایو مستقل D', path: 'D:\\AshkeGhalam_Backups' },
-                                        { label: 'پوشه ایزوله سیستم (%AppData%)', path: '%APPDATA%\\AshkeGhalam\\Backups' }
-                                    ].map((preset, idx) => (
-                                        <button
-                                            key={idx}
-                                            type="button"
-                                            onClick={() => {
-                                                setDesktopBackupPath(preset.path);
-                                                localStorage.setItem('desktop_auto_backup_path', preset.path);
-                                                addNotification('success', `مسیر تنظیم گردید: ${preset.path}`);
-                                            }}
-                                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-700/80 text-teal-300 border border-teal-500/30 rounded-lg text-xs font-mono transition"
-                                        >
-                                            {preset.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                            <p className="text-xs leading-relaxed text-slate-400">
+                                واردکردن آدرس یا انتخاب مسیر پیشنهادی به‌تنهایی دسترسی فایل‌سیستم ایجاد نمی‌کند. برای فعال‌سازی ذخیره واقعی، از دکمه بالا پوشه را در پنجره امن ویندوز انتخاب کنید.
+                            </p>
 
                             {/* Immediate Backup Action */}
                             <div className="pt-3 border-t border-slate-700/50 flex flex-col sm:flex-row items-center justify-between gap-3">
                                 <div className="text-[11px] text-slate-300 flex items-center gap-2">
                                     <ShieldCheck size={16} className="text-teal-400 shrink-0" />
-                                    <span>داده‌های اصلی نرم‌افزار در پایگاه داده مستقل ذخیره بوده و بک‌آپ‌ها به صورت موازی در این دایرکتوری بایگانی می‌شوند.</span>
+                                    <span>نسخه مستقل در این پوشه فقط پس از تأیید نوشتن واقعی فایل ثبت می‌شود؛ در نبود پوشه، خروجی دستی دانلود خواهد شد.</span>
                                 </div>
                                 <button
                                     type="button"
@@ -1275,9 +1295,11 @@ const BackupManager = () => {
                             <div>
                                 <h3 className="text-white font-black text-base flex items-center gap-2">
                                     <HardDrive size={18} className="text-indigo-400" />
-                                    <span>نسخه‌های پشتیبان سریع (سنسور مرورگر IndexedDB)</span>
+                                    <span>{hasNativeEncryptedStorage ? 'نسخه‌های پشتیبان محلی رمزگذاری‌شدهٔ دستگاه' : 'نسخه‌های پشتیبان محلی مرورگر (IndexedDB)'}</span>
                                 </h3>
-                                <p className="text-[11px] text-slate-400 mt-1">سریع‌ترین روش ثبت نسخه محلی در مرورگر فعلی شما، بدون نیاز به دانلود یا آپلود فایل.</p>
+                                <p className="text-sm text-slate-300 mt-1 leading-6">{hasNativeEncryptedStorage
+                                    ? 'در نسخه نصب‌شده ویندوز/اندروید، نسخه محلی با رمزنگاری سیستم‌عامل یا Android Keystore نگهداری می‌شود. برای انتقال به دستگاه دیگر از فایل پشتیبان رمزگذاری‌شده استفاده کنید.'
+                                    : 'این کپی در مخزن محلی مرورگر فعلی ذخیره می‌شود؛ به‌تنهایی در برابر پاک‌سازی پروفایل مرورگر یا خرابی دستگاه حفاظت مستقل ندارد.'}</p>
                             </div>
                             
                             <div className="flex gap-2">
@@ -1303,12 +1325,12 @@ const BackupManager = () => {
                         {loadingLocalList ? (
                             <div className="py-12 flex flex-col items-center justify-center text-indigo-400 animate-pulse">
                                 <Loader2 size={36} className="animate-spin mb-3" />
-                                <span className="text-xs font-black">در حال بازیابی رکوردهای IndexedDB...</span>
+                                <span className="text-sm font-bold">{hasNativeEncryptedStorage ? 'در حال خواندن نسخه‌های رمزگذاری‌شدهٔ دستگاه...' : 'در حال خواندن نسخه‌های محلی مرورگر...'}</span>
                             </div>
                         ) : localSnapshots.length === 0 ? (
                             <div className="py-12 text-center text-slate-500 border-2 border-dashed border-white/5 rounded-2xl">
                                 <HardDrive size={32} className="mx-auto mb-3 text-slate-600" />
-                                <p className="text-xs font-bold">هیچ نسخه پشتیبانی در مرورگر فعلی یافت نشد.</p>
+                                <p className="text-sm font-bold">{hasNativeEncryptedStorage ? 'هنوز نسخه محلی رمزگذاری‌شده‌ای ثبت نشده است.' : 'هیچ نسخه محلی در مخزن مرورگر فعلی پیدا نشد.'}</p>
                                 <p className="text-[10px] text-slate-600 mt-1">با کلیک روی دکمه "ثبت پشتیبان سریع جدید" اولین کپی محلی خود را بسازید.</p>
                             </div>
                         ) : (
@@ -1373,8 +1395,7 @@ const BackupManager = () => {
                                     <span>خروجی و دانلود فایل پشتیبان (امضا شده)</span>
                                 </h4>
                                 <p className="text-[11px] text-slate-400 mt-2 leading-relaxed">
-                                    یک فایل با فرمت JSON دانلود خواهید کرد که شامل کلیه پایگاه‌داده‌ها، حساب‌ها، شعب، کالاها، عکس لوگوها، امضاها، مهرها و غیره است.
-                                    این فایل حاوی امضای یکتای امنیتی سیستم بوده و اصالت آن هنگام بازیابی بررسی خواهد شد.
+                                    یک فایل JSON رمزگذاری‌شده شامل اطلاعات حسابداری، کاربران، شعب، کالاها، فاکتورها، تصاویر/امضاها و دفتر مالی ذخیره یا دانلود می‌شود. این خروجی قابل‌حمل است و با همان رمز در دستگاه دیگر باز می‌شود.
                                 </p>
                             </div>
 
@@ -1384,11 +1405,17 @@ const BackupManager = () => {
                                     <span className="text-indigo-400 font-mono font-bold">{formatSize(JSON.stringify(useStore.getState()).length)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-xs">
-                                    <span className="text-slate-500">حفاظت رمزنگاری:</span>
+                                    <span className="text-slate-500">حفاظت فایل:</span>
                                     <span className="text-emerald-400 font-black flex items-center gap-1">
-                                        <ShieldCheck size={14} /> امضا شده فعال
+                                        <ShieldCheck size={14} /> رمزگذاری با رمز انتخابی
                                     </span>
                                 </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label htmlFor="backup-export-password" className="block text-sm font-bold text-slate-200">رمزگذاری فایل پشتیبان (حداقل ۱۲ نویسه)</label>
+                                <input id="backup-export-password" type="password" autoComplete="new-password" minLength={12} value={backupExportPassword} onChange={e => setBackupExportPassword(e.target.value)} placeholder="رمز قوی و قابل نگهداری انتخاب کنید" className="w-full min-h-12 rounded-xl bg-slate-950 border border-white/20 px-3 py-3 text-base text-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
+                                <p className="text-sm text-slate-300 leading-6">رمز را جدا از فایل نگه دارید؛ فراموشی آن به معنی ناتوانی در بازیابی است.</p>
                             </div>
 
                             <button
@@ -1413,8 +1440,13 @@ const BackupManager = () => {
                                 </p>
                             </div>
 
-                            <div 
-                                className={`h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
+                            <div className="space-y-1.5 mb-4">
+                                <label htmlFor="backup-import-password" className="block text-sm font-bold text-slate-200">رمز بازیابی فایل رمزگذاری‌شده</label>
+                                <input id="backup-import-password" type="password" autoComplete="current-password" value={backupImportPassword} onChange={e => setBackupImportPassword(e.target.value)} placeholder="رمز هنگام ایجاد فایل" className="w-full min-h-12 rounded-xl bg-slate-950 border border-white/20 px-3 py-3 text-base text-white placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-400/40" />
+                                <p className="text-sm text-slate-300 leading-6">اگر فایل قدیمی و بدون رمز است، برنامه پیش از بازیابی هشدار می‌دهد.</p>
+                            </div>
+
+                            <div className={`h-40 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-2 transition-all cursor-pointer ${
                                     dragOver ? 'border-teal-500 bg-teal-500/10 text-teal-400' : 'border-white/10 hover:border-teal-500 text-slate-400 hover:text-white'
                                 }`}
                                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -1429,7 +1461,7 @@ const BackupManager = () => {
                                 <input 
                                     id="restore_file_input" 
                                     type="file" 
-                                    accept=".json" 
+                                    accept=".json,.agbak" 
                                     onChange={handleFileChange} 
                                     className="hidden" 
                                 />

@@ -456,3 +456,67 @@ input[type="tel"] {
   }
 }
 
+
+
+/* Native document scroll and touch scrolling across every application section. */
+html {
+  height: auto !important;
+  min-height: 100%;
+  width: 100%;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  position: static !important;
+  overscroll-behavior-y: auto !important;
+}
+
+body {
+  height: auto !important;
+  min-height: 100vh !important;
+  width: 100%;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  position: static !important;
+  overscroll-behavior-y: auto !important;
+  touch-action: pan-y pinch-zoom !important;
+}
+
+#root {
+  height: auto !important;
+  min-height: 100vh;
+  width: 100%;
+  overflow: visible !important;
+}
+
+#root > div.min-h-screen {
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+}
+
+#root main {
+  height: auto !important;
+  min-height: 0;
+  overflow: visible !important;
+}
+
+[class~="overflow-y-auto"],
+[class~="overflow-y-scroll"],
+[class~="overflow-auto"],
+.custom-scrollbar,
+.sidebar-scrollbar,
+.modal-container,
+.bottom-sheet,
+.table-responsive-touch {
+  min-height: 0;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y !important;
+}
+
+@supports (height: 100dvh) {
+  #root,
+  #root > div.min-h-screen {
+    min-height: 100dvh !important;
+  }
+}

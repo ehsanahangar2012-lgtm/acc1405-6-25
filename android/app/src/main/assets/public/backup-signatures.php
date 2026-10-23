@@ -4,14 +4,31 @@
  * برای اجرا روزانه از طریق cron job
  */
 
+if (PHP_SAPI !== 'cli') {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    header('X-Content-Type-Options: nosniff');
+    http_response_code(403);
+    echo json_encode(['success' => false, 'error' => 'CLI_ONLY']);
+    exit;
+}
+
 define('SIGNATURES_DIR', __DIR__ . '/signatures/');
 define('BACKUP_DIR', __DIR__ . '/backups/signatures/');
 define('RETENTION_DAYS', 90); // نگهداری 90 روز
 
-// ایجاد دایرکتوری پشتیبان
-if (!file_exists(BACKUP_DIR)) {
-    mkdir(BACKUP_DIR, 0755, true);
+// Signatures are private; this job is intentionally CLI-only.
+if (!is_dir(SIGNATURES_DIR)) {
+    fwrite(STDERR, "Signature storage directory is missing.\n");
+    exit(1);
 }
+if (!is_dir(BACKUP_DIR) && !@mkdir(BACKUP_DIR, 0700, true) && !is_dir(BACKUP_DIR)) {
+    fwrite(STDERR, "Signature backup directory is unavailable.\n");
+    exit(1);
+}
+@chmod(BACKUP_DIR, 0700);
+$deny = BACKUP_DIR . '.htaccess';
+if (!is_file($deny)) @file_put_contents($deny, "<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nDeny from all\n</IfModule>\nOptions -Indexes\n", LOCK_EX);
 
 // نام فایل پشتیبان
 $backupFile = BACKUP_DIR . 'signatures_' . date('Y-m-d_His') . '.zip';

@@ -438,7 +438,7 @@ export const SplashAnnouncement: React.FC = () => {
               <span className={`text-[10px] font-black px-2 py-0.5 rounded-lg border ${getTypeStyles(current.type)}`}>
                 {current.type === 'update' ? 'بروزرسانی' : current.type === 'promo' ? 'پیشنهاد جشنواره' : 'اطلاعیه'}
               </span>
-              <span className="text-[11px] text-teal-600 dark:text-teal-400 font-bold">بخش IT اشک قلم | www.ashkghalam.ir</span>
+              <a href="https://ashkghalam.ir" target="_blank" rel="noreferrer" className="text-[10px] text-teal-700 dark:text-teal-400 font-semibold hover:underline underline-offset-2">ashkghalam.ir</a>
               <span className="text-xs text-slate-500 font-bold mr-auto">{toPersianDigits(current.date)}</span>
             </div>
 

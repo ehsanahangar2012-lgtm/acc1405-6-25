@@ -3,12 +3,15 @@
 import { encryptedStorageService, AppManifest } from './encryptedStorageService';
 import { hardwareIdService } from './hardwareIdService';
 import { isAndroidApp } from '../utils';
+import { refreshServerLicense, type VerifiedLicensePayload } from './serverLicenseReceiptService';
 
 export const MAX_TRIAL_CUSTOMERS = 30;
 export const MAX_TRIAL_DOCUMENTS = 100;
 
 export const MAX_ANDROID_DEFAULT_CUSTOMERS = 30;
 export const MAX_ANDROID_DEFAULT_DOCUMENTS = 50;
+export const MAX_TRIAL_USERS = 1;
+export const MAX_ANDROID_DEFAULT_USERS = 1;
 
 export const MAX_HEMAYAT_CUSTOMERS = 70;
 export const MAX_HEMAYAT_DOCUMENTS = 450;
@@ -36,13 +39,145 @@ export interface QuotaStatus {
 class LicenseQuotaService {
     private cachedManifest: AppManifest | null = null;
     private listeners: Array<() => void> = [];
+    // Session-only proof: localStorage values cannot set this flag. It is set only after a fresh, signed server receipt is checked.
+    private serverReceiptVerifiedInSession = false;
+    private refreshPromise: Promise<boolean> | null = null;
+    private serverEntitlements: VerifiedLicensePayload | null = null;
+    private verifiedLicenseKey = '';
+    private verifiedWorkspaceId = '';
+    private verifiedHwid = '';
+    private receiptRenewalTimer: ReturnType<typeof setTimeout> | null = null;
 
     constructor() {
         if (typeof window !== 'undefined') {
-            window.addEventListener('ashk-license-updated', () => {
+            const refresh = () => {
                 this.cachedManifest = null;
+                this.clearReceiptRenewal();
+                this.serverReceiptVerifiedInSession = false;
+                this.serverEntitlements = null;
+                this.clearReceiptRenewal();
+                this.verifiedLicenseKey = '';
+                this.verifiedWorkspaceId = '';
+                this.verifiedHwid = '';
                 this.notifyListeners();
+                void this.refreshCachedServerLicense();
+            };
+            window.addEventListener('ashk-license-updated', refresh);
+            window.addEventListener('online', () => void this.refreshCachedServerLicense());
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden) void this.refreshCachedServerLicense();
             });
+            void this.refreshCachedServerLicense();
+        }
+    }
+
+    private clearReceiptRenewal(): void {
+        if (this.receiptRenewalTimer) clearTimeout(this.receiptRenewalTimer);
+        this.receiptRenewalTimer = null;
+    }
+
+    private scheduleReceiptRenewal(expiresAt: number): void {
+        this.clearReceiptRenewal();
+        if (typeof window === 'undefined') return;
+        const delay = Math.max(5_000, expiresAt * 1000 - Date.now() - 30_000);
+        this.receiptRenewalTimer = setTimeout(() => {
+            this.serverReceiptVerifiedInSession = false;
+            this.serverEntitlements = null;
+            this.verifiedLicenseKey = '';
+            this.verifiedWorkspaceId = '';
+            this.verifiedHwid = '';
+            this.notifyListeners();
+            void this.refreshCachedServerLicense();
+        }, delay);
+    }
+
+    private async refreshCachedServerLicense(): Promise<boolean> {
+        if (typeof window === 'undefined') return false;
+        if (this.refreshPromise) return this.refreshPromise;
+
+        const pending = (async () => {
+            const raw = localStorage.getItem('ashk_server_license_data');
+            if (!raw) {
+                this.serverReceiptVerifiedInSession = false;
+                this.serverEntitlements = null;
+                this.verifiedLicenseKey = '';
+                this.verifiedWorkspaceId = '';
+                this.verifiedHwid = '';
+                return false;
+            }
+            let stored: any;
+            try { stored = JSON.parse(raw); } catch {
+                this.serverReceiptVerifiedInSession = false;
+                this.serverEntitlements = null;
+                return false;
+            }
+            const licenseKey = String(stored?.licenseKey || '').trim();
+            const workspaceId = String(stored?.workspaceId || '').trim();
+            const hostUrl = String(stored?.hostUrl || '').trim();
+            if (!licenseKey || !workspaceId || !hostUrl || ['default', 'main'].includes(workspaceId)) {
+                this.serverReceiptVerifiedInSession = false;
+                this.serverEntitlements = null;
+                return false;
+            }
+
+            try {
+                // Never trust a device ID read from localStorage; recompute it using the current native device APIs.
+                const hwid = String(await hardwareIdService.getHardwareId()).trim();
+                const verified = await refreshServerLicense({ hostUrl, licenseKey, workspaceId, hwid });
+                if (!verified) {
+                    this.serverReceiptVerifiedInSession = false;
+                    this.serverEntitlements = null;
+                    this.verifiedLicenseKey = '';
+                    this.verifiedWorkspaceId = '';
+                    this.verifiedHwid = '';
+                    localStorage.setItem('ashk_server_license_data', JSON.stringify({ ...stored, serverVerified: false }));
+                    this.notifyListeners();
+                    return false;
+                }
+
+                const p = verified.payload;
+                const updated = {
+                    ...stored,
+                    serverVerified: true,
+                    licenseReceipt: verified.receipt,
+                    workspaceId: p.workspace_id,
+                    licenseKey,
+                    hwid: p.hwid,
+                    plan: p.plan,
+                    maxCustomers: p.max_customers,
+                    maxDocuments: p.max_documents,
+                    maxUsers: p.max_users,
+                    isUnlimited: p.is_unlimited,
+                    features: p.features,
+                    expireDate: p.expire_date,
+                    verifiedAt: new Date().toISOString()
+                };
+                localStorage.setItem('ashk_server_license_data', JSON.stringify(updated));
+                localStorage.setItem('ashk_license_plan', p.plan);
+                localStorage.setItem('ashk_license_type', p.is_unlimited ? 'UNLIMITED' : 'LIMITED');
+                this.serverReceiptVerifiedInSession = true;
+                this.serverEntitlements = p;
+                this.scheduleReceiptRenewal(p.expires_at);
+                this.verifiedLicenseKey = licenseKey;
+                this.verifiedWorkspaceId = p.workspace_id;
+                this.verifiedHwid = p.hwid;
+                this.notifyListeners();
+                return true;
+            } catch {
+                this.serverReceiptVerifiedInSession = false;
+                this.serverEntitlements = null;
+                this.verifiedLicenseKey = '';
+                this.verifiedWorkspaceId = '';
+                this.verifiedHwid = '';
+                return false;
+            }
+        })();
+        this.refreshPromise = pending;
+
+        try {
+            return await pending;
+        } finally {
+            if (this.refreshPromise === pending) this.refreshPromise = null;
         }
     }
 
@@ -64,25 +199,36 @@ class LicenseQuotaService {
      */
     isAndroidActivatedOrLinked(): boolean {
         if (typeof window === 'undefined') return false;
+        if (localStorage.getItem('ashk_license_status') !== 'ACTIVATED') return false;
 
-        // ۱. پیوند صریح با سیستم PWA یا هاست سرور اصلی
-        if (localStorage.getItem('ashk_pwa_linked') === 'true') {
-            return true;
-        }
+        const licenseKey = (
+            localStorage.getItem('ashk_license_key') ||
+            localStorage.getItem('ashk_active_license_key') ||
+            ''
+        ).trim();
 
-        // ۲. فعال‌سازی صریح پلتفرم اندروید
-        if (localStorage.getItem('ashk_android_activated') === 'true') {
-            return true;
-        }
+        let serverVerified = false;
+        try {
+            const data = JSON.parse(localStorage.getItem('ashk_server_license_data') || 'null');
+            serverVerified = Boolean(
+                data?.serverVerified === true &&
+                data?.licenseKey === licenseKey &&
+                licenseKey === this.verifiedLicenseKey &&
+                data?.workspaceToken === licenseKey &&
+                data?.syncToken === licenseKey &&
+                data?.workspaceId === this.verifiedWorkspaceId &&
+                String(data?.hwid || '').toUpperCase() === String(this.verifiedHwid || '').toUpperCase() &&
+                typeof data?.hostUrl === 'string' &&
+                /^https?:\/\//i.test(data.hostUrl) &&
+                data?.workspaceId &&
+                data.workspaceId !== 'default' &&
+                data.workspaceId !== 'main'
+            );
+        } catch {}
 
-        // ۳. بررسی لایسنس فعال با کلید اختصاصی یا داده‌های سرور اصلی
-        const localStatus = localStorage.getItem('ashk_license_status');
-        const hasLicenseKey = Boolean(localStorage.getItem('ashk_license_key') || localStorage.getItem('ashk_activation_code'));
-        if (localStatus === 'ACTIVATED' && (hasLicenseKey || localStorage.getItem('ashk_server_license_data'))) {
-            return true;
-        }
-
-        return false;
+        // Local flags are only cache metadata. A fresh signed server receipt must have been verified in this session.
+        return serverVerified && this.serverReceiptVerifiedInSession &&
+            !!this.serverEntitlements && this.serverEntitlements.expires_at > Math.floor(Date.now() / 1000);
     }
 
     /**
@@ -95,13 +241,31 @@ class LicenseQuotaService {
         licenseKey?: string;
         hostUrl?: string;
         syncToken?: string;
+        workspaceId?: string;
+        maxCustomers?: number;
+        maxDocuments?: number;
+        isUnlimited?: boolean;
+        features?: string[];
+        verifiedByServer?: boolean;
     }): void {
         if (typeof window === 'undefined') return;
+        if (
+            details?.verifiedByServer !== true ||
+            !details.licenseKey?.trim() ||
+            !details.hostUrl?.trim() ||
+            !details.syncToken?.trim() ||
+            !details.workspaceId ||
+            details.workspaceId === 'default' ||
+            details.workspaceId === 'main'
+        ) {
+            console.warn('[License] Refusing activation without server-verified tenant license.');
+            return;
+        }
 
-        const companyName = details?.companyName || localStorage.getItem('ashk_company_name') || 'شرکت تجاری فعال سرور اصلی';
+        const companyName = details.companyName || localStorage.getItem('ashk_company_name') || 'شرکت تجاری فعال سرور اصلی';
         const plan = details?.plan || 'UNLIMITED';
         const expireDate = details?.expireDate || 'دائمی (۱۰ ساله - متصل به سرور اصلی)';
-        const licenseKey = details?.licenseKey || `PWA-HOST-LIC-${Date.now().toString(36).toUpperCase()}`;
+        const licenseKey = details.licenseKey.trim();
 
         localStorage.setItem('ashk_pwa_linked', 'true');
         localStorage.setItem('ashk_android_activated', 'true');
@@ -113,14 +277,21 @@ class LicenseQuotaService {
         const serverData = {
             companyName,
             plan,
-            planTitle: 'نسخه تجاری همراه (فعال‌شده با لایسنس سرور اصلی - نامحدود)',
+            planTitle: details?.isUnlimited === false
+                ? `نسخه تجاری محدود (${plan})`
+                : 'نسخه تجاری همراه (فعال‌شده با لایسنس سرور اصلی)',
             expireDate,
             licenseKey,
             hostUrl: details?.hostUrl || localStorage.getItem('ashk_host_url') || '',
             syncToken: details?.syncToken || localStorage.getItem('ashk_host_sync_token') || '',
+            workspaceToken: details?.syncToken || localStorage.getItem('ashk_host_sync_token') || '',
+            maxCustomers: Number.isFinite(details?.maxCustomers) ? details?.maxCustomers : (plan === 'HEMAYAT' ? MAX_HEMAYAT_CUSTOMERS : -1),
+            maxDocuments: Number.isFinite(details?.maxDocuments) ? details?.maxDocuments : (plan === 'HEMAYAT' ? MAX_HEMAYAT_DOCUMENTS : -1),
+            isUnlimited: details?.isUnlimited ?? (plan !== 'HEMAYAT'),
+            features: details?.features || (plan === 'HEMAYAT' ? ['BASIC_MODULES'] : ['ALL_MODULES']),
             linkedAt: new Date().toISOString()
         };
-        localStorage.setItem('ashk_server_license_data', JSON.stringify(serverData));
+        localStorage.setItem('ashk_server_license_data', JSON.stringify({ ...serverData, serverVerified: true, workspaceId: details.workspaceId }));
 
         try {
             const manifest = encryptedStorageService.createManifestObject({
@@ -158,7 +329,7 @@ class LicenseQuotaService {
             companyName: serverData.companyName || localStorage.getItem('ashk_company_name') || 'سامانه مرکزی اشک قلم',
             planTitle: serverData.planTitle || 'نسخه تجاری متصل به سرور اصلی (نامحدود)',
             expireDate: serverData.expireDate || 'دائمی (معتبر در سرور اصلی)',
-            isUnlimited: true,
+            isUnlimited: serverData.isUnlimited === true,
             hostUrl: serverData.hostUrl || localStorage.getItem('ashk_host_url') || ''
         };
     }
@@ -169,6 +340,10 @@ class LicenseQuotaService {
     async isFullyLicensed(): Promise<boolean> {
         if (typeof window === 'undefined') return false;
 
+        if (!this.serverReceiptVerifiedInSession) {
+            await this.refreshCachedServerLicense();
+        }
+
         // پلتفرم اندروید: در حالت پیش‌فرض محدود به ۵۰ سند، با فعال‌سازی یا لینک به PWA فعال می‌شود
         if (isAndroidApp()) {
             return this.isAndroidActivatedOrLinked();
@@ -176,13 +351,13 @@ class LicenseQuotaService {
 
         // بررسی کش سریع
         const localStatus = localStorage.getItem('ashk_license_status');
-        if (localStatus === 'ACTIVATED') {
+        if (localStatus === 'ACTIVATED' && this.isFullyLicensedSync()) {
             return true;
         }
 
         try {
             const manifest = await encryptedStorageService.getAppManifest();
-            if (manifest && manifest.status === 'ACTIVATED') {
+            if (manifest && manifest.status === 'ACTIVATED' && this.isFullyLicensedSync()) {
                 this.cachedManifest = manifest;
                 return true;
             }
@@ -206,9 +381,31 @@ class LicenseQuotaService {
 
         // ۱. بررسی وضعیت لایسنس فعال روی سیستم (فقط در صورت داشتن وضعیت ACTIVATED و کلید معتبر یا مانیفست تایید شده)
         const localStatus = localStorage.getItem('ashk_license_status');
-        const hasKey = Boolean(localStorage.getItem('ashk_license_key') || localStorage.getItem('ashk_activation_code') || localStorage.getItem('ashk_server_license_data'));
-        
-        if (localStatus === 'ACTIVATED' && hasKey) {
+        const licenseKey = (
+            localStorage.getItem('ashk_license_key') ||
+            localStorage.getItem('ashk_active_license_key') ||
+            ''
+        ).trim();
+        let serverVerified = false;
+        try {
+            const data = JSON.parse(localStorage.getItem('ashk_server_license_data') || 'null');
+            serverVerified = Boolean(
+                data?.serverVerified === true &&
+                data?.licenseKey === licenseKey &&
+                licenseKey === this.verifiedLicenseKey &&
+                data?.workspaceToken === licenseKey &&
+                data?.syncToken === licenseKey &&
+                data?.workspaceId === this.verifiedWorkspaceId &&
+                String(data?.hwid || '').toUpperCase() === String(this.verifiedHwid || '').toUpperCase() &&
+                typeof data?.hostUrl === 'string' &&
+                /^https?:\/\//i.test(data.hostUrl) &&
+                data?.workspaceId &&
+                data.workspaceId !== 'default' &&
+                data.workspaceId !== 'main'
+            );
+        } catch {}
+        if (localStatus === 'ACTIVATED' && serverVerified && this.serverReceiptVerifiedInSession &&
+            !!this.serverEntitlements && this.serverEntitlements.expires_at > Math.floor(Date.now() / 1000)) {
             return true;
         }
 
@@ -225,18 +422,54 @@ class LicenseQuotaService {
         // پلتفرم اندروید
         if (isAndroidApp()) {
             if (this.isAndroidActivatedOrLinked()) {
-                return 'COMMERCIAL_ANDROID_LINKED';
+                return this.serverEntitlements?.plan || 'COMMERCIAL_ANDROID_LINKED';
             }
             return 'ANDROID_TRIAL_50';
         }
 
         if (this.isFullyLicensedSync()) {
-            const plan = localStorage.getItem('ashk_license_plan');
-            if (plan) return plan;
-            return 'UNLIMITED';
+            return this.serverEntitlements?.plan || 'LICENSED';
         }
 
         return 'TRIAL';
+    }
+
+    private getCurrentEntitlements(): {
+        plan: string; maxCustomers: number; maxDocuments: number; maxUsers: number; isUnlimited: boolean;
+        expireDate: string; features: string[];
+    } {
+        const p = this.serverEntitlements;
+        const plan = p?.plan || this.getCurrentPlan();
+        const defaults: Record<string, [number, number]> = {
+            TRIAL: [MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS],
+            ANDROID_TRIAL_50: [MAX_ANDROID_DEFAULT_CUSTOMERS, MAX_ANDROID_DEFAULT_DOCUMENTS],
+            HEMAYAT: [MAX_HEMAYAT_CUSTOMERS, MAX_HEMAYAT_DOCUMENTS],
+            BRONZE: [50, 500],
+            SILVER: [200, 2000],
+            GOLD: [MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS],
+            ENTERPRISE: [MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS],
+            LICENSED: [MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS]
+        };
+        const fallback = defaults[plan] || [MAX_TRIAL_CUSTOMERS, MAX_TRIAL_DOCUMENTS];
+        const isUnlimited = p?.is_unlimited === true;
+        const maxCustomers = isUnlimited ? -1 :
+            (p && Number.isFinite(p.max_customers) && p.max_customers >= 0 ? p.max_customers :
+                (fallback[0] >= 0 ? fallback[0] : MAX_TRIAL_CUSTOMERS));
+        const maxDocuments = isUnlimited ? -1 :
+            (p && Number.isFinite(p.max_documents) && p.max_documents >= 0 ? p.max_documents :
+                (fallback[1] >= 0 ? fallback[1] : MAX_TRIAL_DOCUMENTS));
+        const maxUsers = p && Number.isInteger(p.max_users) && p.max_users >= 1
+            ? p.max_users
+            : MAX_TRIAL_USERS;
+        return {
+            plan,
+            maxCustomers,
+            maxDocuments,
+            maxUsers,
+            isUnlimited,
+            expireDate: p?.is_unlimited ? 'دائمی' : (p?.expire_date || ''),
+            features: Array.isArray(p?.features) ? p.features : ['BASIC_MODULES']
+        };
     }
 
     /**
@@ -250,70 +483,33 @@ class LicenseQuotaService {
         const documentCount = docCount;
 
         if (isLicensed) {
-            // نسخه همراه متصل به PWA یا فعال‌شده با لایسنس سرور اصلی
-            if (isAndroidApp() || currentPlan === 'COMMERCIAL_ANDROID_LINKED' || currentPlan === 'COMMERCIAL_ANDROID') {
-                const serverLicense = this.getMainServerLicenseInfo();
-                return {
-                    isLicensed: true,
-                    isTrial: false,
-                    customerCount,
-                    maxCustomers: -1,
-                    remainingCustomers: 999999,
-                    isCustomerLimitReached: false,
-                    documentCount,
-                    maxDocuments: -1,
-                    remainingDocuments: 999999,
-                    isDocumentLimitReached: false,
-                    isExceeded: false,
-                    planTitle: serverLicense.planTitle || 'نسخه تجاری همراه (فعال‌شده با لایسنس سرور اصلی - نامحدود)',
-                    companyName: serverLicense.companyName || localStorage.getItem('ashk_company_name') || 'نسخه تجاری فعال سرور اصلی',
-                    expireDate: serverLicense.expireDate || 'دائمی (بدون محدودیت سند و طرف حساب)',
-                    hwid: hwidStr || 'ANDROID-COMMERCIAL-UNLIMITED'
-                };
-            }
-
-            // پلن حمایتی کسب‌وکارهای خرد و نوپا
-            if (currentPlan === 'HEMAYAT') {
-                const maxCust = MAX_HEMAYAT_CUSTOMERS;
-                const maxDoc = MAX_HEMAYAT_DOCUMENTS;
-                const isCustomerLimitReached = customerCount >= maxCust;
-                const isDocumentLimitReached = documentCount >= maxDoc;
-                const isExceeded = isCustomerLimitReached || isDocumentLimitReached;
-
-                return {
-                    isLicensed: true,
-                    isTrial: false,
-                    customerCount,
-                    maxCustomers: maxCust,
-                    remainingCustomers: Math.max(0, maxCust - customerCount),
-                    isCustomerLimitReached,
-                    documentCount,
-                    maxDocuments: maxDoc,
-                    remainingDocuments: Math.max(0, maxDoc - documentCount),
-                    isDocumentLimitReached,
-                    isExceeded,
-                    planTitle: `نسخه حامی اشک قلم (ویژه کسب‌وکارهای نوپا - سقف ${maxCust} طرف حساب / ${maxDoc} سند)`,
-                    companyName: localStorage.getItem('ashk_company_name') || 'نسخه حامی فعال',
-                    expireDate: 'دائمی (۱۰ ساله)',
-                    hwid: hwidStr
-                };
-            }
+            const entitlements = this.getCurrentEntitlements();
+            const isUnlimited = entitlements.isUnlimited;
+            const maxCust = isUnlimited ? -1 : entitlements.maxCustomers;
+            const maxDoc = isUnlimited ? -1 : entitlements.maxDocuments;
+            const isCustomerLimitReached = !isUnlimited && customerCount >= maxCust;
+            const isDocumentLimitReached = !isUnlimited && documentCount >= maxDoc;
+            const planTitle = isUnlimited
+                ? `پلن ${entitlements.plan} نامحدود (تأییدشده توسط سرور)`
+                : entitlements.plan === 'HEMAYAT'
+                    ? `نسخه حامی اشک قلم (سقف ${maxCust} طرف حساب / ${maxDoc} سند)`
+                    : `پلن تجاری ${entitlements.plan} (${maxCust} طرف حساب / ${maxDoc} سند)`;
 
             return {
                 isLicensed: true,
                 isTrial: false,
                 customerCount,
-                maxCustomers: -1,
-                remainingCustomers: 999999,
-                isCustomerLimitReached: false,
+                maxCustomers: maxCust,
+                remainingCustomers: isUnlimited ? 999999 : Math.max(0, maxCust - customerCount),
+                isCustomerLimitReached,
                 documentCount,
-                maxDocuments: -1,
-                remainingDocuments: 999999,
-                isDocumentLimitReached: false,
-                isExceeded: false,
-                planTitle: 'نسخه تجاری نامحدود (فعال)',
-                companyName: localStorage.getItem('ashk_company_name') || 'نسخه تجاری فعال',
-                expireDate: 'دائمی / معتبر',
+                maxDocuments: maxDoc,
+                remainingDocuments: isUnlimited ? 999999 : Math.max(0, maxDoc - documentCount),
+                isDocumentLimitReached,
+                isExceeded: isCustomerLimitReached || isDocumentLimitReached,
+                planTitle,
+                companyName: localStorage.getItem('ashk_company_name') || 'مشتری مجاز اشک قلم',
+                expireDate: entitlements.expireDate || 'ثبت‌شده در سرور',
                 hwid: hwidStr
             };
         }
@@ -366,131 +562,83 @@ class LicenseQuotaService {
         };
     }
 
+    /** Maximum user seats come only from a verified server receipt for native clients. */
+    getMaxUsers(): number {
+        if (!this.isFullyLicensedSync()) {
+            return isAndroidApp() ? MAX_ANDROID_DEFAULT_USERS : MAX_TRIAL_USERS;
+        }
+        return this.serverEntitlements?.max_users ?? MAX_TRIAL_USERS;
+    }
+
+    canAddUser(currentUserCount: number): { allowed: boolean; reason?: string } {
+        // The mother web portal owns customer/license administration; seat enforcement applies
+        // to installed customer clients, not the central administration portal.
+        const isNativeClient = isAndroidApp() ||
+            (typeof window !== 'undefined' && Boolean((window as any).electronDesktopAPI));
+        if (!isNativeClient) return { allowed: true };
+
+        const maxUsers = this.getMaxUsers();
+        if (currentUserCount < maxUsers) return { allowed: true };
+
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
+                detail: { reason: 'USERS_LIMIT', current: currentUserCount, max: maxUsers, platform: isAndroidApp() ? 'android' : 'desktop' }
+            }));
+        }
+        return {
+            allowed: false,
+            reason: this.isFullyLicensedSync()
+                ? `سقف کاربران پلن ${this.serverEntitlements?.plan || 'تجاری'} (${maxUsers} کاربر) تکمیل شده است. برای افزایش سهمیه با پشتیبانی تماس بگیرید.`
+                : `نسخه پایه این برنامه حداکثر ${maxUsers} کاربر دارد؛ برای افزودن کاربران بیشتر، لایسنس آنلاین را فعال کنید.`
+        };
+    }
+
     /**
      * اعتبارسنجی ثبت مشتری جدید در استور
      */
     canAddPerson(currentPeopleCount: number): { allowed: boolean; reason?: string } {
-        // پلتفرم اندروید: در حالت پیش‌فرض دارای سقف، و پس از فعال‌سازی یا لینک به PWA نامحدود
-        if (isAndroidApp()) {
-            if (this.isAndroidActivatedOrLinked()) {
-                return { allowed: true };
-            }
-            if (currentPeopleCount >= MAX_ANDROID_DEFAULT_CUSTOMERS) {
-                if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
-                        detail: { 
-                            reason: 'CUSTOMERS_LIMIT', 
-                            current: currentPeopleCount, 
-                            max: MAX_ANDROID_DEFAULT_CUSTOMERS,
-                            platform: 'android'
-                        }
-                    }));
-                }
-                return {
-                    allowed: false,
-                    reason: `سقف ثبت طرف حساب در نسخه پیش‌فرض همراه (${MAX_ANDROID_DEFAULT_CUSTOMERS} نفر) تکمیل شده است. جهت ارتقا، لطفاً لایسنس را فعال کرده یا با پیوند به سیستم PWA / سرور اصلی آن را نامحدود نمایید.`
-                };
-            }
-            return { allowed: true };
-        }
+        const isLicensed = this.isFullyLicensedSync();
+        const entitlements = isLicensed ? this.getCurrentEntitlements() : null;
+        const maxCustomers = entitlements
+            ? (entitlements.isUnlimited ? -1 : entitlements.maxCustomers)
+            : MAX_TRIAL_CUSTOMERS;
 
-        if (this.isFullyLicensedSync()) {
-            const currentPlan = this.getCurrentPlan();
-            if (currentPlan === 'HEMAYAT') {
-                const maxCust = MAX_HEMAYAT_CUSTOMERS;
-                if (currentPeopleCount >= maxCust) {
-                    if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
-                            detail: { reason: 'CUSTOMERS_LIMIT', current: currentPeopleCount, max: maxCust }
-                        }));
-                    }
-                    return {
-                        allowed: false,
-                        reason: `سقف نسخه حامی (${maxCust} طرف حساب) تکمیل شده است. جهت ارتقا به نسخه نامحدود تجاری، لطفاً با پشتیبانی هماهنگ فرمایید.`
-                    };
-                }
-            }
-            return { allowed: true };
+        if (maxCustomers < 0 || currentPeopleCount < maxCustomers) return { allowed: true };
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
+                detail: { reason: 'CUSTOMERS_LIMIT', current: currentPeopleCount, max: maxCustomers, platform: isAndroidApp() ? 'android' : 'desktop' }
+            }));
         }
-
-        if (currentPeopleCount >= MAX_TRIAL_CUSTOMERS) {
-            // اعلام رویداد باز شدن دیالوگ فعال‌سازی
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
-                    detail: { reason: 'CUSTOMERS_LIMIT', current: currentPeopleCount, max: MAX_TRIAL_CUSTOMERS }
-                }));
-            }
-            return {
-                allowed: false,
-                reason: `سقف نسخه پایه مستقل (${MAX_TRIAL_CUSTOMERS} طرف حساب) پر شده است. برای ثبت طرف حساب‌های بیشتر، لطفاً با پشتیبانی تماس گرفته و لایسنس خود را فعال نمایید.`
-            };
-        }
-
-        return { allowed: true };
+        return {
+            allowed: false,
+            reason: isLicensed
+                ? `سقف پلن ${entitlements!.plan} (${maxCustomers} طرف حساب) تکمیل شده است. برای ارتقا یا افزایش سهمیه با پشتیبانی تماس بگیرید.`
+                : `سقف نسخه آزمایشی (${maxCustomers} طرف حساب) تکمیل شده است؛ لایسنس آنلاین را فعال کنید.`
+        };
     }
 
-    /**
-     * اعتبارسنجی ثبت سند جدید در استور (فاکتور، حواله انبار، چک، تراکنش)
-     */
     canAddDocument(currentDocCount: number): { allowed: boolean; reason?: string } {
-        // پلتفرم اندروید: در حالت پیش‌فرض سقف ۵۰ سند، و پس از فعال‌سازی یا لینک به PWA نامحدود
-        if (isAndroidApp()) {
-            if (this.isAndroidActivatedOrLinked()) {
-                return { allowed: true };
-            }
-            if (currentDocCount >= MAX_ANDROID_DEFAULT_DOCUMENTS) {
-                if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
-                        detail: { 
-                            reason: 'DOCUMENTS_LIMIT', 
-                            current: currentDocCount, 
-                            max: MAX_ANDROID_DEFAULT_DOCUMENTS,
-                            platform: 'android'
-                        }
-                    }));
-                }
-                return {
-                    allowed: false,
-                    reason: `سقف ثبت اسناد در نسخه پیش‌فرض همراه (${MAX_ANDROID_DEFAULT_DOCUMENTS} سند) تکمیل شده است. برای ثبت اسناد بیشتر، لطفاً با فعال‌سازی لایسنس یا پیوند به سیستم PWA / سرور اصلی، برنامه را فعال فرمایید.`
-                };
-            }
-            return { allowed: true };
-        }
+        const isLicensed = this.isFullyLicensedSync();
+        const entitlements = isLicensed ? this.getCurrentEntitlements() : null;
+        const trialMax = isAndroidApp() ? MAX_ANDROID_DEFAULT_DOCUMENTS : MAX_TRIAL_DOCUMENTS;
+        const maxDocuments = entitlements
+            ? (entitlements.isUnlimited ? -1 : entitlements.maxDocuments)
+            : trialMax;
 
-        if (this.isFullyLicensedSync()) {
-            const currentPlan = this.getCurrentPlan();
-            if (currentPlan === 'HEMAYAT') {
-                const maxDoc = MAX_HEMAYAT_DOCUMENTS;
-                if (currentDocCount >= maxDoc) {
-                    if (typeof window !== 'undefined') {
-                        window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
-                            detail: { reason: 'DOCUMENTS_LIMIT', current: currentDocCount, max: maxDoc }
-                        }));
-                    }
-                    return {
-                        allowed: false,
-                        reason: `سقف نسخه حامی (${maxDoc} سند مالی) تکمیل شده است. جهت ارتقا به نسخه نامحدود تجاری، لطفاً با پشتیبانی هماهنگ فرمایید.`
-                    };
-                }
-            }
-            return { allowed: true };
+        if (maxDocuments < 0 || currentDocCount < maxDocuments) return { allowed: true };
+        if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
+                detail: { reason: 'DOCUMENTS_LIMIT', current: currentDocCount, max: maxDocuments, platform: isAndroidApp() ? 'android' : 'desktop' }
+            }));
         }
-
-        if (currentDocCount >= MAX_TRIAL_DOCUMENTS) {
-            // اعلام رویداد باز شدن دیالوگ فعال‌سازی
-            if (typeof window !== 'undefined') {
-                window.dispatchEvent(new CustomEvent('open-trial-limit-modal', {
-                    detail: { reason: 'DOCUMENTS_LIMIT', current: currentDocCount, max: MAX_TRIAL_DOCUMENTS }
-                }));
-            }
-            return {
-                allowed: false,
-                reason: `سقف نسخه پایه مستقل (${MAX_TRIAL_DOCUMENTS} سند حسابداری) پر شده است. برای صدور و ثبت اسناد جدید، لطفاً با پشتیبانی تماس گرفته و لایسنس خود را فعال نمایید.`
-            };
-        }
-
-        return { allowed: true };
+        return {
+            allowed: false,
+            reason: isLicensed
+                ? `سقف پلن ${entitlements!.plan} (${maxDocuments} سند) تکمیل شده است. برای ارتقا یا افزایش سهمیه با پشتیبانی تماس بگیرید.`
+                : `سقف نسخه آزمایشی (${maxDocuments} سند) تکمیل شده است؛ لایسنس آنلاین را فعال کنید.`
+        };
     }
+
 }
 
 export const licenseQuotaService = new LicenseQuotaService();
