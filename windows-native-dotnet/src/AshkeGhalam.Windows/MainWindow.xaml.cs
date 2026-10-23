@@ -814,6 +814,85 @@ public partial class MainWindow : Window
         return prefix + candidateNumber.ToString("D5", CultureInfo.InvariantCulture);
     }
 
+    private CustomerRecord? AddCustomerInline(Window dialogOwner)
+    {
+        if (!_canWrite)
+        {
+            MessageBox.Show(dialogOwner, "ذخیره‌سازی محلی آماده نیست؛ ابتدا از یک فایل پشتیبان معتبر بازیابی کنید.",
+                "ذخیره‌سازی غیرفعال", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
+        }
+
+        var decision = NativeLicenseQuotaService.CanAddCustomer(_data, GetLiveSessionEntitlements());
+        if (!decision.Allowed)
+        {
+            MessageBox.Show(dialogOwner, decision.Message, "سقف استفاده از نسخه", MessageBoxButton.OK, MessageBoxImage.Information);
+            return null;
+        }
+
+        var suggestedCode = NextCode(_data.Customers.Select(person => person.Code), "CUS-");
+        var dialog = new CustomerDialog(dialogOwner, suggestedCode: suggestedCode);
+        if (dialog.ShowDialog() != true || dialog.Result is not CustomerRecord customer)
+            return null;
+
+        try
+        {
+            var next = _data.DeepCopy();
+            if (!string.IsNullOrWhiteSpace(customer.Code) &&
+                next.Customers.Any(person => string.Equals(person.Code, customer.Code, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("کد شخص تکراری است.");
+            next.Customers.Add(customer);
+            NativeOperationalPostingService.Reconcile(next);
+            AccountingDataValidator.Validate(next);
+            _store.Save(next);
+            _data = next;
+            RefreshAll();
+            FooterStatus.Text = "پرونده شخص از داخل فرم فاکتور ذخیره شد • " + DateTime.Now.ToString("HH:mm:ss");
+            return customer;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(dialogOwner, ex.Message, "ذخیره شخص انجام نشد", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
+        }
+    }
+
+    private ProductRecord? AddProductInline(Window dialogOwner)
+    {
+        if (!_canWrite)
+        {
+            MessageBox.Show(dialogOwner, "ذخیره‌سازی محلی آماده نیست؛ ابتدا از یک فایل پشتیبان معتبر بازیابی کنید.",
+                "ذخیره‌سازی غیرفعال", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
+        }
+
+        var suggestedCode = NextCode(_data.Products.Select(product => product.Code), "SKU-");
+        var dialog = new ProductDialog(dialogOwner, suggestedCode: suggestedCode);
+        if (dialog.ShowDialog() != true || dialog.Result is not ProductRecord product)
+            return null;
+
+        try
+        {
+            var next = _data.DeepCopy();
+            if (!string.IsNullOrWhiteSpace(product.Sku) &&
+                next.Products.Any(item => string.Equals(item.Sku, product.Sku, StringComparison.OrdinalIgnoreCase)))
+                throw new InvalidOperationException("کد کالای تکراری مجاز نیست.");
+            next.Products.Add(product);
+            NativeOperationalPostingService.Reconcile(next);
+            AccountingDataValidator.Validate(next);
+            _store.Save(next);
+            _data = next;
+            RefreshAll();
+            FooterStatus.Text = "کالا از داخل فرم فاکتور ذخیره شد • " + DateTime.Now.ToString("HH:mm:ss");
+            return product;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(dialogOwner, ex.Message, "ذخیره کالا انجام نشد", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
+        }
+    }
+
     private void AddCustomer_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable() || !ConfirmCanAddCustomer()) return;
@@ -922,13 +1001,9 @@ public partial class MainWindow : Window
     private void AddInvoice_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
-        if (_data.Customers.Count == 0 || _data.Products.Count == 0)
-        {
-            MessageBox.Show(this, "برای ثبت فاکتور/پیش‌فاکتور ابتدا طرف حساب و کالا ثبت کنید.",
-                "پیش‌نیاز سند", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        var dialog = new InvoiceDialog(this, _data.Customers, _data.Products, _data.Invoices);
+        var dialog = new InvoiceDialog(
+            this, _data.Customers, _data.Products, _data.Invoices,
+            AddCustomerInline, AddProductInline);
         if (dialog.ShowDialog() == true && dialog.Result is InvoiceDraft draft)
         {
             var message = draft.Type switch
