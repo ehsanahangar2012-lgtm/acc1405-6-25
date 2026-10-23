@@ -15,6 +15,8 @@ public sealed class InvoicePreviewWindow : Window
     private readonly InvoiceRecord _invoice;
     private readonly CompanyProfileRecord? _company;
     private readonly bool _showQr;
+    private readonly string _currencyLabel;
+    private readonly string _invoiceFooter;
     private FlowDocument _document;
     private FlowDocumentScrollViewer _viewer = null!;
     private string _theme = "smart";
@@ -44,8 +46,10 @@ public sealed class InvoicePreviewWindow : Window
         IReadOnlyList<InvoiceRecord> invoices,
         string? defaultTheme = null,
         bool showQr = true,
-        CompanyProfileRecord? company = null)
-        : this(owner, BuildDraftPreview(draft, people, invoices), defaultTheme, showQr, company)
+        CompanyProfileRecord? company = null,
+        string? currencyCode = "RIAL",
+        string? invoiceFooter = null)
+        : this(owner, BuildDraftPreview(draft, people, invoices), defaultTheme, showQr, company, currencyCode, invoiceFooter)
     {
     }
 
@@ -128,11 +132,20 @@ public sealed class InvoicePreviewWindow : Window
         InvoiceRecord invoice,
         string? defaultTheme = null,
         bool showQr = true,
-        CompanyProfileRecord? company = null)
+        CompanyProfileRecord? company = null,
+        string? currencyCode = "RIAL",
+        string? invoiceFooter = null)
     {
         _invoice = invoice ?? throw new ArgumentNullException(nameof(invoice));
         _company = company;
         _showQr = showQr;
+        _currencyLabel = currencyCode?.Trim().ToUpperInvariant() switch
+        {
+            "TOMAN" => "تومان",
+            "RIAL" or "" or null => "ریال",
+            _ => currencyCode.Trim()
+        };
+        _invoiceFooter = invoiceFooter ?? "";
         _theme = InvoiceThemes.Any(option => string.Equals(option.Key, defaultTheme, StringComparison.Ordinal))
             ? defaultTheme!
             : "smart";
@@ -146,7 +159,7 @@ public sealed class InvoicePreviewWindow : Window
         FlowDirection = FlowDirection.RightToLeft;
         Background = new SolidColorBrush(Color.FromRgb(241, 245, 249));
 
-        _document = BuildDocument(invoice, _theme, _showQr, _company);
+        _document = BuildDocument(invoice, _theme, _showQr, _company, _currencyLabel, _invoiceFooter);
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -191,7 +204,7 @@ public sealed class InvoicePreviewWindow : Window
         {
             if (themeSelector.SelectedValue is not string selected || selected == _theme) return;
             _theme = selected;
-            _document = BuildDocument(_invoice, _theme, _showQr, _company);
+            _document = BuildDocument(_invoice, _theme, _showQr, _company, _currencyLabel, _invoiceFooter);
             if (_viewer is not null) _viewer.Document = _document;
         };
         buttons.Children.Add(themeSelector);
@@ -259,7 +272,9 @@ public sealed class InvoicePreviewWindow : Window
         InvoiceRecord invoice,
         string theme,
         bool showQr,
-        CompanyProfileRecord? company)
+        CompanyProfileRecord? company,
+        string currencyLabel,
+        string invoiceFooter)
     {
         var palette = GetPalette(theme);
         var accent = new SolidColorBrush(palette.Accent);
@@ -349,7 +364,7 @@ public sealed class InvoicePreviewWindow : Window
 
         var group = new TableRowGroup();
         var header = new TableRow();
-        foreach (var label in new[] { "کالا / شرح قلم", "تعداد", "واحد", "قیمت واحد", "جمع" })
+        foreach (var label in new[] { "کالا / شرح قلم", "تعداد", "واحد", $"قیمت واحد ({currencyLabel})", $"جمع ({currencyLabel})" })
         {
             header.Cells.Add(new TableCell(new Paragraph(new Run(label)))
             {
@@ -371,8 +386,8 @@ public sealed class InvoicePreviewWindow : Window
                 string.IsNullOrWhiteSpace(line.Description) ? line.ProductName : $"{line.ProductName}\n{line.Description}",
                 line.Quantity.ToString("N2", CultureInfo.CurrentCulture),
                 "—",
-                line.UnitPrice.ToString("N2", CultureInfo.CurrentCulture),
-                line.LineTotal.ToString("N2", CultureInfo.CurrentCulture)
+                line.UnitPrice.ToString("N2", CultureInfo.CurrentCulture) + " " + currencyLabel,
+                line.LineTotal.ToString("N2", CultureInfo.CurrentCulture) + " " + currencyLabel
             };
 
             foreach (var value in values)
@@ -406,16 +421,16 @@ public sealed class InvoicePreviewWindow : Window
 
         table.RowGroups.Add(group);
         document.Blocks.Add(table);
-        document.Blocks.Add(new Paragraph(new Run($"جمع کالاها: {invoice.Subtotal.ToString("N2", CultureInfo.CurrentCulture)}"))
+        document.Blocks.Add(new Paragraph(new Run($"جمع کالاها: {invoice.Subtotal.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
         { TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 18, 0, 0) });
-        document.Blocks.Add(new Paragraph(new Run($"تخفیف: {invoice.Discount.ToString("N2", CultureInfo.CurrentCulture)}"))
+        document.Blocks.Add(new Paragraph(new Run($"تخفیف: {invoice.Discount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
         { TextAlignment = TextAlignment.Left });
         var taxLabel = invoice.TaxIsAmount
             ? "مالیات"
             : $"مالیات ({invoice.TaxRatePercent.ToString("N2", CultureInfo.CurrentCulture)}%)";
-        document.Blocks.Add(new Paragraph(new Run($"{taxLabel}: {invoice.TaxAmount.ToString("N2", CultureInfo.CurrentCulture)}"))
+        document.Blocks.Add(new Paragraph(new Run($"{taxLabel}: {invoice.TaxAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
         { TextAlignment = TextAlignment.Left });
-        document.Blocks.Add(new Paragraph(new Run($"مبلغ نهایی: {invoice.Total.ToString("N2", CultureInfo.CurrentCulture)}"))
+        document.Blocks.Add(new Paragraph(new Run($"مبلغ نهایی: {invoice.Total.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
         {
             FontSize = 19,
             FontWeight = FontWeights.Bold,
@@ -424,17 +439,26 @@ public sealed class InvoicePreviewWindow : Window
             Margin = new Thickness(0, 8, 0, 0)
         });
         document.Blocks.Add(new Paragraph(new Run(
-            $"نقدی ثبت‌شده: {invoice.CashAmount.ToString("N2", CultureInfo.CurrentCulture)}    مبلغ چک: {invoice.CheckAmount.ToString("N2", CultureInfo.CurrentCulture)}"))
+            $"نقدی ثبت‌شده: {invoice.CashAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}    مبلغ چک: {invoice.CheckAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
         { TextAlignment = TextAlignment.Left });
         document.Blocks.Add(new Paragraph(new Run($"وضعیت سند: {invoice.Status}"))
         { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 14, 0, 0) });
+
+        if (!string.IsNullOrWhiteSpace(invoiceFooter))
+            document.Blocks.Add(new Paragraph(new Run(invoiceFooter))
+            {
+                Foreground = Brushes.DimGray,
+                FontSize = 10,
+                Margin = new Thickness(0, 10, 0, 8),
+                TextAlignment = TextAlignment.Right
+            });
 
         if (showQr)
         {
             try
             {
                 var companyName = company?.Name ?? "اشک قلم";
-                var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CUSTOMER|{invoice.CustomerName}|COMPANY|{companyName}";
+                var payload = $"ASHKEGHALAM|INVOICE|{invoice.TrackingCode}|DATE|{FormatDate(invoice.CreatedAt)}|TOTAL|{invoice.Total.ToString(CultureInfo.InvariantCulture)}|CURRENCY|{currencyLabel}|CUSTOMER|{invoice.CustomerName}|COMPANY|{companyName}";
                 var qr = CreateQrImage(payload);
                 var qrCard = new Border
                 {
