@@ -154,6 +154,59 @@ public sealed class AccountingBehaviorTests
         finally{if(Directory.Exists(folder))Directory.Delete(folder,true);}
     }
 
+    [TestMethod]
+    public void NativeCheckRecordDeepCopyPreservesHistory()
+    {
+        var check = new CheckRecord
+        {
+            Id = "check-test-1",
+            BankName = "ملی",
+            Amount = 250.50m,
+            DueDate = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.FromHours(3.5)),
+            Status = "PENDING",
+            SayadId = "1234567890123456",
+            HolderName = "شرکت نمونه",
+            CheckType = "RECEIVED",
+            History = [new CheckHistoryRecord { Status = "PENDING", Note = "ثبت اولیه" }]
+        };
+        var data = new AccountingData { Checks = [check] };
+        var copy = data.DeepCopy();
+
+        Assert.AreEqual(1, copy.Checks.Count);
+        Assert.AreNotSame(check, copy.Checks[0]);
+        Assert.AreNotSame(check.History[0], copy.Checks[0].History[0]);
+        Assert.AreEqual("1234567890123456", copy.Checks[0].SayadId);
+        Assert.AreEqual("ثبت اولیه", copy.Checks[0].History[0].Note);
+        AccountingDataValidator.Validate(copy);
+    }
+
+    [TestMethod]
+    public void RejectsDuplicateCheckSayadIdentifiers()
+    {
+        var dueDate = new DateTimeOffset(2026, 11, 1, 0, 0, 0, TimeSpan.FromHours(3.5));
+        var data = new AccountingData
+        {
+            Checks =
+            [
+                new CheckRecord { Id = "check-test-1", BankName = "ملی", HolderName = "شرکت اول", Amount = 100m, DueDate = dueDate, SayadId = "ABC123", History = [new CheckHistoryRecord()] },
+                new CheckRecord { Id = "check-test-2", BankName = "ملت", HolderName = "شرکت دوم", Amount = 200m, DueDate = dueDate, SayadId = "abc123", History = [new CheckHistoryRecord()] }
+            ]
+        };
+
+        Assert.ThrowsException<InvalidDataException>(() => AccountingDataValidator.Validate(data));
+    }
+
+    [TestMethod]
+    public void RejectsUnknownCheckStatus()
+    {
+        var data = new AccountingData
+        {
+            Checks = [new CheckRecord { Id = "check-test-1", BankName = "ملی", HolderName = "شرکت نمونه", Amount = 100m, DueDate = DateTimeOffset.Now.AddDays(10), Status = "BANK_CONFIRMED" }]
+        };
+
+        Assert.ThrowsException<InvalidDataException>(() => AccountingDataValidator.Validate(data));
+    }
+
     private static AccountingData CreateSampleData(bool includeInvoice)
     {
         var customer=new CustomerRecord{Id="customer-test-1",Name="مشتری آزمایشی",Phone="09120000000",Address="تهران"};
