@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using AshkeGhalam.Windows.Models;
 using AshkeGhalam.Windows.Services;
@@ -78,8 +79,19 @@ public sealed class CheckDialog : Window
     private readonly PersianDateSelector _issueDate;
     private readonly TextBox _sayadId = new() { Height = 36, Padding = new Thickness(10, 5, 10, 5), FlowDirection = FlowDirection.LeftToRight };
     private readonly TextBox _checkNumber = new() { Height = 36, Padding = new Thickness(10, 5, 10, 5), FlowDirection = FlowDirection.LeftToRight };
-    private readonly TextBox _holderName = new() { Height = 36, Padding = new Thickness(10, 5, 10, 5) };
-    private readonly TextBox _personName = new() { Height = 36, Padding = new Thickness(10, 5, 10, 5) };
+    private readonly ComboBox _holderName = new()
+    {
+        Height = 36, Padding = new Thickness(8, 4, 8, 4), IsEditable = true,
+        IsTextSearchEnabled = true, StaysOpenOnEdit = true
+    };
+    private readonly ComboBox _personName = new()
+    {
+        Height = 36, Padding = new Thickness(8, 4, 8, 4), IsEditable = true,
+        IsTextSearchEnabled = true, StaysOpenOnEdit = true,
+        DisplayMemberPath = nameof(CustomerRecord.Name)
+    };
+    private IReadOnlyList<CustomerRecord> _people = [];
+    private bool _formattingAmount;
     private readonly TextBox _description = new()
     {
         Height = 90,
@@ -102,9 +114,10 @@ public sealed class CheckDialog : Window
 
     public CheckRecord? Result { get; private set; }
 
-    public CheckDialog(Window owner, CheckRecord? existing = null)
+    public CheckDialog(Window owner, CheckRecord? existing = null, IReadOnlyList<CustomerRecord>? people = null)
     {
         _existing = existing;
+        _people = people ?? [];
         _dueDate = new PersianDateSelector(existing?.DueDate ?? DateTimeOffset.Now.AddDays(30));
         _issueDate = new PersianDateSelector(existing?.IssueDate, optional: true);
 
@@ -124,13 +137,25 @@ public sealed class CheckDialog : Window
         _amount.Text = existing?.Amount.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")) ?? "";
         _sayadId.Text = existing?.SayadId ?? "";
         _checkNumber.Text = existing?.CheckNumber ?? "";
+        _holderName.ItemsSource = _people.Select(person => person.Name).Where(name => !string.IsNullOrWhiteSpace(name))
+            .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(name => name).ToList();
         _holderName.Text = existing?.HolderName ?? "";
+        _personName.ItemsSource = _people.Where(person => person.IsCustomer || person.IsSupplier).OrderBy(person => person.Name).ToList();
         _personName.Text = existing?.PersonName ?? "";
+        if (existing is not null)
+        {
+            var linkedPerson = _people.FirstOrDefault(person => person.Id == existing.PersonId)
+                ?? _people.FirstOrDefault(person => string.Equals(person.Name, existing.PersonName, StringComparison.CurrentCultureIgnoreCase));
+            if (linkedPerson is not null) _personName.SelectedItem = linkedPerson;
+        }
         _description.Text = existing?.Description ?? "";
         _checkType.SelectedItem = CheckTypes.First(item => item.Value == (existing?.CheckType ?? "RECEIVED"));
         _status.SelectedItem = CheckStatuses.First(item => item.Value == (existing?.Status ?? "PENDING"));
         _highPriority.IsChecked = existing?.IsHighPriority ?? false;
         _amount.LostFocus += (_, _) => FormatAmount();
+        _amount.TextChanged += Amount_TextChanged;
+        foreach (var combo in new[] { _bankName, _holderName, _personName, _checkType, _status })
+            AttachDropDownOpen(combo);
 
         var header = new StackPanel();
         header.Children.Add(new TextBlock
@@ -256,10 +281,55 @@ public sealed class CheckDialog : Window
         }
     }
 
+    private void Amount_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+    {
+        if (_formattingAmount || !_amount.IsKeyboardFocusWithin) return;
+        var current = _amount.Text;
+        if (string.IsNullOrWhiteSpace(current)) return;
+        var endsWithDecimal = current.EndsWith(".", StringComparison.Ordinal) ||
+            current.EndsWith("٫", StringComparison.Ordinal);
+        if (!PersianNumberParser.TryParseDecimal(current, out var value)) return;
+
+        var oldCaret = Math.Clamp(_amount.CaretIndex, 0, current.Length);
+        var digitsBeforeCaret = current.Take(oldCaret).Count(char.IsDigit);
+        var formatted = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+        if (endsWithDecimal && !formatted.Contains('٫') && !formatted.Contains('.')) formatted += "٫";
+        if (formatted == current) return;
+
+        _formattingAmount = true;
+        try
+        {
+            _amount.Text = formatted;
+            var digitCount = 0;
+            var caret = formatted.Length;
+            for (var i = 0; i < formatted.Length; i++)
+            {
+                if (char.IsDigit(formatted[i])) digitCount++;
+                if (digitCount >= digitsBeforeCaret)
+                {
+                    caret = Math.Min(formatted.Length, i + 1);
+                    break;
+                }
+            }
+            _amount.CaretIndex = caret;
+        }
+        finally { _formattingAmount = false; }
+    }
+
     private void FormatAmount()
     {
         if (PersianNumberParser.TryParseDecimal(_amount.Text, out var value))
             _amount.Text = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+    }
+
+    private static void AttachDropDownOpen(ComboBox combo)
+    {
+        combo.PreviewMouseLeftButtonDown += (_, _) =>
+            combo.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input,
+                new Action(() => { if (combo.IsEnabled && combo.IsVisible) combo.IsDropDownOpen = true; }));
+        combo.GotKeyboardFocus += (_, _) =>
+            combo.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Input,
+                new Action(() => { if (combo.IsEnabled && combo.IsVisible) combo.IsDropDownOpen = true; }));
     }
 
     private void SaveResult()
@@ -273,6 +343,10 @@ public sealed class CheckDialog : Window
             var dueDate = _dueDate.SelectedDate
                 ?? throw new InvalidOperationException("تاریخ سررسید را از انتخاب‌گر شمسی کامل کنید.");
             var issueDate = _issueDate.SelectedDate;
+            var linkedPerson = _personName.SelectedItem as CustomerRecord;
+            if (linkedPerson is not null &&
+                !string.Equals(linkedPerson.Name, _personName.Text.Trim(), StringComparison.CurrentCultureIgnoreCase))
+                linkedPerson = null;
             var type = _checkType.SelectedItem as ChoiceItem
                 ?? throw new InvalidOperationException("نوع چک را انتخاب کنید.");
             var status = _status.SelectedItem as ChoiceItem
@@ -309,7 +383,7 @@ public sealed class CheckDialog : Window
                 SayadId = _sayadId.Text.Trim(),
                 CheckNumber = _checkNumber.Text.Trim(),
                 HolderName = holder,
-                PersonId = _existing?.PersonId ?? "",
+                PersonId = linkedPerson?.Id ?? "",
                 PersonName = _personName.Text.Trim(),
                 RelatedInvoiceId = _existing?.RelatedInvoiceId ?? "",
                 ImagePath = _existing?.ImagePath ?? "",
@@ -365,6 +439,9 @@ public sealed class CheckDialog : Window
             _year.ItemsSource = Enumerable.Range(Math.Max(1300, currentYear - 30), 61).ToList();
             _month.ItemsSource = MonthNames;
             _day.ItemsSource = Enumerable.Range(1, 31).ToList();
+            AttachDropDownOpen(_year);
+            AttachDropDownOpen(_month);
+            AttachDropDownOpen(_day);
             _year.SelectionChanged += (_, _) => RefreshDayChoices();
             _month.SelectionChanged += (_, _) => RefreshDayChoices();
             Children.Add(_year);
