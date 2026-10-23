@@ -236,7 +236,7 @@ public sealed class CheckRecord
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public string BankName { get; set; } = "";
     public decimal Amount { get; set; }
-    public DateTimeOffset DueDate { get; set; } = DateTimeOffset.Today.AddDays(30);
+    public DateTimeOffset DueDate { get; set; } = DateTimeOffset.Now.AddDays(30);
     public DateTimeOffset? IssueDate { get; set; }
     // Internal values mirror the source application; display labels remain Persian.
     public string Status { get; set; } = "PENDING";
