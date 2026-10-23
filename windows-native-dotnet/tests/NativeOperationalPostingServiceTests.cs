@@ -133,7 +133,7 @@ public sealed class NativeOperationalPostingServiceTests
         Assert.AreEqual("هزینه: اجاره کارگاه", entry.Description);
         Assert.AreEqual(125m, entry.Amount);
         Assert.AreEqual("5200", data.LedgerAccounts.Single(a => a.Id == entry.DebitAccountId).Code);
-        Assert.AreEqual("1000", data.LedgerAccounts.Single(a => a.Id == entry.CreditAccountId).Code);
+        Assert.AreEqual("1110", data.LedgerAccounts.Single(a => a.Id == entry.CreditAccountId).Code);
     }
 
     private static AccountingData CreateData()
