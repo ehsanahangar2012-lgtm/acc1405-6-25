@@ -30,6 +30,7 @@
     "test:backup-encryption": "bun run scripts/test-backup-encryption.ts"
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
     "@capacitor/camera": "^8.2.4",
     "@capacitor/core": "^8.5.2",
     "@capacitor/local-notifications": "^8.3.1",
