@@ -11,9 +11,9 @@ public sealed class LedgerAccountDialog : Window
 
     private readonly TextBox _code = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _name = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label) };
-    private readonly ComboBox _level = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label) };
-    private readonly ComboBox _parent = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label) };
+    private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
+    private readonly ComboBox _level = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
+    private readonly ComboBox _parent = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };\n    private IReadOnlyList<ChartOfAccountRecord> _accounts = [];
 
     public ChartOfAccountRecord? Result { get; private set; }
 
@@ -25,11 +25,11 @@ public sealed class LedgerAccountDialog : Window
         Height = 520;
         MinHeight = 500;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        ResizeMode = ResizeMode.NoResize;
+        ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
 
-        _type.ItemsSource = new[]
+        _accounts = accounts;\n        _type.ItemsSource = new[]
         {
             new Choice("ASSET", "دارایی"),
             new Choice("LIABILITY", "بدهی"),
@@ -45,11 +45,9 @@ public sealed class LedgerAccountDialog : Window
             new Choice("DETAIL", "تفصیلی")
         };
         _level.SelectedIndex = 0;
-        _parent.ItemsSource = new[] { new Choice("", "بدون والد (حساب کل)") }
-            .Concat(accounts.OrderBy(a => a.Code, StringComparer.OrdinalIgnoreCase)
-                .Select(a => new Choice(a.Id, $"{a.Code} — {a.Name}")))
-            .ToList();
-        _parent.SelectedIndex = 0;
+        RefreshParentChoices();
+        _type.SelectionChanged += (_, _) => RefreshParentChoices();
+        _level.SelectionChanged += (_, _) => RefreshParentChoices();
 
         var root = new StackPanel { Margin = new Thickness(22) };
         root.Children.Add(new TextBlock
@@ -75,12 +73,19 @@ public sealed class LedgerAccountDialog : Window
         AddField(root, "سطح حساب", _level);
         AddField(root, "حساب والد (برای معین/تفصیلی الزامی)", _parent);
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 20, 0, 0) };
-        var save = new Button { Content = "ثبت سرفصل", Width = 115, Height = 36, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 10, 22, 18) };
+        var save = new Button { Content = "ثبت سرفصل", Width = 125, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
         buttons.Children.Add(save);
-        buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 36, IsCancel = true });
-        root.Children.Add(buttons);
-        Content = root;
+        buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root };
+        Grid.SetRow(scroll, 0);
+        Grid.SetRow(buttons, 1);
+        layout.Children.Add(scroll);
+        layout.Children.Add(buttons);
+        Content = layout;
 
         save.Click += (_, _) =>
         {
@@ -110,6 +115,35 @@ public sealed class LedgerAccountDialog : Window
                 MessageBox.Show(this, ex.Message, "بررسی سرفصل حساب", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
         };
+    }
+
+    private void RefreshParentChoices()
+    {
+        var type = (_type.SelectedItem as Choice)?.Value;
+        var level = (_level.SelectedItem as Choice)?.Value;
+        var previousParentId = (_parent.SelectedItem as Choice)?.Value ?? "";
+        var allowedParentLevel = level switch
+        {
+            "SUB" => "MAIN",
+            "DETAIL" => "SUB",
+            _ => ""
+        };
+
+        var choices = new List<Choice> { new("", "بدون والد (حساب کل)") };
+        if (!string.IsNullOrWhiteSpace(allowedParentLevel))
+        {
+            choices.AddRange(_accounts
+                .Where(account => account.IsActive &&
+                    string.Equals(account.Type, type, StringComparison.Ordinal) &&
+                    string.Equals(account.Level, allowedParentLevel, StringComparison.Ordinal))
+                .OrderBy(account => account.Code, StringComparer.OrdinalIgnoreCase)
+                .Select(account => new Choice(account.Id, $"{account.Code} — {account.Name}")));
+        }
+
+        _parent.ItemsSource = choices;
+        _parent.SelectedItem = choices.FirstOrDefault(choice => choice.Value == previousParentId)
+            ?? choices[0];
+        _parent.IsEnabled = level != "MAIN";
     }
 
     private static void AddField(Panel root, string label, Control field)
