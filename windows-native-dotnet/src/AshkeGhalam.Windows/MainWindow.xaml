@@ -700,6 +700,103 @@
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>
+            <TabItem Header="تنظیمات و شرکت‌ها">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12" MaxWidth="1050" HorizontalAlignment="Right">
+                        <TextBlock Text="تنظیمات حسابداری و پروفایل شرکت‌ها" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="پروفایل شرکت فعال، مشخصات چاپ فاکتور و گزینه‌های محلی را مدیریت کنید. تنظیمات در فایل دادهٔ محلی ذخیره می‌شوند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,18"/>
+                        <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="10" Padding="13" Margin="0,0,0,14">
+                            <TextBlock Text="محدودیت فعلی: این نسخه پروفایل چند شرکت را ذخیره می‌کند، اما جداسازی دفترکل، اسناد و موجودی برای هر شرکت هنوز پیاده‌سازی نشده است. تا تکمیل جداسازی داده‌ها، از یک مجموعه دادهٔ عملیاتی برای چند شرکت به‌صورت هم‌زمان استفاده نکنید." Foreground="#9A3412" TextWrapping="Wrap"/>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="مشخصات شرکت / شعبه" FontSize="17" FontWeight="Bold"/>
+                                <DockPanel Margin="0,10,0,12">
+                                    <TextBlock Text="پروفایل" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <ComboBox x:Name="CompanyProfileSelector" Width="330" DisplayMemberPath="Name" SelectionChanged="CompanyProfileSelector_SelectionChanged"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <Button Content="شرکت فعال شود" Click="ActivateCompanyProfile_Click" Margin="4,0"/>
+                                        <Button Content="شرکت جدید" Click="AddCompanyProfile_Click" Margin="4,0" Background="#0F766E" Foreground="White"/>
+                                    </StackPanel>
+                                </DockPanel>
+                                <UniformGrid Columns="2" Margin="0,0,0,8">
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="نام قابل نمایش" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileName" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="نام حقوقی" Margin="0,0,0,5"/><TextBox x:Name="CompanyLegalName" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="شناسه ملی" Margin="0,0,0,5"/><TextBox x:Name="CompanyNationalId" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="شناسه / کد مالیاتی" Margin="0,0,0,5"/><TextBox x:Name="CompanyTaxId" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="تلفن" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfilePhone" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="شعبه" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileBranch" MinHeight="34" Padding="8" Text="مرکزی"/></StackPanel>
+                                </UniformGrid>
+                                <TextBlock Text="نشانی" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileAddress" MinHeight="64" Padding="8" AcceptsReturn="True" TextWrapping="Wrap"/>
+                                <Button Content="ذخیره مشخصات شرکت" Click="SaveCompanyProfile_Click" HorizontalAlignment="Right" Margin="0,12,0,0" Background="#0F766E" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="تنظیمات فاکتور و چاپ" FontSize="17" FontWeight="Bold"/>
+                                <UniformGrid Columns="2" Margin="0,12,0,0">
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="قالب پیش‌فرض" Margin="0,0,0,5"/><ComboBox x:Name="InvoiceThemeSelector" MinHeight="34" SelectedIndex="6">
+                                        <ComboBoxItem Content="شرکتی مدرن" Tag="modern"/><ComboBoxItem Content="رسمی و اداری" Tag="official"/><ComboBoxItem Content="لوکس / مدیریتی" Tag="premium"/><ComboBoxItem Content="حرارتی" Tag="thermal"/><ComboBoxItem Content="مینیمال" Tag="minimal"/><ComboBoxItem Content="کلاسیک" Tag="classic"/><ComboBoxItem Content="هوشمند" Tag="smart"/><ComboBoxItem Content="رنگی" Tag="colorful"/><ComboBoxItem Content="صنعتی" Tag="industrial"/><ComboBoxItem Content="خلاقانه" Tag="creative"/><ComboBoxItem Content="ایرانی" Tag="persian"/>
+                                    </ComboBox></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="واحد پول" Margin="0,0,0,5"/><ComboBox x:Name="SettingsCurrencySelector" MinHeight="34"><ComboBoxItem Content="ریال" Tag="RIAL"/><ComboBoxItem Content="تومان" Tag="TOMAN"/></ComboBox></StackPanel>
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="نرخ مالیات پیش‌فرض (درصد)" Margin="0,0,0,5"/><TextBox x:Name="SettingsTaxRate" MinHeight="34" Padding="8" Text="0"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="پیشوند فاکتور فروش" Margin="0,0,0,5"/><TextBox x:Name="SettingsInvoicePrefix" MinHeight="34" Padding="8" Text="INV-"/></StackPanel>
+                                </UniformGrid>
+                                <CheckBox x:Name="SettingsShowInvoiceQr" Content="درج خودکار QR در پیش‌نمایش و چاپ فاکتور" Margin="0,2,0,10" IsChecked="True"/>
+                                <TextBlock Text="متن پایانی فاکتور" Margin="0,0,0,5"/><TextBox x:Name="SettingsInvoiceFooter" MinHeight="54" Padding="8" AcceptsReturn="True" TextWrapping="Wrap"/>
+                                <Button Content="ذخیره تنظیمات حسابداری" Click="SaveAccountingPreferences_Click" HorizontalAlignment="Right" Margin="0,12,0,0" Background="#0F766E" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="سامانهٔ مؤدیان">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12" MaxWidth="980" HorizontalAlignment="Right">
+                        <TextBlock Text="سامانهٔ مؤدیان مالیاتی" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="پروفایل مؤدی و آماده‌سازی دادهٔ صورتحساب برای بازبینی قبل از اتصال رسمی." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,16"/>
+                        <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="10" Padding="14">
+                            <TextBlock Text="ارسال به سازمان امور مالیاتی در این نسخه فعال نیست. تا زمان تطبیق دقیق قرارداد API، گواهی و الزامات رسمی با نسخهٔ اصلی، این صفحه فقط تنظیمات محلی و JSON نمونه تولید می‌کند." Foreground="#9A3412" TextWrapping="Wrap"/>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="تنظیمات مؤدی" FontSize="17" FontWeight="Bold"/>
+                                <UniformGrid Columns="2" Margin="0,12,0,0">
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="شناسه / شناسهٔ اقتصادی" Margin="0,0,0,5"/><TextBox x:Name="MoadianTaxpayerId" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="محیط" Margin="0,0,0,5"/><ComboBox x:Name="MoadianEnvironmentSelector" MinHeight="34"><ComboBoxItem Content="آزمایشی" Tag="Sandbox"/><ComboBoxItem Content="عملیاتی" Tag="Production"/></ComboBox></StackPanel>
+                                    <StackPanel Grid.ColumnSpan="2"><TextBlock Text="نشانی API تأییدشده (در حالت فعلی فقط ذخیره می‌شود)" Margin="0,0,0,5"/><TextBox x:Name="MoadianApiBaseUrl" MinHeight="34" Padding="8" FlowDirection="LeftToRight"/></StackPanel>
+                                </UniformGrid>
+                                <CheckBox x:Name="MoadianIsConfigured" Content="پروفایل مؤدی توسط مدیر سیستم بررسی شده است" Margin="0,12,0,8"/>
+                                <WrapPanel HorizontalAlignment="Right"><Button Content="ذخیره پروفایل مؤدی" Click="SaveMoadianSettings_Click" Background="#0F766E" Foreground="White" Margin="4"/><Button Content="ساخت JSON نمونه از فاکتور انتخاب‌شده" Click="BuildMoadianPayload_Click" Margin="4"/></WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                            <StackPanel><TextBlock Text="JSON نمونه — ارسال نمی‌شود" FontSize="17" FontWeight="Bold" Margin="0,0,0,8"/><TextBox x:Name="MoadianPayloadPreview" MinHeight="250" Padding="10" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FlowDirection="LeftToRight" FontFamily="Consolas"/></StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="اتصال به سرور اصلی">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12" MaxWidth="930" HorizontalAlignment="Right">
+                        <TextBlock Text="اتصال سرور، لایسنس و همگام‌سازی" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="اتصال لایسنس از مسیر امن موجود استفاده می‌کند؛ همگام‌سازی عمومی داده‌های حسابداری تا تعیین API و قواعد تعارض غیرفعال است." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,14"/>
+                        <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="10" Padding="14">
+                            <TextBlock Text="برای جلوگیری از ارسال ناخواستهٔ داده‌های مالی، دکمهٔ بررسی فقط نشانی HTTPS را اعتبارسنجی می‌کند و هیچ درخواست همگام‌سازی نمی‌فرستد. صدور/ابطال لایسنس و ابزار انتشار فقط در نسخهٔ مادر وب باقی می‌ماند." Foreground="#9A3412" TextWrapping="Wrap"/>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="نشانی میزبان" FontSize="17" FontWeight="Bold"/>
+                                <TextBox x:Name="ServerBaseUrl" MinHeight="36" Padding="8" Margin="0,12,0,10" Text="https://acc.ashkghalam.ir/" FlowDirection="LeftToRight"/>
+                                <TextBlock Text="شناسهٔ فضای کاری / شرکت" Margin="0,0,0,5"/><TextBox x:Name="ServerWorkspaceId" MinHeight="34" Padding="8"/>
+                                <TextBlock Text="سیاست همگام‌سازی" Margin="0,12,0,5"/><ComboBox x:Name="ServerSyncModeSelector" MinHeight="34"><ComboBoxItem Content="دستی" Tag="manual"/><ComboBoxItem Content="پس از تأیید" Tag="approval"/><ComboBoxItem Content="غیرفعال" Tag="disabled"/></ComboBox>
+                                <TextBlock x:Name="ServerConnectionStatusText" Text="وضعیت: هنوز بررسی نشده" FontWeight="Bold" Foreground="#475569" Margin="0,12,0,8"/>
+                                <WrapPanel HorizontalAlignment="Right"><Button Content="ذخیره تنظیمات اتصال" Click="SaveServerConnection_Click" Background="#0F766E" Foreground="White" Margin="4"/><Button Content="اعتبارسنجی نشانی HTTPS" Click="ValidateServerConnection_Click" Margin="4"/></WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
                 </TabControl>
                 <Border x:Name="MigrationPanel" Visibility="Collapsed" Background="#F1F5F9" CornerRadius="14" Padding="28">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
