@@ -12,6 +12,7 @@ public sealed class ProductDialog : Window
     private readonly TextBox _name = new();
     private readonly TextBox _code = new();
     private readonly TextBox _serialNumber = new();
+    private readonly TextBox _barcode = new();
     private readonly TextBox _unit = new() { Text = "عدد" };
     private readonly TextBox _quantity = new() { Text = "0" };
     private readonly TextBox _reserved = new() { IsReadOnly = true, Background = new SolidColorBrush(Color.FromRgb(241, 245, 249)) };
@@ -41,11 +42,13 @@ public sealed class ProductDialog : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
+        FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
 
         _name.Text = existing?.Name ?? "";
         _code.Text = existing?.Code ?? suggestedCode;
         _serialNumber.Text = existing?.SerialNumber ?? "";
+        _barcode.Text = existing?.Barcode ?? "";
         _unit.Text = existing?.Unit ?? "عدد";
         _quantity.Text = (existing?.StockQuantity ?? 0m).ToString("0.##", CultureInfo.InvariantCulture);
         _reserved.Text = (existing?.ReservedStock ?? 0m).ToString("0.##", CultureInfo.InvariantCulture);
@@ -83,12 +86,15 @@ public sealed class ProductDialog : Window
         Add(root, "نام کالا (الزامی)", _name);
         Add(root, "کد کالا (خودکار پیشنهاد شده؛ قابل ویرایش و باید یکتا باشد)", _code);
         Add(root, "شماره سریال اختصاصی کالا", _serialNumber);
+        Add(root, "بارکد کالا (برای اسکنر دستی)", _barcode);
         Add(root, "واحد (مثلاً عدد، کیلوگرم، متر)", _unit);
         Add(root, existing is null ? "موجودی اولیه" : "موجودی فعلی (فقط از «ورود موجودی» تغییر می‌کند)", _quantity);
         Add(root, "موجودی رزروشده (فقط‌خواندنی)", _reserved);
         Add(root, "حداقل موجودی (اختیاری)", _minStock);
         Add(root, "قیمت خرید (اختیاری)", _buyPrice);
         Add(root, "قیمت فروش", _sellPrice);
+        foreach (var numericField in new[] { _quantity, _buyPrice, _sellPrice, _minStock, _weight })
+            numericField.LostFocus += (_, _) => FormatNumericField(numericField);
         Add(root, "وزن (اختیاری)", _weight);
         Add(root, "محل قرارگیری در انبار / قفسه", _shelfLocation);
         Add(root, "دسته‌بندی اصلی", _category);
@@ -158,6 +164,7 @@ public sealed class ProductDialog : Window
                 Name = name,
                 Code = _code.Text.Trim(),
                 SerialNumber = _serialNumber.Text.Trim(),
+                Barcode = _barcode.Text.Trim(),
                 Unit = string.IsNullOrWhiteSpace(_unit.Text) ? "عدد" : _unit.Text.Trim(),
                 StockQuantity = _existing?.StockQuantity ?? quantity,
                 ReservedStock = reserved,
@@ -180,6 +187,13 @@ public sealed class ProductDialog : Window
         {
             MessageBox.Show(this, ex.Message, "بررسی اطلاعات کالا", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private static void FormatNumericField(TextBox field)
+    {
+        if (string.IsNullOrWhiteSpace(field.Text)) return;
+        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "عدد").ToString("N2", CultureInfo.GetCultureInfo("fa-IR")); }
+        catch (InvalidOperationException) { }
     }
 
     private static decimal? ParseOptional(string text, string label) =>

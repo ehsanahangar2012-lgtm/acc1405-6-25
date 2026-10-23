@@ -80,7 +80,7 @@ public sealed class VoucherDialog : Window
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
-        FontFamily = new System.Windows.Media.FontFamily("Vazirmatn, Tahoma, Segoe UI");
+        FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
 
         _person.ItemsSource = people;
@@ -192,6 +192,7 @@ public sealed class VoucherDialog : Window
         var barcode = _barcodeScan.Text.Trim();
         if (barcode.Length == 0) return;
         var product = _products.FirstOrDefault(item =>
+            string.Equals(item.Barcode, barcode, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(item.Code, barcode, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(item.SerialNumber, barcode, StringComparison.OrdinalIgnoreCase));
         if (product is null)

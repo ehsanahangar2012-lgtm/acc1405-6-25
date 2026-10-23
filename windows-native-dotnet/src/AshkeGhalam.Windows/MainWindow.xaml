@@ -4,21 +4,21 @@
         Title="حسابداری اشک قلم — نسخه بومی ویندوز"
         Width="1360" Height="880" MinWidth="1040" MinHeight="680"
         WindowStartupLocation="CenterScreen" Background="#F1F5F9"
-        FlowDirection="RightToLeft" FontFamily="Vazirmatn, Tahoma, Segoe UI" UseLayoutRounding="True" SnapsToDevicePixels="True">
+        FlowDirection="RightToLeft" FontFamily="pack://application:,,,/Assets/Fonts/#Vazirmatn" UseLayoutRounding="True" SnapsToDevicePixels="True">
     <Window.Resources>
         <Style TargetType="Button">
             <Setter Property="Padding" Value="12,7"/> 
-            <Setter Property="FontFamily" Value="Vazirmatn, Tahoma, Segoe UI"/>
+            <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
             <Setter Property="Margin" Value="0,0,8,0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="MinHeight" Value="32"/>
         </Style>
         <Style TargetType="TextBox">
-            <Setter Property="FontFamily" Value="Vazirmatn, Tahoma, Segoe UI"/>
+            <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
             <Setter Property="MinHeight" Value="32"/>
         </Style>
         <Style TargetType="ComboBox">
-            <Setter Property="FontFamily" Value="Vazirmatn, Tahoma, Segoe UI"/>
+            <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
         </Style>
         <Style TargetType="DataGrid">
             <Setter Property="AutoGenerateColumns" Value="False"/>
@@ -215,7 +215,7 @@
                         <TextBlock Text="کالا و انبار" FontSize="23" FontWeight="Bold"/>
                         <TextBlock Text="پرونده کالا با فیلدهای مدل اصلی گسترش یافته است؛ موجودی رزروشده حفظ می‌شود و گردش حواله‌های چندانباره هنوز در مرحلهٔ مهاجرت است." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
                         <WrapPanel Margin="0,14,0,0">
-                            <TextBox x:Name="ProductsSearchBox" Tag="products" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در کد، نام، سریال، دسته‌بندی و قفسه" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <TextBox x:Name="ProductsSearchBox" Tag="products" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در کد، بارکد، نام، سریال، دسته‌بندی و قفسه" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
                             <ComboBox x:Name="ProductsPageSize" Tag="products" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
                                 <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
                             </ComboBox>
@@ -239,6 +239,7 @@
                             <DataGridTextColumn Header="نام کالا" Binding="{Binding Name}" Width="210"/>
                             <DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="120"/>
                             <DataGridTextColumn Header="شماره سریال" Binding="{Binding SerialNumber}" Width="140"/>
+                            <DataGridTextColumn Header="بارکد" Binding="{Binding Barcode}" Width="150"/>
                             <DataGridTextColumn Header="واحد" Binding="{Binding Unit}" Width="90"/>
                             <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding CategoryPath}" Width="190"/>
                             <DataGridTextColumn Header="موجودی" Binding="{Binding StockQuantity, StringFormat={}{0:N2}}" Width="120"/>

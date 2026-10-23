@@ -36,6 +36,16 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: Bundle Vazirmatn font and SIL OFL license
+        shell: pwsh
+        run: |
+          $fontDir = 'windows-native-dotnet/src/AshkeGhalam.Windows/Assets/Fonts'
+          New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+          $fontBase = 'https://raw.githubusercontent.com/rastikerdar/vazirmatn/6e553e33489a8f9dfaccc76860a2e3f3c1e66de7'
+          Invoke-WebRequest -Uri "$fontBase/fonts/ttf/Vazirmatn-Regular.ttf" -OutFile (Join-Path $fontDir 'Vazirmatn-Regular.ttf')
+          Invoke-WebRequest -Uri "$fontBase/OFL.txt" -OutFile (Join-Path $fontDir 'OFL.txt')
+          if ((Get-Item (Join-Path $fontDir 'Vazirmatn-Regular.ttf')).Length -lt 50000) { throw 'Vazirmatn font download is incomplete.' }
+
       - name: Restore WPF project
         shell: pwsh
         run: dotnet restore windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj
@@ -69,6 +79,7 @@ jobs:
             -p:IncludeNativeLibrariesForSelfExtract=true -o $publishDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Copy-Item 'windows-native-dotnet/QUICKSTART.md' (Join-Path $publishDir 'راهنمای-شروع.txt')
+          Copy-Item 'windows-native-dotnet/src/AshkeGhalam.Windows/Assets/Fonts/OFL.txt' (Join-Path $publishDir 'Vazirmatn-OFL.txt')
           Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath (Join-Path $env:RUNNER_TEMP 'AshkeGhalam-Windows-Native.zip') -Force
 
       - name: Smoke-test published executable startup

@@ -73,7 +73,7 @@ public sealed class AccountingData
         Products = Products.Select(p => new ProductRecord
         {
             Id=p.Id, Name=p.Name, Sku=p.Sku, Unit=p.Unit, StockQuantity=p.StockQuantity, UnitPrice=p.UnitPrice,
-            SerialNumber=p.SerialNumber, BuyPrice=p.BuyPrice, ReservedStock=p.ReservedStock, MinStock=p.MinStock,
+            SerialNumber=p.SerialNumber, Barcode=p.Barcode, BuyPrice=p.BuyPrice, ReservedStock=p.ReservedStock, MinStock=p.MinStock,
             Weight=p.Weight, ShelfLocation=p.ShelfLocation, Category=p.Category, SubCategory=p.SubCategory,
             SubSubCategory=p.SubSubCategory, CategoryPath=p.CategoryPath, Description=p.Description, ImageUrl=p.ImageUrl,
             CreatedAt=p.CreatedAt
@@ -222,6 +222,7 @@ public sealed class ProductRecord
 
     // Fields aligned with the real application Product model.
     public string SerialNumber { get; set; } = "";
+    public string Barcode { get; set; } = "";
     public decimal? BuyPrice { get; set; }
     public decimal ReservedStock { get; set; }
     public decimal? MinStock { get; set; }
@@ -968,6 +969,7 @@ public static class AccountingDataValidator
 
         var productIds = UniqueIds(data.Products.Select(p => p?.Id), "کالا");
         var skuValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var barcodeValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in data.Products)
         {
             if (p is null || string.IsNullOrWhiteSpace(p.Name) || p.Name.Trim().Length < 2 ||
@@ -978,6 +980,8 @@ public static class AccountingDataValidator
                 throw new InvalidDataException("رکورد کالا ناقص یا نامعتبر است.");
             if (!string.IsNullOrWhiteSpace(p.Sku) && !skuValues.Add(p.Sku.Trim()))
                 throw new InvalidDataException("کد کالای تکراری در داده‌ها وجود دارد.");
+            if (!string.IsNullOrWhiteSpace(p.Barcode) && !barcodeValues.Add(p.Barcode.Trim()))
+                throw new InvalidDataException("بارکد تکراری در داده‌ها وجود دارد.");
         }
 
         var invoiceIds = UniqueIds(data.Invoices.Select(i => i?.Id), "فاکتور");

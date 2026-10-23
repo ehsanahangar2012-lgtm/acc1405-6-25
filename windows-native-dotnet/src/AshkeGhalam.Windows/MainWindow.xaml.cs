@@ -251,7 +251,7 @@ public partial class MainWindow : Window
                 break;
             case "products":
                 BindPagedGrid(key, ProductsGrid, _data.Products
-                    .Where(p => MatchesSearch(query, p.Name, p.Code, p.SerialNumber, p.Unit,
+                    .Where(p => MatchesSearch(query, p.Name, p.Code, p.Barcode, p.SerialNumber, p.Unit,
                         p.CategoryPath, p.ShelfLocation, p.Description, p.ImageUrl))
                     .OrderBy(p => p.Name).ToList());
                 break;
@@ -1111,6 +1111,8 @@ public partial class MainWindow : Window
             {
                 if (!string.IsNullOrWhiteSpace(product.Sku) && data.Products.Any(p => string.Equals(p.Sku, product.Sku, StringComparison.OrdinalIgnoreCase)))
                     throw new InvalidOperationException("کد کالای تکراری مجاز نیست.");
+                if (!string.IsNullOrWhiteSpace(product.Barcode) && data.Products.Any(p => string.Equals(p.Barcode, product.Barcode, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("بارکد کالا تکراری است.");
                 data.Products.Add(product);
             }, "کالا و موجودی اولیه ذخیره شد");
     }
@@ -1125,6 +1127,8 @@ public partial class MainWindow : Window
             {
                 if (!string.IsNullOrWhiteSpace(changed.Sku) && data.Products.Any(p => p.Id != changed.Id && string.Equals(p.Sku, changed.Sku, StringComparison.OrdinalIgnoreCase)))
                     throw new InvalidOperationException("کد کالای تکراری مجاز نیست.");
+                if (!string.IsNullOrWhiteSpace(changed.Barcode) && data.Products.Any(p => p.Id != changed.Id && string.Equals(p.Barcode, changed.Barcode, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("بارکد کالا تکراری است.");
                 var index = data.Products.FindIndex(p => p.Id == changed.Id);
                 if (index < 0) throw new InvalidOperationException("کالا پیدا نشد.");
                 data.Products[index] = changed;
@@ -1169,6 +1173,7 @@ public partial class MainWindow : Window
         var barcode = ProductsBarcodeSearchBox.Text.Trim();
         if (barcode.Length == 0) return;
         var product = _data.Products.FirstOrDefault(item =>
+            string.Equals(item.Barcode, barcode, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(item.Code, barcode, StringComparison.OrdinalIgnoreCase) ||
             string.Equals(item.SerialNumber, barcode, StringComparison.OrdinalIgnoreCase));
         if (product is null)
