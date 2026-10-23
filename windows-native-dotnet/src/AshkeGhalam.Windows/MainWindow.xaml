@@ -733,7 +733,7 @@
                 </ScrollViewer>
             </TabItem>
             <TabItem Header="تنظیمات و شرکت‌ها">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <ScrollViewer x:Name="AccountingSettingsScrollViewer" VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="12" MaxWidth="1050" HorizontalAlignment="Right">
                         <TextBlock Text="تنظیمات حسابداری و پروفایل شرکت‌ها" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
                         <TextBlock Text="پروفایل شرکت فعال، مشخصات چاپ فاکتور و گزینه‌های محلی را مدیریت کنید. تنظیمات در فایل دادهٔ محلی ذخیره می‌شوند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,18"/>
