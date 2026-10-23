@@ -19,7 +19,8 @@ public sealed class PaymentReceiptPreviewWindow : Window
         PaymentRecord payment,
         InvoiceRecord invoice,
         CompanyProfileRecord? company,
-        string? currencyCode = "RIAL")
+        string? currencyCode = "RIAL",
+        IReadOnlyList<CheckRecord>? relatedChecks = null)
     {
         _payment = payment ?? throw new ArgumentNullException(nameof(payment));
         ArgumentNullException.ThrowIfNull(invoice);
@@ -40,7 +41,7 @@ public sealed class PaymentReceiptPreviewWindow : Window
             "RIAL" or "" or null => "ریال",
             _ => currencyCode.Trim()
         };
-        _document = BuildDocument(payment, invoice, company, currency);
+        _document = BuildDocument(payment, invoice, company, currency, relatedChecks ?? Array.Empty<CheckRecord>());
 
         var root = new Grid { Margin = new Thickness(16) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -107,7 +108,8 @@ public sealed class PaymentReceiptPreviewWindow : Window
         PaymentRecord payment,
         InvoiceRecord invoice,
         CompanyProfileRecord? company,
-        string currency)
+        string currency,
+        IReadOnlyList<CheckRecord> relatedChecks)
     {
         var accent = new SolidColorBrush(Color.FromRgb(15, 118, 110));
         var soft = new SolidColorBrush(Color.FromRgb(231, 248, 244));
@@ -196,7 +198,7 @@ public sealed class PaymentReceiptPreviewWindow : Window
 
         var amountPanel = new StackPanel { FlowDirection = FlowDirection.RightToLeft, HorizontalAlignment = HorizontalAlignment.Stretch };
         amountPanel.Children.Add(new TextBlock { Text = "مبلغ ثبت‌شده در رسید", FontSize = 11, Foreground = muted, TextAlignment = TextAlignment.Center });
-        amountPanel.Children.Add(new TextBlock { Text = $"{payment.Amount.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))} {currency}",
+        amountPanel.Children.Add(new TextBlock { Text = $"{payment.Amount.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))} {currency}",
             FontSize = 30, FontWeight = FontWeights.Bold, Foreground = accent, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 5, 0, 3) });
         amountPanel.Children.Add(new TextBlock { Text = payment.Method == "چک"
                 ? "ثبت محلی چک؛ این رسید به‌تنهایی تأیید یا وصول بانکی را اثبات نمی‌کند."
@@ -213,7 +215,7 @@ public sealed class PaymentReceiptPreviewWindow : Window
             { Foreground = ink, Margin = new Thickness(0, 0, 0, 10) });
 
         document.Blocks.Add(new Paragraph(new Run(
-            $"وضعیت فاکتور: {invoice.Status}    •    مبلغ کل فاکتور: {invoice.Total.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))} {currency}"))
+            $"وضعیت فاکتور: {invoice.Status}    •    مبلغ کل فاکتور: {invoice.Total.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))} {currency}"))
         { Foreground = muted, TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 0, 0, 20) });
 
         document.Blocks.Add(new Paragraph(new Run(
@@ -223,15 +225,41 @@ public sealed class PaymentReceiptPreviewWindow : Window
         document.Blocks.Add(new Paragraph(new Run("این رسید بر مبنای عملیات محلی ثبت‌شده در نسخهٔ بومی تهیه شده است."))
         { FontSize = 9, Foreground = muted, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 20, 0, 0) });
 
+        foreach (var check in relatedChecks.Where(item =>
+                     !string.IsNullOrWhiteSpace(item.ImageDataBase64) ||
+                     !string.IsNullOrWhiteSpace(item.ImagePath)))
+        {
+            var image = CreateCompanyImage(check.ImageDataBase64, 460, 280, check.ImagePath);
+            if (image is null) continue;
+            var attachment = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+            attachment.Children.Add(new TextBlock
+            {
+                Text = $"تصویر چک پیوست — شماره {check.CheckNumber}، بانک {check.BankName}، مبلغ {NumericTextBoxFormatter.Format(check.Amount)} {currency}",
+                FontSize = 11, FontWeight = FontWeights.SemiBold, Foreground = ink,
+                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8)
+            });
+            attachment.Children.Add(new Border
+            {
+                Background = Brushes.White, BorderBrush = accent, BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8), Padding = new Thickness(8), Child = image
+            });
+            document.Blocks.Add(new BlockUIContainer(new Border
+            {
+                Width = 640, Background = soft, BorderBrush = accent, BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8), Padding = new Thickness(12), Margin = new Thickness(0, 0, 0, 14),
+                Child = attachment
+            }));
+        }
         return document;
     }
 
-    private static Image? CreateCompanyImage(string? encoded, double width, double height)
+    private static Image? CreateCompanyImage(string? encoded, double width, double height, string? filePath = null)
     {
-        if (string.IsNullOrWhiteSpace(encoded)) return null;
+        if (string.IsNullOrWhiteSpace(encoded) && (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath))) return null;
         try
         {
-            using var stream = new MemoryStream(Convert.FromBase64String(encoded));
+            var bytes = !string.IsNullOrWhiteSpace(encoded) ? Convert.FromBase64String(encoded) : File.ReadAllBytes(filePath!);
+            using var stream = new MemoryStream(bytes);
             var bitmap = new System.Windows.Media.Imaging.BitmapImage();
             bitmap.BeginInit(); bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
             bitmap.StreamSource = stream; bitmap.DecodePixelWidth = (int)Math.Max(width * 2, 100); bitmap.EndInit(); bitmap.Freeze();

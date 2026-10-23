@@ -413,19 +413,19 @@ public partial class MainWindow : Window
         CustomerCount.Text = _data.Customers.Count.ToString("N0", CultureInfo.CurrentCulture);
         ProductCount.Text = _data.Products.Count.ToString("N0", CultureInfo.CurrentCulture);
         InvoiceCount.Text = _data.Invoices.Count(i => i.Status != "لغو شده").ToString("N0", CultureInfo.CurrentCulture);
-        SalesTotal.Text = sales.ToString("N2", CultureInfo.CurrentCulture);
-        PurchasesTotal.Text = purchases.ToString("N2", CultureInfo.CurrentCulture);
-        PaymentsTotal.Text = paid.ToString("N2", CultureInfo.CurrentCulture);
-        ReceivablesTotal.Text = receivables.ToString("N2", CultureInfo.CurrentCulture);
-        PayablesTotal.Text = payables.ToString("N2", CultureInfo.CurrentCulture);
-        ExpensesTotal.Text = expenses.ToString("N2", CultureInfo.CurrentCulture);
-        ReportSales.Text = sales.ToString("N2", CultureInfo.CurrentCulture);
-        ReportPurchases.Text = purchases.ToString("N2", CultureInfo.CurrentCulture);
-        ReportPayments.Text = paid.ToString("N2", CultureInfo.CurrentCulture);
-        ReportReceivables.Text = receivables.ToString("N2", CultureInfo.CurrentCulture);
-        ReportPayables.Text = payables.ToString("N2", CultureInfo.CurrentCulture);
-        ReportExpenses.Text = expenses.ToString("N2", CultureInfo.CurrentCulture);
-        ReportCash.Text = (salesReceipts - purchasePayments - expenses).ToString("N2", CultureInfo.CurrentCulture);
+        SalesTotal.Text = sales.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        PurchasesTotal.Text = purchases.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        PaymentsTotal.Text = paid.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        ReceivablesTotal.Text = receivables.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        PayablesTotal.Text = payables.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        ExpensesTotal.Text = expenses.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        ReportSales.Text = sales.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        ReportPurchases.Text = purchases.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        ReportPayments.Text = paid.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        ReportReceivables.Text = receivables.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        ReportPayables.Text = payables.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        ReportExpenses.Text = expenses.ToString("#,##0.##", CultureInfo.CurrentCulture);
+        ReportCash.Text = (salesReceipts - purchasePayments - expenses).ToString("#,##0.##", CultureInfo.CurrentCulture);
         RefreshLedger();
         RefreshFinancialReports();
         RefreshDueCalendar();
@@ -470,7 +470,7 @@ public partial class MainWindow : Window
         var totalCredit = posted.Sum(j => j.Amount);
         LedgerSummary.Text =
             $"سرفصل‌ها: {_data.LedgerAccounts.Count:N0}  •  اسناد قطعی: {posted.Count:N0}  •  " +
-            $"جمع بدهکار: {totalDebit:N2}  •  جمع بستانکار: {totalCredit:N2}";
+            $"جمع بدهکار: {totalDebit:#,##0.##}  •  جمع بستانکار: {totalCredit:#,##0.##}";
     }
 
     private void SeedLedgerAccounts_Click(object sender, RoutedEventArgs e)
@@ -552,7 +552,7 @@ public partial class MainWindow : Window
     private void RefreshFinancialReports()
     {
         var report = FinancialReportsService.Build(_data);
-        static string Money(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+        static string Money(decimal value) => value.ToString("#,##0.##", CultureInfo.CurrentCulture);
 
         FinancialRevenue.Text = Money(report.Revenue);
         FinancialCostOfSales.Text = Money(report.CostOfSales);
@@ -604,7 +604,7 @@ public partial class MainWindow : Window
         var overdue = items.Where(item => item.DaysFromDue < 0).ToList();
         DueCalendarSummary.Text =
             $"تعداد تعهدها: {items.Count:N0}  •  موارد معوق: {overdue.Count:N0}  •  " +
-            $"مبلغ معوق: {overdue.Sum(item => item.Amount).ToString("N2", CultureInfo.CurrentCulture)}";
+            $"مبلغ معوق: {overdue.Sum(item => item.Amount).ToString("#,##0.##", CultureInfo.CurrentCulture)}";
     }
 
     private void RefreshCashFlowForecast_Click(object sender, RoutedEventArgs e) =>
@@ -622,7 +622,7 @@ public partial class MainWindow : Window
     private void RefreshCashFlowForecast()
     {
         var forecast = CashFlowForecastService.Build(_data, SelectedCashFlowHorizonDays());
-        static string Money(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+        static string Money(decimal value) => value.ToString("#,##0.##", CultureInfo.CurrentCulture);
 
         CashFlowOpeningBalance.Text = Money(forecast.OpeningBalance);
         CashFlowExpectedInflows.Text = Money(forecast.TotalExpectedInflows);
@@ -1310,7 +1310,7 @@ public partial class MainWindow : Window
                 document, movement.Description, Math.Max(0m, movement.SignedQuantity),
                 Math.Abs(Math.Min(0m, movement.SignedQuantity)), balance));
         }
-        KardexModuleSummary.Text = $"کالا: {product.Name}   |   کد: {product.Code}   |   موجودی فعلی: {product.StockQuantity.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))} {product.Unit}";
+        KardexModuleSummary.Text = $"کالا: {product.Name}   |   کد: {product.Code}   |   موجودی فعلی: {product.StockQuantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))} {product.Unit}";
         KardexModuleGrid.ItemsSource = rows;
     }
 
@@ -1931,7 +1931,7 @@ public partial class MainWindow : Window
                 "حذف ایمن هزینه", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        if (MessageBox.Show(this, $"هزینه «{selected.Title}» با مبلغ {selected.Amount:N2} حذف شود؟",
+        if (MessageBox.Show(this, $"هزینه «{selected.Title}» با مبلغ {selected.Amount:#,##0.##} حذف شود؟",
             "تأیید حذف هزینه", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         Commit(data =>
         {
@@ -1999,7 +1999,7 @@ public partial class MainWindow : Window
                 "حذف ایمن دریافت/پرداخت", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        if (MessageBox.Show(this, $"عملیات {selected.Amount:N2} مربوط به فاکتور {selected.InvoiceNumber} حذف شود؟",
+        if (MessageBox.Show(this, $"عملیات {selected.Amount:#,##0.##} مربوط به فاکتور {selected.InvoiceNumber} حذف شود؟",
             "تأیید حذف دریافت/پرداخت", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         Commit(data =>
         {
@@ -2304,7 +2304,7 @@ public partial class MainWindow : Window
             _data.Vouchers.OrderBy(v => v.Number).Select(v => new[]
             {
                 v.Number.ToString(CultureInfo.InvariantCulture), v.TrackingCode, FormatPersianDate(v.Date), v.Type, v.MovementType,
-                v.PersonName, v.RelatedInvoiceId, string.Join("؛ ", v.Items.Select(i => $"{i.ProductName} ({i.Quantity:N2} {i.Unit})")),
+                v.PersonName, v.RelatedInvoiceId, string.Join("؛ ", v.Items.Select(i => $"{i.ProductName} ({i.Quantity:#,##0.##} {i.Unit})")),
                 v.TotalWeight.ToString(CultureInfo.InvariantCulture), v.EstimatedValue.ToString(CultureInfo.InvariantCulture),
                 VoucherStatusLabel(v.Status), v.VehicleNumber, v.Supervisor, v.ReceiverPhone, v.ReturnReason, v.Notes
             }));
@@ -2374,37 +2374,39 @@ public partial class MainWindow : Window
     private void SpendCheck_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
-        if (ChecksGrid.SelectedItem is not CheckGridRow selectedRow)
+        var receivedChecks = ChecksGrid.SelectedItems.OfType<CheckGridRow>()
+            .Select(row => row.Record).DistinctBy(check => check.Id).ToList();
+        if (receivedChecks.Count == 0 && ChecksGrid.SelectedItem is CheckGridRow selectedRow)
+            receivedChecks.Add(selectedRow.Record);
+        if (receivedChecks.Count == 0)
         {
-            MessageBox.Show(this, "ابتدا چک دریافتی موردنظر را انتخاب کنید.", "خرج کردن چک",
+            MessageBox.Show(this, "یک یا چند چک را با Ctrl/Shift از جدول انتخاب کنید.", "واگذاری چک",
                 MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-
-        var received = selectedRow.Record;
-        if (received.CheckType != "RECEIVED" || received.Status is not ("PENDING" or "DEPOSITED"))
+        var ineligible = receivedChecks.Where(check =>
+            check.CheckType != "RECEIVED" || check.Status is not ("PENDING" or "DEPOSITED")).ToList();
+        if (ineligible.Count > 0)
         {
-            MessageBox.Show(this, "فقط چک دریافتی در انتظار یا واگذار‌شده به بانک، قابل خرج/واگذاری است.",
-                "خرج کردن چک", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this,
+                $"واگذاری گروهی انجام نشد. تمام چک‌های انتخابی باید دریافتی و در وضعیت «در انتظار» یا «واگذار به بانک» باشند. تعداد نامعتبر: {ineligible.Count}",
+                "وضعیت چک‌ها", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-
+        if (!ConfirmCanAddDocuments(receivedChecks.Count)) return;
         var payee = new ComboBox
         {
-            IsEditable = true,
-            IsTextSearchEnabled = true,
-            StaysOpenOnEdit = true,
+            IsEditable = true, IsTextSearchEnabled = true, StaysOpenOnEdit = true,
             DisplayMemberPath = nameof(CustomerRecord.Name),
-            ItemsSource = _data.Customers.Where(person => person.IsSupplier || person.IsCustomer)
-                .OrderBy(person => person.Name).ToList(),
-            MinWidth = 330,
-            Height = 36
+            ItemsSource = _data.Customers.Where(person => person.IsSupplier || person.IsCustomer).OrderBy(person => person.Name).ToList(),
+            MinWidth = 330, Height = 36
         };
         var note = new TextBox { MinWidth = 330, Height = 72, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
+        var totalAmount = receivedChecks.Sum(check => check.Amount);
         var dialog = new Window
         {
-            Owner = this, Title = "خرج / واگذاری چک دریافتی",
-            Width = 500, Height = 360, MinWidth = 450, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = this, Title = "خرج / واگذاری گروهی چک‌های دریافتی",
+            Width = 520, Height = 410, MinWidth = 450, WindowStartupLocation = WindowStartupLocation.CenterOwner,
             FlowDirection = FlowDirection.RightToLeft, ResizeMode = ResizeMode.NoResize,
             FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
             Background = new SolidColorBrush(Color.FromRgb(248, 250, 252))
@@ -2412,14 +2414,14 @@ public partial class MainWindow : Window
         var form = new StackPanel { Margin = new Thickness(22) };
         form.Children.Add(new TextBlock
         {
-            Text = $"واگذاری چک {received.CheckNumber} به مبلغ {received.Amount:N0} {CurrencyUnitLabel()}",
+            Text = $"تعداد چک: {receivedChecks.Count:N0}\nجمع مبلغ: {NumericTextBoxFormatter.Format(totalAmount)} {CurrencyUnitLabel()}",
             FontSize = 17, FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap,
             Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)), Margin = new Thickness(0, 0, 0, 12)
         });
-        AddLabeledControl(form, "دارنده / ذی‌نفع جدید (از لیست انتخاب یا دستی وارد کنید)", payee);
+        AddLabeledControl(form, "دارنده / ذی‌نفع جدید برای همهٔ چک‌های انتخابی", payee);
         AddLabeledControl(form, "شرح خرج / علت واگذاری", note);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
-        var confirm = new Button { Content = "ثبت خرج چک", Width = 130, Height = 36, IsDefault = true, Background = new SolidColorBrush(Color.FromRgb(15, 118, 110)), Foreground = Brushes.White };
+        var confirm = new Button { Content = $"ثبت واگذاری {receivedChecks.Count:N0} چک", Width = 170, Height = 36, IsDefault = true, Background = new SolidColorBrush(Color.FromRgb(15, 118, 110)), Foreground = Brushes.White };
         confirm.Click += (_, _) =>
         {
             if (string.IsNullOrWhiteSpace(payee.Text) || payee.Text.Trim().Length < 2)
@@ -2435,51 +2437,13 @@ public partial class MainWindow : Window
         dialog.Content = form;
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true) return;
-
         var selectedPayee = payee.SelectedItem as CustomerRecord;
         if (selectedPayee is not null &&
             !string.Equals(selectedPayee.Name, payee.Text.Trim(), StringComparison.CurrentCultureIgnoreCase))
             selectedPayee = null;
-
-        var outgoing = new CheckRecord
-        {
-            BankName = received.BankName,
-            Amount = received.Amount,
-            DueDate = received.DueDate,
-            IssueDate = received.IssueDate,
-            Status = "PENDING",
-            // The cheque's SAYAD identifier remains on the source record to avoid duplicating it.
-            SayadId = "",
-            CheckNumber = received.CheckNumber,
-            HolderName = payee.Text.Trim(),
-            PersonId = selectedPayee?.Id ?? "",
-            PersonName = payee.Text.Trim(),
-            RelatedInvoiceId = received.RelatedInvoiceId,
-            IsHighPriority = received.IsHighPriority,
-            Description = $"خرج از چک دریافتی {received.CheckNumber} (شناسهٔ اصلی: {received.SayadId}). {note.Text.Trim()}".Trim(),
-            CheckType = "ISSUED",
-            CreatedAt = DateTimeOffset.Now,
-            History = [new CheckHistoryRecord
-            {
-                ChangedAt = DateTimeOffset.Now, Status = "PENDING",
-                Note = $"ثبت خرج چک دریافتی {received.CheckNumber} به نام {payee.Text.Trim()}"
-            }]
-        };
-
-        Commit(data =>
-        {
-            var original = data.Checks.SingleOrDefault(check => check.Id == received.Id)
-                ?? throw new InvalidOperationException("چک دریافتی پیدا نشد.");
-            if (original.CheckType != "RECEIVED" || original.Status is not ("PENDING" or "DEPOSITED"))
-                throw new InvalidOperationException("وضعیت چک تغییر کرده است؛ جدول را تازه‌سازی و دوباره بررسی کنید.");
-            original.Status = "TRANSFERRED";
-            original.History.Add(new CheckHistoryRecord
-            {
-                ChangedAt = DateTimeOffset.Now, Status = "TRANSFERRED",
-                Note = $"خرج / واگذاری به {payee.Text.Trim()}: {note.Text.Trim()}"
-            });
-            data.Checks.Add(outgoing);
-        }, "خرج چک ثبت شد؛ چک دریافتی واگذار و سابقهٔ چک پرداختی مرتبط ایجاد شد.");
+        var ids = receivedChecks.Select(check => check.Id).ToArray();
+        Commit(data => CheckTransferService.TransferToPerson(data, ids, payee.Text.Trim(), selectedPayee?.Id, note.Text.Trim()),
+            $"{receivedChecks.Count:N0} چک به مبلغ {NumericTextBoxFormatter.Format(totalAmount)} {CurrencyUnitLabel()} واگذار شد؛ سوابق و تصاویر حفظ شدند.");
     }
 
     private static void AddLabeledControl(Panel root, string label, FrameworkElement field)
@@ -3578,6 +3542,7 @@ public partial class MainWindow : Window
             ["inventory"] = "کالا و انبار",
             ["kardex"] = "کارتکس کالا",
             ["checks"] = "مدیریت چک",
+            ["finance"] = "امور مالی",
             ["vouchers"] = "حواله‌های انبار",
             ["customers"] = "مشتریان",
             ["companies"] = "تنظیمات و شرکت‌ها",
@@ -3597,6 +3562,17 @@ public partial class MainWindow : Window
             ["advanced-settings"] = "تنظیمات پیشرفته",
             ["settings"] = "تنظیمات و شرکت‌ها"
         };
+
+    private void FinanceShortcut_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string header }) return;
+        var target = MainTabs.Items.OfType<TabItem>().FirstOrDefault(tab =>
+            string.Equals(tab.Header?.ToString(), header, StringComparison.Ordinal));
+        if (target is null) return;
+        MainTabs.Visibility = Visibility.Visible;
+        MigrationPanel.Visibility = Visibility.Collapsed;
+        MainTabs.SelectedItem = target;
+    }
 
     private void NavigateModule_Click(object sender, RoutedEventArgs e)
     {

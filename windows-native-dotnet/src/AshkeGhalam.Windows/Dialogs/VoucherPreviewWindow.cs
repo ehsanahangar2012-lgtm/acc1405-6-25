@@ -177,7 +177,7 @@ public sealed class VoucherPreviewWindow : Window
         foreach (var item in voucher.Items)
         {
             var row = new TableRow();
-            var values = new[] { item.ProductName, item.Quantity.ToString("N2", CultureInfo.GetCultureInfo("fa-IR")), item.Unit,
+            var values = new[] { item.ProductName, item.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")), item.Unit,
                 string.Join(" / ", new[] { item.Description, item.ShelfLocation }.Where(value => !string.IsNullOrWhiteSpace(value))) };
             foreach (var value in values)
                 row.Cells.Add(new TableCell(new Paragraph(new Run(value))) { Padding = new Thickness(8),
@@ -189,9 +189,9 @@ public sealed class VoucherPreviewWindow : Window
         table.RowGroups.Add(group);
         document.Blocks.Add(table);
         var totals = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
-        totals.Children.Add(new TextBlock { Text = $"جمع تعداد اقلام: {voucher.Items.Sum(item => item.Quantity).ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}",
+        totals.Children.Add(new TextBlock { Text = $"جمع تعداد اقلام: {voucher.Items.Sum(item => item.Quantity).ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))}",
             FontSize = 13, FontWeight = FontWeights.Bold, Foreground = accent, Margin = new Thickness(0, 0, 0, 5) });
-        totals.Children.Add(new TextBlock { Text = $"وزن تخمینی: {voucher.TotalWeight.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}    •    ارزش تخمینی: {voucher.EstimatedValue.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}",
+        totals.Children.Add(new TextBlock { Text = $"وزن تخمینی: {voucher.TotalWeight.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))}    •    ارزش تخمینی: {voucher.EstimatedValue.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))}",
             FontSize = 12, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)), TextWrapping = TextWrapping.Wrap });
         document.Blocks.Add(new BlockUIContainer(new Border { Width = 660, Background = soft, BorderBrush = accent,
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(14),

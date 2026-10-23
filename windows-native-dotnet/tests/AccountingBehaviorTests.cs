@@ -55,6 +55,56 @@ public sealed class AccountingBehaviorTests
     }
 
     [TestMethod]
+    public void SlashDecimalAndThousandsSeparatorsAreParsed()
+    {
+        Assert.AreEqual(123456.75m, PersianNumberParser.ParseDecimal("۱۲۳٬۴۵۶/۷۵", "مبلغ"));
+    }
+
+    [TestMethod]
+    public void NumericFormatterOmitsZeroDecimalsAndKeepsUsefulFractions()
+    {
+        var whole = NumericTextBoxFormatter.Format(100m);
+        Assert.IsFalse(whole.Contains('/'));
+        Assert.IsFalse(whole.Contains('.'));
+        Assert.AreEqual("1,234/5", NumericTextBoxFormatter.Format(1234.50m));
+    }
+
+    [TestMethod]
+    public void BatchCheckTransferPreservesImagesAndAuditTrail()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        data.Checks =
+        [
+            new CheckRecord { Id = "check-a", CheckType = "RECEIVED", Status = "PENDING", Amount = 100m, CheckNumber = "A-1", ImageDataBase64 = "base64-a" },
+            new CheckRecord { Id = "check-b", CheckType = "RECEIVED", Status = "DEPOSITED", Amount = 250m, CheckNumber = "B-2", ImageDataBase64 = "base64-b" }
+        ];
+        var result = CheckTransferService.TransferToPerson(data, ["check-a", "check-b"], "تأمین‌کننده", "customer-test-1", "پرداخت بدهی");
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual(350m, result.TotalAmount);
+        Assert.AreEqual(2, data.Checks.Count(check => check.Status == "TRANSFERRED"));
+        var outgoing = data.Checks.Where(check => check.CheckType == "ISSUED").ToList();
+        Assert.AreEqual(2, outgoing.Count);
+        Assert.AreEqual("base64-a", outgoing.Single(check => check.CheckNumber == "A-1").ImageDataBase64);
+        Assert.AreEqual("base64-b", outgoing.Single(check => check.CheckNumber == "B-2").ImageDataBase64);
+        Assert.IsTrue(data.Checks.Where(check => check.Status == "TRANSFERRED").All(check => check.History.Any(history => history.Status == "TRANSFERRED")));
+    }
+
+    [TestMethod]
+    public void BatchCheckTransferRejectsIneligibleSelectionWithoutPartialMutation()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        data.Checks =
+        [
+            new CheckRecord { Id = "check-good", CheckType = "RECEIVED", Status = "PENDING", Amount = 100m },
+            new CheckRecord { Id = "check-cashed", CheckType = "RECEIVED", Status = "CASHED", Amount = 200m }
+        ];
+        Assert.ThrowsException<InvalidOperationException>(() =>
+            CheckTransferService.TransferToPerson(data, ["check-good", "check-cashed"], "تأمین‌کننده", null, ""));
+        Assert.AreEqual("PENDING", data.Checks.Single(check => check.Id == "check-good").Status);
+        Assert.AreEqual(2, data.Checks.Count);
+    }
+
+    [TestMethod]
     public void InvoiceCreationUpdatesStockAndTotals()
     {
         var data=CreateSampleData(includeInvoice:false);

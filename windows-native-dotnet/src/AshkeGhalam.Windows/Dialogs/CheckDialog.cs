@@ -1,8 +1,11 @@
 using System.Globalization;
+using System.IO;
+using Microsoft.Win32;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using AshkeGhalam.Windows.Models;
 using AshkeGhalam.Windows.Services;
 
@@ -110,6 +113,10 @@ public sealed class CheckDialog : Window
     private readonly ComboBox _status = new() { Height = 36, DisplayMemberPath = nameof(ChoiceItem.Label), ItemsSource = CheckStatuses };
     private readonly CheckBox _highPriority = new() { Content = "این چک در اولویت پیگیری قرار دارد", Margin = new Thickness(0, 12, 0, 0) };
     private readonly CheckRecord? _existing;
+    private readonly Image _imagePreview = new() { Width = 310, Height = 170, Stretch = Stretch.Uniform };
+    private readonly TextBlock _imageStatus = new() { FontSize = 11, Margin = new Thickness(0, 5, 0, 0) };
+    private string _imageDataBase64 = "";
+    private string _imagePath = "";
     private readonly ScrollViewer _stepHost = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
     private readonly TextBlock _stepIndicator = new() { FontSize = 12, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 12) };
     private readonly Button _previousButton = new() { Content = "مرحله قبل", MinWidth = 104, Height = 38, Margin = new Thickness(0, 0, 8, 0) };
@@ -123,6 +130,8 @@ public sealed class CheckDialog : Window
     public CheckDialog(Window owner, CheckRecord? existing = null, IReadOnlyList<CustomerRecord>? people = null, string? currency = "RIAL", decimal? prefillAmount = null, string? prefillType = null, string? relatedInvoiceId = null, string? personId = null, string? personName = null)
     {
         _existing = existing;
+        _imageDataBase64 = existing?.ImageDataBase64 ?? "";
+        _imagePath = existing?.ImagePath ?? "";
         _people = people ?? [];
         _currencyLabel = string.Equals(currency, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "تومان" : "ریال";
         _prefillAmount = prefillAmount;
@@ -165,6 +174,8 @@ public sealed class CheckDialog : Window
         _checkType.SelectedItem = CheckTypes.First(item => item.Value == (existing?.CheckType ?? _prefillType));
         _status.SelectedItem = CheckStatuses.First(item => item.Value == (existing?.Status ?? "PENDING"));
         _highPriority.IsChecked = existing?.IsHighPriority ?? false;
+        _imagePreview.Source = DecodeCheckImage(_imageDataBase64, _imagePath);
+        _imageStatus.Text = _imagePreview.Source is null ? "تصویری پیوست نشده است." : "تصویر چک پیوست شده است.";
         _amount.LostFocus += (_, _) => FormatAmount();
         _amount.TextChanged += Amount_TextChanged;
         foreach (var combo in new[] { _bankName, _holderName, _personName })
@@ -211,6 +222,25 @@ public sealed class CheckDialog : Window
         var stepThree = new StackPanel { Margin = new Thickness(2, 4, 2, 12) };
         AddField(stepThree, "وضعیت فعلی چک", _status);
         stepThree.Children.Add(_highPriority);
+        var imageActions = new WrapPanel { Margin = new Thickness(0, 10, 0, 6) };
+        var chooseImage = new Button { Content = "📷 انتخاب / دریافت تصویر", Height = 36, MinWidth = 170, Margin = new Thickness(0, 0, 8, 6) };
+        chooseImage.Click += ChooseCheckImage_Click;
+        var viewImage = new Button { Content = "🔎 نمایش بزرگ تصویر", Height = 36, MinWidth = 160, Margin = new Thickness(0, 0, 8, 6) };
+        viewImage.Click += ShowCheckImage_Click;
+        imageActions.Children.Add(chooseImage);
+        imageActions.Children.Add(viewImage);
+        AddField(stepThree, "تصویر چک (عکس یا اسکن)", imageActions);
+        stepThree.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(8),
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Child = _imagePreview
+        });
+        stepThree.Children.Add(_imageStatus);
         AddField(stepThree, "توضیحات و یادداشت پیگیری", _description);
         stepThree.Children.Add(new TextBlock
         {
@@ -300,12 +330,12 @@ public sealed class CheckDialog : Window
         var current = _amount.Text;
         if (string.IsNullOrWhiteSpace(current)) return;
         var endsWithDecimal = current.EndsWith(".", StringComparison.Ordinal) ||
-            current.EndsWith("٫", StringComparison.Ordinal);
+            current.EndsWith("٫", StringComparison.Ordinal) || current.EndsWith("/", StringComparison.Ordinal);
         if (!PersianNumberParser.TryParseDecimal(current, out var value)) return;
 
         var oldCaret = Math.Clamp(_amount.CaretIndex, 0, current.Length);
         var prefix = current[..oldCaret];
-        var decimalInPrefix = prefix.IndexOfAny(['٫', '.']);
+        var decimalInPrefix = prefix.IndexOfAny(['٫', '.', '/']);
         var integerDigitsBeforeCaret = decimalInPrefix >= 0
             ? prefix[..decimalInPrefix].Count(char.IsDigit)
             : prefix.Count(char.IsDigit);
@@ -313,7 +343,7 @@ public sealed class CheckDialog : Window
             ? prefix[(decimalInPrefix + 1)..].Count(char.IsDigit)
             : 0;
 
-        var formatted = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+        var formatted = NumericTextBoxFormatter.Format(value);
         if (endsWithDecimal && !formatted.Contains('٫') && !formatted.Contains('.')) formatted += "٫";
         if (formatted == current) return;
 
@@ -357,7 +387,7 @@ public sealed class CheckDialog : Window
     private void FormatAmount()
     {
         if (PersianNumberParser.TryParseDecimal(_amount.Text, out var value))
-            _amount.Text = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+            _amount.Text = NumericTextBoxFormatter.Format(value);
     }
 
     private static void AttachDropDownOpen(ComboBox combo)
@@ -385,6 +415,112 @@ public sealed class CheckDialog : Window
                     combo.IsDropDownOpen = true;
             };
         };
+    }
+
+    private void ChooseCheckImage_Click(object? sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "انتخاب عکس یا اسکن چک",
+            Filter = "تصاویر|*.png;*.jpg;*.jpeg;*.bmp;*.tif;*.tiff;*.gif|همه فایل‌ها|*.*",
+            CheckFileExists = true,
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true) return;
+
+        try
+        {
+            BitmapSource source;
+            using (var input = File.OpenRead(dialog.FileName))
+            {
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.StreamSource = input;
+                bitmap.EndInit();
+                bitmap.Freeze();
+                source = bitmap;
+            }
+
+            if (source.PixelWidth > 1600)
+            {
+                var scale = 1600d / source.PixelWidth;
+                var resized = new TransformedBitmap(source, new ScaleTransform(scale, scale));
+                resized.Freeze();
+                source = resized;
+            }
+
+            var encoder = new JpegBitmapEncoder { QualityLevel = 84 };
+            encoder.Frames.Add(BitmapFrame.Create(source));
+            using var output = new MemoryStream();
+            encoder.Save(output);
+            _imageDataBase64 = Convert.ToBase64String(output.ToArray());
+            _imagePath = "";
+            _imagePreview.Source = DecodeCheckImage(_imageDataBase64, "");
+            _imageStatus.Text = $"تصویر چک آمادهٔ ذخیره است ({Math.Round(output.Length / 1024d):N0} کیلوبایت).";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"خواندن یا فشرده‌سازی تصویر انجام نشد: {ex.Message}", "تصویر چک", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void ShowCheckImage_Click(object? sender, RoutedEventArgs e)
+    {
+        var source = DecodeCheckImage(_imageDataBase64, _imagePath, 1400);
+        if (source is null)
+        {
+            MessageBox.Show(this, "برای این چک تصویری ثبت نشده است.", "تصویر چک", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var preview = new Window
+        {
+            Owner = this,
+            Title = "نمایش تصویر چک",
+            Width = 960,
+            Height = 760,
+            MinWidth = 600,
+            MinHeight = 480,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            FlowDirection = FlowDirection.RightToLeft,
+            Background = new SolidColorBrush(Color.FromRgb(241, 245, 249)),
+            Content = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
+                Content = new Image { Source = source, Stretch = Stretch.Uniform, MaxWidth = 1400, MaxHeight = 1100, Margin = new Thickness(12) }
+            }
+        };
+        preview.ShowDialog();
+    }
+
+    private static BitmapImage? DecodeCheckImage(string? encoded, string? path, int width = 800)
+    {
+        try
+        {
+            byte[] bytes;
+            if (!string.IsNullOrWhiteSpace(encoded))
+                bytes = Convert.FromBase64String(encoded);
+            else if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
+                bytes = File.ReadAllBytes(path);
+            else
+                return null;
+
+            using var stream = new MemoryStream(bytes);
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.StreamSource = stream;
+            bitmap.DecodePixelWidth = width;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private void SaveResult()
@@ -444,7 +580,8 @@ public sealed class CheckDialog : Window
                         : ""),
                 PersonName = _personName.Text.Trim(),
                 RelatedInvoiceId = _existing?.RelatedInvoiceId ?? _relatedInvoiceId,
-                ImagePath = _existing?.ImagePath ?? "",
+                ImagePath = _imagePath,
+                ImageDataBase64 = _imageDataBase64,
                 IsHighPriority = _highPriority.IsChecked == true,
                 Description = _description.Text.Trim(),
                 CheckType = type.Value,

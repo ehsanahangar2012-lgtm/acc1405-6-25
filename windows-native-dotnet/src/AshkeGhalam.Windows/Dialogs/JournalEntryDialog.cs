@@ -26,6 +26,7 @@ public sealed class JournalEntryDialog : Window
     public JournalEntryDialog(Window owner, IReadOnlyList<ChartOfAccountRecord> accounts)
     {
         Owner = owner;
+        NumericTextBoxFormatter.Attach(_amount);
         Title = "ثبت سند حسابداری دوبل";
         Width = 610;
         Height = 760;

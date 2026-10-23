@@ -50,12 +50,12 @@ public sealed class ProductDialog : Window
         _serialNumber.Text = existing?.SerialNumber ?? "";
         _barcode.Text = existing?.Barcode ?? "";
         _unit.Text = existing?.Unit ?? "عدد";
-        _quantity.Text = (existing?.StockQuantity ?? 0m).ToString("0.##", CultureInfo.InvariantCulture);
-        _reserved.Text = (existing?.ReservedStock ?? 0m).ToString("0.##", CultureInfo.InvariantCulture);
-        _minStock.Text = existing?.MinStock?.ToString("0.##", CultureInfo.InvariantCulture) ?? "";
-        _buyPrice.Text = existing?.BuyPrice?.ToString("0.##", CultureInfo.InvariantCulture) ?? "";
-        _sellPrice.Text = (existing?.SellPrice ?? existing?.UnitPrice ?? 0m).ToString("0.##", CultureInfo.InvariantCulture);
-        _weight.Text = existing?.Weight?.ToString("0.##", CultureInfo.InvariantCulture) ?? "";
+        _quantity.Text = NumericTextBoxFormatter.Format(existing?.StockQuantity ?? 0m);
+        _reserved.Text = NumericTextBoxFormatter.Format(existing?.ReservedStock ?? 0m);
+        _minStock.Text = existing?.MinStock is decimal minStock ? NumericTextBoxFormatter.Format(minStock) : "";
+        _buyPrice.Text = existing?.BuyPrice is decimal buyPrice ? NumericTextBoxFormatter.Format(buyPrice) : "";
+        _sellPrice.Text = NumericTextBoxFormatter.Format(existing?.SellPrice ?? existing?.UnitPrice ?? 0m);
+        _weight.Text = existing?.Weight is decimal weight ? NumericTextBoxFormatter.Format(weight) : "";
         _shelfLocation.Text = existing?.ShelfLocation ?? "";
         _category.Text = existing?.Category ?? "";
         _subCategory.Text = existing?.SubCategory ?? "";
@@ -94,7 +94,7 @@ public sealed class ProductDialog : Window
         Add(root, "قیمت خرید (اختیاری)", _buyPrice);
         Add(root, "قیمت فروش", _sellPrice);
         foreach (var numericField in new[] { _quantity, _buyPrice, _sellPrice, _minStock, _weight })
-            numericField.LostFocus += (_, _) => FormatNumericField(numericField);
+            NumericTextBoxFormatter.Attach(numericField);
         Add(root, "وزن (اختیاری)", _weight);
         Add(root, "محل قرارگیری در انبار / قفسه", _shelfLocation);
         Add(root, "دسته‌بندی اصلی", _category);
@@ -192,7 +192,7 @@ public sealed class ProductDialog : Window
     private static void FormatNumericField(TextBox field)
     {
         if (string.IsNullOrWhiteSpace(field.Text)) return;
-        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "عدد").ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")); }
+        try { field.Text = NumericTextBoxFormatter.Format(PersianNumberParser.ParseDecimal(field.Text, "عدد")); }
         catch (InvalidOperationException) { }
     }
 

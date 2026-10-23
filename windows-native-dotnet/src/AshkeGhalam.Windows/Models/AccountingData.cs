@@ -391,6 +391,8 @@ public sealed class CheckRecord
     public string PersonName { get; set; } = "";
     public string RelatedInvoiceId { get; set; } = "";
     public string ImagePath { get; set; } = "";
+    // Optimized cheque photo stored inside the encrypted local dataset and its backups.
+    public string ImageDataBase64 { get; set; } = "";
     public bool IsHighPriority { get; set; }
     public string Description { get; set; } = "";
     public string CheckType { get; set; } = "RECEIVED";

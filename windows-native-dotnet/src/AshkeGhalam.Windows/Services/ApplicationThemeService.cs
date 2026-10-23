@@ -76,7 +76,10 @@ public static class ApplicationThemeService
         // Window is not a Control in WPF. Without its BackgroundProperty, the outer shell
         // stayed light even while the selected page had switched to the dark palette.
         if (element is Window)
+        {
             yield return Window.BackgroundProperty;
+            yield return Window.ForegroundProperty;
+        }
 
         if (element is Control)
         {
@@ -116,6 +119,7 @@ public static class ApplicationThemeService
                 continue;
 
             Color? mapped = property == Control.ForegroundProperty ||
+                            property == Window.ForegroundProperty ||
                             property == TextBlock.ForegroundProperty ||
                             property == TextElement.ForegroundProperty
                 ? MapForeground(brush.Color)
@@ -129,6 +133,56 @@ public static class ApplicationThemeService
             var replacement = new SolidColorBrush(mapped.Value) { Opacity = brush.Opacity };
             if (replacement.CanFreeze) replacement.Freeze();
             element.SetValue(property, replacement);
+        }
+
+        var darkSurface = new SolidColorBrush(Color.FromRgb(17, 24, 39));
+        var darkerSurface = new SolidColorBrush(Color.FromRgb(11, 18, 32));
+        var lightText = new SolidColorBrush(Color.FromRgb(229, 231, 235));
+        var outline = new SolidColorBrush(Color.FromRgb(75, 85, 99));
+        var alternateRow = new SolidColorBrush(Color.FromRgb(31, 41, 55));
+
+        if (element is Control control && element is (TextBox or ComboBox or PasswordBox or DatePicker or ListBox))
+        {
+            control.Background = darkSurface;
+            control.Foreground = lightText;
+            control.BorderBrush = outline;
+        }
+        if (element is TextBox input)
+        {
+            input.CaretBrush = lightText;
+            input.SelectionBrush = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+        }
+        if (element is ComboBoxItem or ListBoxItem)
+        {
+            ((Control)element).Background = darkSurface;
+            ((Control)element).Foreground = lightText;
+        }
+        if (element is DataGrid grid)
+        {
+            grid.Background = darkSurface;
+            grid.Foreground = lightText;
+            grid.RowBackground = darkSurface;
+            grid.AlternatingRowBackground = alternateRow;
+            grid.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
+            grid.HorizontalGridLinesBrush = outline;
+            grid.VerticalGridLinesBrush = outline;
+        }
+        if (element is DataGridCell cell)
+        {
+            cell.Background = darkSurface;
+            cell.Foreground = lightText;
+            cell.BorderBrush = outline;
+        }
+        if (element is DataGridRow row)
+        {
+            row.Background = darkSurface;
+            row.Foreground = lightText;
+        }
+        if (element is DataGridColumnHeader header)
+        {
+            header.Background = darkerSurface;
+            header.Foreground = lightText;
+            header.BorderBrush = outline;
         }
     }
 

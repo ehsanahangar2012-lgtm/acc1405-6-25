@@ -21,12 +21,12 @@ public sealed class ExpenseDialog : Window
     {
         Owner=owner;Title=existing is null ? "ثبت هزینه" : "ویرایش هزینه";Width=450;Height=460;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
-        _amount.LostFocus += (_, _) => FormatNumericField(_amount);
+        NumericTextBoxFormatter.Attach(_amount);
         if (existing is not null)
         {
             _title.Text = existing.Title;
             _category.Text = existing.Category;
-            _amount.Text = existing.Amount.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            _amount.Text = NumericTextBoxFormatter.Format(existing.Amount);
             _notes.Text = existing.Notes;
         }
         var root=new StackPanel{Margin=new Thickness(22)};

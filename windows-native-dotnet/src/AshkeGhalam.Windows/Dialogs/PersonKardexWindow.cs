@@ -86,7 +86,8 @@ public sealed class PersonKardexWindow : Window
         filter.Children.Add(MakeButton("پاک‌کردن تاریخ", ClearFilter_Click));
         filter.Children.Add(MakeButton("پیش‌نمایش فاکتور انتخابی", OpenSelectedInvoice_Click));
         filter.Children.Add(MakeButton("خروجی CSV", ExportCsv_Click));
-        filter.Children.Add(MakeButton("چاپ جدول", Print_Click));
+        filter.Children.Add(MakeButton("پیش‌نمایش چاپ گزارش", PreviewPrint_Click, primary: true));
+        filter.Children.Add(MakeButton("چاپ مستقیم جدول", Print_Click));
         Grid.SetRow(filter, 1);
         root.Children.Add(filter);
 
@@ -132,9 +133,9 @@ public sealed class PersonKardexWindow : Window
         _grid.Columns.Add(new DataGridTextColumn { Header = "نوع سند", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Type)), Width = 125 });
         _grid.Columns.Add(new DataGridTextColumn { Header = "شماره / مرجع", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Reference)), Width = 150 });
         _grid.Columns.Add(new DataGridTextColumn { Header = "شرح گردش", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Description)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        _grid.Columns.Add(new DataGridTextColumn { Header = "بدهکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Debit)) { StringFormat = "N2" }, Width = 115 });
-        _grid.Columns.Add(new DataGridTextColumn { Header = "بستانکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Credit)) { StringFormat = "N2" }, Width = 115 });
-        _grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Balance)) { StringFormat = "N2" }, Width = 125 });
+        _grid.Columns.Add(new DataGridTextColumn { Header = "بدهکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Debit)) { StringFormat = "#,##0.##" }, Width = 115 });
+        _grid.Columns.Add(new DataGridTextColumn { Header = "بستانکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Credit)) { StringFormat = "#,##0.##" }, Width = 115 });
+        _grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Balance)) { StringFormat = "#,##0.##" }, Width = 125 });
         _grid.AlternationCount = 2;
         _grid.RowBackground = Brushes.White;
         _grid.AlternatingRowBackground = soft;
@@ -204,10 +205,10 @@ public sealed class PersonKardexWindow : Window
             _grid.ItemsSource = _report.Rows;
             var balanceType = _report.ClosingBalance > 0m ? "بدهکار" :
                 _report.ClosingBalance < 0m ? "بستانکار" : "تسویه";
-            var balance = Math.Abs(_report.ClosingBalance).ToString("N2", CultureInfo.GetCultureInfo("fa-IR"));
+            var balance = Math.Abs(_report.ClosingBalance).ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
             _summary.Text =
-                $"جمع بدهکار دوره: {_report.TotalDebit.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}    " +
-                $"جمع بستانکار دوره: {_report.TotalCredit.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))}    " +
+                $"جمع بدهکار دوره: {_report.TotalDebit.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))}    " +
+                $"جمع بستانکار دوره: {_report.TotalCredit.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))}    " +
                 $"مانده نهایی: {balance} {balanceType}    " +
                 $"فاکتور: {_report.InvoiceCount:N0} • دریافت/پرداخت: {_report.PaymentCount:N0} • چک مستقل: {_report.CheckCount:N0} • حواله: {_report.VoucherCount:N0}";
             _status.Text = "ماندهٔ مثبت یعنی بدهکاری طرف حساب به شرکت؛ ماندهٔ منفی یعنی بستانکاری شرکت به طرف حساب. حواله، غیرمالی است.";
@@ -291,6 +292,15 @@ public sealed class PersonKardexWindow : Window
         {
             MessageBox.Show(this, ex.Message, "خروجی کاردکس", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+    }
+
+    private void PreviewPrint_Click(object sender, RoutedEventArgs e)
+    {
+        if (_report is null) ReloadReport();
+        if (_report is null) return;
+        var window = new PersonKardexPrintPreviewWindow(this, _person, _report, _data.Preferences.Currency);
+        ApplicationThemeService.ApplyWhenLoaded(window, _data.Preferences.ApplicationTheme);
+        window.ShowDialog();
     }
 
     private void Print_Click(object sender, RoutedEventArgs e)

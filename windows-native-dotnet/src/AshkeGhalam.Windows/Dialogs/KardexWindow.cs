@@ -85,9 +85,9 @@ public sealed class KardexWindow : Window
         root.Children.Add(hero);
 
         var summary = new WrapPanel { FlowDirection = FlowDirection.RightToLeft, Margin = new Thickness(0, 0, 0, 10) };
-        AddMetric(summary, "موجودی فعلی", $"{product.StockQuantity.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))} {product.Unit}", accent, ink, soft);
-        AddMetric(summary, "ورودی ثبت‌شده", history.Where(item => item.SignedQuantity > 0).Sum(item => item.SignedQuantity).ToString("N2", CultureInfo.GetCultureInfo("fa-IR")), accent, ink, soft);
-        AddMetric(summary, "خروجی ثبت‌شده", Math.Abs(history.Where(item => item.SignedQuantity < 0).Sum(item => item.SignedQuantity)).ToString("N2", CultureInfo.GetCultureInfo("fa-IR")), accent, ink, soft);
+        AddMetric(summary, "موجودی فعلی", $"{product.StockQuantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))} {product.Unit}", accent, ink, soft);
+        AddMetric(summary, "ورودی ثبت‌شده", history.Where(item => item.SignedQuantity > 0).Sum(item => item.SignedQuantity).ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")), accent, ink, soft);
+        AddMetric(summary, "خروجی ثبت‌شده", Math.Abs(history.Where(item => item.SignedQuantity < 0).Sum(item => item.SignedQuantity)).ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")), accent, ink, soft);
         AddMetric(summary, "ردیف‌های گردش", history.Count.ToString("N0", CultureInfo.GetCultureInfo("fa-IR")), accent, ink, soft);
         DockPanel.SetDock(summary, Dock.Top);
         root.Children.Add(summary);
@@ -118,9 +118,9 @@ public sealed class KardexWindow : Window
         grid.Columns.Add(new DataGridTextColumn { Header = "نوع گردش", Binding = new Binding(nameof(KardexRow.Movement)), Width = 160 });
         grid.Columns.Add(new DataGridTextColumn { Header = "سند مرجع", Binding = new Binding(nameof(KardexRow.Document)), Width = 170 });
         grid.Columns.Add(new DataGridTextColumn { Header = "شرح گردش", Binding = new Binding(nameof(KardexRow.Description)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "ورودی", Binding = new Binding(nameof(KardexRow.Incoming)) { StringFormat = "N2" }, Width = 110 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "خروجی", Binding = new Binding(nameof(KardexRow.Outgoing)) { StringFormat = "N2" }, Width = 110 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new Binding(nameof(KardexRow.Balance)) { StringFormat = "N2" }, Width = 120 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "ورودی", Binding = new Binding(nameof(KardexRow.Incoming)) { StringFormat = "#,##0.##" }, Width = 110 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "خروجی", Binding = new Binding(nameof(KardexRow.Outgoing)) { StringFormat = "#,##0.##" }, Width = 110 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new Binding(nameof(KardexRow.Balance)) { StringFormat = "#,##0.##" }, Width = 120 });
 
         var headerStyle = new Style(typeof(DataGridColumnHeader));
         headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, accent));
@@ -132,7 +132,7 @@ public sealed class KardexWindow : Window
         var footer = new DockPanel { Margin = new Thickness(0, 12, 0, 0), LastChildFill = true };
         var note = new TextBlock
         {
-            Text = $"ماندهٔ ابتدای گردش: {openingBalance.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"))} {product.Unit}   •   ردیف «ماندهٔ ابتدای گردش» محاسبهٔ پایه از موجودی فعلی و مجموع حرکات ذخیره‌شده است.",
+            Text = $"ماندهٔ ابتدای گردش: {openingBalance.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))} {product.Unit}   •   ردیف «ماندهٔ ابتدای گردش» محاسبهٔ پایه از موجودی فعلی و مجموع حرکات ذخیره‌شده است.",
             FontSize = 10,
             Foreground = muted,
             TextWrapping = TextWrapping.Wrap,

@@ -36,7 +36,7 @@ public sealed class PaymentDialog : Window
         _currencyLabel = string.Equals(currencyCode, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "تومان" : "ریال";
         Owner=owner;Title=title;Width=530;Height=450;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
-        _amount.LostFocus += (_, _) => FormatNumericField(_amount);
+        NumericTextBoxFormatter.Attach(_amount);
         _invoice.DisplayMemberPath=nameof(InvoiceOption.Label);
         _invoice.ItemsSource=data.Invoices.Where(i=>i.Status!="لغو شده"&&i.Type!="PROFORMA"&&
                 (string.IsNullOrWhiteSpace(invoiceTypeFilter) || i.Type == invoiceTypeFilter) &&
@@ -71,7 +71,7 @@ public sealed class PaymentDialog : Window
             _invoice.SelectedItem = invoiceOptions.FirstOrDefault(option => option.Invoice.Id == existingPayment?.InvoiceId) ?? invoiceOptions[0];
         if (existingPayment is not null)
         {
-            _amount.Text = existingPayment.Amount.ToString("0.##", CultureInfo.InvariantCulture);
+            _amount.Text = NumericTextBoxFormatter.Format(existingPayment.Amount);
             _reference.Text = existingPayment.Reference;
             var methods = _method.Items.Cast<string>().ToList();
             if (!methods.Contains(existingPayment.Method, StringComparer.Ordinal)) methods.Add(existingPayment.Method);
@@ -98,7 +98,7 @@ public sealed class PaymentDialog : Window
     private static void FormatNumericField(TextBox field)
     {
         if (string.IsNullOrWhiteSpace(field.Text)) return;
-        try { field.Text = PersianNumberParser.ParseDecimal(field.Text, "مبلغ").ToString("#,##0.##", System.Globalization.CultureInfo.GetCultureInfo("fa-IR")); }
+        try { field.Text = NumericTextBoxFormatter.Format(PersianNumberParser.ParseDecimal(field.Text, "مبلغ")); }
         catch (InvalidOperationException) { }
     }
 

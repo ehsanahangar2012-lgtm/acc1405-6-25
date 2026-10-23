@@ -144,6 +144,28 @@ public sealed class CheckPreviewWindow : Window
                 Margin = new Thickness(0, 0, 0, 6)
             });
         }
+        var checkImage = CreateImage(check.ImageDataBase64, 480, 300, check.ImagePath);
+        if (checkImage is not null)
+        {
+            summary.Children.Add(new TextBlock
+            {
+                Text = "تصویر پیوست چک",
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                Foreground = ink,
+                Margin = new Thickness(0, 14, 0, 8)
+            });
+            summary.Children.Add(new Border
+            {
+                Background = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(8),
+                Margin = new Thickness(0, 0, 0, 10),
+                Child = checkImage
+            });
+        }
         _document.Blocks.Add(new BlockUIContainer(summary));
 
         var root = new Grid { Margin = new Thickness(14) };
@@ -228,12 +250,12 @@ public sealed class CheckPreviewWindow : Window
         return new Border { Background = soft, BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(6), Padding = new Thickness(10), Margin = new Thickness(0, 0, 6, 0), Child = stack };
     }
 
-    private static Image? CreateImage(string? encoded, double width, double height)
+    private static Image? CreateImage(string? encoded, double width, double height, string? path = null)
     {
-        if (string.IsNullOrWhiteSpace(encoded)) return null;
+        if (string.IsNullOrWhiteSpace(encoded) && (string.IsNullOrWhiteSpace(path) || !File.Exists(path))) return null;
         try
         {
-            var bytes = Convert.FromBase64String(encoded);
+            var bytes = !string.IsNullOrWhiteSpace(encoded) ? Convert.FromBase64String(encoded) : File.ReadAllBytes(path!);
             using var stream = new MemoryStream(bytes);
             var bitmap = new BitmapImage();
             bitmap.BeginInit();

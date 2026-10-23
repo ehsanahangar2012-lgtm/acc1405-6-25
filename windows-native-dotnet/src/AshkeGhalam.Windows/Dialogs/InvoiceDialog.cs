@@ -276,7 +276,7 @@ public sealed class InvoiceDialog : Window
         Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
         foreach (var field in new[] { _quantity, _price, _discount, _tax, _cashAmount })
-            field.LostFocus += (_, _) => FormatNumericField(field);
+            NumericTextBoxFormatter.Attach(field);
         _barcodeScan.PreviewKeyDown += BarcodeScan_PreviewKeyDown;
 
         _type.SelectionChanged += (_, _) =>
@@ -428,7 +428,7 @@ public sealed class InvoiceDialog : Window
         // Group thousands but do not force trailing decimal zeros such as 2.00.
         if (!string.IsNullOrWhiteSpace(field.Text) &&
             PersianNumberParser.TryParseDecimal(field.Text, out var value))
-            field.Text = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+            field.Text = NumericTextBoxFormatter.Format(value);
     }
 
     private void ConfigureLineGrid()
@@ -512,7 +512,7 @@ public sealed class InvoiceDialog : Window
                 if (_existingInvoice?.Type == "SALE")
                     available += _existingInvoice.Lines.Where(line => line.ProductId == product.Id).Sum(line => line.Quantity);
                 if (alreadyInInvoice + quantity > available)
-                    throw new InvalidOperationException($"موجودی آزاد کافی نیست؛ موجودی آزاد پس از درنظرگرفتن سند انتخابی: {available:N2}");
+                    throw new InvalidOperationException($"موجودی آزاد کافی نیست؛ موجودی آزاد پس از درنظرگرفتن سند انتخابی: {available:#,##0.##}");
             }
             var buyPrice = AccountingRules.Money(product.BuyPrice ?? 0m);
             var entryOrder = _editingLineIndex >= 0 && _editingLineIndex < _lines.Count
@@ -600,8 +600,8 @@ public sealed class InvoiceDialog : Window
         var cash = TryParseAmount(_cashAmount.Text, out var c) && c >= 0m ? c : 0m;
         var total = AccountingRules.Money(subtotal - discount + tax);
         var remaining = total - cash;
-        var taxLabel = isTaxAmount ? "مالیات مبلغی" : $"مالیات ({taxInput:N2}٪)";
-        _totals.Text = $"جمع کالاها: {subtotal:N2} {_currencyLabel}   |   تخفیف: {discount:N2} {_currencyLabel}   |   {taxLabel}: {tax:N2} {_currencyLabel}\nمبلغ نهایی: {total:N2} {_currencyLabel}   |   نقدی: {cash:N2} {_currencyLabel}   |   مانده پس از نقدی: {remaining:N2} {_currencyLabel}";
+        var taxLabel = isTaxAmount ? "مالیات مبلغی" : $"مالیات ({taxInput:#,##0.##}٪)";
+        _totals.Text = $"جمع کالاها: {subtotal:#,##0.##} {_currencyLabel}   |   تخفیف: {discount:#,##0.##} {_currencyLabel}   |   {taxLabel}: {tax:#,##0.##} {_currencyLabel}\nمبلغ نهایی: {total:#,##0.##} {_currencyLabel}   |   نقدی: {cash:#,##0.##} {_currencyLabel}   |   مانده پس از نقدی: {remaining:#,##0.##} {_currencyLabel}";
     }
 
     private void RefreshNumberPreview() => _numberPreview.Text = BuildNumberPreview(CurrentType);
@@ -742,7 +742,7 @@ public sealed class InvoiceDialog : Window
     }
 
     private static string ToText(InvoiceLine line) =>
-        $"{line.EntryOrder:N0}. {line.ProductName} | {line.Quantity:N2} × {line.UnitPrice:N2} = {line.LineTotal:N2}" +
+        $"{line.EntryOrder:N0}. {line.ProductName} | {line.Quantity:#,##0.##} × {line.UnitPrice:#,##0.##} = {line.LineTotal:#,##0.##}" +
         (string.IsNullOrWhiteSpace(line.Description) ? "" : $" | {line.Description}");
 
     private static void AddField(Panel root, string label, Control field)

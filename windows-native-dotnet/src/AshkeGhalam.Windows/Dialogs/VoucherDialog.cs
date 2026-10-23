@@ -22,7 +22,7 @@ public sealed class VoucherDialog : Window
         public string ShelfLocation { get; init; } = "";
         public string Description { get; init; } = "";
         public string ImageUrl { get; init; } = "";
-        public string Label => $"{Product.Name} — {Quantity:N2} {Product.Unit} — موجودی فعلی: {Product.StockQuantity:N2}";
+        public string Label => $"{Product.Name} — {Quantity:#,##0.##} {Product.Unit} — موجودی فعلی: {Product.StockQuantity:#,##0.##}";
     }
 
     private static readonly Choice[] Types =
@@ -173,7 +173,7 @@ public sealed class VoucherDialog : Window
         _person.SelectionChanged += (_, _) => RefreshInvoiceChoices();
         _type.SelectionChanged += (_, _) => SetDefaultMovement();
         _lines.CollectionChanged += (_, _) => RefreshTotals();
-        _quantity.LostFocus += (_, _) => FormatNumericField(_quantity);
+        NumericTextBoxFormatter.Attach(_quantity);
         _barcodeScan.PreviewKeyDown += BarcodeScan_PreviewKeyDown;
         addLine.Click += (_, _) => AddLine();
         removeLine.Click += (_, _) =>
@@ -214,7 +214,7 @@ public sealed class VoucherDialog : Window
     {
         if (!string.IsNullOrWhiteSpace(field.Text) &&
             PersianNumberParser.TryParseDecimal(field.Text, out var value))
-            field.Text = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+            field.Text = NumericTextBoxFormatter.Format(value);
     }
 
     private void AddLine()
@@ -342,7 +342,7 @@ public sealed class VoucherDialog : Window
     {
         var weight = _lines.Sum(x => x.Quantity * x.Product.Weight.GetValueOrDefault());
         var value = _lines.Sum(x => x.Quantity * (x.Product.BuyPrice ?? x.Product.SellPrice));
-        _totals.Text = $"اقلام: {_lines.Count:N0}   •   وزن تخمینی: {weight:N2}   •   ارزش تخمینی: {value:N2}";
+        _totals.Text = $"اقلام: {_lines.Count:N0}   •   وزن تخمینی: {weight:#,##0.##}   •   ارزش تخمینی: {value:#,##0.##}";
     }
 
     private static DateTimeOffset ParsePersianDate(string text)

@@ -606,10 +606,10 @@ public sealed class InvoicePreviewWindow : Window
             var values = new[]
             {
                 string.IsNullOrWhiteSpace(line.Description) ? line.ProductName : $"{line.ProductName}\n{line.Description}",
-                line.Quantity.ToString("N2", CultureInfo.CurrentCulture),
+                line.Quantity.ToString("#,##0.##", CultureInfo.CurrentCulture),
                 string.IsNullOrWhiteSpace(line.Unit) ? "—" : line.Unit,
-                line.UnitPrice.ToString("N2", CultureInfo.CurrentCulture) + " " + currencyLabel,
-                line.LineTotal.ToString("N2", CultureInfo.CurrentCulture) + " " + currencyLabel
+                line.UnitPrice.ToString("#,##0.##", CultureInfo.CurrentCulture) + " " + currencyLabel,
+                line.LineTotal.ToString("#,##0.##", CultureInfo.CurrentCulture) + " " + currencyLabel
             };
 
             foreach (var value in values)
@@ -649,7 +649,7 @@ public sealed class InvoicePreviewWindow : Window
         document.Blocks.Add(table);
         var taxLabel = invoice.TaxIsAmount
             ? "مالیات"
-            : $"مالیات ({invoice.TaxRatePercent.ToString("N2", CultureInfo.CurrentCulture)}%)";
+            : $"مالیات ({invoice.TaxRatePercent.ToString("#,##0.##", CultureInfo.CurrentCulture)}%)";
         Grid MakeAmountRow(string label, string amount, bool emphasize = false)
         {
             var row = new Grid { FlowDirection = FlowDirection.RightToLeft, Margin = new Thickness(0, 3, 0, 3) };
@@ -680,20 +680,20 @@ public sealed class InvoicePreviewWindow : Window
         }
 
         var totalsStack = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
-        totalsStack.Children.Add(MakeAmountRow("جمع کالاها", $"{invoice.Subtotal.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
-        totalsStack.Children.Add(MakeAmountRow("تخفیف", $"{invoice.Discount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
-        totalsStack.Children.Add(MakeAmountRow(taxLabel, $"{invoice.TaxAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        totalsStack.Children.Add(MakeAmountRow("جمع کالاها", $"{invoice.Subtotal.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        totalsStack.Children.Add(MakeAmountRow("تخفیف", $"{invoice.Discount.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        totalsStack.Children.Add(MakeAmountRow(taxLabel, $"{invoice.TaxAmount.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
         totalsStack.Children.Add(new Border
         {
             Height = 1, Background = accent, Opacity = 0.65,
             Margin = new Thickness(0, 8, 0, 8)
         });
         totalsStack.Children.Add(MakeAmountRow("مبلغ نهایی قابل پرداخت",
-            $"{invoice.Total.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}", emphasize: true));
+            $"{invoice.Total.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}", emphasize: true));
         totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — نقدی",
-            $"{invoice.CashAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
+            $"{invoice.CashAmount.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
         totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — چک",
-            $"{invoice.CheckAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
+            $"{invoice.CheckAmount.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
         document.Blocks.Add(new BlockUIContainer(new Border
         {
             Width = 660,
