@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Data;
 using AshkeGhalam.Windows.Models;
 using AshkeGhalam.Windows.Services;
 
@@ -52,7 +53,18 @@ public sealed class InvoiceDialog : Window
     private readonly TextBox _taxId = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
     private readonly CheckBox _showPreviousBalance = new() { Content = "نمایش مانده قبلی طرف حساب", IsChecked = true, Margin = new Thickness(0, 8, 0, 8) };
     private readonly ObservableCollection<InvoiceLine> _lines = [];
-    private readonly ListBox _lineList = new() { Height = 155 };
+    private readonly DataGrid _lineList = new()
+    {
+        Height = 190, MinWidth = 400, AutoGenerateColumns = false, CanUserAddRows = false,
+        IsReadOnly = true, SelectionUnit = DataGridSelectionUnit.FullRow, HeadersVisibility = DataGridHeadersVisibility.Column,
+        RowHeaderWidth = 0, CanUserResizeColumns = true, CanUserSortColumns = true,
+        HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+    };
+    private readonly Button _addLineButton = new()
+    {
+        Content = "افزودن قلم", Height = 32, Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0)
+    };
+    private int _editingLineIndex = -1;
     private readonly TextBlock _numberPreview = new() { FontSize = 13, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110)), Margin = new Thickness(0, 8, 0, 12) };
     private readonly TextBlock _totals = new() { FontSize = 14, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 6) };
 
@@ -123,9 +135,8 @@ public sealed class InvoiceDialog : Window
             _taxId.Text = existingInvoice.TaxId;
             _showPreviousBalance.IsChecked = existingInvoice.ShowPreviousBalance;
         }
+        ConfigureLineGrid();
         _lineList.ItemsSource = _lines;
-        // A ListBox can show a readable projection while keeping actual InvoiceLine values in the collection.
-        _lineList.ItemsSource = _lines.Select(ToText).ToList();
         _product.ItemsSource = _products;
 
         var root = new StackPanel { Margin = new Thickness(22) };
@@ -194,8 +205,7 @@ public sealed class InvoiceDialog : Window
         lineRow.Children.Add(_quantity);
         lineRow.Children.Add(_price);
         lineRow.Children.Add(_lineDescription);
-        var addLine = new Button { Content = "افزودن قلم", Height = 32, Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0) };
-        lineRow.Children.Add(addLine);
+        lineRow.Children.Add(_addLineButton);
         root.Children.Add(lineRow);
         root.Children.Add(new TextBlock
         {
@@ -205,8 +215,13 @@ public sealed class InvoiceDialog : Window
             Margin = new Thickness(0, 0, 0, 4)
         });
         root.Children.Add(_lineList);
-        var remove = new Button { Content = "حذف قلم انتخاب‌شده", Width = 150, Height = 30, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 6, 0, 5) };
-        root.Children.Add(remove);
+        var rowActions = new WrapPanel { Margin = new Thickness(0, 6, 0, 5) };
+        var editLine = new Button { Content = "ویرایش ردیف انتخاب‌شده", MinWidth = 160, Height = 32, Margin = new Thickness(0, 0, 8, 0) };
+        editLine.Click += (_, _) => BeginEditLine();
+        rowActions.Children.Add(editLine);
+        var remove = new Button { Content = "حذف قلم انتخاب‌شده", MinWidth = 145, Height = 32 };
+        rowActions.Children.Add(remove);
+        root.Children.Add(rowActions);
 
         var pricing = new Grid { Margin = new Thickness(0, 4, 0, 0) };
         pricing.ColumnDefinitions.Add(new ColumnDefinition());
@@ -279,12 +294,15 @@ public sealed class InvoiceDialog : Window
         _taxIsAmount.Checked += (_, _) => RefreshTotals();
         _taxIsAmount.Unchecked += (_, _) => RefreshTotals();
         _cashAmount.TextChanged += (_, _) => RefreshTotals();
-        addLine.Click += (_, _) => AddLine();
+        _addLineButton.Click += (_, _) => AddLine();
         remove.Click += (_, _) =>
         {
             if (_lineList.SelectedIndex >= 0)
             {
-                _lines.RemoveAt(_lineList.SelectedIndex);
+                var removedIndex = _lineList.SelectedIndex;
+                _lines.RemoveAt(removedIndex);
+                if (_editingLineIndex == removedIndex) ResetLineEditor();
+                else if (_editingLineIndex > removedIndex) _editingLineIndex--;
                 RefreshLines();
                 RefreshTotals();
             }
