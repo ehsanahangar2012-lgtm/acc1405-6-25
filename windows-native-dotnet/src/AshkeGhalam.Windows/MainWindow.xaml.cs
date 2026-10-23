@@ -113,11 +113,17 @@ public partial class MainWindow : Window
         RecentInvoicesGrid.ItemsSource = _data.Invoices.OrderByDescending(i => i.Number).Take(10).ToList();
 
         var activeInvoices = _data.Invoices.Where(i => i.Status != "لغو شده").ToList();
-        var sales = activeInvoices.Where(i => i.Type == "SALE").Sum(i => i.Total);
-        var purchases = activeInvoices.Where(i => i.Type == "PURCHASE").Sum(i => i.Total);
+        var salesInvoices = activeInvoices.Where(i => i.Type == "SALE").ToList();
+        var purchaseInvoices = activeInvoices.Where(i => i.Type == "PURCHASE").ToList();
+        var salesIds = salesInvoices.Select(i => i.Id).ToHashSet(StringComparer.Ordinal);
+        var purchaseIds = purchaseInvoices.Select(i => i.Id).ToHashSet(StringComparer.Ordinal);
+        var sales = salesInvoices.Sum(i => i.Total);
+        var purchases = purchaseInvoices.Sum(i => i.Total);
         var paid = _data.Payments.Sum(p => p.Amount);
-        var receivables = activeInvoices.Where(i => i.Type == "SALE").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
-        var payables = activeInvoices.Where(i => i.Type == "PURCHASE").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
+        var salesReceipts = _data.Payments.Where(p => salesIds.Contains(p.InvoiceId)).Sum(p => p.Amount);
+        var purchasePayments = _data.Payments.Where(p => purchaseIds.Contains(p.InvoiceId)).Sum(p => p.Amount);
+        var receivables = salesInvoices.Sum(i => AccountingRules.RemainingForInvoice(_data, i));
+        var payables = purchaseInvoices.Sum(i => AccountingRules.RemainingForInvoice(_data, i));
         var expenses = _data.Expenses.Sum(x => x.Amount);
         CustomerCount.Text = _data.Customers.Count.ToString("N0", CultureInfo.CurrentCulture);
         ProductCount.Text = _data.Products.Count.ToString("N0", CultureInfo.CurrentCulture);
@@ -134,7 +140,7 @@ public partial class MainWindow : Window
         ReportReceivables.Text = receivables.ToString("N2", CultureInfo.CurrentCulture);
         ReportPayables.Text = payables.ToString("N2", CultureInfo.CurrentCulture);
         ReportExpenses.Text = expenses.ToString("N2", CultureInfo.CurrentCulture);
-        ReportCash.Text = (paid - expenses).ToString("N2", CultureInfo.CurrentCulture);
+        ReportCash.Text = (salesReceipts - purchasePayments - expenses).ToString("N2", CultureInfo.CurrentCulture);
     }
 
     private void AddCustomer_Click(object sender, RoutedEventArgs e)
@@ -453,21 +459,30 @@ public partial class MainWindow : Window
 
     private void ExportReport_Click(object sender, RoutedEventArgs e)
     {
-        var sales = _data.Invoices.Where(i => i.Status != "لغو شده" && i.Type == "SALE").Sum(i => i.Total);
-        var purchases = _data.Invoices.Where(i => i.Status != "لغو شده" && i.Type == "PURCHASE").Sum(i => i.Total);
-        var receivables = _data.Invoices.Where(i => i.Status != "لغو شده" && i.Type == "SALE").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
-        var payables = _data.Invoices.Where(i => i.Status != "لغو شده" && i.Type == "PURCHASE").Sum(i => AccountingRules.RemainingForInvoice(_data, i));
+        var activeInvoices = _data.Invoices.Where(i => i.Status != "لغو شده").ToList();
+        var salesInvoices = activeInvoices.Where(i => i.Type == "SALE").ToList();
+        var purchaseInvoices = activeInvoices.Where(i => i.Type == "PURCHASE").ToList();
+        var salesIds = salesInvoices.Select(i => i.Id).ToHashSet(StringComparer.Ordinal);
+        var purchaseIds = purchaseInvoices.Select(i => i.Id).ToHashSet(StringComparer.Ordinal);
+        var sales = salesInvoices.Sum(i => i.Total);
+        var purchases = purchaseInvoices.Sum(i => i.Total);
+        var receivables = salesInvoices.Sum(i => AccountingRules.RemainingForInvoice(_data, i));
+        var payables = purchaseInvoices.Sum(i => AccountingRules.RemainingForInvoice(_data, i));
         var paid = _data.Payments.Sum(p => p.Amount);
+        var salesReceipts = _data.Payments.Where(p => salesIds.Contains(p.InvoiceId)).Sum(p => p.Amount);
+        var purchasePayments = _data.Payments.Where(p => purchaseIds.Contains(p.InvoiceId)).Sum(p => p.Amount);
         var expenses = _data.Expenses.Sum(i => i.Amount);
         ExportCsv("summary-report.csv", new[] { "Metric", "Value" }, new[]
         {
             new[] { "Sales", sales.ToString(CultureInfo.InvariantCulture) },
             new[] { "Purchases", purchases.ToString(CultureInfo.InvariantCulture) },
-            new[] { "AllPayments", paid.ToString(CultureInfo.InvariantCulture) },
+            new[] { "AllSettlements", paid.ToString(CultureInfo.InvariantCulture) },
+            new[] { "SalesReceipts", salesReceipts.ToString(CultureInfo.InvariantCulture) },
+            new[] { "PurchasePayments", purchasePayments.ToString(CultureInfo.InvariantCulture) },
             new[] { "SalesReceivables", receivables.ToString(CultureInfo.InvariantCulture) },
             new[] { "PurchasePayables", payables.ToString(CultureInfo.InvariantCulture) },
             new[] { "Expenses", expenses.ToString(CultureInfo.InvariantCulture) },
-            new[] { "NetCashFlow", (paid - expenses).ToString(CultureInfo.InvariantCulture) }
+            new[] { "SimpleNetCashFlow", (salesReceipts - purchasePayments - expenses).ToString(CultureInfo.InvariantCulture) }
         });
     }
 
