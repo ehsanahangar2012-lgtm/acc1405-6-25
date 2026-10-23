@@ -33,9 +33,9 @@ public sealed class AutomaticBackupServiceTests
             var automatic = Directory.GetFiles(directory, "AshkeGhalam-AutoBackup-*.ashkbackup");
             Assert.AreEqual(20, automatic.Length);
             Assert.IsTrue(File.Exists(manual), "Manually created backup files must never be removed by automatic retention.");
-            Assert.IsTrue(automatic.Any(path => Path.GetFileName(path).Contains("-23-", StringComparison.Ordinal)),
+            Assert.IsTrue(File.Exists(Path.Combine(directory, "AshkeGhalam-AutoBackup-1405-01-23-120000.ashkbackup")),
                 "The most recent automatic backup should remain.");
-            Assert.IsFalse(automatic.Any(path => Path.GetFileName(path).Contains("-01-", StringComparison.Ordinal)),
+            Assert.IsFalse(File.Exists(Path.Combine(directory, "AshkeGhalam-AutoBackup-1405-01-01-120000.ashkbackup")),
                 "The oldest automatic backup should be removed first.");
         }
         finally
