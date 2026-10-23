@@ -58,7 +58,7 @@ public sealed class VoucherPreviewWindow : Window
         var trackingLabel = string.IsNullOrWhiteSpace(voucher.TrackingCode) ? "پس از ثبت تولید می‌شود" : voucher.TrackingCode;
         var companyName = string.IsNullOrWhiteSpace(company?.LegalName) ? company?.Name ?? "اشک قلم" : company.LegalName;
 
-        var headerGrid = new Grid { Width = 660, FlowDirection = FlowDirection.RightToLeft };
+        var headerGrid = new Grid { Width = 624, FlowDirection = FlowDirection.RightToLeft };
         headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var headerText = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 14, 0) };
