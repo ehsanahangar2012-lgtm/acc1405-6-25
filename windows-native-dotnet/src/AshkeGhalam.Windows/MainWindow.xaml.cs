@@ -106,6 +106,7 @@ public partial class MainWindow : Window
             return;
         ApplicationThemeService.Apply(this, selected.Tag?.ToString());
         UpdateNavigationSelection(_activeNavigationKey, selected.Tag?.ToString());
+        ApplyContextMenuTheme();
     }
 
     private void ApplyCurrentThemeTo(Window dialog) =>
@@ -115,6 +116,7 @@ public partial class MainWindow : Window
     {
         ApplicationThemeService.Apply(this, _data.Preferences?.ApplicationTheme ?? "light");
         UpdateNavigationSelection(_activeNavigationKey);
+        ApplyContextMenuTheme();
     }
 
     private static void TextBox_GotKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
@@ -3426,9 +3428,9 @@ public partial class MainWindow : Window
             migrationPanel.Visibility = Visibility.Collapsed;
             tabs.Visibility = Visibility.Visible;
             tabs.SelectedIndex = nativeTabIndex;
-            if (nativeTabIndex == 15)
+            if (nativeTabIndex == 18)
             {
-                // The settings page is shared by company, standard settings, and advanced settings.
+                // Company profile and accounting preferences share this accounting-settings page.
                 // Scroll after the tab content is realized so this also works when the same tab is
                 // already active or the page is being created for the first time.
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
