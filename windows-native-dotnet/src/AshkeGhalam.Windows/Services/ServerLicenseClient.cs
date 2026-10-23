@@ -231,7 +231,7 @@ public sealed class ServerLicenseClient
             payload.Features is null || payload.Features.Count > 1000 ||
             payload.Features.Any(f => f is null || f.Length > 200) ||
             payload.MaxCustomers < -1 || payload.MaxDocuments < -1 || payload.MaxUsers < 1 ||
-            payload.CompanyName.Length > 500)
+            (payload.CompanyName is not null && payload.CompanyName.Length > 500))
             return null;
 
         var expectedHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(licenseKey.ToUpperInvariant()))).ToLowerInvariant();
