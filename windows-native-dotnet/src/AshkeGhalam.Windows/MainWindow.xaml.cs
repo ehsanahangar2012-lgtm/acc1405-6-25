@@ -965,6 +965,20 @@ public partial class MainWindow : Window
         Commit(data => AccountingOperations.CancelInvoice(data, invoice.Id), "سند لغو و اثر موجودی آن برگشت داده شد");
     }
 
+    private void PreviewInvoice_Click(object sender, RoutedEventArgs e)
+    {
+        var invoice = InvoicesGrid.SelectedItem as InvoiceRecord
+            ?? RecentInvoicesGrid.SelectedItem as InvoiceRecord;
+        if (invoice is null)
+        {
+            MessageBox.Show(this, "ابتدا یک فاکتور را در جدول «فاکتورها» یا «آخرین اسناد» انتخاب کنید.",
+                "پیش‌نمایش فاکتور", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        new InvoicePreviewWindow(this, invoice).ShowDialog();
+    }
+
     private void PrintInvoice_Click(object sender, RoutedEventArgs e)
     {
         if (InvoicesGrid.SelectedItem is not InvoiceRecord invoice) { MessageBox.Show(this, "یک فاکتور را انتخاب کنید."); return; }
