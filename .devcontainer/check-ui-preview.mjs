@@ -10,9 +10,15 @@ assert.match(html, /id="page-dashboard"/, "Dashboard must exist.");
 for (const id of ["page-customers","page-products","page-invoices","page-payments","page-expenses","page-forecast","page-ledger","page-reports","page-migration"]) {
   assert.ok(html.includes('id="' + id + '"'), "Missing UI page: " + id);
 }
-for (const id of ["saveForm","addDraftLine","invoiceOverlay","printInvoice","searchCustomers","searchProducts","searchInvoices","resetDemo"]) {
+for (const id of ["saveForm","addDraftLine","invoiceOverlay","printInvoice","searchCustomers","searchProducts","searchInvoices","resetDemo","quickAddCustomerFromInvoice","quickAddProductFromInvoice","inlineEntityOverlay","inlineEntitySave"]) {
   assert.ok(html.includes('id="' + id + '"'), "Missing key interaction: " + id);
 }
+assert.match(html, /const openInlineEntity = mode =>/, "Inline person/product editor should exist.");
+assert.match(html, /const saveInlineEntity = \(\) =>/, "Inline person/product save handler should exist.");
+assert.match(html, /refreshInvoiceCustomerOptions\(customer\.id\)/, "Saved people should be offered in the open invoice.");
+assert.match(html, /refreshInvoiceProductOptions\(product\.id\)/, "Saved products should be offered in the open invoice.");
+assert.match(html, /state\.customers\.some\(x => String\(x\.code\)\.toLowerCase\(\) === code\.toLowerCase\(\)\)/, "Person codes should be checked for duplicates.");
+assert.match(html, /state\.products\.some\(x => String\(x\.code\)\.toLowerCase\(\) === code\.toLowerCase\(\)\)/, "Product codes should be checked for duplicates.");
 assert.match(html, /localStorage/, "Demo state must remain browser-local.");
 assert.match(html, /داده.*نمونه|داده.*مرورگر/, "Preview needs a demo-data/privacy notice.");
 assert.match(server, /native-windows-preview\/version\.json/, "Version endpoint must work at the stable subpath.");
