@@ -1,0 +1,88 @@
+name: Windows native WPF migration CI
+
+on:
+  push:
+    branches:
+      - feature/windows-native-dotnet
+    paths:
+      - 'windows-native-dotnet/**'
+      - '.github/workflows/windows-native-wpf-parity.yml'
+  pull_request:
+    branches:
+      - feature/windows-native-dotnet
+    paths:
+      - 'windows-native-dotnet/**'
+      - '.github/workflows/windows-native-wpf-parity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test-publish:
+    name: Build and smoke-test native Windows app
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the isolated migration branch
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore WPF project
+        shell: pwsh
+        run: dotnet restore windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj
+
+      - name: Build WPF project
+        shell: pwsh
+        run: dotnet build windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj --configuration Release --no-restore
+
+      - name: Run native-domain tests when present
+        shell: pwsh
+        run: |
+          $appProject = (Resolve-Path 'windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj').Path
+          $projects = Get-ChildItem 'windows-native-dotnet' -Recurse -Filter '*.csproj' |
+            Where-Object { $_.FullName -ne $appProject -and $_.FullName -match '(?i)test' }
+          if (-not $projects) {
+            Write-Host 'No standalone test project was found. The WPF compile and startup smoke test still run.'
+          } else {
+            foreach ($project in $projects) {
+              dotnet test $project.FullName --configuration Release --verbosity normal
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            }
+          }
+
+      - name: Publish self-contained Windows x64 package
+        shell: pwsh
+        run: |
+          $publishDir = Join-Path $env:RUNNER_TEMP 'ashkghalam-windows-native'
+          dotnet publish windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj `
+            --configuration Release --runtime win-x64 --self-contained true `
+            -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true -o $publishDir
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item 'windows-native-dotnet/QUICKSTART.md' (Join-Path $publishDir 'راهنمای-شروع.txt')
+          Compress-Archive -Path (Join-Path $publishDir '*') -DestinationPath (Join-Path $env:RUNNER_TEMP 'AshkeGhalam-Windows-Native.zip') -Force
+
+      - name: Smoke-test published executable startup
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:RUNNER_TEMP 'ashkghalam-windows-native/AshkeGhalam.Windows.exe'
+          if (-not (Test-Path $exe)) { throw "Published executable was not found at $exe" }
+          $process = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 5
+          $process.Refresh()
+          if ($process.HasExited) { throw "Native WPF process exited during startup smoke test (exit code $($process.ExitCode))." }
+          Stop-Process -Id $process.Id -Force
+          Write-Host 'Published WPF executable stayed alive for the startup smoke-test window.'
+
+      - name: Upload portable Windows package
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Windows-Native-${{ github.sha }}
+          path: ${{ runner.temp }}/AshkeGhalam-Windows-Native.zip
+          if-no-files-found: error
+          retention-days: 14
