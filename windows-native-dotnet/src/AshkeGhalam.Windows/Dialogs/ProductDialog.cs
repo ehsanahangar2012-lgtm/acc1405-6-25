@@ -68,6 +68,10 @@ public sealed class ProductDialog : Window
         SetChoices(_subCategory, _knownProducts.Select(product => product.SubCategory));
         SetChoices(_subSubCategory, _knownProducts.Select(product => product.SubSubCategory));
         SetChoices(_categoryPath, _knownProducts.Select(product => product.CategoryPath));
+        _category.Text = existing?.Category ?? "";
+        _subCategory.Text = existing?.SubCategory ?? "";
+        _subSubCategory.Text = existing?.SubSubCategory ?? "";
+        _categoryPath.Text = existing?.CategoryPath ?? "";
         _category.LostKeyboardFocus += (_, _) => RefreshSubCategoryChoices();
         _category.SelectionChanged += (_, _) => { if (!_updatingCategoryChoices) RefreshSubCategoryChoices(); };
         _subCategory.LostKeyboardFocus += (_, _) => RefreshSubSubCategoryChoices();
@@ -252,7 +256,7 @@ public sealed class ProductDialog : Window
     private static decimal? ParseOptional(string text, string label) =>
         string.IsNullOrWhiteSpace(text) ? null : AccountingRules.Money(PersianNumberParser.ParseDecimal(text, label));
 
-    private static void Add(Panel root, string label, TextBox box)
+    private static void Add(Panel root, string label, Control box)
     {
         root.Children.Add(new TextBlock
         {
@@ -262,7 +266,7 @@ public sealed class ProductDialog : Window
             Foreground = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
             Margin = new Thickness(0, 6, 0, 4)
         });
-        box.Height = box.AcceptsReturn ? 62 : 32;
+        box.Height = box is TextBox textBox && textBox.AcceptsReturn ? 62 : 34;
         box.Margin = new Thickness(0, 0, 0, 5);
         box.Padding = new Thickness(8, 5, 8, 5);
         root.Children.Add(box);
