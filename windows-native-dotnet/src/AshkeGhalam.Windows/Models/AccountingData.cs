@@ -62,6 +62,14 @@ public sealed class CustomerRecord
     public string Type { get; set; } = "CUSTOMER";
     public bool IsCustomer { get; set; } = true;
     public bool IsSupplier { get; set; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string RoleLabel => (IsCustomer, IsSupplier) switch
+    {
+        (true, true) => "مشتری و تأمین‌کننده",
+        (true, false) => "مشتری",
+        (false, true) => "تأمین‌کننده",
+        _ => "بدون نقش"
+    };
     public string Address { get; set; } = "";
     public string NationalId { get; set; } = "";
     public string Notes { get; set; } = "";
