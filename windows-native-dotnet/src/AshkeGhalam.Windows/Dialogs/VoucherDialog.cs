@@ -48,11 +48,11 @@ public sealed class VoucherDialog : Window
     private readonly IReadOnlyList<InvoiceRecord> _invoices;
     private readonly VoucherRecord? _existing;
     private readonly CompanyProfileRecord? _companyProfile;
-    private readonly ComboBox _type = new() { Height = 34, ItemsSource = Types, DisplayMemberPath = nameof(Choice.Label), SelectedIndex = 1 };
-    private readonly ComboBox _movementType = new() { Height = 34, ItemsSource = MovementTypes, DisplayMemberPath = nameof(Choice.Label) };
-    private readonly ComboBox _person = new() { Height = 34, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 260 };
-    private readonly ComboBox _invoice = new() { Height = 34, DisplayMemberPath = nameof(InvoiceChoice.Label), MinWidth = 260 };
-    private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240 };
+    private readonly ComboBox _type = new() { Height = 34, ItemsSource = Types, DisplayMemberPath = nameof(Choice.Label), SelectedIndex = 1, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
+    private readonly ComboBox _movementType = new() { Height = 34, ItemsSource = MovementTypes, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _person = new() { Height = 34, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 260, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _invoice = new() { Height = 34, DisplayMemberPath = nameof(InvoiceChoice.Label), MinWidth = 260, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
     private readonly TextBox _quantity = new() { Height = 32, Width = 110, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _barcodeScan = new() { Height = 34, MinWidth = 230, Padding = new Thickness(8, 4, 8, 4), FlowDirection = FlowDirection.LeftToRight };
     private readonly TextBox _date = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
@@ -160,15 +160,22 @@ public sealed class VoucherDialog : Window
         AddField(root, "تلفن تحویل‌گیرنده", _receiverPhone);
         AddField(root, "توضیحات سند", _notes);
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 18, 0, 0) };
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(22, 10, 22, 18) };
         var preview = new Button { Content = "پیش‌نمایش قبل از ثبت", Width = 155, Height = 38, Margin = new Thickness(0, 0, 8, 0) };
         preview.Click += (_, _) => PreviewDraft();
         buttons.Children.Add(preview);
         var save = new Button { Content = "ثبت حواله و گردش موجودی", Width = 185, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
         buttons.Children.Add(save);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
-        root.Children.Add(buttons);
-        Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root };
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var body = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root };
+        Grid.SetRow(body, 0);
+        Grid.SetRow(buttons, 1);
+        layout.Children.Add(body);
+        layout.Children.Add(buttons);
+        Content = layout;
 
         _person.SelectionChanged += (_, _) => RefreshInvoiceChoices();
         _type.SelectionChanged += (_, _) => SetDefaultMovement();
