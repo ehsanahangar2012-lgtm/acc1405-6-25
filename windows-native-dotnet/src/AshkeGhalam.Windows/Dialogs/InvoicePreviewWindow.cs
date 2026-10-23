@@ -12,6 +12,89 @@ public sealed class InvoicePreviewWindow : Window
     private readonly InvoiceRecord _invoice;
     private readonly FlowDocument _document;
 
+    public InvoicePreviewWindow(
+        Window owner,
+        InvoiceDraft draft,
+        IReadOnlyList<CustomerRecord> people,
+        IReadOnlyList<InvoiceRecord> invoices)
+        : this(owner, BuildDraftPreview(draft, people, invoices))
+    {
+    }
+
+    private static InvoiceRecord BuildDraftPreview(
+        InvoiceDraft draft,
+        IReadOnlyList<CustomerRecord> people,
+        IReadOnlyList<InvoiceRecord> invoices)
+    {
+        ArgumentNullException.ThrowIfNull(draft);
+        var person = people.SingleOrDefault(candidate => candidate.Id == draft.CustomerId)
+            ?? throw new InvalidOperationException("طرف حساب پیش‌نمایش پیدا نشد.");
+
+        var floor = draft.Type switch { "SALE" => 1000, "PROFORMA" => 2000, "PURCHASE" => 3000, _ => 0 };
+        var number = invoices.Where(invoice => invoice.Type == draft.Type)
+            .Select(invoice => invoice.Number).DefaultIfEmpty(floor).Max() + 1;
+        while (invoices.Any(invoice => invoice.Number == number)) number++;
+
+        var prefix = !string.IsNullOrWhiteSpace(draft.Prefix) ? draft.Prefix.Trim() : draft.Type switch
+        {
+            "SALE" => "INV-", "PURCHASE" => "PUR-", "PROFORMA" => "PRO-", _ => "INV-"
+        };
+        var createdAt = draft.Date == default ? DateTimeOffset.Now : draft.Date;
+        var lines = draft.Lines.Select(line => new InvoiceLine
+        {
+            ProductId = line.ProductId,
+            ProductName = line.ProductName,
+            SerialNumber = line.SerialNumber,
+            Quantity = line.Quantity,
+            BuyPrice = AccountingRules.Money(line.BuyPrice),
+            UnitPrice = AccountingRules.Money(line.UnitPrice),
+            Profit = draft.Type == "SALE"
+                ? AccountingRules.Money((line.UnitPrice - line.BuyPrice) * line.Quantity)
+                : 0m,
+            LineTotal = AccountingRules.Money(line.Quantity * line.UnitPrice),
+            Description = line.Description,
+            EntryOrder = line.EntryOrder
+        }).ToList();
+        var subtotal = AccountingRules.Money(lines.Sum(line => line.LineTotal));
+        var discount = AccountingRules.Money(draft.Discount);
+        var taxAmount = draft.TaxIsAmount
+            ? AccountingRules.Money(draft.TaxAmount)
+            : AccountingRules.CalculateTax(subtotal, draft.TaxRatePercent);
+        var total = AccountingRules.Money(subtotal - discount + taxAmount);
+        var description = string.IsNullOrWhiteSpace(draft.Description)
+            ? string.Join("، ", lines.Select(line => line.ProductName).Distinct())
+            : draft.Description.Trim();
+
+        return new InvoiceRecord
+        {
+            Number = number,
+            Type = draft.Type,
+            Prefix = prefix,
+            TrackingCode = $"{prefix}{number:D4}-{createdAt:yyyyMMdd}",
+            CustomerId = person.Id,
+            CustomerName = person.Name,
+            Description = description,
+            Lines = lines,
+            Subtotal = subtotal,
+            TaxRatePercent = draft.TaxIsAmount ? 0m : draft.TaxRatePercent,
+            TaxAmount = taxAmount,
+            TaxIsAmount = draft.TaxIsAmount,
+            Discount = discount,
+            Total = total,
+            CashAmount = AccountingRules.Money(draft.CashAmount),
+            CheckAmount = 0m,
+            CreatedAt = createdAt,
+            DueDate = draft.DueDate,
+            Notes = draft.Notes,
+            DriverName = draft.DriverName,
+            DriverPhone = draft.DriverPhone,
+            VehiclePlate = draft.VehiclePlate,
+            TaxId = draft.TaxId,
+            ShowPreviousBalance = draft.ShowPreviousBalance,
+            Status = "پیش‌نمایش — ذخیره نشده"
+        };
+    }
+
     public InvoicePreviewWindow(Window owner, InvoiceRecord invoice)
     {
         _invoice = invoice ?? throw new ArgumentNullException(nameof(invoice));
@@ -231,6 +314,15 @@ public sealed class InvoicePreviewWindow : Window
         { TextAlignment = TextAlignment.Left });
         document.Blocks.Add(new Paragraph(new Run($"وضعیت سند: {invoice.Status}"))
         { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 14, 0, 0) });
+
+        document.Blocks.Add(new Paragraph(new Run(
+            "امضای صادرکننده: ................................       تحویل‌گیرنده: ................................       مهر و امضا: ................................"))
+        {
+            TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 34, 0, 0),
+            Padding = new Thickness(0, 12, 0, 12),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225))
+        });
 
         return document;
     }
