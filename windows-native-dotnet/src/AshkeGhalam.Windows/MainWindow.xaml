@@ -420,7 +420,6 @@
                         <Button Tag="payments" Content="دریافت‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="expenses" Content="هزینه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="backup" Content="پشتیبان‌گیری محلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="checks" Content="مدیریت چک" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="vouchers" Content="حواله‌های انبار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="مدیریت کسب‌وکار" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="projects" Content="پروژه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
