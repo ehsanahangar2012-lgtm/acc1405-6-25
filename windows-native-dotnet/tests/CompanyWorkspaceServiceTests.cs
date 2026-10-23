@@ -59,15 +59,15 @@ public sealed class CompanyWorkspaceServiceTests
 
         Assert.IsTrue(CompanyWorkspaceService.SwitchIfRequested(data, second.Id, first.Id));
         Assert.AreEqual(first.Id, data.ActiveCompanyId);
-        Assert.AreEqual(new[] { "a1" }, data.Customers.Select(customer => customer.Id).ToArray());
-        Assert.AreEqual(new[] { "p1" }, data.Products.Select(product => product.Id).ToArray());
-        Assert.AreEqual(new[] { "i1" }, data.Invoices.Select(invoice => invoice.Id).ToArray());
+        CollectionAssert.AreEqual(new[] { "a1" }, data.Customers.Select(customer => customer.Id).ToArray());
+        CollectionAssert.AreEqual(new[] { "p1" }, data.Products.Select(product => product.Id).ToArray());
+        CollectionAssert.AreEqual(new[] { "i1" }, data.Invoices.Select(invoice => invoice.Id).ToArray());
 
         Assert.IsTrue(CompanyWorkspaceService.SwitchIfRequested(data, first.Id, second.Id));
         Assert.AreEqual(second.Id, data.ActiveCompanyId);
-        Assert.AreEqual(new[] { "b1" }, data.Customers.Select(customer => customer.Id).ToArray());
-        Assert.AreEqual(new[] { "p2" }, data.Products.Select(product => product.Id).ToArray());
-        Assert.AreEqual(new[] { "i2" }, data.Invoices.Select(invoice => invoice.Id).ToArray());
+        CollectionAssert.AreEqual(new[] { "b1" }, data.Customers.Select(customer => customer.Id).ToArray());
+        CollectionAssert.AreEqual(new[] { "p2" }, data.Products.Select(product => product.Id).ToArray());
+        CollectionAssert.AreEqual(new[] { "i2" }, data.Invoices.Select(invoice => invoice.Id).ToArray());
         Assert.AreEqual(2, data.Companies.Count);
     }
 }
