@@ -196,10 +196,13 @@ public sealed class InvoiceDialog : Window
         AddField(root, "شناسه مالیاتی ۲۲ نویسه (اختیاری)", _taxId);
         root.Children.Add(_showPreviousBalance);
 
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
-        var save = new Button { Content = "ذخیره سند", Width = 125, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        var buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
+        var preview = new Button { Content = "پیش‌نمایش قبل از ذخیره", MinWidth = 175, Height = 38, Margin = new Thickness(0, 0, 8, 8) };
+        preview.Click += (_, _) => PreviewDraft();
+        buttons.Children.Add(preview);
+        var save = new Button { Content = "ذخیره سند", Width = 125, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 8) };
         buttons.Children.Add(save);
-        buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
+        buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true, Margin = new Thickness(0, 0, 0, 8) });
         root.Children.Add(buttons);
         Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
 
@@ -396,64 +399,82 @@ public sealed class InvoiceDialog : Window
         return $"شماره پیشنهادی: {prefix}{number:D4}  •  طرف حساب: {(type == "PURCHASE" ? "تأمین‌کننده" : "مشتری")}";
     }
 
+    private InvoiceDraft BuildDraft()
+    {
+        if (_person.SelectedItem is not CustomerRecord person)
+            throw new InvalidOperationException(CurrentType == "PURCHASE"
+                ? "ابتدا یک تأمین‌کننده ثبت یا انتخاب کنید."
+                : "ابتدا یک مشتری ثبت یا انتخاب کنید.");
+        if (_lines.Count == 0)
+            throw new InvalidOperationException("حداقل یک قلم به سند اضافه کنید.");
+
+        var discount = AccountingRules.Money(PersianNumberParser.ParseDecimal(_discount.Text, "تخفیف"));
+        var tax = AccountingRules.Money(PersianNumberParser.ParseDecimal(_tax.Text, "مالیات"));
+        var cash = AccountingRules.Money(PersianNumberParser.ParseDecimal(_cashAmount.Text, "مبلغ نقدی"));
+        var subtotal = AccountingRules.Money(_lines.Sum(l => l.LineTotal));
+        if (discount < 0m || discount > subtotal)
+            throw new InvalidOperationException("تخفیف باید بین صفر و جمع کالاها باشد.");
+        if (tax < 0m || cash < 0m || cash > subtotal - discount + tax)
+            throw new InvalidOperationException("مالیات یا مبلغ نقدی معتبر نیست.");
+        if (CurrentType == "PROFORMA" && cash > 0m)
+            throw new InvalidOperationException("برای پیش‌فاکتور دریافت نقدی ثبت نکنید؛ ابتدا آن را به فروش تبدیل کنید.");
+        var taxId = _taxId.Text.Trim();
+        if (taxId.Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(taxId, "^[A-Za-z0-9]{22}$"))
+            throw new InvalidOperationException("شناسه مالیاتی، در صورت ورود، باید دقیقاً ۲۲ حرف یا رقم انگلیسی باشد.");
+
+        var date = ParsePersianDate(_date.Text, "تاریخ صدور");
+        DateTimeOffset? due = string.IsNullOrWhiteSpace(_dueDate.Text) ? null : ParsePersianDate(_dueDate.Text, "تاریخ سررسید");
+        return new InvoiceDraft
+        {
+            CustomerId = person.Id,
+            Type = CurrentType,
+            Prefix = CurrentType switch { "SALE" => "INV-", "PURCHASE" => "PUR-", "PROFORMA" => "PRO-", _ => "INV-" },
+            Date = date,
+            DueDate = due,
+            TaxRatePercent = 0m,
+            TaxAmount = tax,
+            TaxIsAmount = true,
+            Discount = discount,
+            CashAmount = cash,
+            Description = _description.Text.Trim(),
+            Notes = _notes.Text.Trim(),
+            DriverName = _driverName.Text.Trim(),
+            DriverPhone = _driverPhone.Text.Trim(),
+            VehiclePlate = _vehiclePlate.Text.Trim(),
+            TaxId = taxId,
+            ShowPreviousBalance = _showPreviousBalance.IsChecked == true,
+            Lines = _lines.Select(line => new InvoiceLine
+            {
+                ProductId = line.ProductId, ProductName = line.ProductName, SerialNumber = line.SerialNumber,
+                Quantity = line.Quantity, BuyPrice = line.BuyPrice, UnitPrice = line.UnitPrice, Profit = line.Profit,
+                LineTotal = line.LineTotal, Description = line.Description, EntryOrder = line.EntryOrder
+            }).ToList()
+        };
+    }
+
     private void SaveResult()
     {
         try
         {
-            if (_person.SelectedItem is not CustomerRecord person)
-                throw new InvalidOperationException(CurrentType == "PURCHASE"
-                    ? "ابتدا یک تأمین‌کننده ثبت یا انتخاب کنید."
-                    : "ابتدا یک مشتری ثبت یا انتخاب کنید.");
-            if (_lines.Count == 0)
-                throw new InvalidOperationException("حداقل یک قلم به سند اضافه کنید.");
-
-            var discount = AccountingRules.Money(PersianNumberParser.ParseDecimal(_discount.Text, "تخفیف"));
-            var tax = AccountingRules.Money(PersianNumberParser.ParseDecimal(_tax.Text, "مالیات"));
-            var cash = AccountingRules.Money(PersianNumberParser.ParseDecimal(_cashAmount.Text, "مبلغ نقدی"));
-            var subtotal = AccountingRules.Money(_lines.Sum(l => l.LineTotal));
-            if (discount < 0m || discount > subtotal)
-                throw new InvalidOperationException("تخفیف باید بین صفر و جمع کالاها باشد.");
-            if (tax < 0m || cash < 0m || cash > subtotal - discount + tax)
-                throw new InvalidOperationException("مالیات یا مبلغ نقدی معتبر نیست.");
-            if (CurrentType == "PROFORMA" && cash > 0m)
-                throw new InvalidOperationException("برای پیش‌فاکتور دریافت نقدی ثبت نکنید؛ ابتدا آن را به فروش تبدیل کنید.");
-            var taxId = _taxId.Text.Trim();
-            if (taxId.Length > 0 && !System.Text.RegularExpressions.Regex.IsMatch(taxId, "^[A-Za-z0-9]{22}$"))
-                throw new InvalidOperationException("شناسه مالیاتی، در صورت ورود، باید دقیقاً ۲۲ حرف یا رقم انگلیسی باشد.");
-
-            var date = ParsePersianDate(_date.Text, "تاریخ صدور");
-            DateTimeOffset? due = string.IsNullOrWhiteSpace(_dueDate.Text) ? null : ParsePersianDate(_dueDate.Text, "تاریخ سررسید");
-            Result = new InvoiceDraft
-            {
-                CustomerId = person.Id,
-                Type = CurrentType,
-                Prefix = CurrentType switch { "SALE" => "INV-", "PURCHASE" => "PUR-", "PROFORMA" => "PRO-", _ => "INV-" },
-                Date = date,
-                DueDate = due,
-                TaxRatePercent = 0m,
-                TaxAmount = tax,
-                TaxIsAmount = true,
-                Discount = discount,
-                CashAmount = cash,
-                Description = _description.Text.Trim(),
-                Notes = _notes.Text.Trim(),
-                DriverName = _driverName.Text.Trim(),
-                DriverPhone = _driverPhone.Text.Trim(),
-                VehiclePlate = _vehiclePlate.Text.Trim(),
-                TaxId = taxId,
-                ShowPreviousBalance = _showPreviousBalance.IsChecked == true,
-                Lines = _lines.Select(line => new InvoiceLine
-                {
-                    ProductId = line.ProductId, ProductName = line.ProductName, SerialNumber = line.SerialNumber,
-                    Quantity = line.Quantity, BuyPrice = line.BuyPrice, UnitPrice = line.UnitPrice, Profit = line.Profit,
-                    LineTotal = line.LineTotal, Description = line.Description, EntryOrder = line.EntryOrder
-                }).ToList()
-            };
+            Result = BuildDraft();
             DialogResult = true;
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "بررسی سند", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void PreviewDraft()
+    {
+        try
+        {
+            var draft = BuildDraft();
+            new InvoicePreviewWindow(this, draft, _people, _invoices).ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "بررسی پیش‌نمایش", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
     }
 
