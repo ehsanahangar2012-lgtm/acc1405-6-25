@@ -208,9 +208,11 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable()) return;
         if (ProductsGrid.SelectedItem is not ProductRecord selected) { MessageBox.Show(this, "یک کالا را انتخاب کنید."); return; }
-        if (_data.Invoices.Any(i => i.Lines.Any(l => l.ProductId == selected.Id)))
+        if (_data.Invoices.Any(i => i.Lines.Any(l => l.ProductId == selected.Id)) ||
+            _data.Vouchers.Any(v => v.Items.Any(item => item.ProductId == selected.Id)) ||
+            _data.InventoryMovements.Any(m => m.ProductId == selected.Id))
         {
-            MessageBox.Show(this, "این کالا در سوابق فاکتور وجود دارد؛ برای حفظ سوابق، حذف آن مجاز نیست.", "حذف کالا", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, "این کالا در سوابق فاکتور یا گردش انبار وجود دارد؛ برای حفظ زنجیرهٔ مالی و انبارداری، حذف آن مجاز نیست.", "حذف کالا", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
         if (selected.StockQuantity != 0m)
