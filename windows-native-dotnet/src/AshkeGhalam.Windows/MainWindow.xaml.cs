@@ -125,7 +125,13 @@ public partial class MainWindow : Window
         if (!RequireWritable()) return;
         var dialog = new CustomerDialog(this);
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord customer)
-            Commit(data => data.Customers.Add(customer), "مشتری ذخیره شد");
+            Commit(data =>
+            {
+                if (!string.IsNullOrWhiteSpace(customer.Code) &&
+                    data.Customers.Any(p => string.Equals(p.Code, customer.Code, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("کد شخص تکراری است.");
+                data.Customers.Add(customer);
+            }, "پرونده شخص ذخیره شد");
     }
 
     private void EditCustomer_Click(object sender, RoutedEventArgs e)
@@ -136,11 +142,14 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord changed)
             Commit(data =>
             {
+                if (!string.IsNullOrWhiteSpace(changed.Code) &&
+                    data.Customers.Any(p => p.Id != changed.Id && string.Equals(p.Code, changed.Code, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("کد شخص تکراری است.");
                 var index = data.Customers.FindIndex(c => c.Id == changed.Id);
-                if (index < 0) throw new InvalidOperationException("مشتری پیدا نشد.");
+                if (index < 0) throw new InvalidOperationException("شخص پیدا نشد.");
                 data.Customers[index] = changed;
                 // Invoice/payment names remain historical snapshots.
-            }, "مشخصات مشتری به‌روزرسانی شد");
+            }, "پرونده شخص به‌روزرسانی شد");
     }
 
     private void DeleteCustomer_Click(object sender, RoutedEventArgs e)
@@ -215,13 +224,14 @@ public partial class MainWindow : Window
     private void AddInvoice_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
-        if (_data.Customers.Count == 0 || _data.Products.Count == 0)
+        var eligibleCustomers = _data.Customers.Where(c => c.IsCustomer).ToList();
+        if (eligibleCustomers.Count == 0 || _data.Products.Count == 0)
         {
-            MessageBox.Show(this, "برای صدور فاکتور، ابتدا حداقل یک مشتری و یک کالا ثبت کنید.",
+            MessageBox.Show(this, "برای صدور فاکتور فروش، ابتدا یک شخص با نقش «مشتری» و یک کالا ثبت کنید.",
                 "پیش‌نیاز فاکتور", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
-        var dialog = new InvoiceDialog(this, _data.Customers, _data.Products);
+        var dialog = new InvoiceDialog(this, eligibleCustomers, _data.Products);
         if (dialog.ShowDialog() == true && dialog.Result is InvoiceDraft draft)
         {
             Commit(data => AccountingOperations.CreateInvoice(data, draft), "فاکتور ثبت شد و موجودی کالا به‌روزرسانی شد");
@@ -364,8 +374,13 @@ public partial class MainWindow : Window
     }
 
     private void ExportCustomers_Click(object sender, RoutedEventArgs e) =>
-        ExportCsv("customers.csv", new[] { "Id", "Name", "Phone", "Address", "CreatedAt" },
-            _data.Customers.Select(c => new[] { c.Id, c.Name, c.Phone, c.Address, c.CreatedAt.ToString("O") }));
+        ExportCsv("persons.csv", new[] { "Id", "Code", "Name", "Type", "IsCustomer", "IsSupplier", "Category", "Phone", "Email", "NationalId", "Address", "Notes", "Balance", "CreatedAt" },
+            _data.Customers.Select(p => new[]
+            {
+                p.Id, p.Code, p.Name, p.Type, p.IsCustomer.ToString(), p.IsSupplier.ToString(), p.Category,
+                p.Phone, p.Email, p.NationalId, p.Address, p.Notes,
+                p.Balance.ToString(CultureInfo.InvariantCulture), p.CreatedAt.ToString("O")
+            }));
 
     private void ExportProducts_Click(object sender, RoutedEventArgs e) =>
         ExportCsv("products.csv", new[] { "Id", "Name", "Sku", "Unit", "StockQuantity", "UnitPrice" },
