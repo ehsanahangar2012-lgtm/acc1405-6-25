@@ -624,6 +624,7 @@ public partial class MainWindow : Window
                     : new SolidColorBrush(Color.FromRgb(23, 32, 51));
                 button.Foreground = Brushes.WhiteSmoke;
             }
+            if (current is not Visual) continue;
             for (var i = 0; i < VisualTreeHelper.GetChildrenCount(current); i++)
                 pending.Push(VisualTreeHelper.GetChild(current, i));
         }
