@@ -70,16 +70,6 @@ public sealed class KardexWindow : Window
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 5, 0, 0)
         });
-        DockPanel.SetDock(new Border
-        {
-            Background = accent,
-            BorderBrush = accent,
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(18),
-            Margin = new Thickness(0, 0, 0, 12),
-            Child = headerContent
-        }, Dock.Top);
         var hero = new Border
         {
             Background = accent,
