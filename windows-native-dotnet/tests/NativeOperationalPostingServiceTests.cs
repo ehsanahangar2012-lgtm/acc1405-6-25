@@ -157,12 +157,12 @@ public sealed class NativeOperationalPostingServiceTests
 
         Assert.AreEqual(4, countAfterEdit, "Changed revenue and cost are reversed and current revenue/cost are posted.");
         Assert.AreEqual(countAfterEdit, data.JournalEntries.Count, "Repeat reconciliation remains idempotent.");
-        Assert.AreEqual(150m, data.JournalEntries.Single(e => e.ReferenceType == "AUTO_INVOICE_SALE_REVENUE" &&
-            !data.JournalEntries.Any(r => r.ReferenceType == "AUTO_REVERSAL_" + e.Id)).Amount);
-        Assert.AreEqual(150m, data.JournalEntries.Single(e => e.ReferenceType == "AUTO_INVOICE_SALE_COGS" &&
-            !data.JournalEntries.Any(r => r.ReferenceType == "AUTO_REVERSAL_" + e.Id)).Amount == 0m ? 0m :
-            data.JournalEntries.Single(e => e.ReferenceType == "AUTO_INVOICE_SALE_COGS" &&
-                !data.JournalEntries.Any(r => r.ReferenceType == "AUTO_REVERSAL_" + e.Id)).Amount);
+        var activeRevenue = data.JournalEntries.Single(e => e.ReferenceType == "AUTO_INVOICE_SALE_REVENUE" &&
+            !data.JournalEntries.Any(r => r.ReferenceType == "AUTO_REVERSAL_" + e.Id));
+        var activeCogs = data.JournalEntries.Single(e => e.ReferenceType == "AUTO_INVOICE_SALE_COGS" &&
+            !data.JournalEntries.Any(r => r.ReferenceType == "AUTO_REVERSAL_" + e.Id));
+        Assert.AreEqual(150m, activeRevenue.Amount);
+        Assert.AreEqual(30m, activeCogs.Amount, "Changing the selling price must not alter the recorded purchase cost.");
     }
 
     [TestMethod]
