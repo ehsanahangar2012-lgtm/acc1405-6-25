@@ -1699,8 +1699,14 @@ public partial class MainWindow : Window
 
     private void InvoicesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
-        if (InvoicesGrid.SelectedItem is InvoiceRecord)
-            OpenGridContextMenu(InvoicesGrid);
+        if (sender is not DataGrid grid ||
+            e.OriginalSource is not DependencyObject original ||
+            FindVisualAncestor<DataGridRow>(original) is null ||
+            grid.SelectedItem is not InvoiceRecord)
+            return;
+
+        OpenGridContextMenu(grid);
+        e.Handled = true;
     }
 
     private void PreviewInvoice_Click(object sender, RoutedEventArgs e)
@@ -3034,6 +3040,7 @@ public partial class MainWindow : Window
             new GridMenuAction("🗑 حذف شخص", DeleteCustomer_Click));
 
         AttachGridContextMenu(ProductsGrid,
+            new GridMenuAction("📊 کارتکس کالا / چاپ", ShowKardex_Click),
             new GridMenuAction("✏️ ویرایش کالا", EditProduct_Click),
             new GridMenuAction("🗑 حذف کالا", DeleteProduct_Click));
 
