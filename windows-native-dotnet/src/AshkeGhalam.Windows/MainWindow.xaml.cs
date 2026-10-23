@@ -1516,7 +1516,7 @@ public partial class MainWindow : Window
             {
                 // Contain an exception raised while WPF renders the modal preview instead
                 // of terminating the entire accounting application.
-                if (preview is null || !preview.IsVisible)
+                if (preview is null)
                     return;
 
                 var exception = args.Exception;
@@ -1524,7 +1524,7 @@ public partial class MainWindow : Window
                 WriteInvoicePreviewError(exception);
                 preview.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
                 {
-                    try { if (preview.IsVisible) preview.Close(); } catch { }
+                    try { preview.Close(); } catch { }
                     MessageBox.Show(this,
                         $"پیش‌نمایش فاکتور باز نشد و برای جلوگیری از بسته‌شدن حسابداری متوقف شد.\n{exception.Message}\n\nگزارش فنی: {InvoicePreviewErrorLogPath}",
                         "خطا در پیش‌نمایش فاکتور", MessageBoxButton.OK, MessageBoxImage.Error);
