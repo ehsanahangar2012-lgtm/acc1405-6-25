@@ -166,6 +166,8 @@ public sealed class AccountingPreferences
     public string SalesInvoicePrefix { get; set; } = "INV-";
     public string InvoiceFooter { get; set; } = "";
     public List<string> SelectedInvoiceFootnotes { get; set; } = [];
+    // Custom, selectable footer options configured by the user (one phrase per option).
+    public List<string> CustomInvoiceFootnoteOptions { get; set; } = [];
 }
 
 public sealed class MoadianSettingsRecord
@@ -251,6 +253,7 @@ public sealed class InvoiceLine
 {
     public string ProductId { get; set; } = "";
     public string ProductName { get; set; } = "";
+    public string Unit { get; set; } = "";
     public string SerialNumber { get; set; } = "";
     public decimal Quantity { get; set; }
     public decimal BuyPrice { get; set; }
