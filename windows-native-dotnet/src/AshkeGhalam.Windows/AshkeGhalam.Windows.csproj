@@ -16,7 +16,11 @@
     <PackageReference Include="QRCoder" Version="1.8.1" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="Assets\Fonts\Vazirmatn-Regular.ttf" Condition="Exists('Assets\Fonts\Vazirmatn-Regular.ttf')" />
+    <Resource Include="Assets\Fonts\Vazirmatn-Regular.ttf" />
     <None Include="Assets\Fonts\OFL.txt" Condition="Exists('Assets\Fonts\OFL.txt')" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+  <Target Name="EnsureVazirmatnResourceExists" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('Assets\Fonts\Vazirmatn-Regular.ttf')"
+           Text="Vazirmatn font resource is required. Restore Assets\Fonts\Vazirmatn-Regular.ttf before building the WPF app." />
+  </Target>
 </Project>
