@@ -122,7 +122,11 @@ public static class NativeLedgerService
             ReferenceId = (draft.ReferenceId ?? string.Empty).Trim(),
             ReferenceType = (draft.ReferenceType ?? string.Empty).Trim(),
             DocumentType = draft.DocumentType,
-            FiscalYear = string.IsNullOrWhiteSpace(draft.FiscalYear) ? CurrentJalaliYear() : draft.FiscalYear.Trim(),
+            FiscalYear = !string.IsNullOrWhiteSpace(draft.FiscalYear)
+                ? draft.FiscalYear.Trim()
+                : IsWithinActiveFiscalYear(normalizedDate, data.Preferences)
+                    ? data.Preferences.ActiveFiscalYear.Trim()
+                    : normalizedDate.Split('/')[0],
             Status = "POSTED",
             CreatedAt = DateTimeOffset.Now
         };
@@ -199,6 +203,20 @@ public static class NativeLedgerService
                 : "والد حساب تفصیلی باید یک حساب معین باشد.");
         if (parent.Type != account.Type)
             throw new InvalidOperationException("نوع حساب فرزند باید با نوع حساب والد یکسان باشد.");
+    }
+
+    private static bool IsWithinActiveFiscalYear(string normalizedDate, AccountingPreferences? preferences)
+    {
+        if (preferences is null ||
+            string.IsNullOrWhiteSpace(preferences.ActiveFiscalYear) ||
+            string.IsNullOrWhiteSpace(preferences.FiscalYearStartDate) ||
+            string.IsNullOrWhiteSpace(preferences.FiscalYearEndDate))
+            return false;
+
+        // All dates are normalized as yyyy/MM/dd, so ordinal comparison is chronological
+        // within the supported normalized Jalali or Gregorian date format.
+        return string.CompareOrdinal(normalizedDate, preferences.FiscalYearStartDate) >= 0 &&
+               string.CompareOrdinal(normalizedDate, preferences.FiscalYearEndDate) <= 0;
     }
 
     private static string CurrentJalaliYear()
