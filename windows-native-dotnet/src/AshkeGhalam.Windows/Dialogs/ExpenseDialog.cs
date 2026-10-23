@@ -9,7 +9,7 @@ namespace AshkeGhalam.Windows.Dialogs;
 public sealed class ExpenseDialog : Window
 {
     private readonly TextBox _title=new();
-    private readonly TextBox _category=new(){Text="عمومی"};
+    private readonly ComboBox _category = new() { IsEditable = true, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, StaysOpenOnEdit = true, Height = 34, MaxDropDownHeight = 280 };
     private readonly TextBox _amount=new(){Text="0"};
     private readonly TextBox _notes=new(){Height=52,AcceptsReturn=true,TextWrapping=TextWrapping.Wrap};
     public string ExpenseTitle{get;private set;}="";
@@ -17,7 +17,7 @@ public sealed class ExpenseDialog : Window
     public decimal Amount{get;private set;}
     public string Notes{get;private set;}="";
 
-    public ExpenseDialog(Window owner, ExpenseRecord? existing = null)
+    public ExpenseDialog(Window owner, ExpenseRecord? existing = null, IEnumerable<string>? knownCategories = null)
     {
         Owner=owner;Title=existing is null ? "ثبت هزینه" : "ویرایش هزینه";Width=450;Height=460;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
@@ -29,12 +29,35 @@ public sealed class ExpenseDialog : Window
             _amount.Text = NumericTextBoxFormatter.Format(existing.Amount);
             _notes.Text = existing.Notes;
         }
-        var root=new StackPanel{Margin=new Thickness(22)};
-        root.Children.Add(new TextBlock{Text=existing is null ? "هزینهٔ جدید" : "ویرایش مشخصات هزینه",FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
-        Add(root,"عنوان هزینه",_title);Add(root,"دسته‌بندی",_category);Add(root,"مبلغ",_amount);Add(root,"توضیحات",_notes);
-        var buttons=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,18,0,0)};
-        var ok=new Button{Content=existing is null ? "ثبت هزینه" : "ذخیره تغییرات",Width=125,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
-        buttons.Children.Add(ok);buttons.Children.Add(new Button{Content="انصراف",Width=90,Height=36,IsCancel=true});root.Children.Add(buttons);Content=root;
+        _category.ItemsSource = (knownCategories ?? Enumerable.Empty<string>())
+            .Append(existing?.Category ?? "")
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim())
+            .Distinct(StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(value => value, StringComparer.CurrentCultureIgnoreCase)
+            .ToList();
+        _category.Text = existing?.Category ?? "عمومی";
+
+        var root = new StackPanel { Margin = new Thickness(22) };
+        root.Children.Add(new TextBlock { Text = existing is null ? "هزینهٔ جدید" : "ویرایش مشخصات هزینه", FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 14) });
+        Add(root, "عنوان هزینه", _title);
+        Add(root, "دسته‌بندی (انتخاب قبلی یا ورود دستهٔ جدید)", _category);
+        Add(root, "مبلغ", _amount);
+        Add(root, "توضیحات", _notes);
+
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 10, 22, 18) };
+        var ok = new Button { Content = existing is null ? "ثبت هزینه" : "ذخیره تغییرات", Width = 135, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        buttons.Children.Add(ok);
+        buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
+        var layout = new Grid();
+        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var body = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root };
+        Grid.SetRow(body, 0);
+        Grid.SetRow(buttons, 1);
+        layout.Children.Add(body);
+        layout.Children.Add(buttons);
+        Content = layout;
         ok.Click+=(_,_) =>
         {
             try
