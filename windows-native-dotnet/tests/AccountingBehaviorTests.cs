@@ -263,6 +263,31 @@ public sealed class AccountingBehaviorTests
         Assert.AreEqual(0, data.Invoices.Count);
     }
 
+    [TestMethod]
+    public void NativeProductRecordDeepCopyPreservesSourceFields()
+    {
+        var product = new ProductRecord
+        {
+            Id = "product-source-1", Name = "جعبه نمونه", Code = "BOX-01", SerialNumber = "SN-01",
+            Unit = "عدد", StockQuantity = 25m, ReservedStock = 3m, MinStock = 5m,
+            BuyPrice = 120m, SellPrice = 250m, Weight = 0.4m, ShelfLocation = "قفسه A-2",
+            Category = "بسته‌بندی", SubCategory = "کارتن", SubSubCategory = "سه‌لایه",
+            CategoryPath = "بسته‌بندی / کارتن / سه‌لایه", Description = "آزمون", ImageUrl = "C:/products/box.png"
+        };
+        var clone = new AccountingData { Products = [product] }.DeepCopy();
+        var copied = clone.Products[0];
+
+        Assert.AreNotSame(product, copied);
+        Assert.AreEqual("BOX-01", copied.Code);
+        Assert.AreEqual(25m, copied.Stock);
+        Assert.AreEqual(3m, copied.ReservedStock);
+        Assert.AreEqual(120m, copied.BuyPrice);
+        Assert.AreEqual(250m, copied.SellPrice);
+        Assert.AreEqual("بسته‌بندی / کارتن / سه‌لایه", copied.CategoryPath);
+        Assert.AreEqual("C:/products/box.png", copied.ImageUrl);
+        AccountingDataValidator.Validate(clone);
+    }
+
     private static AccountingData CreateSampleData(bool includeInvoice)
     {
         var customer=new CustomerRecord{Id="customer-test-1",Name="مشتری آزمایشی",Phone="09120000000",Address="تهران"};
