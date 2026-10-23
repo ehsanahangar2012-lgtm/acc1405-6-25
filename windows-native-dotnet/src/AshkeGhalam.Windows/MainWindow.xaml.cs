@@ -92,7 +92,12 @@ public partial class MainWindow : Window
         if (FindName("ChecksGrid") is DataGrid checksGrid)
         {
             checksGrid.ItemsSource = null;
-            checksGrid.ItemsSource = _data.Checks.OrderBy(c => c.DueDate).ThenByDescending(c => c.CreatedAt).ToList();
+            checksGrid.ItemsSource = _data.Checks.OrderBy(c => c.DueDate).ThenByDescending(c => c.CreatedAt)
+                .Select(c => new CheckGridRow(c, CheckTypeLabel(c.CheckType), c.HolderName, c.BankName, c.Amount,
+                    c.SayadId, c.CheckNumber, FormatPersianDate(c.DueDate),
+                    c.IssueDate is DateTimeOffset issue ? FormatPersianDate(issue) : "—",
+                    CheckStatusLabel(c.Status), c.IsHighPriority ? "اولویت‌دار" : "عادی", c.PersonName))
+                .ToList();
         }
         RecentInvoicesGrid.ItemsSource = null;
         RecentInvoicesGrid.ItemsSource = _data.Invoices.OrderByDescending(i => i.Number).Take(10).ToList();
@@ -422,8 +427,9 @@ public partial class MainWindow : Window
     private void EditCheck_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
-        if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckRecord selected)
+        if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckGridRow selectedRow)
         { MessageBox.Show(this, "یک چک را انتخاب کنید."); return; }
+        var selected = selectedRow.Record;
         var dialog = new CheckDialog(this, selected);
         if (dialog.ShowDialog() != true || dialog.Result is not CheckRecord changed) return;
         Commit(data =>
@@ -439,8 +445,9 @@ public partial class MainWindow : Window
     private void ChangeCheckStatus_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
-        if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckRecord selected)
+        if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckGridRow selectedRow)
         { MessageBox.Show(this, "ابتدا یک چک را انتخاب کنید."); return; }
+        var selected = selectedRow.Record;
         var dialog = new CheckStatusDialog(this, selected.Status);
         if (dialog.ShowDialog() != true) return;
         if (string.Equals(selected.Status, dialog.SelectedStatus, StringComparison.Ordinal))
@@ -457,8 +464,9 @@ public partial class MainWindow : Window
     private void DeleteCheck_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
-        if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckRecord selected)
+        if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckGridRow selectedRow)
         { MessageBox.Show(this, "یک چک را انتخاب کنید."); return; }
+        var selected = selectedRow.Record;
         if (!string.IsNullOrWhiteSpace(selected.RelatedInvoiceId) || selected.Status != "PENDING")
         {
             MessageBox.Show(this, "برای حفظ سابقهٔ مالی، فقط چکِ در انتظار و بدون پیوند فاکتور قابل حذف است. چک‌های دیگر را با وضعیت مناسب نگه دارید.",
@@ -505,6 +513,11 @@ public partial class MainWindow : Window
             calendar.GetYear(value.DateTime), calendar.GetMonth(value.DateTime), calendar.GetDayOfMonth(value.DateTime));
     }
 
+    private sealed record CheckGridRow(
+        CheckRecord Record, string TypeLabel, string HolderName, string BankName, decimal Amount,
+        string SayadId, string CheckNumber, string DueDateLabel, string IssueDateLabel,
+        string StatusLabel, string PriorityLabel, string PersonName);
+
     // Native navigation mirrors the existing Ashke Ghalam sidebar. Unported pages are
     // deliberately marked as pending instead of being represented by fake functionality.
     private sealed record NativeModuleLink(string Title, string Group, string OriginalRoute, int? NativeTabIndex);
@@ -515,7 +528,7 @@ public partial class MainWindow : Window
             ["dashboard"] = new("پیشخوان", "منوی اصلی", "/", 0),
             ["invoices"] = new("فاکتورها", "منوی اصلی", "/invoices", 3),
             ["inventory"] = new("انبارداری", "منوی اصلی", "/inventory", 2),
-            ["checks"] = new("مدیریت چک", "منوی اصلی", "/checks", null),
+            ["checks"] = new("مدیریت چک", "منوی اصلی", "/checks", 8),
             ["finance"] = new("امور مالی", "منوی اصلی", "/finance", null),
             ["customers"] = new("اشخاص", "منوی اصلی", "/customers", 1),
             ["reports"] = new("گزارشات عمومی", "گزارشات و تحلیل", "/reports", 6),
