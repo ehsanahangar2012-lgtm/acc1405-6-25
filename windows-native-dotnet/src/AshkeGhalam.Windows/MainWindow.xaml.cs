@@ -88,7 +88,7 @@ public partial class MainWindow : Window
     {
         if (e.OriginalSource != MainTabs) return;
         RefreshAll();
-        if (MainTabs.SelectedIndex == 11) RefreshLicensePanel();
+        if (MainTabs.SelectedIndex == 13) RefreshLicensePanel();
     }
 
     private bool RequireWritable()
