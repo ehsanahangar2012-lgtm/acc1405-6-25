@@ -37,11 +37,19 @@ public sealed class AccountingData
         }).ToList(),
         Invoices = Invoices.Select(i => new InvoiceRecord
         {
-            Id=i.Id, Number=i.Number, CustomerId=i.CustomerId, CustomerName=i.CustomerName,
-            Description=i.Description, Lines=i.Lines.Select(l => new InvoiceLine
-            { ProductId=l.ProductId, ProductName=l.ProductName, Quantity=l.Quantity, UnitPrice=l.UnitPrice, LineTotal=l.LineTotal }).ToList(),
-            Subtotal=i.Subtotal, TaxRatePercent=i.TaxRatePercent, TaxAmount=i.TaxAmount,
-            Total=i.Total, CreatedAt=i.CreatedAt, Notes=i.Notes, Status=i.Status
+            Id=i.Id, Number=i.Number, Type=i.Type, Prefix=i.Prefix, TrackingCode=i.TrackingCode,
+            CustomerId=i.CustomerId, CustomerName=i.CustomerName, Description=i.Description,
+            Lines=i.Lines.Select(l => new InvoiceLine
+            {
+                ProductId=l.ProductId, ProductName=l.ProductName, SerialNumber=l.SerialNumber,
+                Quantity=l.Quantity, BuyPrice=l.BuyPrice, UnitPrice=l.UnitPrice, Profit=l.Profit,
+                LineTotal=l.LineTotal, Description=l.Description, EntryOrder=l.EntryOrder
+            }).ToList(),
+            Subtotal=i.Subtotal, TaxRatePercent=i.TaxRatePercent, TaxAmount=i.TaxAmount, TaxIsAmount=i.TaxIsAmount,
+            Discount=i.Discount, Total=i.Total, CashAmount=i.CashAmount, CheckAmount=i.CheckAmount,
+            CreatedAt=i.CreatedAt, DueDate=i.DueDate, Notes=i.Notes, Status=i.Status,
+            DriverName=i.DriverName, DriverPhone=i.DriverPhone, VehiclePlate=i.VehiclePlate,
+            TaxId=i.TaxId, ShowPreviousBalance=i.ShowPreviousBalance
         }).ToList(),
         Payments = Payments.Select(p => new PaymentRecord
         { Id=p.Id, InvoiceId=p.InvoiceId, InvoiceNumber=p.InvoiceNumber, CustomerName=p.CustomerName, Amount=p.Amount, Method=p.Method, Reference=p.Reference, CreatedAt=p.CreatedAt }).ToList(),
@@ -148,26 +156,57 @@ public sealed class InvoiceLine
 {
     public string ProductId { get; set; } = "";
     public string ProductName { get; set; } = "";
+    public string SerialNumber { get; set; } = "";
     public decimal Quantity { get; set; }
+    public decimal BuyPrice { get; set; }
     public decimal UnitPrice { get; set; }
+    public decimal Profit { get; set; }
     public decimal LineTotal { get; set; }
+    public string Description { get; set; } = "";
+    public int EntryOrder { get; set; }
 }
 
 public sealed class InvoiceRecord
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
     public int Number { get; set; }
+    public string Type { get; set; } = "SALE";
+    public string Prefix { get; set; } = "INV-";
+    public string TrackingCode { get; set; } = "";
     public string CustomerId { get; set; } = "";
     public string CustomerName { get; set; } = "";
     public string Description { get; set; } = "";
     public List<InvoiceLine> Lines { get; set; } = [];
     public decimal Subtotal { get; set; }
+    // Percentage-tax fields are retained for old WPF data.
     public decimal TaxRatePercent { get; set; }
     public decimal TaxAmount { get; set; }
+    public bool TaxIsAmount { get; set; }
+    public decimal Discount { get; set; }
     public decimal Total { get; set; }
+    public decimal CashAmount { get; set; }
+    public decimal CheckAmount { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
+    public DateTimeOffset? DueDate { get; set; }
     public string Notes { get; set; } = "";
     public string Status { get; set; } = "صادر شده";
+    public string DriverName { get; set; } = "";
+    public string DriverPhone { get; set; } = "";
+    public string VehiclePlate { get; set; } = "";
+    public string TaxId { get; set; } = "";
+    public bool ShowPreviousBalance { get; set; } = true;
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string TypeLabel => Type switch
+    {
+        "SALE" => "فروش",
+        "PURCHASE" => "خرید",
+        "PROFORMA" => "پیش‌فاکتور",
+        _ => Type
+    };
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string DisplayNumber => (Prefix ?? "") + Number.ToString("D4", System.Globalization.CultureInfo.InvariantCulture);
 }
 
 public sealed class PaymentRecord
@@ -282,6 +321,24 @@ public sealed class InventoryMovementRecord
 public sealed class InvoiceDraft
 {
     public string CustomerId { get; init; } = "";
+    public string Type { get; init; } = "SALE";
+    public string Prefix { get; init; } = "";
+    public DateTimeOffset Date { get; init; } = DateTimeOffset.Now;
+    public DateTimeOffset? DueDate { get; init; }
+    public decimal TaxRatePercent { get; init; }
+    public decimal TaxAmount { get; init; }
+    public bool TaxIsAmount { get; init; }
+    public decimal Discount { get; init; }
+    public decimal CashAmount { get; init; }
+    public string Description { get; init; } = "";
+    public string Notes { get; init; } = "";
+    public string DriverName { get; init; } = "";
+    public string DriverPhone { get; init; } = "";
+    public string VehiclePlate { get; init; } = "";
+    public string TaxId { get; init; } = "";
+    public bool ShowPreviousBalance { get; init; } = true;
+    public List<InvoiceLine> Lines { get; init; } = [];
+} = "";
     public decimal TaxRatePercent { get; init; }
     public string Notes { get; init; } = "";
     public List<InvoiceLine> Lines { get; init; } = [];
@@ -315,22 +372,41 @@ public static class AccountingOperations
 {
     public static InvoiceRecord CreateInvoice(AccountingData data, InvoiceDraft draft)
     {
-        if (draft.Lines.Count == 0)
+        if (draft.Lines is null || draft.Lines.Count == 0)
             throw new InvalidOperationException("برای فاکتور حداقل یک قلم کالا لازم است.");
-        var customer = data.Customers.SingleOrDefault(c => c.Id == draft.CustomerId)
-            ?? throw new InvalidOperationException("مشتری انتخاب‌شده پیدا نشد.");
-        if (!customer.IsCustomer)
-            throw new InvalidOperationException("برای صدور فاکتور فروش، شخص باید با نوع مشتری ثبت شده باشد.");
+        if (!new[] { "SALE", "PURCHASE", "PROFORMA" }.Contains(draft.Type, StringComparer.Ordinal))
+            throw new InvalidOperationException("نوع سند فروش، خرید یا پیش‌فاکتور را انتخاب کنید.");
+
+        var person = data.Customers.SingleOrDefault(c => c.Id == draft.CustomerId)
+            ?? throw new InvalidOperationException("طرف حساب انتخاب‌شده پیدا نشد.");
+        if (draft.Type == "PURCHASE" && !person.IsSupplier)
+            throw new InvalidOperationException("برای فاکتور خرید، طرف حساب باید نقش تأمین‌کننده داشته باشد.");
+        if ((draft.Type is "SALE" or "PROFORMA") && !person.IsCustomer)
+            throw new InvalidOperationException("برای فاکتور فروش یا پیش‌فاکتور، طرف حساب باید نقش مشتری داشته باشد.");
         if (draft.TaxRatePercent < 0m || draft.TaxRatePercent > 100m)
-            throw new InvalidOperationException("درصد مالیات باید بین صفر تا صد باشد.");
+            throw new InvalidOperationException("نرخ مالیات باید بین صفر تا صد باشد.");
+
+        var discount = AccountingRules.Money(draft.Discount);
+        if (discount < 0m || draft.CashAmount < 0m || draft.TaxAmount < 0m)
+            throw new InvalidOperationException("تخفیف، مالیات و مبلغ نقدی نمی‌توانند منفی باشند.");
+        if (draft.Type == "PROFORMA" && draft.CashAmount > 0m)
+            throw new InvalidOperationException("پیش‌فاکتور سند غیرقطعی است؛ دریافت را پس از تبدیل به فروش ثبت کنید.");
+        if (draft.TaxIsAmount && draft.TaxRatePercent != 0m)
+            throw new InvalidOperationException("مالیات مبلغی و نرخ درصدی را در یک سند هم‌زمان وارد نکنید.");
 
         foreach (var group in draft.Lines.GroupBy(line => line.ProductId, StringComparer.Ordinal))
         {
             var product = data.Products.SingleOrDefault(p => p.Id == group.Key)
                 ?? throw new InvalidOperationException("یکی از کالاهای فاکتور پیدا نشد.");
             var requiredQuantity = group.Sum(line => line.Quantity);
-            if (requiredQuantity <= 0m || product.StockQuantity < requiredQuantity)
-                throw new InvalidOperationException($"موجودی کالای «{product.Name}» کافی نیست. موجودی: {product.StockQuantity:N2}");
+            if (requiredQuantity <= 0m)
+                throw new InvalidOperationException("تعداد ردیف‌های فاکتور معتبر نیست.");
+            if (draft.Type == "SALE")
+            {
+                var available = product.StockQuantity - product.ReservedStock;
+                if (available < requiredQuantity)
+                    throw new InvalidOperationException($"موجودی آزاد کالای «{product.Name}» کافی نیست. آزاد: {available:N2}");
+            }
         }
 
         var resolved = new List<(ProductRecord Product, InvoiceLine Line)>();
@@ -338,42 +414,135 @@ public static class AccountingOperations
         {
             var product = data.Products.SingleOrDefault(p => p.Id == item.ProductId)
                 ?? throw new InvalidOperationException("یکی از کالاهای فاکتور پیدا نشد.");
-            if (item.Quantity <= 0m || item.UnitPrice < 0m)
-                throw new InvalidOperationException("تعداد باید مثبت و قیمت نمی‌تواند منفی باشد.");
+            if (item.Quantity <= 0m || item.UnitPrice < 0m || item.BuyPrice < 0m)
+                throw new InvalidOperationException("تعداد باید مثبت و قیمت‌ها نمی‌توانند منفی باشند.");
             var unitPrice = AccountingRules.Money(item.UnitPrice);
+            var buyPrice = AccountingRules.Money(item.BuyPrice);
             var line = new InvoiceLine
             {
                 ProductId = product.Id,
                 ProductName = product.Name,
+                SerialNumber = string.IsNullOrWhiteSpace(item.SerialNumber) ? product.SerialNumber : item.SerialNumber.Trim(),
                 Quantity = item.Quantity,
+                BuyPrice = buyPrice,
                 UnitPrice = unitPrice,
-                LineTotal = AccountingRules.Money(item.Quantity * unitPrice)
+                Profit = draft.Type == "SALE" ? AccountingRules.Money((unitPrice - buyPrice) * item.Quantity) : 0m,
+                LineTotal = AccountingRules.Money(item.Quantity * unitPrice),
+                Description = item.Description.Trim(),
+                EntryOrder = item.EntryOrder
             };
             resolved.Add((product, line));
         }
 
         var subtotal = AccountingRules.Money(resolved.Sum(x => x.Line.LineTotal));
+        if (discount > subtotal)
+            throw new InvalidOperationException("تخفیف از جمع کالاها بیشتر است.");
+        var taxAmount = draft.TaxIsAmount
+            ? AccountingRules.Money(draft.TaxAmount)
+            : AccountingRules.CalculateTax(subtotal, draft.TaxRatePercent);
+        var total = AccountingRules.Money(subtotal - discount + taxAmount);
+        if (draft.CashAmount > total)
+            throw new InvalidOperationException("مبلغ نقدی اولیه از مبلغ نهایی سند بیشتر است.");
+
+        var floor = draft.Type switch { "SALE" => 1000, "PROFORMA" => 2000, "PURCHASE" => 3000, _ => 0 };
+        var number = data.Invoices.Where(i => i.Type == draft.Type).Select(i => i.Number).DefaultIfEmpty(floor).Max() + 1;
+        var prefix = !string.IsNullOrWhiteSpace(draft.Prefix) ? draft.Prefix.Trim() : draft.Type switch
+        {
+            "SALE" => "INV-",
+            "PURCHASE" => "PUR-",
+            "PROFORMA" => "PRO-",
+            _ => "INV-"
+        };
+        var createdAt = draft.Date == default ? DateTimeOffset.Now : draft.Date;
+        var description = string.IsNullOrWhiteSpace(draft.Description)
+            ? string.Join("، ", resolved.Select(x => x.Line.ProductName).Distinct())
+            : draft.Description.Trim();
+
         var invoice = new InvoiceRecord
         {
-            Number = data.NextInvoiceNumber,
-            CustomerId = customer.Id,
-            CustomerName = customer.Name,
-            Description = string.Join("، ", resolved.Select(x => x.Line.ProductName).Distinct()),
+            Number = number,
+            Type = draft.Type,
+            Prefix = prefix,
+            TrackingCode = $"{prefix}{number:D4}-{createdAt:yyyyMMdd}",
+            CustomerId = person.Id,
+            CustomerName = person.Name,
+            Description = description,
             Lines = resolved.Select(x => x.Line).ToList(),
             Subtotal = subtotal,
-            TaxRatePercent = draft.TaxRatePercent,
-            TaxAmount = AccountingRules.CalculateTax(subtotal, draft.TaxRatePercent),
-            Total = AccountingRules.CalculateTotal(subtotal, draft.TaxRatePercent),
+            TaxRatePercent = draft.TaxIsAmount ? 0m : draft.TaxRatePercent,
+            TaxAmount = taxAmount,
+            TaxIsAmount = draft.TaxIsAmount,
+            Discount = discount,
+            Total = total,
+            CashAmount = AccountingRules.Money(draft.CashAmount),
+            CheckAmount = 0m,
+            CreatedAt = createdAt,
+            DueDate = draft.DueDate,
             Notes = draft.Notes.Trim(),
-            Status = "صادر شده",
-            CreatedAt = DateTimeOffset.Now
+            DriverName = draft.DriverName.Trim(),
+            DriverPhone = draft.DriverPhone.Trim(),
+            VehiclePlate = draft.VehiclePlate.Trim(),
+            TaxId = draft.TaxId.Trim(),
+            ShowPreviousBalance = draft.ShowPreviousBalance,
+            Status = "صادر شده"
         };
 
-        // Mutations happen only after all lines and stock levels have been validated.
-        foreach (var entry in resolved)
-            entry.Product.StockQuantity -= entry.Line.Quantity;
+        // Sales reduce stock; purchases increase stock; proformas are non-posting until conversion.
+        if (draft.Type == "SALE")
+            foreach (var entry in resolved) entry.Product.StockQuantity -= entry.Line.Quantity;
+        else if (draft.Type == "PURCHASE")
+            foreach (var entry in resolved) entry.Product.StockQuantity += entry.Line.Quantity;
+
         data.Invoices.Add(invoice);
-        data.NextInvoiceNumber++;
+        data.NextInvoiceNumber = Math.Max(data.NextInvoiceNumber, number + 1);
+        if (invoice.CashAmount > 0m)
+        {
+            data.Payments.Add(new PaymentRecord
+            {
+                InvoiceId = invoice.Id,
+                InvoiceNumber = invoice.Number,
+                CustomerName = invoice.CustomerName,
+                Amount = invoice.CashAmount,
+                Method = "نقدی",
+                Reference = draft.Type == "PURCHASE" ? "پرداخت نقدی هنگام ثبت فاکتور خرید" : "دریافت نقدی هنگام ثبت فاکتور",
+                CreatedAt = DateTimeOffset.Now
+            });
+            if (AccountingRules.RemainingForInvoice(data, invoice) == 0m)
+                invoice.Status = "تسویه شده";
+        }
+        return invoice;
+    }
+
+    public static InvoiceRecord ConvertProformaToSale(AccountingData data, string invoiceId)
+    {
+        var invoice = data.Invoices.SingleOrDefault(i => i.Id == invoiceId)
+            ?? throw new InvalidOperationException("پیش‌فاکتور پیدا نشد.");
+        if (invoice.Type != "PROFORMA")
+            throw new InvalidOperationException("فقط پیش‌فاکتور را می‌توان به فاکتور فروش تبدیل کرد.");
+        if (invoice.Status != "صادر شده")
+            throw new InvalidOperationException("وضعیت این پیش‌فاکتور برای تبدیل معتبر نیست.");
+        var person = data.Customers.SingleOrDefault(c => c.Id == invoice.CustomerId)
+            ?? throw new InvalidOperationException("مشتری پیش‌فاکتور پیدا نشد.");
+        if (!person.IsCustomer)
+            throw new InvalidOperationException("طرف حساب دیگر نقش مشتری ندارد.");
+
+        var requirements = invoice.Lines.GroupBy(l => l.ProductId, StringComparer.Ordinal)
+            .Select(g => new
+            {
+                Product = data.Products.SingleOrDefault(p => p.Id == g.Key),
+                Quantity = g.Sum(l => l.Quantity)
+            }).ToList();
+        if (requirements.Any(x => x.Product is null))
+            throw new InvalidOperationException("یکی از کالاهای پیش‌فاکتور دیگر موجود نیست.");
+        foreach (var item in requirements)
+        {
+            var available = item.Product!.StockQuantity - item.Product.ReservedStock;
+            if (available < item.Quantity)
+                throw new InvalidOperationException($"موجودی آزاد کالای «{item.Product.Name}» برای تبدیل کافی نیست. آزاد: {available:N2}");
+        }
+        foreach (var item in requirements) item.Product!.StockQuantity -= item.Quantity;
+        invoice.Type = "SALE";
+        // Preserve the original number/tracking history just like the source app's type update.
         return invoice;
     }
 
@@ -382,7 +551,9 @@ public static class AccountingOperations
         var invoice = data.Invoices.SingleOrDefault(i => i.Id == invoiceId)
             ?? throw new InvalidOperationException("فاکتور پیدا نشد.");
         if (invoice.Status == "لغو شده")
-            throw new InvalidOperationException("برای فاکتور لغوشده نمی‌توان دریافت ثبت کرد.");
+            throw new InvalidOperationException("برای فاکتور لغوشده نمی‌توان دریافت/پرداخت ثبت کرد.");
+        if (invoice.Type == "PROFORMA")
+            throw new InvalidOperationException("پیش‌فاکتور سند قطعی نیست؛ ابتدا آن را به فاکتور فروش تبدیل کنید.");
         if (amount <= 0m)
             throw new InvalidOperationException("مبلغ دریافت باید بیشتر از صفر باشد.");
         amount = AccountingRules.Money(amount);
@@ -401,6 +572,8 @@ public static class AccountingOperations
             CreatedAt = DateTimeOffset.Now
         };
         data.Payments.Add(payment);
+        if (string.Equals(payment.Method, "نقدی", StringComparison.Ordinal))
+            invoice.CashAmount = AccountingRules.Money(invoice.CashAmount + payment.Amount);
         if (AccountingRules.RemainingForInvoice(data, invoice) == 0m)
             invoice.Status = "تسویه شده";
         return payment;
@@ -556,25 +729,31 @@ public static class AccountingOperations
     public static void CancelInvoice(AccountingData data, string invoiceId)
     {
         var invoice = data.Invoices.SingleOrDefault(i => i.Id == invoiceId)
-            ?? throw new InvalidOperationException("فاکتور پیدا نشد.");
+            ?? throw new InvalidOperationException("سند پیدا نشد.");
         if (invoice.Status != "صادر شده")
-            throw new InvalidOperationException("فقط فاکتور صادرشدهٔ تسویه‌نشده قابل لغو است.");
+            throw new InvalidOperationException("فقط سند صادرشدهٔ تسویه‌نشده قابل لغو است.");
         if (AccountingRules.PaidForInvoice(data, invoice.Id) != 0m)
-            throw new InvalidOperationException("برای فاکتور دارای دریافت، لغو مستقیم مجاز نیست.");
+            throw new InvalidOperationException("برای سند دارای دریافت/پرداخت، لغو مستقیم مجاز نیست.");
 
-        // Validate all products before changing any stock to keep cancellation atomic.
-        var products = invoice.Lines.Select(line => new
-        {
-            Line = line,
-            Product = data.Products.SingleOrDefault(product => product.Id == line.ProductId)
-        }).ToList();
-        if (products.Any(item => item.Product is null))
-            throw new InvalidOperationException("یکی از کالاهای این فاکتور برای برگشت موجودی پیدا نشد.");
-        foreach (var item in products)
-            item.Product!.StockQuantity += item.Line.Quantity;
+        var products = invoice.Lines.GroupBy(line => line.ProductId, StringComparer.Ordinal)
+            .Select(group => new
+            {
+                Product = data.Products.SingleOrDefault(p => p.Id == group.Key),
+                Quantity = group.Sum(line => line.Quantity)
+            }).ToList();
+        if (invoice.Type != "PROFORMA" && products.Any(item => item.Product is null))
+            throw new InvalidOperationException("یکی از کالاهای این سند برای برگشت گردش موجودی پیدا نشد.");
+        if (invoice.Type == "PURCHASE" && products.Any(item => item.Product!.StockQuantity < item.Quantity))
+            throw new InvalidOperationException("موجودی خرید قبلاً مصرف شده است؛ ابتدا سند برگشت/تعدیل ثبت کنید.");
 
+        if (invoice.Type == "SALE")
+            foreach (var item in products) item.Product!.StockQuantity += item.Quantity;
+        else if (invoice.Type == "PURCHASE")
+            foreach (var item in products) item.Product!.StockQuantity -= item.Quantity;
+        // A proforma has no inventory posting to reverse.
         invoice.Status = "لغو شده";
     }
+
 }
 
 public static class AccountingDataValidator
@@ -624,22 +803,33 @@ public static class AccountingDataValidator
 
         var invoiceIds = UniqueIds(data.Invoices.Select(i => i?.Id), "فاکتور");
         var invoiceNumbers = new HashSet<int>();
+        var validInvoiceTypes = new[] { "SALE", "PURCHASE", "PROFORMA" };
         foreach (var invoice in data.Invoices)
         {
             if (invoice is null || invoice.Lines is null || invoice.Lines.Count == 0 || invoice.Lines.Any(line => line is null))
                 throw new InvalidDataException("فاکتور فاقد اقلام معتبر است.");
 
             if (invoice.Number < 1 || !invoiceNumbers.Add(invoice.Number) ||
+                !validInvoiceTypes.Contains(invoice.Type, StringComparer.Ordinal) ||
                 !customerIds.Contains(invoice.CustomerId) || string.IsNullOrWhiteSpace(invoice.CustomerName) ||
-                invoice.TaxRatePercent < 0m || invoice.TaxRatePercent > 100m || invoice.Subtotal < 0m ||
-                invoice.TaxAmount != AccountingRules.CalculateTax(invoice.Subtotal, invoice.TaxRatePercent) ||
-                invoice.Total != AccountingRules.CalculateTotal(invoice.Subtotal, invoice.TaxRatePercent) ||
+                invoice.TaxRatePercent < 0m || invoice.TaxRatePercent > 100m ||
+                invoice.Subtotal < 0m || invoice.TaxAmount < 0m || invoice.Discount < 0m ||
+                invoice.Discount > invoice.Subtotal ||
+                invoice.Total != AccountingRules.Money(invoice.Subtotal - invoice.Discount + invoice.TaxAmount) ||
+                (!invoice.TaxIsAmount && invoice.TaxAmount != AccountingRules.CalculateTax(invoice.Subtotal, invoice.TaxRatePercent)) ||
+                (invoice.TaxIsAmount && invoice.TaxRatePercent != 0m) ||
+                invoice.CashAmount < 0m || invoice.CheckAmount < 0m ||
+                invoice.CashAmount + invoice.CheckAmount > invoice.Total ||
                 invoice.Subtotal != AccountingRules.Money(invoice.Lines.Sum(line => line.LineTotal)) ||
                 invoice.Lines.Any(line => string.IsNullOrWhiteSpace(line.ProductId) ||
-                    string.IsNullOrWhiteSpace(line.ProductName) || line.Quantity <= 0m || line.UnitPrice < 0m ||
+                    string.IsNullOrWhiteSpace(line.ProductName) || line.Quantity <= 0m ||
+                    line.BuyPrice < 0m || line.UnitPrice < 0m ||
+                    line.Profit != AccountingRules.Money(line.Profit) ||
                     line.LineTotal != AccountingRules.Money(line.Quantity * line.UnitPrice)) ||
                 !new[] { "صادر شده", "تسویه شده", "لغو شده" }.Contains(invoice.Status, StringComparer.Ordinal))
                 throw new InvalidDataException("فاکتور ناقص یا ناسازگار است.");
+            if (invoice.Type == "PROFORMA" && (invoice.CashAmount > 0m || invoice.CheckAmount > 0m))
+                throw new InvalidDataException("پیش‌فاکتور نباید دریافت/پرداخت قطعی داشته باشد.");
         }
 
         if (data.NextInvoiceNumber < 1 || (invoiceNumbers.Count > 0 && data.NextInvoiceNumber <= invoiceNumbers.Max()))
@@ -658,8 +848,9 @@ public static class AccountingDataValidator
         {
             var paid = AccountingRules.PaidForInvoice(data, invoice.Id);
             if (paid > invoice.Total || (invoice.Status == "تسویه شده" && paid != invoice.Total) ||
-                (invoice.Status == "لغو شده" && paid != 0m))
-                throw new InvalidDataException("مبالغ دریافتی با وضعیت فاکتور سازگار نیست.");
+                (invoice.Status == "لغو شده" && paid != 0m) ||
+                (invoice.Type == "PROFORMA" && paid != 0m))
+                throw new InvalidDataException("مبالغ دریافت/پرداخت با وضعیت سند سازگار نیست.");
         }
 
         UniqueIds(data.Expenses.Select(e => e?.Id), "هزینه");
