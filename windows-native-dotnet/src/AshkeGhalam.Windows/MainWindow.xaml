@@ -5,7 +5,7 @@
         Title="حسابداری اشک قلم — نسخه بومی ویندوز"
         Width="1360" Height="880" MinWidth="1040" MinHeight="680"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
-        Background="#F1F5F9" FlowDirection="RightToLeft"
+        Background="#F1F5F9" Foreground="#0F172A" FlowDirection="RightToLeft"
         FontFamily="pack://application:,,,/Assets/Fonts/#Vazirmatn"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
     <shell:WindowChrome.WindowChrome>
@@ -25,6 +25,46 @@
         </Style>
         <Style TargetType="ComboBox">
             <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="IsTextSearchEnabled" Value="True"/>
+            <Setter Property="MaxDropDownHeight" Value="320"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Padding" Value="8,4"/>
+        </Style>
+        <Style TargetType="DataGridRow">
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Foreground" Value="#1E293B"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Style.Triggers>
+                <Trigger Property="AlternationIndex" Value="1">
+                    <Setter Property="Background" Value="#F8FAFC"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#CCFBF1"/>
+                    <Setter Property="Foreground" Value="#134E4A"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0FDFA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Padding" Value="9,5"/>
+            <Setter Property="Foreground" Value="#1E293B"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#E2E8F0"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="9,7"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
         </Style>
         <Style TargetType="DataGrid">
             <Setter Property="AutoGenerateColumns" Value="False"/>
@@ -110,7 +150,7 @@
                 <ColumnDefinition Width="300"/>
             </Grid.ColumnDefinitions>
             <Grid Grid.Column="0" FlowDirection="RightToLeft">
-                <TabControl x:Name="MainTabs" FlowDirection="RightToLeft" Margin="0,0,14,0" Padding="0" SelectionChanged="MainTabs_SelectionChanged">
+                <TabControl x:Name="MainTabs" SelectedIndex="0" FlowDirection="RightToLeft" Margin="0,0,14,0" Padding="0" SelectionChanged="MainTabs_SelectionChanged">
                     <TabControl.Template>
                         <ControlTemplate TargetType="{x:Type TabControl}">
                             <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
@@ -1096,8 +1136,6 @@
                         <Button Tag="workflow-rules" Content="⚙️  قواعد گردش مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="گزارشات و تحلیل" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="financial-reports" Content="📊  گزارشات مالی پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <TextBlock Text="سامانه‌های مالیاتی" Style="{StaticResource NavSectionLabel}"/>
-                        <TextBlock Text="تنظیمات حسابداری و اتصال" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="companies" Content="🏢  چندشرکتی و مشخصات شرکت" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="server" Content="🌐  ارتباط با سرور اصلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="fiscal-year" Content="📅  سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
