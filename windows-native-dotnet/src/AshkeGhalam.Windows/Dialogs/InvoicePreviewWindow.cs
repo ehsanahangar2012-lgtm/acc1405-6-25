@@ -293,6 +293,7 @@ public sealed class InvoicePreviewWindow : Window
         "thermal" => new(Color.FromRgb(17, 24, 39), Color.FromRgb(243, 244, 246), Color.FromRgb(17, 24, 39)),
         "minimal" => new(Color.FromRgb(100, 116, 139), Color.FromRgb(248, 250, 252), Color.FromRgb(30, 41, 59)),
         "classic" => new(Color.FromRgb(30, 64, 175), Color.FromRgb(239, 246, 255), Color.FromRgb(30, 41, 59)),
+        "smart" => new(Color.FromRgb(3, 105, 161), Color.FromRgb(224, 242, 254), Color.FromRgb(12, 45, 72)),
         "colorful" => new(Color.FromRgb(124, 58, 237), Color.FromRgb(245, 243, 255), Color.FromRgb(30, 27, 75)),
         "industrial" => new(Color.FromRgb(55, 65, 81), Color.FromRgb(243, 244, 246), Color.FromRgb(31, 41, 55)),
         "creative" => new(Color.FromRgb(3, 105, 161), Color.FromRgb(224, 242, 254), Color.FromRgb(12, 74, 110)),
@@ -328,73 +329,171 @@ public sealed class InvoicePreviewWindow : Window
             Foreground = ink
         };
 
-        document.Blocks.Add(new Paragraph(new Run($"اشک قلم — {invoice.TypeLabel}"))
+        var companyName = company is null
+            ? "اشک قلم"
+            : string.IsNullOrWhiteSpace(company.LegalName) ? company.Name : company.LegalName;
+        var headerBackground = theme switch
         {
-            FontSize = 25,
+            "premium" => Color.FromRgb(41, 37, 36),
+            "official" or "thermal" or "minimal" or "persian" => palette.Soft,
+            _ => palette.Accent
+        };
+        var headerForeground = theme is "official" or "thermal" or "minimal" or "persian"
+            ? palette.Ink
+            : Colors.White;
+        var roundHeader = theme is not ("official" or "thermal" or "minimal");
+        var headerLayout = new Grid
+        {
+            Width = 660,
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        headerLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        headerLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var headerText = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 14, 0)
+        };
+        headerText.Children.Add(new TextBlock
+        {
+            Text = invoice.TypeLabel,
+            FontSize = theme == "thermal" ? 20 : 26,
             FontWeight = FontWeights.Bold,
-            Foreground = accent,
-            TextAlignment = TextAlignment.Center,
-            Margin = new Thickness(0, 0, 0, 10)
+            Foreground = new SolidColorBrush(headerForeground),
+            TextWrapping = TextWrapping.Wrap
         });
-
-        var logoImage = CreateCompanyImage(company?.LogoDataBase64, 112, 84);
-        if (logoImage is not null)
-            document.Blocks.Add(new BlockUIContainer(new Border
-            {
-                Child = logoImage, HorizontalAlignment = HorizontalAlignment.Center,
-                Padding = new Thickness(4), Margin = new Thickness(0, 0, 0, 10)
-            }));
-
-        if (company is not null)
+        headerText.Children.Add(new TextBlock
         {
-            var companyName = string.IsNullOrWhiteSpace(company.LegalName) ? company.Name : company.LegalName;
-            document.Blocks.Add(new Paragraph(new Run(
-                $"{companyName}   •   شعبه: {company.Branch}   •   تلفن: {company.Phone}"))
-            {
-                Foreground = accent,
-                FontSize = 10,
-                TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 14)
-            });
-            if (!string.IsNullOrWhiteSpace(company.Address) ||
-                !string.IsNullOrWhiteSpace(company.NationalId) ||
-                !string.IsNullOrWhiteSpace(company.TaxId))
-            {
-                document.Blocks.Add(new Paragraph(new Run(
-                    $"نشانی: {company.Address}   •   شناسه ملی: {company.NationalId}   •   شناسه مالیاتی: {company.TaxId}"))
-                {
-                    Foreground = Brushes.DimGray,
-                    FontSize = 9,
-                    TextAlignment = TextAlignment.Center
-                });
-            }
+            Text = companyName,
+            FontSize = 14,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(headerForeground),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 3, 0, 0)
+        });
+        headerText.Children.Add(new TextBlock
+        {
+            Text = $"شماره {invoice.DisplayNumber}   •   تاریخ {FormatDate(invoice.CreatedAt)}",
+            FontSize = 10,
+            Foreground = new SolidColorBrush(headerForeground),
+            Margin = new Thickness(0, 7, 0, 0)
+        });
+        Grid.SetColumn(headerText, 0);
+        headerLayout.Children.Add(headerText);
+
+        var logoImage = CreateCompanyImage(company?.LogoDataBase64, 94, 72);
+        if (logoImage is not null)
+        {
+            logoImage.VerticalAlignment = VerticalAlignment.Center;
+            Grid.SetColumn(logoImage, 1);
+            headerLayout.Children.Add(logoImage);
         }
 
-        document.Blocks.Add(new Paragraph(new Run(
-            $"شماره سند: {invoice.DisplayNumber}     کد پیگیری: {invoice.TrackingCode}     تاریخ: {FormatDate(invoice.CreatedAt)}"))
-        { TextAlignment = TextAlignment.Right });
+        document.Blocks.Add(new BlockUIContainer(new Border
+        {
+            Width = 660,
+            Background = new SolidColorBrush(headerBackground),
+            BorderBrush = accent,
+            BorderThickness = new Thickness(theme == "minimal" ? 0 : 1),
+            CornerRadius = new CornerRadius(roundHeader ? 14 : 2),
+            Padding = new Thickness(theme == "thermal" ? 12 : 18),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = headerLayout
+        }));
 
-        document.Blocks.Add(new Paragraph(new Run($"طرف حساب: {invoice.CustomerName}"))
-        { TextAlignment = TextAlignment.Right });
+        if (company is not null &&
+            (!string.IsNullOrWhiteSpace(company.Address) ||
+             !string.IsNullOrWhiteSpace(company.Phone) ||
+             !string.IsNullOrWhiteSpace(company.NationalId) ||
+             !string.IsNullOrWhiteSpace(company.TaxId)))
+        {
+            var identity = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+            var contact = string.Join("   •   ", new[]
+            {
+                string.IsNullOrWhiteSpace(company.Branch) ? "" : "شعبه: " + company.Branch,
+                string.IsNullOrWhiteSpace(company.Phone) ? "" : "تلفن: " + company.Phone,
+                string.IsNullOrWhiteSpace(company.Address) ? "" : "نشانی: " + company.Address
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+            if (!string.IsNullOrWhiteSpace(contact))
+                identity.Children.Add(new TextBlock
+                {
+                    Text = contact, FontSize = 10, Foreground = ink,
+                    TextWrapping = TextWrapping.Wrap
+                });
+            var identifiers = string.Join("   •   ", new[]
+            {
+                string.IsNullOrWhiteSpace(company.NationalId) ? "" : "شناسه ملی: " + company.NationalId,
+                string.IsNullOrWhiteSpace(company.TaxId) ? "" : "شناسه مالیاتی: " + company.TaxId
+            }.Where(value => !string.IsNullOrWhiteSpace(value)));
+            if (!string.IsNullOrWhiteSpace(identifiers))
+                identity.Children.Add(new TextBlock
+                {
+                    Text = identifiers, FontSize = 9, Foreground = ink,
+                    TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 4, 0, 0)
+                });
+            document.Blocks.Add(new BlockUIContainer(new Border
+            {
+                Width = 660,
+                Background = soft,
+                BorderBrush = accent,
+                BorderThickness = new Thickness(0, 0, 4, 0),
+                CornerRadius = new CornerRadius(theme == "official" ? 2 : 8),
+                Padding = new Thickness(12),
+                Margin = new Thickness(0, 0, 0, 12),
+                Child = identity
+            }));
+        }
 
+        Border MakeInfoCard(string label, string value, double minWidth = 190)
+        {
+            var stack = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+            stack.Children.Add(new TextBlock
+            {
+                Text = label, FontSize = 9, Foreground = accent,
+                FontWeight = FontWeights.SemiBold
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(value) ? "—" : value,
+                FontSize = 11, Foreground = ink, FontWeight = FontWeights.SemiBold,
+                TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0)
+            });
+            return new Border
+            {
+                MinWidth = minWidth,
+                MaxWidth = 310,
+                Background = soft,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(220, 226, 234)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(theme == "official" ? 2 : 8),
+                Padding = new Thickness(10),
+                Margin = new Thickness(0, 0, 8, 8),
+                Child = stack
+            };
+        }
+
+        var invoiceFacts = new WrapPanel
+        {
+            FlowDirection = FlowDirection.RightToLeft,
+            Width = 660,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        invoiceFacts.Children.Add(MakeInfoCard("طرف حساب", invoice.CustomerName, 245));
+        invoiceFacts.Children.Add(MakeInfoCard("کد پیگیری", invoice.TrackingCode, 185));
         if (invoice.DueDate is DateTimeOffset dueDate)
-            document.Blocks.Add(new Paragraph(new Run($"سررسید: {FormatDate(dueDate)}")) { TextAlignment = TextAlignment.Right });
-
+            invoiceFacts.Children.Add(MakeInfoCard("سررسید شمسی", FormatDate(dueDate), 150));
+        if (!string.IsNullOrWhiteSpace(invoice.TaxId))
+            invoiceFacts.Children.Add(MakeInfoCard("شناسه مالیاتی فاکتور", invoice.TaxId, 200));
         if (!string.IsNullOrWhiteSpace(invoice.DriverName) ||
             !string.IsNullOrWhiteSpace(invoice.VehiclePlate) ||
             !string.IsNullOrWhiteSpace(invoice.DriverPhone))
-        {
-            document.Blocks.Add(new Paragraph(new Run(
-                $"راننده: {invoice.DriverName}   تلفن: {invoice.DriverPhone}   خودرو: {invoice.VehiclePlate}"))
-            { TextAlignment = TextAlignment.Right });
-        }
-
-        if (!string.IsNullOrWhiteSpace(invoice.TaxId))
-            document.Blocks.Add(new Paragraph(new Run($"شناسه مالیاتی فاکتور: {invoice.TaxId}")) { TextAlignment = TextAlignment.Right });
+            invoiceFacts.Children.Add(MakeInfoCard("حمل و تحویل",
+                $"راننده: {invoice.DriverName}   •   تلفن: {invoice.DriverPhone}   •   خودرو: {invoice.VehiclePlate}", 300));
         if (!string.IsNullOrWhiteSpace(invoice.Description))
-            document.Blocks.Add(new Paragraph(new Run($"شرح: {invoice.Description}")) { TextAlignment = TextAlignment.Right });
+            invoiceFacts.Children.Add(MakeInfoCard("شرح سند", invoice.Description, 300));
         if (!string.IsNullOrWhiteSpace(invoice.Notes))
-            document.Blocks.Add(new Paragraph(new Run($"یادداشت: {invoice.Notes}")) { TextAlignment = TextAlignment.Right });
+            invoiceFacts.Children.Add(MakeInfoCard("یادداشت", invoice.Notes, 300));
+        document.Blocks.Add(new BlockUIContainer(invoiceFacts));
 
         if (showQr)
         {
@@ -465,6 +564,7 @@ public sealed class InvoicePreviewWindow : Window
         }
         group.Rows.Add(header);
 
+        var invoiceRowIndex = 0;
         foreach (var line in invoiceLines)
         {
             var row = new TableRow();
@@ -481,11 +581,15 @@ public sealed class InvoicePreviewWindow : Window
             {
                 row.Cells.Add(new TableCell(new Paragraph(new Run(value)))
                 {
-                    Padding = new Thickness(7),
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                    Padding = new Thickness(theme == "thermal" ? 5 : 8),
+                    Background = invoiceRowIndex % 2 == 0 ? Brushes.White : soft,
+                    BorderBrush = new SolidColorBrush(theme == "thermal"
+                        ? Color.FromRgb(75, 85, 99)
+                        : Color.FromRgb(203, 213, 225)),
                     BorderThickness = new Thickness(0.5)
                 });
             }
+            invoiceRowIndex++;
             group.Rows.Add(row);
         }
 
@@ -508,26 +612,64 @@ public sealed class InvoicePreviewWindow : Window
 
         table.RowGroups.Add(group);
         document.Blocks.Add(table);
-        document.Blocks.Add(new Paragraph(new Run($"جمع کالاها: {invoice.Subtotal.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
-        { TextAlignment = TextAlignment.Left, Margin = new Thickness(0, 18, 0, 0) });
-        document.Blocks.Add(new Paragraph(new Run($"تخفیف: {invoice.Discount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
-        { TextAlignment = TextAlignment.Left });
         var taxLabel = invoice.TaxIsAmount
             ? "مالیات"
             : $"مالیات ({invoice.TaxRatePercent.ToString("N2", CultureInfo.CurrentCulture)}%)";
-        document.Blocks.Add(new Paragraph(new Run($"{taxLabel}: {invoice.TaxAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
-        { TextAlignment = TextAlignment.Left });
-        document.Blocks.Add(new Paragraph(new Run($"مبلغ نهایی: {invoice.Total.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
+        Grid MakeAmountRow(string label, string amount, bool emphasize = false)
         {
-            FontSize = 19,
-            FontWeight = FontWeights.Bold,
-            Foreground = accent,
-            TextAlignment = TextAlignment.Left,
-            Margin = new Thickness(0, 8, 0, 0)
+            var row = new Grid { FlowDirection = FlowDirection.RightToLeft, Margin = new Thickness(0, 3, 0, 3) };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            var labelText = new TextBlock
+            {
+                Text = label,
+                FontSize = emphasize ? 14 : 11,
+                FontWeight = emphasize ? FontWeights.Bold : FontWeights.Normal,
+                Foreground = ink,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var amountText = new TextBlock
+            {
+                Text = amount,
+                FontSize = emphasize ? 20 : 11,
+                FontWeight = emphasize ? FontWeights.Bold : FontWeights.SemiBold,
+                Foreground = emphasize ? accent : ink,
+                TextAlignment = TextAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(labelText, 0);
+            Grid.SetColumn(amountText, 1);
+            row.Children.Add(labelText);
+            row.Children.Add(amountText);
+            return row;
+        }
+
+        var totalsStack = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+        totalsStack.Children.Add(MakeAmountRow("جمع کالاها", $"{invoice.Subtotal.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        totalsStack.Children.Add(MakeAmountRow("تخفیف", $"{invoice.Discount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        totalsStack.Children.Add(MakeAmountRow(taxLabel, $"{invoice.TaxAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        totalsStack.Children.Add(new Border
+        {
+            Height = 1, Background = accent, Opacity = 0.65,
+            Margin = new Thickness(0, 8, 0, 8)
         });
-        document.Blocks.Add(new Paragraph(new Run(
-            $"نقدی ثبت‌شده: {invoice.CashAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}    مبلغ چک: {invoice.CheckAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"))
-        { TextAlignment = TextAlignment.Left });
+        totalsStack.Children.Add(MakeAmountRow("مبلغ نهایی قابل پرداخت",
+            $"{invoice.Total.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}", emphasize: true));
+        totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — نقدی",
+            $"{invoice.CashAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — چک",
+            $"{invoice.CheckAmount.ToString("N2", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        document.Blocks.Add(new BlockUIContainer(new Border
+        {
+            Width = 660,
+            Background = soft,
+            BorderBrush = accent,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(theme == "official" || theme == "thermal" ? 2 : 12),
+            Padding = new Thickness(16),
+            Margin = new Thickness(0, 16, 0, 6),
+            Child = totalsStack
+        }));
         document.Blocks.Add(new Paragraph(new Run($"وضعیت سند: {invoice.Status}"))
         { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 14, 0, 0) });
 
