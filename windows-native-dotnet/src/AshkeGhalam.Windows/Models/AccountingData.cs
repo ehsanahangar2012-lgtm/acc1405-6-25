@@ -18,7 +18,11 @@ public sealed class AccountingData
         SchemaVersion = SchemaVersion,
         NextInvoiceNumber = NextInvoiceNumber,
         Customers = Customers.Select(c => new CustomerRecord
-        { Id=c.Id, Name=c.Name, Phone=c.Phone, Address=c.Address, CreatedAt=c.CreatedAt }).ToList(),
+        {
+            Id=c.Id, Code=c.Code, Name=c.Name, Phone=c.Phone, Email=c.Email, Balance=c.Balance,
+            Category=c.Category, Type=c.Type, IsCustomer=c.IsCustomer, IsSupplier=c.IsSupplier,
+            Address=c.Address, NationalId=c.NationalId, Notes=c.Notes, CreatedAt=c.CreatedAt
+        }).ToList(),
         Products = Products.Select(p => new ProductRecord
         { Id=p.Id, Name=p.Name, Sku=p.Sku, Unit=p.Unit, StockQuantity=p.StockQuantity, UnitPrice=p.UnitPrice, CreatedAt=p.CreatedAt }).ToList(),
         Invoices = Invoices.Select(i => new InvoiceRecord
@@ -48,9 +52,19 @@ public sealed class AccountingData
 public sealed class CustomerRecord
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
+    public string Code { get; set; } = "";
     public string Name { get; set; } = "";
     public string Phone { get; set; } = "";
+    public string Email { get; set; } = "";
+    // Preserved for future ledger parity; the native register does not let users edit a balance directly.
+    public decimal Balance { get; set; }
+    public string Category { get; set; } = "عمومی";
+    public string Type { get; set; } = "CUSTOMER";
+    public bool IsCustomer { get; set; } = true;
+    public bool IsSupplier { get; set; }
     public string Address { get; set; } = "";
+    public string NationalId { get; set; } = "";
+    public string Notes { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
 }
 
@@ -183,6 +197,8 @@ public static class AccountingOperations
             throw new InvalidOperationException("برای فاکتور حداقل یک قلم کالا لازم است.");
         var customer = data.Customers.SingleOrDefault(c => c.Id == draft.CustomerId)
             ?? throw new InvalidOperationException("مشتری انتخاب‌شده پیدا نشد.");
+        if (!customer.IsCustomer)
+            throw new InvalidOperationException("برای صدور فاکتور فروش، شخص باید با نوع مشتری ثبت شده باشد.");
         if (draft.TaxRatePercent < 0m || draft.TaxRatePercent > 100m)
             throw new InvalidOperationException("درصد مالیات باید بین صفر تا صد باشد.");
 
@@ -332,10 +348,19 @@ public static class AccountingDataValidator
             data.Expenses.Count > 1_000_000 || data.Checks.Count > 1_000_000)
             throw new InvalidDataException("ساختار یا اندازهٔ دادهٔ حسابداری معتبر نیست.");
 
-        var customerIds = UniqueIds(data.Customers.Select(c => c?.Id), "مشتری");
+        var customerIds = UniqueIds(data.Customers.Select(c => c?.Id), "شخص");
+        var personCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var c in data.Customers)
-            if (c is null || string.IsNullOrWhiteSpace(c.Name) || c.Name.Trim().Length < 2)
-                throw new InvalidDataException("رکورد مشتری ناقص است.");
+        {
+            if (c is null || string.IsNullOrWhiteSpace(c.Name) || c.Name.Trim().Length < 2 ||
+                (!c.IsCustomer && !c.IsSupplier) ||
+                !new[] { "CUSTOMER", "VENDOR" }.Contains(c.Type, StringComparer.Ordinal))
+                throw new InvalidDataException("رکورد شخص ناقص یا نامعتبر است.");
+            if (!string.IsNullOrWhiteSpace(c.Code) && !personCodes.Add(c.Code.Trim()))
+                throw new InvalidDataException("کد شخص تکراری در داده‌ها وجود دارد.");
+            if (c.Balance != AccountingRules.Money(c.Balance))
+                throw new InvalidDataException("ماندهٔ ثبت‌شدهٔ شخص با دقت مالی معتبر سازگار نیست.");
+        }
 
         var productIds = UniqueIds(data.Products.Select(p => p?.Id), "کالا");
         var skuValues = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
