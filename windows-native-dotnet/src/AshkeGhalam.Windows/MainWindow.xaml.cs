@@ -30,6 +30,8 @@ public partial class MainWindow : Window
     private string _startupAccountingWarning = "";
     private static bool _textBoxSelectAllHandlersRegistered;
     private string _activeNavigationKey = "dashboard";
+    private bool _gridMenusConfigured;
+    private readonly DispatcherTimer _automaticBackupTimer = new() { Interval = TimeSpan.FromMinutes(1) };
     private const string FooterNoteNoReturns = "کالای فروخته‌شده پس گرفته نمی‌شود.";
     private const string FooterNotePaymentTerms = "لطفاً هنگام پرداخت شماره فاکتور را ذکر کنید.";
     private const string FooterNoteDeliveryTerms = "تحویل طبق توافق طرفین انجام می‌شود.";
@@ -48,6 +50,8 @@ public partial class MainWindow : Window
         _uiReady = true;
         Loaded += MainWindow_Loaded;
         StateChanged += (_, _) => UpdateWindowStateButton();
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
+        _automaticBackupTimer.Tick += AutomaticBackupTimer_Tick;
     }
 
     private void WindowMinimize_Click(object sender, RoutedEventArgs e) =>
@@ -169,6 +173,12 @@ public partial class MainWindow : Window
             RefreshAll();
             RefreshLicensePanel();
             ApplyMainWindowTheme();
+            ConfigureGridContextMenus();
+            RefreshFiscalYearPage();
+            RefreshSecurityStatus();
+            RefreshAutoBackupControls();
+            ApplyCurrencyLabels();
+            _automaticBackupTimer.Start();
             _ = RefreshSavedLicenseOnlineAsync();
         }
         catch (Exception ex)
@@ -420,6 +430,8 @@ public partial class MainWindow : Window
         RefreshCashFlowForecast();
         RefreshAccountingConfigurationPanels();
         RefreshKardexModule();
+        ApplyCurrencyLabels();
+        RefreshFiscalYearLedger();
     }
 
     private void RefreshLedger()
@@ -1541,7 +1553,7 @@ public partial class MainWindow : Window
     private void InvoicesGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
         if (InvoicesGrid.SelectedItem is InvoiceRecord)
-            PreviewInvoice_Click(sender, e);
+            OpenGridContextMenu(InvoicesGrid);
     }
 
     private void PreviewInvoice_Click(object sender, RoutedEventArgs e)
@@ -2383,6 +2395,17 @@ public partial class MainWindow : Window
         _data.Preferences ??= new AccountingPreferences();
         _data.Preferences.CustomInvoiceFootnoteOptions ??= [];
         _data.Preferences.SelectedInvoiceFootnotes ??= [];
+        var jalaliYear = new PersianCalendar().GetYear(DateTime.Now).ToString(CultureInfo.InvariantCulture);
+        if (string.IsNullOrWhiteSpace(_data.Preferences.ActiveFiscalYear))
+            _data.Preferences.ActiveFiscalYear = jalaliYear;
+        if (string.IsNullOrWhiteSpace(_data.Preferences.FiscalYearStartDate))
+            _data.Preferences.FiscalYearStartDate = _data.Preferences.ActiveFiscalYear + "/01/01";
+        if (string.IsNullOrWhiteSpace(_data.Preferences.FiscalYearEndDate))
+        {
+            var year = int.TryParse(_data.Preferences.ActiveFiscalYear, out var parsedYear) ? parsedYear : int.Parse(jalaliYear, CultureInfo.InvariantCulture);
+            var finalDay = new PersianCalendar().GetDaysInMonth(year, 12);
+            _data.Preferences.FiscalYearEndDate = string.Format(CultureInfo.InvariantCulture, "{0:0000}/12/{1:00}", year, finalDay);
+        }
         _data.MoadianSettings ??= new MoadianSettingsRecord();
         _data.ServerConnection ??= new ServerConnectionSettings();
 
@@ -2679,7 +2702,10 @@ public partial class MainWindow : Window
                 SalesInvoicePrefix = string.IsNullOrWhiteSpace(SettingsInvoicePrefix.Text) ? "INV-" : SettingsInvoicePrefix.Text.Trim(),
                 InvoiceFooter = SettingsInvoiceFooter.Text.Trim(),
                 SelectedInvoiceFootnotes = GetSelectedInvoiceFootnotes(),
-                CustomInvoiceFootnoteOptions = ParseCustomInvoiceFootnoteOptions(SettingsCustomFootnoteOptions.Text)
+                CustomInvoiceFootnoteOptions = ParseCustomInvoiceFootnoteOptions(SettingsCustomFootnoteOptions.Text),
+                ActiveFiscalYear = data.Preferences.ActiveFiscalYear,
+                FiscalYearStartDate = data.Preferences.FiscalYearStartDate,
+                FiscalYearEndDate = data.Preferences.FiscalYearEndDate
             };
         }, "تنظیمات حسابداری ذخیره شد؛ تم رابط کاربری اعمال شد.");
         ApplyMainWindowTheme();
