@@ -68,17 +68,25 @@ public static class NativeLicenseQuotaService
         return new NativeQuotaDecision(false, reason, count, limits.MaxCustomers);
     }
 
-    public static NativeQuotaDecision CanAddDocument(AccountingData data, VerifiedLicensePayload? sessionEntitlements)
+    public static NativeQuotaDecision CanAddDocument(AccountingData data, VerifiedLicensePayload? sessionEntitlements) =>
+        CanAddDocuments(data, sessionEntitlements, 1);
+
+    public static NativeQuotaDecision CanAddDocuments(
+        AccountingData data, VerifiedLicensePayload? sessionEntitlements, int additionalDocuments)
     {
         ArgumentNullException.ThrowIfNull(data);
+        if (additionalDocuments < 1 || additionalDocuments > 10)
+            throw new ArgumentOutOfRangeException(nameof(additionalDocuments), "تعداد اسناد موردنیاز باید بین ۱ تا ۱۰ باشد.");
+
         var limits = GetLimits(sessionEntitlements);
         var count = CountDocuments(data);
-        if (limits.MaxDocuments < 0 || count < limits.MaxDocuments)
-            return new NativeQuotaDecision(true, "ثبت سند مجاز است.", count, limits.MaxDocuments);
+        if (limits.MaxDocuments < 0 || (long)count + additionalDocuments <= limits.MaxDocuments)
+            return new NativeQuotaDecision(true, $"ثبت {additionalDocuments:N0} سند مجاز است.", count, limits.MaxDocuments);
 
+        var remaining = Math.Max(0, limits.MaxDocuments - count);
         var reason = limits.IsLicensed
-            ? $"سقف پلن {limits.Plan} ({limits.MaxDocuments:N0} سند) تکمیل شده است. برای افزایش سهمیه با پشتیبانی تماس بگیرید."
-            : $"نسخهٔ پایهٔ اشک قلم حداکثر {limits.MaxDocuments:N0} سند دارد؛ برای ادامه، لایسنس را آنلاین تأیید کنید.";
+            ? $"برای این عملیات {additionalDocuments:N0} سند لازم است اما فقط {remaining:N0} سند از سقف پلن {limits.Plan} ({limits.MaxDocuments:N0}) باقی مانده است."
+            : $"برای این عملیات {additionalDocuments:N0} سند لازم است اما فقط {remaining:N0} سند از سقف نسخهٔ پایه ({limits.MaxDocuments:N0}) باقی مانده است؛ برای ادامه لایسنس را آنلاین تأیید کنید.";
         return new NativeQuotaDecision(false, reason, count, limits.MaxDocuments);
     }
 }
