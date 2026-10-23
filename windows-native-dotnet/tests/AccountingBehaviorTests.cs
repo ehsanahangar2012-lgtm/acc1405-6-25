@@ -288,6 +288,99 @@ public sealed class AccountingBehaviorTests
         AccountingDataValidator.Validate(clone);
     }
 
+    [TestMethod]
+    public void CreateInventoryVoucherUpdatesStockAndRecordsMovement()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        var product = data.Products[0];
+        var voucher = AccountingOperations.CreateVoucher(data, new VoucherRecord
+        {
+            Type = "OUT", MovementType = "GOODS_ISSUE",
+            Items = [new VoucherItemRecord { ProductId = product.Id, ProductName = product.Name, Quantity = 3.5m, Unit = product.Unit }]
+        });
+
+        Assert.AreEqual(1, voucher.Number);
+        Assert.AreEqual(2, data.NextVoucherNumber);
+        Assert.AreEqual(6.5m, product.StockQuantity);
+        Assert.AreEqual(1, data.Vouchers.Count);
+        Assert.AreEqual(-3.5m, data.InventoryMovements.Single().SignedQuantity);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void InventoryVoucherRejectsInsufficientStockWithoutPartialMutation()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        var product = data.Products[0];
+        Assert.ThrowsException<InvalidOperationException>(() => AccountingOperations.CreateVoucher(data, new VoucherRecord
+        {
+            Type = "OUT", MovementType = "GOODS_ISSUE",
+            Items = [new VoucherItemRecord { ProductId = product.Id, ProductName = product.Name, Quantity = 11m, Unit = product.Unit }]
+        }));
+
+        Assert.AreEqual(10m, product.StockQuantity);
+        Assert.AreEqual(0, data.Vouchers.Count);
+        Assert.AreEqual(0, data.InventoryMovements.Count);
+        Assert.AreEqual(1, data.NextVoucherNumber);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void InventoryReturnReceiptAndPurchaseReturnUseOppositeStockDirections()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        var product = data.Products[0];
+        AccountingOperations.CreateVoucher(data, new VoucherRecord
+        {
+            Type = "RETURN", MovementType = "RETURN_RECEIPT",
+            Items = [new VoucherItemRecord { ProductId = product.Id, ProductName = product.Name, Quantity = 2m, Unit = product.Unit }]
+        });
+        Assert.AreEqual(12m, product.StockQuantity);
+
+        AccountingOperations.CreateVoucher(data, new VoucherRecord
+        {
+            Type = "RETURN", MovementType = "RETURN_ISSUE",
+            Items = [new VoucherItemRecord { ProductId = product.Id, ProductName = product.Name, Quantity = 3m, Unit = product.Unit }]
+        });
+        Assert.AreEqual(9m, product.StockQuantity);
+        Assert.AreEqual(2, data.InventoryMovements.Count);
+        Assert.AreEqual(2m, data.InventoryMovements[0].SignedQuantity);
+        Assert.AreEqual(-3m, data.InventoryMovements[1].SignedQuantity);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void DeletingInventoryVoucherReversesItsStockAndMovementRecords()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        var product = data.Products[0];
+        var voucher = AccountingOperations.CreateVoucher(data, new VoucherRecord
+        {
+            Type = "IN", MovementType = "GOODS_RECEIPT",
+            Items = [new VoucherItemRecord { ProductId = product.Id, ProductName = product.Name, Quantity = 5m, Unit = product.Unit }]
+        });
+        Assert.AreEqual(15m, product.StockQuantity);
+
+        AccountingOperations.DeleteVoucher(data, voucher.Id);
+        Assert.AreEqual(10m, product.StockQuantity);
+        Assert.AreEqual(0, data.Vouchers.Count);
+        Assert.AreEqual(0, data.InventoryMovements.Count);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void RejectsInternalTransferUntilWarehouseBalancesExist()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        Assert.ThrowsException<InvalidOperationException>(() => AccountingOperations.CreateVoucher(data, new VoucherRecord
+        {
+            Type = "OUT", MovementType = "INTERNAL_TRANSFER",
+            Items = [new VoucherItemRecord { ProductId = data.Products[0].Id, ProductName = data.Products[0].Name, Quantity = 1m, Unit = data.Products[0].Unit }]
+        }));
+        Assert.AreEqual(10m, data.Products[0].StockQuantity);
+        Assert.AreEqual(0, data.Vouchers.Count);
+    }
+
     private static AccountingData CreateSampleData(bool includeInvoice)
     {
         var customer=new CustomerRecord{Id="customer-test-1",Name="مشتری آزمایشی",Phone="09120000000",Address="تهران"};
