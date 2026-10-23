@@ -76,7 +76,7 @@ public sealed class InvoiceDialog : Window
         _invoices = invoices;
         _quickAddCustomer = quickAddCustomer;
         _quickAddProduct = quickAddProduct;
-        _defaultInvoiceTheme = defaultInvoiceTheme ?? "smart";
+        _defaultInvoiceTheme = defaultInvoiceTheme ?? "modern";
         _showInvoiceQr = showInvoiceQr;
         _companyProfile = companyProfile;
         _defaultInvoicePrefix = string.IsNullOrWhiteSpace(defaultInvoicePrefix) ? "INV-" : defaultInvoicePrefix.Trim();
