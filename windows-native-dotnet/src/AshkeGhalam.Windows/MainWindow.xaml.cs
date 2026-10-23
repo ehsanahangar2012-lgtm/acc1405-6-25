@@ -1610,7 +1610,7 @@ public partial class MainWindow : Window
 
         InvoiceThemeSelector.SelectedItem = InvoiceThemeSelector.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.Preferences.InvoiceTheme, StringComparison.Ordinal))
-            ?? InvoiceThemeSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "smart", StringComparison.Ordinal));
+            ?? InvoiceThemeSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "modern", StringComparison.Ordinal));
         SettingsCurrencySelector.SelectedItem = SettingsCurrencySelector.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.Preferences.Currency, StringComparison.Ordinal))
             ?? SettingsCurrencySelector.Items.OfType<ComboBoxItem>().FirstOrDefault();
@@ -1730,7 +1730,7 @@ public partial class MainWindow : Window
             MessageBox.Show(this, "نرخ مالیات باید بین صفر تا ۱۰۰ درصد باشد.");
             return;
         }
-        var theme = (InvoiceThemeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "smart";
+        var theme = (InvoiceThemeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "modern";
         var currency = (SettingsCurrencySelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "RIAL";
         Commit(data =>
         {
