@@ -331,6 +331,7 @@
                             <Button x:Name="PaymentsNextPage" Tag="payments" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
                             <Button Content="ثبت دریافت / پرداخت جدید" Click="AddPayment_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
                             <Button Content="ویرایش دریافت / پرداخت" Click="EditPayment_Click" Margin="0,0,8,8"/>
+                            <Button Content="پیش‌نمایش و چاپ رسید" Click="PreviewPaymentReceipt_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
                             <Button Content="حذف دریافت / پرداخت" Click="DeletePayment_Click" Margin="0,0,8,8"/>
                             <Button Content="خروجی CSV" Click="ExportPayments_Click" Margin="0,0,8,8"/>
                         </WrapPanel>
