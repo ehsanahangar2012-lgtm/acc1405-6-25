@@ -7,13 +7,28 @@ const server = await readFile(".devcontainer/preview-server.mjs", "utf8");
 assert.match(html, /<html[^>]*lang="fa"[^>]*dir="rtl"/i, "Preview must be Persian RTL.");
 assert.match(html, /\.sidebar\s*\{[^}]*grid-column\s*:\s*2/s, "Main navigation must be on the right.");
 assert.match(html, /id="page-dashboard"/, "Dashboard must exist.");
-for (const id of ["page-customers","page-products","page-invoices","page-payments","page-expenses","page-forecast","page-ledger","page-reports","page-migration"]) {
+for (const id of ["page-customers","page-products","page-invoices","page-payments","page-expenses","page-forecast","page-ledger","page-checks","page-vouchers","page-cardex","page-moadian","page-companies","page-settings","page-server","page-reports","page-backup","page-migration"]) {
   assert.ok(html.includes('id="' + id + '"'), "Missing UI page: " + id);
 }
+const sidebar = html.match(/<aside class="sidebar"[\\s\\S]*?<\\/aside>/i)?.[0];
+assert.ok(sidebar, "Accounting navigation must be present.");
+const navPages = [...sidebar.matchAll(/class="nav-btn[^"]*" data-page="([^"]+)"/g)].map(match => match[1]);
+assert.equal(new Set(navPages).size, navPages.length, "Accounting navigation must not repeat modules.");
+for (const page of ["invoices","payments","vouchers","cardex","checks","ledger","reports","moadian","companies","settings","server","backup"]) {
+  assert.ok(navPages.includes(page), "Missing accounting module navigation: " + page);
+}
+assert.ok(!navPages.includes("migration"), "Developer migration tracking must not appear as a customer module.");
 for (const id of ["saveForm","addDraftLine","invoiceOverlay","printInvoice","searchCustomers","searchProducts","searchInvoices","resetDemo","quickAddCustomerFromInvoice","quickAddProductFromInvoice","inlineEntityOverlay","inlineEntitySave"]) {
   assert.ok(html.includes('id="' + id + '"'), "Missing key interaction: " + id);
 }
 assert.match(html, /const openInlineEntity = mode =>/, "Inline person/product editor should exist.");
+assert.match(html, /settings:\\{invoiceTheme:'modern',showQr:true/, "The modern invoice theme must be the preview's first-run default.");
+assert.match(html, /const switchActiveCompany = id =>/, "Switching companies must switch the scoped accounting workspace.");
+assert.match(html, /state\\.companyData\\[state\\.activeCompanyId\\]=captureCompanyData\\(\\)/, "The current company's data must be saved before switching.");
+assert.match(html, /applyCompanyData\\(nextData\\)/, "The selected company's independent data must be restored.");
+assert.match(html, /id="invoiceThemeSelect"/, "Invoice preview must expose theme selection.");
+assert.match(html, /id="invoiceQrToggle"/, "Invoice preview must expose QR inclusion.");
+assert.match(html, /id="downloadInvoiceQr"/, "Invoice preview must allow downloading its QR as SVG.");
 assert.match(html, /const saveInlineEntity = \(\) =>/, "Inline person/product save handler should exist.");
 assert.match(html, /const exportVisibleTableCsv = \(bodyId, filename, excludeOperations = false\) =>/, "Visible table CSV export should exist.");
 for (const id of ['customers','products','invoices','payments','expenses']) {
