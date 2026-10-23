@@ -1805,7 +1805,7 @@ public partial class MainWindow : Window
                 "ویرایش ایمن دریافت/پرداخت", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
-        var dialog = new PaymentDialog(this, _data, existingPayment: selected);
+        var dialog = new PaymentDialog(this, _data, existingPayment: selected, currencyCode: _data.Preferences.Currency);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true) return;
         Commit(data =>
