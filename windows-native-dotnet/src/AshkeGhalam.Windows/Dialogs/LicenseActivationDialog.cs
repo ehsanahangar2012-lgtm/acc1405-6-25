@@ -23,8 +23,8 @@ public sealed class LicenseActivationDialog : Window
         Owner = owner;
         Title = "اتصال سرور و فعال‌سازی لایسنس اشک قلم";
         Width = 600;
-        Height = 650;
-        MinHeight = 600;
+        Height = 680;
+        MinHeight = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
