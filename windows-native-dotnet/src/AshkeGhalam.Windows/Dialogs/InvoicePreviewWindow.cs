@@ -354,7 +354,7 @@ public sealed class InvoicePreviewWindow : Window
                 Foreground = accent,
                 FontSize = 10,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, -6, 0, 14)
+                Margin = new Thickness(0, 0, 0, 14)
             });
             if (!string.IsNullOrWhiteSpace(company.Address) ||
                 !string.IsNullOrWhiteSpace(company.NationalId) ||
