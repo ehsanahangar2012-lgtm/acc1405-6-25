@@ -425,9 +425,71 @@ public sealed class InvoiceDialog : Window
 
     private static void FormatNumericField(TextBox field)
     {
+        // Group thousands but do not force trailing decimal zeros such as 2.00.
         if (!string.IsNullOrWhiteSpace(field.Text) &&
             PersianNumberParser.TryParseDecimal(field.Text, out var value))
-            field.Text = value.ToString("N2", CultureInfo.GetCultureInfo("fa-IR"));
+            field.Text = value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+    }
+
+    private void ConfigureLineGrid()
+    {
+        _lineList.Columns.Add(new DataGridTextColumn
+        {
+            Header = "کالا", Binding = new Binding(nameof(InvoiceLine.ProductName)),
+            Width = new DataGridLength(2.2, DataGridLengthUnitType.Star), MinWidth = 90
+        });
+        _lineList.Columns.Add(new DataGridTextColumn
+        {
+            Header = "تعداد", Binding = new Binding(nameof(InvoiceLine.Quantity)) { StringFormat = "{0:#,##0.##}" },
+            Width = new DataGridLength(0.8, DataGridLengthUnitType.Star), MinWidth = 55
+        });
+        _lineList.Columns.Add(new DataGridTextColumn
+        {
+            Header = "واحد", Binding = new Binding(nameof(InvoiceLine.Unit)),
+            Width = new DataGridLength(0.75, DataGridLengthUnitType.Star), MinWidth = 50
+        });
+        _lineList.Columns.Add(new DataGridTextColumn
+        {
+            Header = "قیمت واحد", Binding = new Binding(nameof(InvoiceLine.UnitPrice)) { StringFormat = "{0:#,##0.##}" },
+            Width = new DataGridLength(1.2, DataGridLengthUnitType.Star), MinWidth = 70
+        });
+        _lineList.Columns.Add(new DataGridTextColumn
+        {
+            Header = "جمع", Binding = new Binding(nameof(InvoiceLine.LineTotal)) { StringFormat = "{0:#,##0.##}" },
+            Width = new DataGridLength(1.2, DataGridLengthUnitType.Star), MinWidth = 70
+        });
+        _lineList.Columns.Add(new DataGridTextColumn
+        {
+            Header = "شرح", Binding = new Binding(nameof(InvoiceLine.Description)),
+            Width = new DataGridLength(1.5, DataGridLengthUnitType.Star), MinWidth = 65
+        });
+    }
+
+    private void BeginEditLine()
+    {
+        if (_lineList.SelectedItem is not InvoiceLine line)
+        {
+            MessageBox.Show(this, "ابتدا ردیف موردنظر را در جدول انتخاب کنید.", "ویرایش قلم",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        _editingLineIndex = _lines.IndexOf(line);
+        _product.SelectedItem = _products.FirstOrDefault(product => product.Id == line.ProductId);
+        _quantity.Text = line.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+        _price.Text = line.UnitPrice.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+        _lineDescription.Text = line.Description;
+        _addLineButton.Content = "اعمال تغییرات ردیف";
+        _quantity.Focus();
+    }
+
+    private void ResetLineEditor()
+    {
+        _editingLineIndex = -1;
+        _addLineButton.Content = "افزودن قلم";
+        _quantity.Text = "1";
+        _lineDescription.Clear();
+        ApplyDefaultPrice();
     }
 
     private void AddLine()
