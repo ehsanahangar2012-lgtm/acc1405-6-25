@@ -1,0 +1,189 @@
+using System.Runtime.CompilerServices;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+
+namespace AshkeGhalam.Windows.Services;
+
+/// <summary>
+/// Applies a high-contrast dark palette to the existing WPF visual tree while preserving
+/// each control's original local values so the user can switch back to the light palette.
+/// Invoice paper previews remain white and use their independent print-template palette.
+/// </summary>
+public static class ApplicationThemeService
+{
+    private const string LightTheme = "light";
+    private const string DarkTheme = "dark";
+
+    private sealed class Snapshot
+    {
+        public Dictionary<DependencyProperty, object?> LocalValues { get; } = [];
+    }
+
+    private static readonly ConditionalWeakTable<DependencyObject, Snapshot> OriginalValues = new();
+
+    public static string Normalize(string? theme) =>
+        string.Equals(theme, DarkTheme, StringComparison.OrdinalIgnoreCase) ? DarkTheme : LightTheme;
+
+    public static void Apply(Window window, string? theme)
+    {
+        ArgumentNullException.ThrowIfNull(window);
+        var elements = EnumerateTree(window).ToList();
+
+        foreach (var element in elements)
+        {
+            var snapshot = OriginalValues.GetValue(element, CaptureOriginalValues);
+            RestoreOriginalValues(element, snapshot);
+        }
+
+        if (Normalize(theme) == LightTheme)
+            return;
+
+        foreach (var element in elements)
+            ApplyDarkValues(element);
+    }
+
+    private static Snapshot CaptureOriginalValues(DependencyObject element)
+    {
+        var snapshot = new Snapshot();
+        foreach (var property in GetBrushProperties(element))
+            snapshot.LocalValues[property] = element.ReadLocalValue(property);
+        return snapshot;
+    }
+
+    private static IEnumerable<DependencyProperty> GetBrushProperties(DependencyObject element)
+    {
+        if (element is Control)
+        {
+            yield return Control.BackgroundProperty;
+            yield return Control.ForegroundProperty;
+            yield return Control.BorderBrushProperty;
+        }
+        if (element is TextBlock)
+            yield return TextBlock.ForegroundProperty;
+        if (element is Border)
+        {
+            yield return Border.BackgroundProperty;
+            yield return Border.BorderBrushProperty;
+        }
+        if (element is Panel)
+            yield return Panel.BackgroundProperty;
+    }
+
+    private static void RestoreOriginalValues(DependencyObject element, Snapshot snapshot)
+    {
+        foreach (var pair in snapshot.LocalValues)
+        {
+            if (ReferenceEquals(pair.Value, DependencyProperty.UnsetValue))
+                element.ClearValue(pair.Key);
+            else
+                element.SetValue(pair.Key, pair.Value);
+        }
+    }
+
+    private static void ApplyDarkValues(DependencyObject element)
+    {
+        foreach (var property in GetBrushProperties(element))
+        {
+            if (element.GetValue(property) is not SolidColorBrush brush || brush.Color.A == 0)
+                continue;
+
+            Color? mapped = property == Control.ForegroundProperty || property == TextBlock.ForegroundProperty
+                ? MapForeground(brush.Color)
+                : property == Control.BorderBrushProperty || property == Border.BorderBrushProperty
+                    ? MapBorder(brush.Color)
+                    : MapBackground(brush.Color);
+
+            if (mapped is null || mapped.Value == brush.Color)
+                continue;
+
+            var replacement = new SolidColorBrush(mapped.Value) { Opacity = brush.Opacity };
+            if (replacement.CanFreeze) replacement.Freeze();
+            element.SetValue(property, replacement);
+        }
+    }
+
+    private static Color? MapBackground(Color color)
+    {
+        var brightness = Brightness(color);
+        if (brightness < 0.74)
+            return color;
+
+        // Neutral page/background shades get predictable dark surfaces. Tinted warning,
+        // success and information cards retain a hint of their semantic color.
+        if (Saturation(color) < 0.12)
+        {
+            if (brightness > 0.97) return Color.FromRgb(17, 24, 39);    // #111827
+            if (brightness > 0.91) return Color.FromRgb(11, 18, 32);    // #0B1220
+            if (brightness > 0.82) return Color.FromRgb(31, 41, 55);    // #1F2937
+            return Color.FromRgb(39, 52, 71);                           // #273447
+        }
+
+        return Color.FromRgb(
+            (byte)Math.Clamp((int)(color.R * 0.24), 18, 72),
+            (byte)Math.Clamp((int)(color.G * 0.24), 22, 76),
+            (byte)Math.Clamp((int)(color.B * 0.24), 28, 88));
+    }
+
+    private static Color? MapBorder(Color color)
+    {
+        return Brightness(color) > 0.48
+            ? Color.FromRgb(65, 81, 106)
+            : color;
+    }
+
+    private static Color? MapForeground(Color color)
+    {
+        if (Brightness(color) > 0.84)
+            return color; // Keep white and pale text on dark navigation/buttons.
+
+        // Make dark headings, body text, muted labels and semantic warning text readable
+        // on the new dark surfaces rather than blindly preserving low-luminance colors.
+        if (Brightness(color) < 0.42)
+            return Color.FromRgb(229, 231, 235); // #E5E7EB
+        return Color.FromRgb(203, 213, 225);     // #CBD5E1
+    }
+
+    private static double Brightness(Color color) =>
+        (0.2126 * color.R + 0.7152 * color.G + 0.0722 * color.B) / 255.0;
+
+    private static double Saturation(Color color)
+    {
+        var max = Math.Max(color.R, Math.Max(color.G, color.B));
+        var min = Math.Min(color.R, Math.Min(color.G, color.B));
+        return max == 0 ? 0 : (max - min) / (double)max;
+    }
+
+    private static IEnumerable<DependencyObject> EnumerateTree(DependencyObject root)
+    {
+        var visited = new HashSet<DependencyObject>(ReferenceEqualityComparer.Instance);
+        var stack = new Stack<DependencyObject>();
+        stack.Push(root);
+
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (!visited.Add(current))
+                continue;
+
+            yield return current;
+
+            try
+            {
+                foreach (var child in LogicalTreeHelper.GetChildren(current).OfType<DependencyObject>())
+                    stack.Push(child);
+            }
+            catch (InvalidOperationException) { }
+
+            if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+            {
+                try
+                {
+                    for (var index = 0; index < VisualTreeHelper.GetChildrenCount(current); index++)
+                        stack.Push(VisualTreeHelper.GetChild(current, index));
+                }
+                catch (InvalidOperationException) { }
+            }
+        }
+    }
+}
