@@ -3131,6 +3131,7 @@ var qrcode = function() {
       const svg=$('#printArea .invoice-qr-card svg');if(!svg){toast('QR فعال نیست یا تولید نشده است.');return;}
       const blob=new Blob([svg.outerHTML],{type:'image/svg+xml;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='ashkghalam-'+(selectedInvoiceId||'invoice')+'-qr.svg';a.click();setTimeout(()=>URL.revokeObjectURL(url),1200);toast('فایل SVG کد QR آماده شد.');return;
     }
+    const navLink=e.target.closest('[data-page-link]');if(navLink){go(navLink.dataset.pageLink);return}
     const nav=e.target.closest('[data-page]');if(nav){go(nav.dataset.page);return}
     const link=e.target.closest('[data-page-link]');if(link){go(link.dataset.pageLink);return}
     const action=e.target.closest('[data-action]');if(action){const what=action.dataset.action;if(what==='preview-last'){const last=state.invoices[state.invoices.length-1];if(last)showInvoice(last.id);else toast('هنوز فاکتوری ثبت نشده است.')}else if(what==='export')exportJson();else openForm(what);return}
