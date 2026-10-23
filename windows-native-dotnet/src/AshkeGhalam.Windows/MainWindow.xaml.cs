@@ -219,9 +219,8 @@ public partial class MainWindow : Window
 
         var dialog = new JournalEntryDialog(this, activeAccounts);
         if (dialog.ShowDialog() != true || dialog.Result is not AccountingEntryRecord draft) return;
-        var number = 0;
-        Commit(data => number = NativeLedgerService.PostEntry(data, draft).Number,
-            $"سند حسابداری شماره {number:D4} ثبت قطعی شد");
+        Commit(data => { NativeLedgerService.PostEntry(data, draft); },
+            "سند حسابداری ثبت قطعی شد");
     }
 
     private void ExportJournalEntries_Click(object sender, RoutedEventArgs e) =>
