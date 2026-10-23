@@ -290,6 +290,37 @@
                                TextWrapping="Wrap" FontSize="12" Foreground="#64748B" Margin="0,18,0,0"/>
                 </StackPanel>
             </TabItem>
+            <TabItem Header="مدیریت چک">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="مدیریت چک‌های دریافتی و پرداختی" FontSize="23" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="سوابق چک به‌صورت محلی نگهداری می‌شود. تغییر وضعیت دستی است؛ این نسخه استعلام صیادی یا اتصال بانکی انجام نمی‌دهد." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <Button Content="ثبت چک" Click="AddCheck_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="ویرایش چک انتخابی" Click="EditCheck_Click"/>
+                            <Button Content="تغییر وضعیت و ثبت سابقه" Click="ChangeCheckStatus_Click"/>
+                            <Button Content="حذف چک در انتظار" Click="DeleteCheck_Click"/>
+                            <Button Content="خروجی CSV" Click="ExportChecks_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="ChecksGrid" Grid.Row="1">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="100"/>
+                            <DataGridTextColumn Header="دارنده / ذی‌نفع" Binding="{Binding HolderName}" Width="190"/>
+                            <DataGridTextColumn Header="بانک" Binding="{Binding BankName}" Width="110"/>
+                            <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:N2}}" Width="140"/>
+                            <DataGridTextColumn Header="شناسه صیادی" Binding="{Binding SayadId}" Width="150"/>
+                            <DataGridTextColumn Header="شماره چک" Binding="{Binding CheckNumber}" Width="110"/>
+                            <DataGridTextColumn Header="سررسید شمسی" Binding="{Binding DueDateLabel}" Width="110"/>
+                            <DataGridTextColumn Header="تاریخ صدور" Binding="{Binding IssueDateLabel}" Width="100"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="130"/>
+                            <DataGridTextColumn Header="اولویت" Binding="{Binding PriorityLabel}" Width="95"/>
+                            <DataGridTextColumn Header="شخص مرتبط" Binding="{Binding PersonName}" Width="150"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
                 </TabControl>
                 <Border x:Name="MigrationPanel" Visibility="Collapsed" Background="#F1F5F9" CornerRadius="14" Padding="28">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
