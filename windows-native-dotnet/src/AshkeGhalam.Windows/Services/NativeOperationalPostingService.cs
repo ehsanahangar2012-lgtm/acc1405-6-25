@@ -15,24 +15,22 @@ public static class NativeOperationalPostingService
 {
     private static readonly (string Code, string Name, string Type)[] RequiredAccounts =
     [
-        ("1000", "صندوق", "ASSET"),
-        ("1010", "بانک", "ASSET"),
-        ("1020", "اسناد دریافتنی", "ASSET"),
-        ("1100", "حساب‌های دریافتنی", "ASSET"),
-        ("1200", "موجودی کالا", "ASSET"),
-        ("1300", "مالیات و عوارض خرید", "ASSET"),
-        ("2000", "حساب‌های پرداختنی", "LIABILITY"),
-        ("2020", "اسناد پرداختنی", "LIABILITY"),
-        ("2100", "مالیات و عوارض پرداختنی", "LIABILITY"),
+        ("1110", "صندوق", "ASSET"),
+        ("1120", "بانک", "ASSET"),
+        ("1130", "حساب‌های دریافتنی", "ASSET"),
+        ("1140", "اسناد دریافتنی / چک در دست", "ASSET"),
+        ("1150", "چک‌های در جریان وصول", "ASSET"),
+        ("1160", "موجودی کالا", "ASSET"),
+        ("1170", "مالیات و عوارض خرید", "ASSET"),
+        ("2110", "حساب‌های پرداختنی", "LIABILITY"),
+        ("2120", "مالیات و عوارض فروش پرداختنی", "LIABILITY"),
+        ("2130", "اسناد پرداختنی / چک صادره", "LIABILITY"),
         ("3000", "سرمایه", "EQUITY"),
         ("3100", "سود و زیان انباشته", "EQUITY"),
-        ("4000", "درآمد فروش", "REVENUE"),
         ("4100", "سایر درآمدها", "REVENUE"),
+        ("4110", "درآمد فروش", "REVENUE"),
         ("5000", "بهای تمام‌شده کالای فروش‌رفته", "EXPENSE"),
-        ("5100", "هزینه حقوق و دستمزد", "EXPENSE"),
-        ("5200", "هزینه اجاره", "EXPENSE"),
-        ("5300", "هزینه‌های اداری و عملیاتی", "EXPENSE"),
-        ("5400", "مالیات و عوارض هزینه‌ای", "EXPENSE")
+        ("5200", "هزینه‌های عملیاتی", "EXPENSE")
     ];
 
     public static void Reconcile(AccountingData data)
@@ -105,23 +103,23 @@ public static class NativeOperationalPostingService
         {
             var netSales = AccountingRules.Money(invoice.Subtotal - invoice.Discount);
             PostOnce(data, invoice.Id, "AUTO_INVOICE_SALE_REVENUE", date,
-                $"فروش فاکتور {invoice.DisplayNumber}", "1100", "4000", netSales);
+                $"فروش فاکتور {invoice.DisplayNumber}", "1130", "4110", netSales);
 
             PostOnce(data, invoice.Id, "AUTO_INVOICE_SALE_TAX", date,
-                $"مالیات فروش فاکتور {invoice.DisplayNumber}", "1100", "2100", invoice.TaxAmount);
+                $"مالیات فروش فاکتور {invoice.DisplayNumber}", "1130", "2120", invoice.TaxAmount);
 
             var cost = AccountingRules.Money(invoice.Lines.Sum(line => line.BuyPrice * line.Quantity));
             PostOnce(data, invoice.Id, "AUTO_INVOICE_SALE_COGS", date,
-                $"بهای تمام‌شده فاکتور {invoice.DisplayNumber}", "5000", "1200", cost);
+                $"بهای تمام‌شده فاکتور {invoice.DisplayNumber}", "5000", "1160", cost);
         }
         else if (invoice.Type == "PURCHASE")
         {
             var netPurchase = AccountingRules.Money(invoice.Subtotal - invoice.Discount);
             PostOnce(data, invoice.Id, "AUTO_INVOICE_PURCHASE_STOCK", date,
-                $"خرید موجودی فاکتور {invoice.DisplayNumber}", "1200", "2000", netPurchase);
+                $"خرید موجودی فاکتور {invoice.DisplayNumber}", "1160", "2110", netPurchase);
 
             PostOnce(data, invoice.Id, "AUTO_INVOICE_PURCHASE_TAX", date,
-                $"مالیات خرید فاکتور {invoice.DisplayNumber}", "1300", "2000", invoice.TaxAmount);
+                $"مالیات خرید فاکتور {invoice.DisplayNumber}", "1170", "2110", invoice.TaxAmount);
         }
     }
 
@@ -135,35 +133,31 @@ public static class NativeOperationalPostingService
             method.Contains("واریز", StringComparison.Ordinal) ||
             method.Contains("کارت", StringComparison.Ordinal));
 
-        string counterAccount = isCheck ? (invoice.Type == "PURCHASE" ? "2020" : "1020")
-            : isBank ? "1010" : "1000";
+        string counterAccount = isCheck ? (invoice.Type == "PURCHASE" ? "2130" : "1140")
+            : isBank ? "1120" : "1110";
 
         if (invoice.Type == "PURCHASE")
         {
             // Paying a supplier reduces accounts payable and credits the selected payment source.
             PostOnce(data, payment.Id, "AUTO_PAYMENT", ToJalaliDate(payment.CreatedAt),
                 $"پرداخت فاکتور خرید {invoice.DisplayNumber} — {method}",
-                "2000", counterAccount, payment.Amount);
+                "2110", counterAccount, payment.Amount);
         }
         else
         {
             // Receipt from a customer increases cash/bank/checks and reduces receivables.
             PostOnce(data, payment.Id, "AUTO_PAYMENT", ToJalaliDate(payment.CreatedAt),
                 $"دریافت بابت فاکتور فروش {invoice.DisplayNumber} — {method}",
-                counterAccount, "1100", payment.Amount);
+                counterAccount, "1130", payment.Amount);
         }
     }
 
     private static void PostExpense(AccountingData data, ExpenseRecord expense)
     {
-        var combined = (expense.Category + " " + expense.Title).Trim();
-        var expenseAccount = combined.Contains("اجاره", StringComparison.Ordinal) ? "5200"
-            : combined.Contains("حقوق", StringComparison.Ordinal) || combined.Contains("دستمزد", StringComparison.Ordinal) ? "5100"
-            : combined.Contains("مالیات", StringComparison.Ordinal) ? "5400"
-            : "5300";
+        var expenseAccount = "5200"; // Matches source accountingEngine.postGeneralTransaction for direct expenses.
 
         PostOnce(data, expense.Id, "AUTO_EXPENSE", ToJalaliDate(expense.CreatedAt),
-            $"هزینه: {expense.Title}", expenseAccount, "1000", expense.Amount);
+            $"هزینه: {expense.Title}", expenseAccount, "1110", expense.Amount);
     }
 
     private static void ReverseInvoiceEntries(AccountingData data, InvoiceRecord invoice)
