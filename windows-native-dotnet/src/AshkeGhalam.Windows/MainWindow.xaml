@@ -165,7 +165,7 @@
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                     <StackPanel>
                         <TextBlock Text="کالا و انبار" FontSize="23" FontWeight="Bold"/>
-                        <TextBlock Text="صدور فاکتور، موجودی قابل دسترس را به‌صورت محلی کاهش می‌دهد." Style="{StaticResource SectionHint}"/>
+                        <TextBlock Text="پرونده کالا با فیلدهای مدل اصلی گسترش یافته است؛ موجودی رزروشده حفظ می‌شود و گردش حواله‌های چندانباره هنوز در مرحلهٔ مهاجرت است." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
                         <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
                             <Button Content="ثبت کالا" Click="AddProduct_Click" Background="#0F766E" Foreground="White"/>
                             <Button Content="ویرایش کالای انتخابی" Click="EditProduct_Click"/>
@@ -174,13 +174,25 @@
                             <Button Content="خروجی CSV" Click="ExportProducts_Click"/>
                         </StackPanel>
                     </StackPanel>
-                    <DataGrid x:Name="ProductsGrid" Grid.Row="1">
+                    <DataGrid x:Name="ProductsGrid" Grid.Row="1"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              CanUserResizeColumns="True">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="نام کالا" Binding="{Binding Name}" Width="*"/>
-                            <DataGridTextColumn Header="کد کالا" Binding="{Binding Sku}" Width="150"/>
+                            <DataGridTextColumn Header="نام کالا" Binding="{Binding Name}" Width="210"/>
+                            <DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="120"/>
+                            <DataGridTextColumn Header="شماره سریال" Binding="{Binding SerialNumber}" Width="140"/>
                             <DataGridTextColumn Header="واحد" Binding="{Binding Unit}" Width="90"/>
-                            <DataGridTextColumn Header="موجودی" Binding="{Binding StockQuantity, StringFormat={}{0:N2}}" Width="130"/>
-                            <DataGridTextColumn Header="قیمت واحد" Binding="{Binding UnitPrice, StringFormat={}{0:N2}}" Width="160"/>
+                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding CategoryPath}" Width="190"/>
+                            <DataGridTextColumn Header="موجودی" Binding="{Binding StockQuantity, StringFormat={}{0:N2}}" Width="120"/>
+                            <DataGridTextColumn Header="رزروشده" Binding="{Binding ReservedStock, StringFormat={}{0:N2}}" Width="100"/>
+                            <DataGridTextColumn Header="حداقل موجودی" Binding="{Binding MinStock, StringFormat={}{0:N2}}" Width="120"/>
+                            <DataGridTextColumn Header="قیمت خرید" Binding="{Binding BuyPrice, StringFormat={}{0:N2}}" Width="130"/>
+                            <DataGridTextColumn Header="قیمت فروش" Binding="{Binding SellPrice, StringFormat={}{0:N2}}" Width="130"/>
+                            <DataGridTextColumn Header="وزن" Binding="{Binding Weight, StringFormat={}{0:N2}}" Width="90"/>
+                            <DataGridTextColumn Header="قفسه" Binding="{Binding ShelfLocation}" Width="130"/>
+                            <DataGridTextColumn Header="توضیحات" Binding="{Binding Description}" Width="220"/>
+                            <DataGridTextColumn Header="تصویر / مسیر" Binding="{Binding ImageUrl}" Width="220"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
