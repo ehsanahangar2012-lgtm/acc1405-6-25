@@ -23,15 +23,37 @@ public sealed class PaymentDialog : Window
         public string Label{get;init;}="";
     }
 
-    public PaymentDialog(Window owner,AccountingData data)
+    public PaymentDialog(Window owner, AccountingData data, string? invoiceTypeFilter = null)
     {
-        Owner=owner;Title="ثبت دریافت/پرداخت طرف حساب";Width=530;Height=450;WindowStartupLocation=WindowStartupLocation.CenterOwner;
+        var title = invoiceTypeFilter switch
+        {
+            "SALE" => "ثبت دریافت از مشتری",
+            "PURCHASE" => "ثبت پرداخت به تأمین‌کننده",
+            _ => "ثبت دریافت/پرداخت طرف حساب"
+        };
+        Owner=owner;Title=title;Width=530;Height=450;WindowStartupLocation=WindowStartupLocation.CenterOwner;
         FlowDirection=FlowDirection.RightToLeft;Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
         _invoice.DisplayMemberPath=nameof(InvoiceOption.Label);
-        _invoice.ItemsSource=data.Invoices.Where(i=>i.Status!="لغو شده"&&i.Type!="PROFORMA"&&AccountingRules.RemainingForInvoice(data,i)>0)
+        _invoice.ItemsSource=data.Invoices.Where(i=>i.Status!="لغو شده"&&i.Type!="PROFORMA"&&
+                (string.IsNullOrWhiteSpace(invoiceTypeFilter) || i.Type == invoiceTypeFilter) &&
+                AccountingRules.RemainingForInvoice(data,i)>0)
             .Select(i=>new InvoiceOption{Invoice=i,Label=$"{i.TypeLabel} {i.DisplayNumber} — {i.CustomerName} — مانده {AccountingRules.RemainingForInvoice(data,i):N2}"}).ToList();
         var root=new StackPanel{Margin=new Thickness(22)};
-        root.Children.Add(new TextBlock{Text="ثبت دریافت یا پرداخت",FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
+        root.Children.Add(new TextBlock{Text=title,FontSize=20,FontWeight=FontWeights.Bold,Margin=new Thickness(0,0,0,14)});
+        if (_invoice.Items.Count == 0)
+        {
+            root.Children.Add(new TextBlock
+            {
+                Text = invoiceTypeFilter == "SALE"
+                    ? "فاکتور فروش قطعی و دارای مانده برای دریافت پیدا نشد."
+                    : invoiceTypeFilter == "PURCHASE"
+                        ? "فاکتور خرید قطعی و دارای مانده برای پرداخت پیدا نشد."
+                        : "فاکتور قطعی دارای مانده برای تسویه پیدا نشد.",
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(153, 27, 27)),
+                Margin = new Thickness(0, 0, 0, 8)
+            });
+        }
         Add(root,"سند قطعی و مانده",_invoice);Add(root,"مبلغ تسویه",_amount);Add(root,"روش دریافت / پرداخت",_method);Add(root,"شماره پیگیری / توضیح",_reference);
         var buttons=new StackPanel{Orientation=Orientation.Horizontal,Margin=new Thickness(0,18,0,0)};
         var ok=new Button{Content="ثبت عملیات نقدی/مالی",Width=110,Height=36,IsDefault=true,Margin=new Thickness(0,0,8,0)};
