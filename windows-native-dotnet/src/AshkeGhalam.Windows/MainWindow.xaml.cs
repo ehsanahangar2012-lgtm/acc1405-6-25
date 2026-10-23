@@ -3423,6 +3423,37 @@ public partial class MainWindow : Window
             ["updates"] = new("مرکز به‌روزرسانی", "تنظیمات و سیستم", "/updates", null)
         };
 
+    // Resolve destinations by stable TabItem headers, not hard-coded numeric indexes.
+    // A module that has no true native counterpart remains in the migration panel instead
+    // of opening an unrelated page with a similar-sounding title.
+    private static readonly IReadOnlyDictionary<string, string> NativeTabHeaders =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["dashboard"] = "نمای کلی",
+            ["invoices"] = "فاکتورهای فروش/خرید",
+            ["inventory"] = "کالا و انبار",
+            ["kardex"] = "کارتکس کالا",
+            ["checks"] = "مدیریت چک",
+            ["vouchers"] = "حواله‌های انبار",
+            ["customers"] = "مشتریان",
+            ["companies"] = "تنظیمات و شرکت‌ها",
+            ["reports"] = "گزارش‌ها",
+            ["payments"] = "دریافت‌ها",
+            ["expenses"] = "هزینه‌ها",
+            ["backup"] = "پشتیبان‌گیری",
+            ["accounting"] = "حسابداری دوبل",
+            ["cashflow-predictor"] = "پیش‌بینی نقدینگی",
+            ["due-calendar"] = "تقویم سررسیدها",
+            ["financial-reports"] = "گزارش مالی پیشرفته",
+            ["moadian"] = "سامانهٔ مؤدیان",
+            ["activation"] = "اتصال و لایسنس",
+            ["server"] = "اتصال به سرور اصلی",
+            ["fiscal-year"] = "سال مالی",
+            ["security"] = "امنیت داده‌ها",
+            ["advanced-settings"] = "تنظیمات پیشرفته",
+            ["settings"] = "تنظیمات و شرکت‌ها"
+        };
+
     private void NavigateModule_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement source || source.Tag is not string key ||
@@ -3431,22 +3462,27 @@ public partial class MainWindow : Window
 
         UpdateNavigationSelection(key);
 
-        // Resolve controls by name so this handler can be committed before the new XAML shell.
-        if (FindName("CurrentModuleText") is TextBlock currentModule)
-            currentModule.Text = module.Title + (module.NativeTabIndex.HasValue ? " • نسخهٔ بومی" : " • در حال مهاجرت");
-
         var tabs = FindName("MainTabs") as TabControl;
         var migrationPanel = FindName("MigrationPanel") as Border;
-        if (module.NativeTabIndex is int nativeTabIndex && tabs is not null && migrationPanel is not null)
+        var targetHeader = NativeTabHeaders.GetValueOrDefault(key);
+        var targetTab = targetHeader is null || tabs is null
+            ? null
+            : tabs.Items.OfType<TabItem>().FirstOrDefault(tab =>
+                string.Equals(tab.Header?.ToString(), targetHeader, StringComparison.Ordinal));
+
+        if (FindName("CurrentModuleText") is TextBlock currentModule)
+            currentModule.Text = module.Title + (targetTab is not null ? " • نسخهٔ بومی" : " • در حال مهاجرت");
+
+        if (targetTab is not null && tabs is not null && migrationPanel is not null)
         {
             migrationPanel.Visibility = Visibility.Collapsed;
             tabs.Visibility = Visibility.Visible;
-            tabs.SelectedIndex = nativeTabIndex;
-            if (nativeTabIndex == 18)
+            tabs.SelectedItem = targetTab;
+
+            // Company profile and accounting preferences share one page; advanced settings
+            // is its own tab, so it is never scrolled into a different page by index.
+            if (key is "companies" or "settings")
             {
-                // Company profile and accounting preferences share this accounting-settings page.
-                // Scroll after the tab content is realized so this also works when the same tab is
-                // already active or the page is being created for the first time.
                 Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
                 {
                     if (!IsLoaded) return;
@@ -3456,12 +3492,6 @@ public partial class MainWindow : Window
                         AccountingSettingsScrollViewer.ScrollToHome();
                         CompanyProfileSelector.BringIntoView();
                     }
-                    else if (key == "advanced-settings")
-                    {
-                        AdvancedSettingsSection.BringIntoView();
-                        if (!AdvancedSettingsSection.IsLoaded)
-                            AccountingSettingsScrollViewer.ScrollToEnd();
-                    }
                     else
                     {
                         AccountingSettingsScrollViewer.ScrollToHome();
@@ -3469,8 +3499,9 @@ public partial class MainWindow : Window
                     }
                 }));
             }
+
             if (FindName("FooterStatus") is TextBlock footer)
-                footer.Text = "بخش بومی فعال: " + module.Title + "؛ دامنهٔ امکانات این صفحه هنوز باید با نسخهٔ اصلی تطبیق داده شود.";
+                footer.Text = "بخش بومی فعال: " + module.Title + "؛ قابلیت‌های هنوز منتقل‌نشده جداگانه مشخص هستند.";
             return;
         }
 
