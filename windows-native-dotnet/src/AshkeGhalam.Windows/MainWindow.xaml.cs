@@ -2859,46 +2859,46 @@ public partial class MainWindow : Window
         _gridMenusConfigured = true;
 
         AttachGridContextMenu(InvoicesGrid,
-            new("👁 پیش‌نمایش", PreviewInvoice_Click),
-            new("🖨 چاپ سند", PrintInvoice_Click),
-            new("✏️ ویرایش", EditInvoice_Click),
-            new("💳 ثبت دریافت / پرداخت", AddPayment_Click),
-            new("↩ لغو سند", CancelInvoice_Click),
-            new("🗑 حذف پیش‌فاکتور", DeleteInvoice_Click));
+            new GridMenuAction("👁 پیش‌نمایش", PreviewInvoice_Click),
+            new GridMenuAction("🖨 چاپ سند", PrintInvoice_Click),
+            new GridMenuAction("✏️ ویرایش", EditInvoice_Click),
+            new GridMenuAction("💳 ثبت دریافت / پرداخت", AddPayment_Click),
+            new GridMenuAction("↩ لغو سند", CancelInvoice_Click),
+            new GridMenuAction("🗑 حذف پیش‌فاکتور", DeleteInvoice_Click));
 
         AttachGridContextMenu(ChecksGrid,
-            new("👁 نمایش / 🖨 چاپ چک", PreviewCheck_Click),
-            new("✏️ ویرایش چک", EditCheck_Click),
-            new("↗ خرج / واگذاری چک دریافتی", SpendCheck_Click),
-            new("🔄 تغییر وضعیت و سابقه", ChangeCheckStatus_Click),
-            new("🗑 حذف چک مجاز", DeleteCheck_Click));
+            new GridMenuAction("👁 نمایش / 🖨 چاپ چک", PreviewCheck_Click),
+            new GridMenuAction("✏️ ویرایش چک", EditCheck_Click),
+            new GridMenuAction("↗ خرج / واگذاری چک دریافتی", SpendCheck_Click),
+            new GridMenuAction("🔄 تغییر وضعیت و سابقه", ChangeCheckStatus_Click),
+            new GridMenuAction("🗑 حذف چک مجاز", DeleteCheck_Click));
 
         AttachGridContextMenu(PaymentsGrid,
-            new("👁 نمایش / 🖨 چاپ رسید", PreviewPaymentReceipt_Click),
-            new("✏️ ویرایش دریافت / پرداخت", EditPayment_Click),
-            new("🗑 حذف دریافت / پرداخت", DeletePayment_Click));
+            new GridMenuAction("👁 نمایش / 🖨 چاپ رسید", PreviewPaymentReceipt_Click),
+            new GridMenuAction("✏️ ویرایش دریافت / پرداخت", EditPayment_Click),
+            new GridMenuAction("🗑 حذف دریافت / پرداخت", DeletePayment_Click));
 
         AttachGridContextMenu(ExpensesGrid,
-            new("✏️ ویرایش هزینه", EditExpense_Click),
-            new("🗑 حذف هزینه", DeleteExpense_Click));
+            new GridMenuAction("✏️ ویرایش هزینه", EditExpense_Click),
+            new GridMenuAction("🗑 حذف هزینه", DeleteExpense_Click));
 
         AttachGridContextMenu(CustomersGrid,
-            new("✏️ ویرایش شخص", EditCustomer_Click),
-            new("📒 کارتکس / گردش حساب", ShowPersonKardex_Click),
-            new("🗑 حذف شخص", DeleteCustomer_Click));
+            new GridMenuAction("✏️ ویرایش شخص", EditCustomer_Click),
+            new GridMenuAction("📒 کارتکس / گردش حساب", ShowPersonKardex_Click),
+            new GridMenuAction("🗑 حذف شخص", DeleteCustomer_Click));
 
         AttachGridContextMenu(ProductsGrid,
-            new("✏️ ویرایش کالا", EditProduct_Click),
-            new("🗑 حذف کالا", DeleteProduct_Click));
+            new GridMenuAction("✏️ ویرایش کالا", EditProduct_Click),
+            new GridMenuAction("🗑 حذف کالا", DeleteProduct_Click));
 
         AttachGridContextMenu(VouchersGrid,
-            new("👁 نمایش / 🖨 چاپ حواله", PreviewVoucher_Click),
-            new("✏️ ویرایش حواله", EditVoucher_Click),
-            new("🔄 تغییر وضعیت حواله", AdvanceVoucherStatus_Click),
-            new("🗑 حذف حواله", DeleteVoucher_Click));
+            new GridMenuAction("👁 نمایش / 🖨 چاپ حواله", PreviewVoucher_Click),
+            new GridMenuAction("✏️ ویرایش حواله", EditVoucher_Click),
+            new GridMenuAction("🔄 تغییر وضعیت حواله", AdvanceVoucherStatus_Click),
+            new GridMenuAction("🗑 حذف حواله", DeleteVoucher_Click));
 
         AttachGridContextMenu(RecentInvoicesGrid,
-            new("👁 پیش‌نمایش فاکتور", PreviewInvoice_Click));
+            new GridMenuAction("👁 پیش‌نمایش فاکتور", PreviewInvoice_Click));
 
         // InvoicesGrid already has a named XAML double-click handler; other tables are wired here.
         foreach (var grid in new[] { ChecksGrid, PaymentsGrid, ExpensesGrid, CustomersGrid, ProductsGrid, VouchersGrid, RecentInvoicesGrid })
