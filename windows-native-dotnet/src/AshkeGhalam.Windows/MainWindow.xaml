@@ -185,6 +185,7 @@
                             <Button Content="ثبت تأمین‌کننده" Click="AddSupplier_Click" Margin="0,0,8,8"/>
                             <Button Content="ویرایش شخص انتخابی" Click="EditCustomer_Click" Margin="0,0,8,8"/>
                             <Button Content="حذف شخص انتخابی" Click="DeleteCustomer_Click" Margin="0,0,8,8"/>
+                            <Button Content="کاردکس مالی شخص انتخابی" Click="ShowPersonKardex_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
                             <Button Content="خروجی CSV کامل پرونده‌ها" Click="ExportCustomers_Click" Margin="0,0,8,8"/>
                         </WrapPanel>
                     </StackPanel>
