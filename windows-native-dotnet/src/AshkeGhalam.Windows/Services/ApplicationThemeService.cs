@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -85,6 +86,8 @@ public static class ApplicationThemeService
         }
         if (element is TextBlock)
             yield return TextBlock.ForegroundProperty;
+        if (element is TextElement)
+            yield return TextElement.ForegroundProperty;
         if (element is Border)
         {
             yield return Border.BackgroundProperty;
@@ -112,7 +115,9 @@ public static class ApplicationThemeService
             if (element.GetValue(property) is not SolidColorBrush brush || brush.Color.A == 0)
                 continue;
 
-            Color? mapped = property == Control.ForegroundProperty || property == TextBlock.ForegroundProperty
+            Color? mapped = property == Control.ForegroundProperty ||
+                            property == TextBlock.ForegroundProperty ||
+                            property == TextElement.ForegroundProperty
                 ? MapForeground(brush.Color)
                 : property == Control.BorderBrushProperty || property == Border.BorderBrushProperty
                     ? MapBorder(brush.Color)
@@ -130,11 +135,10 @@ public static class ApplicationThemeService
     private static Color? MapBackground(Color color)
     {
         var brightness = Brightness(color);
-        if (brightness < 0.74)
-            return color;
+        if (brightness < 0.32)
+            return color; // Already a dark surface.
 
-        // Neutral page/background shades get predictable dark surfaces. Tinted warning,
-        // success and information cards retain a hint of their semantic color.
+        // Neutral pages, cards, and input surfaces become predictable dark layers.
         if (Saturation(color) < 0.12)
         {
             if (brightness > 0.97) return Color.FromRgb(17, 24, 39);    // #111827
@@ -143,10 +147,12 @@ public static class ApplicationThemeService
             return Color.FromRgb(39, 52, 71);                           // #273447
         }
 
+        // Bright semantic fills (warning, success, info, selected and hover surfaces)
+        // must be darkened too; otherwise light-colored text can land on a pale card.
         return Color.FromRgb(
-            (byte)Math.Clamp((int)(color.R * 0.24), 18, 72),
-            (byte)Math.Clamp((int)(color.G * 0.24), 22, 76),
-            (byte)Math.Clamp((int)(color.B * 0.24), 28, 88));
+            (byte)Math.Clamp((int)(color.R * 0.36), 18, 86),
+            (byte)Math.Clamp((int)(color.G * 0.36), 20, 90),
+            (byte)Math.Clamp((int)(color.B * 0.36), 22, 96));
     }
 
     private static Color? MapBorder(Color color)
