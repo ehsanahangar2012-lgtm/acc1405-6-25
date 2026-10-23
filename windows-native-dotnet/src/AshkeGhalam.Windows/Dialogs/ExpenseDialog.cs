@@ -19,8 +19,8 @@ public sealed class ExpenseDialog : Window
 
     public ExpenseDialog(Window owner, ExpenseRecord? existing = null, IEnumerable<string>? knownCategories = null)
     {
-        Owner=owner;Title=existing is null ? "ثبت هزینه" : "ویرایش هزینه";Width=450;Height=460;WindowStartupLocation=WindowStartupLocation.CenterOwner;
-        FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.NoResize;
+        Owner = owner; Title = existing is null ? "ثبت هزینه" : "ویرایش هزینه"; Width = 520; Height = 520; MinHeight = 390; MinWidth = 450; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background=Brushes.White;ResizeMode=ResizeMode.CanResize;
         NumericTextBoxFormatter.Attach(_amount);
         if (existing is not null)
         {
