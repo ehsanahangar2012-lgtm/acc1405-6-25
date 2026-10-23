@@ -62,10 +62,10 @@ public sealed class AccountingBehaviorTests
             CustomerId=data.Customers[0].Id,TaxRatePercent=10m,Notes="نمونه",
             Lines=[new InvoiceLine{ProductId=data.Products[0].Id,ProductName=data.Products[0].Name,Quantity=2m,UnitPrice=100m,LineTotal=200m}]
         });
-        Assert.AreEqual(1,invoice.Number);
+        Assert.AreEqual(1001,invoice.Number);
         Assert.AreEqual(220m,invoice.Total);
         Assert.AreEqual(8m,data.Products[0].StockQuantity);
-        Assert.AreEqual(2,data.NextInvoiceNumber);
+        Assert.AreEqual(1002,data.NextInvoiceNumber);
         AccountingDataValidator.Validate(data);
     }
 
@@ -431,6 +431,126 @@ public sealed class AccountingBehaviorTests
         });
         voucher.MovementType = "RETURN_RECEIPT";
         Assert.ThrowsException<InvalidDataException>(() => AccountingDataValidator.Validate(data));
+    }
+
+    [TestMethod]
+    public void SaleInvoiceSupportsSourcePricingAndFlatTax()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        data.Products[0].BuyPrice = 40m;
+        var invoice = AccountingOperations.CreateInvoice(data, new InvoiceDraft
+        {
+            CustomerId = data.Customers[0].Id, Type = "SALE", TaxIsAmount = true, TaxAmount = 12m,
+            Discount = 25m, CashAmount = 30m,
+            Lines = [new InvoiceLine { ProductId = data.Products[0].Id, ProductName = data.Products[0].Name, Quantity = 2m, BuyPrice = 40m, UnitPrice = 100m, LineTotal = 200m, Profit = 120m, EntryOrder = 1 }]
+        });
+
+        Assert.AreEqual(1001, invoice.Number);
+        Assert.AreEqual("INV-", invoice.Prefix);
+        Assert.AreEqual(200m, invoice.Subtotal);
+        Assert.AreEqual(25m, invoice.Discount);
+        Assert.AreEqual(12m, invoice.TaxAmount);
+        Assert.AreEqual(187m, invoice.Total);
+        Assert.AreEqual(8m, data.Products[0].StockQuantity);
+        Assert.AreEqual(30m, invoice.CashAmount);
+        Assert.AreEqual(30m, AccountingRules.PaidForInvoice(data, invoice.Id));
+        Assert.AreEqual("INVOICE", data.InventoryMovements.Single().ReferenceType);
+        Assert.AreEqual(-2m, data.InventoryMovements.Single().SignedQuantity);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void PurchaseInvoiceIncreasesStockAndUsesPurchaseSequence()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        data.Customers[0].IsCustomer = false;
+        data.Customers[0].IsSupplier = true;
+        data.Customers[0].Type = "VENDOR";
+        data.Products[0].BuyPrice = 55m;
+        var invoice = AccountingOperations.CreateInvoice(data, new InvoiceDraft
+        {
+            CustomerId = data.Customers[0].Id, Type = "PURCHASE",
+            Lines = [new InvoiceLine { ProductId = data.Products[0].Id, ProductName = data.Products[0].Name, Quantity = 3m, BuyPrice = 55m, UnitPrice = 55m, LineTotal = 165m }]
+        });
+
+        Assert.AreEqual(3001, invoice.Number);
+        Assert.AreEqual("PUR-", invoice.Prefix);
+        Assert.AreEqual(13m, data.Products[0].StockQuantity);
+        Assert.AreEqual(3m, data.InventoryMovements.Single().SignedQuantity);
+        Assert.AreEqual("GOODS_RECEIPT", data.InventoryMovements.Single().MovementType);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void ProformaDoesNotChangeStockUntilConvertedToSale()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        var invoice = AccountingOperations.CreateInvoice(data, new InvoiceDraft
+        {
+            CustomerId = data.Customers[0].Id, Type = "PROFORMA",
+            Lines = [new InvoiceLine { ProductId = data.Products[0].Id, ProductName = data.Products[0].Name, Quantity = 2m, UnitPrice = 100m, LineTotal = 200m }]
+        });
+        Assert.AreEqual(2001, invoice.Number);
+        Assert.AreEqual("PRO-", invoice.Prefix);
+        Assert.AreEqual(10m, data.Products[0].StockQuantity);
+        Assert.AreEqual(0, data.InventoryMovements.Count);
+        Assert.ThrowsException<InvalidOperationException>(() => AccountingOperations.RecordPayment(data, invoice.Id, 1m, "نقدی", ""));
+
+        AccountingOperations.ConvertProformaToSale(data, invoice.Id);
+        Assert.AreEqual("SALE", invoice.Type);
+        Assert.AreEqual(8m, data.Products[0].StockQuantity);
+        Assert.AreEqual(-2m, data.InventoryMovements.Single().SignedQuantity);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void SaleCannotConsumeReservedStock()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        data.Products[0].ReservedStock = 9m;
+        Assert.ThrowsException<InvalidOperationException>(() => AccountingOperations.CreateInvoice(data, new InvoiceDraft
+        {
+            CustomerId = data.Customers[0].Id, Type = "SALE",
+            Lines = [new InvoiceLine { ProductId = data.Products[0].Id, ProductName = data.Products[0].Name, Quantity = 2m, UnitPrice = 100m, LineTotal = 200m }]
+        }));
+        Assert.AreEqual(10m, data.Products[0].StockQuantity);
+        Assert.AreEqual(0, data.Invoices.Count);
+        Assert.AreEqual(0, data.InventoryMovements.Count);
+    }
+
+    [TestMethod]
+    public void PurchaseCancellationReversesStockAndRecordsMovement()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        data.Customers[0].IsCustomer = false;
+        data.Customers[0].IsSupplier = true;
+        data.Customers[0].Type = "VENDOR";
+        var invoice = AccountingOperations.CreateInvoice(data, new InvoiceDraft
+        {
+            CustomerId = data.Customers[0].Id, Type = "PURCHASE",
+            Lines = [new InvoiceLine { ProductId = data.Products[0].Id, ProductName = data.Products[0].Name, Quantity = 3m, UnitPrice = 20m, LineTotal = 60m }]
+        });
+        Assert.AreEqual(13m, data.Products[0].StockQuantity);
+        AccountingOperations.CancelInvoice(data, invoice.Id);
+        Assert.AreEqual(10m, data.Products[0].StockQuantity);
+        Assert.AreEqual("لغو شده", invoice.Status);
+        Assert.AreEqual(2, data.InventoryMovements.Count);
+        Assert.AreEqual(3m, data.InventoryMovements[0].SignedQuantity);
+        Assert.AreEqual(-3m, data.InventoryMovements[1].SignedQuantity);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void SaleCancellationAddsAuditableStockReversal()
+    {
+        var data = CreateSampleData(includeInvoice: true);
+        var invoice = data.Invoices.Single();
+        AccountingOperations.CancelInvoice(data, invoice.Id);
+        Assert.AreEqual(10m, data.Products[0].StockQuantity);
+        Assert.AreEqual(2, data.InventoryMovements.Count);
+        Assert.AreEqual(-10m, data.InventoryMovements[0].SignedQuantity);
+        Assert.AreEqual(10m, data.InventoryMovements[1].SignedQuantity);
+        AccountingDataValidator.Validate(data);
     }
 
     private static AccountingData CreateSampleData(bool includeInvoice)
