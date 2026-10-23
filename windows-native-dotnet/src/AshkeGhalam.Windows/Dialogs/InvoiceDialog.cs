@@ -29,19 +29,19 @@ public sealed class InvoiceDialog : Window
     private readonly TextBox _barcodeScan = new() { Height = 34, MinWidth = 240, Padding = new Thickness(8, 4, 8, 4), FlowDirection = FlowDirection.LeftToRight };
     private readonly CheckBox _taxIsAmount = new() { Content = "مالیات مبلغی است (خاموش: درصد از جمع کالاها)", IsChecked = true, Margin = new Thickness(0, 6, 0, 0) };
 
-    private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), ItemsSource = new[]
+    private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, ItemsSource = new[]
     {
         new Choice("SALE", "فاکتور فروش"),
         new Choice("PURCHASE", "فاکتور خرید"),
         new Choice("PROFORMA", "پیش‌فاکتور")
     }, SelectedIndex = 0 };
-    private readonly ComboBox _person = new() { Height = 34, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 250 };
-    private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240 };
+    private readonly ComboBox _person = new() { Height = 34, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 250, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
     private readonly TextBox _quantity = new() { Height = 32, Width = 90, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _price = new() { Height = 32, Width = 130, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _lineDescription = new() { Height = 32, Width = 180, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _date = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _dueDate = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
+    private readonly TextBox _date = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4), ToolTip = "تاریخ شمسی با قالب سال/ماه/روز؛ نمونه: ۱۴۰۵/۰۷/۰۲" };
+    private readonly TextBox _dueDate = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4), ToolTip = "تاریخ سررسید شمسی با قالب سال/ماه/روز؛ خالی گذاشتن مجاز است" };
     private readonly TextBox _discount = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4), Text = "0" };
     private readonly TextBox _tax = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4), Text = "0" };
     private readonly TextBox _cashAmount = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4), Text = "0" };
