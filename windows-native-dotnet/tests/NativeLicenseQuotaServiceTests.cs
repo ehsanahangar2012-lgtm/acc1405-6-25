@@ -35,6 +35,22 @@ public sealed class NativeLicenseQuotaServiceTests
     }
 
     [TestMethod]
+    public void MultiRecordCheckPaymentRequiresQuotaForBothPaymentAndCheck()
+    {
+        var data = new AccountingData();
+        for (var i = 0; i < 99; i++)
+            data.Invoices.Add(new InvoiceRecord { Number = i + 1 });
+
+        Assert.IsTrue(NativeLicenseQuotaService.CanAddDocument(data, null).Allowed,
+            "A single-record operation is allowed when one slot remains.");
+        var pairedOperation = NativeLicenseQuotaService.CanAddDocuments(data, null, 2);
+        Assert.IsFalse(pairedOperation.Allowed,
+            "A payment paid by cheque writes two source records and must not exceed the trial cap.");
+        Assert.AreEqual(99, pairedOperation.CurrentCount);
+        Assert.AreEqual(100, pairedOperation.Limit);
+    }
+
+    [TestMethod]
     public void DocumentQuotaCountsOnlySourceInvoiceVoucherTransactionAndCheckCollections()
     {
         var data = new AccountingData();
