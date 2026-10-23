@@ -179,6 +179,7 @@ public partial class MainWindow : Window
         ReportExpenses.Text = expenses.ToString("N2", CultureInfo.CurrentCulture);
         ReportCash.Text = (salesReceipts - purchasePayments - expenses).ToString("N2", CultureInfo.CurrentCulture);
         RefreshLedger();
+        RefreshFinancialReports();
     }
 
     private void RefreshLedger()
@@ -288,6 +289,73 @@ public partial class MainWindow : Window
                 line.Credit.ToString(CultureInfo.InvariantCulture),
                 line.Balance.ToString(CultureInfo.InvariantCulture)
             }));
+
+    private void RefreshFinancialReports_Click(object sender, RoutedEventArgs e) =>
+        RefreshFinancialReports();
+
+    private void RefreshFinancialReports()
+    {
+        var report = FinancialReportsService.Build(_data);
+        static string Money(decimal value) => value.ToString("N2", CultureInfo.CurrentCulture);
+
+        FinancialRevenue.Text = Money(report.Revenue);
+        FinancialCostOfSales.Text = Money(report.CostOfSales);
+        FinancialGrossProfit.Text = Money(report.GrossProfit);
+        FinancialOperatingExpenses.Text = Money(report.OperatingExpenses);
+        FinancialNetProfit.Text = Money(report.NetProfit);
+        FinancialAssets.Text = Money(report.Assets);
+        FinancialLiabilities.Text = Money(report.Liabilities);
+        FinancialEquity.Text = Money(report.Equity);
+        FinancialCashInflows.Text = Money(report.CashInflows);
+        FinancialCashOutflows.Text = Money(report.CashOutflows);
+        FinancialNetCashChange.Text = Money(report.NetCashChange);
+        FinancialCashBalance.Text = Money(report.CashBalance);
+        FinancialBalanceIntegrity.Text = Math.Abs(report.BalanceSheetDifference) < 0.01m
+            ? "کنترل تراز حسابداری برقرار است؛ اختلاف دارایی با بدهی + حقوق مالکانه + سود/زیان دوره: ۰"
+            : $"هشدار کنترل تراز: اختلاف دارایی با بدهی + حقوق مالکانه + سود/زیان برابر {Money(report.BalanceSheetDifference)} است. کدینگ و اسناد دفتر روزنامه را بررسی کنید.";
+
+        FinancialAccountsGrid.ItemsSource = null;
+        FinancialAccountsGrid.ItemsSource = report.Accounts
+            .Select(line => new TrialBalanceGridRow(
+                line.Code, line.Name, AccountTypeLabel(line.Type), line.Debit, line.Credit, line.Balance))
+            .ToList();
+    }
+
+    private void ExportFinancialReports_Click(object sender, RoutedEventArgs e)
+    {
+        var report = FinancialReportsService.Build(_data);
+        var summaryRows = new (string Label, decimal Value)[]
+        {
+            ("درآمد کل", report.Revenue),
+            ("بهای تمام‌شده", report.CostOfSales),
+            ("سود ناخالص", report.GrossProfit),
+            ("هزینه‌های عملیاتی", report.OperatingExpenses),
+            ("سود/زیان خالص", report.NetProfit),
+            ("دارایی‌ها", report.Assets),
+            ("بدهی‌ها", report.Liabilities),
+            ("حقوق مالکانه", report.Equity),
+            ("ورودی نقد و بانک", report.CashInflows),
+            ("خروجی نقد و بانک", report.CashOutflows),
+            ("تغییر خالص نقد", report.NetCashChange),
+            ("مانده نقد و بانک", report.CashBalance),
+            ("اختلاف کنترل تراز", report.BalanceSheetDifference)
+        }.Select(item => new[]
+        {
+            "SUMMARY", "", item.Label, "", "", "", item.Value.ToString(CultureInfo.InvariantCulture)
+        });
+
+        var accountRows = report.Accounts.Select(account => new[]
+        {
+            "ACCOUNT", account.Code, account.Name, account.Type,
+            account.Debit.ToString(CultureInfo.InvariantCulture),
+            account.Credit.ToString(CultureInfo.InvariantCulture),
+            account.Balance.ToString(CultureInfo.InvariantCulture)
+        });
+
+        ExportCsv("advanced-financial-report.csv",
+            new[] { "RowType", "AccountCode", "AccountNameOrMetric", "AccountType", "Debit", "Credit", "BalanceOrValue" },
+            summaryRows.Concat(accountRows));
+    }
 
     private static string AccountTypeLabel(string type) => type switch
     {
