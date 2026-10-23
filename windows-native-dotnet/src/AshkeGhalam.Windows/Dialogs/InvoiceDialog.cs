@@ -296,6 +296,8 @@ public sealed class InvoiceDialog : Window
         RefreshPeople();
         if (_existingInvoice is not null)
         {
+            // Preserve document type while editing so inventory and posting reversal stay coherent.
+            _type.IsEnabled = false;
             _person.SelectedItem = _person.Items.Cast<CustomerRecord>()
                 .FirstOrDefault(person => person.Id == _existingInvoice.CustomerId);
             foreach (var line in _existingInvoice.Lines)
@@ -424,8 +426,11 @@ public sealed class InvoiceDialog : Window
             {
                 var alreadyInInvoice = _lines.Where(l => l.ProductId == product.Id).Sum(l => l.Quantity);
                 var available = product.StockQuantity - product.ReservedStock;
+                // When editing a posted sale, temporarily account for its existing stock-out.
+                if (_existingInvoice?.Type == "SALE")
+                    available += _existingInvoice.Lines.Where(line => line.ProductId == product.Id).Sum(line => line.Quantity);
                 if (alreadyInInvoice + quantity > available)
-                    throw new InvalidOperationException($"موجودی آزاد کافی نیست؛ موجودی آزاد فعلی: {available:N2}");
+                    throw new InvalidOperationException($"موجودی آزاد کافی نیست؛ موجودی آزاد پس از درنظرگرفتن سند انتخابی: {available:N2}");
             }
             var buyPrice = AccountingRules.Money(product.BuyPrice ?? 0m);
             _lines.Add(new InvoiceLine
