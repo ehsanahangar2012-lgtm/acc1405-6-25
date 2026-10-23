@@ -2127,7 +2127,7 @@ public partial class MainWindow : Window
     private void AddCheck_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable() || !ConfirmCanAddDocument()) return;
-        var dialog = new CheckDialog(this);
+        var dialog = new CheckDialog(this, null, _data.Customers, _data.Preferences.Currency);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not CheckRecord check) return;
         Commit(data =>
@@ -2144,7 +2144,7 @@ public partial class MainWindow : Window
         if (FindName("ChecksGrid") is not DataGrid grid || grid.SelectedItem is not CheckGridRow selectedRow)
         { MessageBox.Show(this, "یک چک را انتخاب کنید."); return; }
         var selected = selectedRow.Record;
-        var dialog = new CheckDialog(this, selected);
+        var dialog = new CheckDialog(this, selected, _data.Customers, _data.Preferences.Currency);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not CheckRecord changed) return;
         Commit(data =>
@@ -2156,6 +2156,142 @@ public partial class MainWindow : Window
             data.Checks[index] = changed;
         }, "مشخصات چک به‌روزرسانی شد");
     }
+
+    private void PreviewCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (ChecksGrid.SelectedItem is not CheckGridRow selectedRow)
+        {
+            MessageBox.Show(this, "ابتدا یک چک را انتخاب کنید.", "پیش‌نمایش سند چک",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        new CheckPreviewWindow(this, selectedRow.Record, ActiveCompanyProfile(), _data.Preferences.Currency).ShowDialog();
+    }
+
+    private void SpendCheck_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (ChecksGrid.SelectedItem is not CheckGridRow selectedRow)
+        {
+            MessageBox.Show(this, "ابتدا چک دریافتی موردنظر را انتخاب کنید.", "خرج کردن چک",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var received = selectedRow.Record;
+        if (received.CheckType != "RECEIVED" || received.Status is not ("PENDING" or "DEPOSITED"))
+        {
+            MessageBox.Show(this, "فقط چک دریافتی در انتظار یا واگذار‌شده به بانک، قابل خرج/واگذاری است.",
+                "خرج کردن چک", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var payee = new ComboBox
+        {
+            IsEditable = true,
+            IsTextSearchEnabled = true,
+            StaysOpenOnEdit = true,
+            DisplayMemberPath = nameof(CustomerRecord.Name),
+            ItemsSource = _data.Customers.Where(person => person.IsSupplier || person.IsCustomer)
+                .OrderBy(person => person.Name).ToList(),
+            MinWidth = 330,
+            Height = 36
+        };
+        var note = new TextBox { MinWidth = 330, Height = 72, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
+        var dialog = new Window
+        {
+            Owner = this, Title = "خرج / واگذاری چک دریافتی",
+            Width = 500, Height = 360, MinWidth = 450, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            FlowDirection = FlowDirection.RightToLeft, ResizeMode = ResizeMode.NoResize,
+            FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
+            Background = new SolidColorBrush(Color.FromRgb(248, 250, 252))
+        };
+        var form = new StackPanel { Margin = new Thickness(22) };
+        form.Children.Add(new TextBlock
+        {
+            Text = $"واگذاری چک {received.CheckNumber} به مبلغ {received.Amount:N0} {CurrencyUnitLabel()}",
+            FontSize = 17, FontWeight = FontWeights.Bold, TextWrapping = TextWrapping.Wrap,
+            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)), Margin = new Thickness(0, 0, 0, 12)
+        });
+        AddLabeledControl(form, "دارنده / ذی‌نفع جدید (از لیست انتخاب یا دستی وارد کنید)", payee);
+        AddLabeledControl(form, "شرح خرج / علت واگذاری", note);
+        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
+        var confirm = new Button { Content = "ثبت خرج چک", Width = 130, Height = 36, IsDefault = true, Background = new SolidColorBrush(Color.FromRgb(15, 118, 110)), Foreground = Brushes.White };
+        confirm.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(payee.Text) || payee.Text.Trim().Length < 2)
+            {
+                MessageBox.Show(dialog, "نام دارنده / ذی‌نفع جدید را وارد کنید.");
+                return;
+            }
+            dialog.DialogResult = true;
+        };
+        buttons.Children.Add(confirm);
+        buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 36, Margin = new Thickness(8, 0, 0, 0), IsCancel = true });
+        form.Children.Add(buttons);
+        dialog.Content = form;
+        ApplyCurrentThemeTo(dialog);
+        if (dialog.ShowDialog() != true) return;
+
+        var selectedPayee = payee.SelectedItem as CustomerRecord;
+        if (selectedPayee is not null &&
+            !string.Equals(selectedPayee.Name, payee.Text.Trim(), StringComparison.CurrentCultureIgnoreCase))
+            selectedPayee = null;
+
+        var outgoing = new CheckRecord
+        {
+            BankName = received.BankName,
+            Amount = received.Amount,
+            DueDate = received.DueDate,
+            IssueDate = received.IssueDate,
+            Status = "PENDING",
+            // The cheque's SAYAD identifier remains on the source record to avoid duplicating it.
+            SayadId = "",
+            CheckNumber = received.CheckNumber,
+            HolderName = payee.Text.Trim(),
+            PersonId = selectedPayee?.Id ?? "",
+            PersonName = payee.Text.Trim(),
+            RelatedInvoiceId = received.RelatedInvoiceId,
+            IsHighPriority = received.IsHighPriority,
+            Description = $"خرج از چک دریافتی {received.CheckNumber} (شناسهٔ اصلی: {received.SayadId}). {note.Text.Trim()}".Trim(),
+            CheckType = "ISSUED",
+            CreatedAt = DateTimeOffset.Now,
+            History = [new CheckHistoryRecord
+            {
+                ChangedAt = DateTimeOffset.Now, Status = "PENDING",
+                Note = $"ثبت خرج چک دریافتی {received.CheckNumber} به نام {payee.Text.Trim()}"
+            }]
+        };
+
+        Commit(data =>
+        {
+            var original = data.Checks.SingleOrDefault(check => check.Id == received.Id)
+                ?? throw new InvalidOperationException("چک دریافتی پیدا نشد.");
+            if (original.CheckType != "RECEIVED" || original.Status is not ("PENDING" or "DEPOSITED"))
+                throw new InvalidOperationException("وضعیت چک تغییر کرده است؛ جدول را تازه‌سازی و دوباره بررسی کنید.");
+            original.Status = "TRANSFERRED";
+            original.History.Add(new CheckHistoryRecord
+            {
+                ChangedAt = DateTimeOffset.Now, Status = "TRANSFERRED",
+                Note = $"خرج / واگذاری به {payee.Text.Trim()}: {note.Text.Trim()}"
+            });
+            data.Checks.Add(outgoing);
+        }, "خرج چک ثبت شد؛ چک دریافتی واگذار و سابقهٔ چک پرداختی مرتبط ایجاد شد.");
+    }
+
+    private static void AddLabeledControl(Panel root, string label, FrameworkElement field)
+    {
+        root.Children.Add(new TextBlock
+        {
+            Text = label, FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+            Margin = new Thickness(0, 7, 0, 4)
+        });
+        root.Children.Add(field);
+    }
+
+    private string CurrencyUnitLabel() =>
+        string.Equals(_data.Preferences.Currency, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "تومان" : "ریال";
 
     private void ChangeCheckStatus_Click(object sender, RoutedEventArgs e)
     {
