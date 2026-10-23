@@ -18,7 +18,7 @@ public sealed class NativeLicenseQuotaServiceTests
         var decision = NativeLicenseQuotaService.CanAddCustomer(data, null);
         Assert.IsFalse(decision.Allowed);
         Assert.AreEqual(30, decision.Limit);
-        StringAssert.Contains(decision.Message, "۳۰");
+        StringAssert.Contains(decision.Message, "طرف حساب");
     }
 
     [TestMethod]
