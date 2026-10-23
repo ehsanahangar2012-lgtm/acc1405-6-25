@@ -19,7 +19,9 @@ public sealed class JournalEntryDialog : Window
     private readonly TextBox _referenceType = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
     private readonly ComboBox _debit = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsEditable = true, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
     private readonly ComboBox _credit = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsEditable = true, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
-    private readonly ComboBox _documentType = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };\n    private IReadOnlyList<Choice> _accountChoices = [];\n    private bool _refreshingCreditChoices;
+    private readonly ComboBox _documentType = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
+    private IReadOnlyList<Choice> _accountChoices = [];
+    private bool _refreshingCreditChoices;
 
     public AccountingEntryRecord? Result { get; private set; }
 
@@ -29,8 +31,8 @@ public sealed class JournalEntryDialog : Window
         NumericTextBoxFormatter.Attach(_amount);
         Title = "ثبت سند حسابداری دوبل";
         Width = 610;
-        Height = 760;
-        MinHeight = 700;
+        Height = 690;
+        MinHeight = 480;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         ResizeMode = ResizeMode.CanResize;
         FlowDirection = FlowDirection.RightToLeft;
