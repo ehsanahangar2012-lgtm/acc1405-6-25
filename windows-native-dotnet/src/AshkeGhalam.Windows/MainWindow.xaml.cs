@@ -427,7 +427,7 @@ public partial class MainWindow : Window
     {
         NativeLicenseState? existing = null;
         try { existing = _licenseStore.Load(); }
-        catch (Exception ex)
+        catch (Exception)
         {
             if (MessageBox.Show(this,
                     "فایل لایسنس قبلی خوانده نشد. می‌توانید دوباره با سرور تأیید کنید؛ پس از تأیید موفق، فایل رمزگذاری‌شده جایگزین می‌شود. ادامه می‌دهید؟",
