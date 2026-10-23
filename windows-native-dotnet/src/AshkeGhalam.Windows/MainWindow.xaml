@@ -131,21 +131,31 @@
                 <Grid Margin="8">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
                     <StackPanel>
-                        <TextBlock Text="مدیریت مشتریان" FontSize="23" FontWeight="Bold"/>
-                        <TextBlock Text="اطلاعات مشتری در حافظه محلی این رایانه ذخیره می‌شود." Style="{StaticResource SectionHint}"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
-                            <Button Content="ثبت مشتری جدید" Click="AddCustomer_Click" Background="#0F766E" Foreground="White"/>
-                            <Button Content="ویرایش مشتری انتخابی" Click="EditCustomer_Click"/>
-                            <Button Content="حذف مشتری انتخابی" Click="DeleteCustomer_Click"/>
-                            <Button Content="خروجی CSV" Click="ExportCustomers_Click"/>
-                        </StackPanel>
+                        <TextBlock Text="مدیریت اشخاص" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="مدل پرونده از نسخهٔ اصلی توسعه یافته است: کد، نقش مشتری/تأمین‌کننده، دسته‌بندی، اطلاعات تماس و یادداشت. ماندهٔ حساب هنوز با انتقال دفترکل اصلی محاسبه نمی‌شود." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <Button Content="ثبت شخص جدید" Click="AddCustomer_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="ویرایش شخص انتخابی" Click="EditCustomer_Click"/>
+                            <Button Content="حذف شخص انتخابی" Click="DeleteCustomer_Click"/>
+                            <Button Content="خروجی CSV کامل پرونده‌ها" Click="ExportCustomers_Click"/>
+                        </WrapPanel>
                     </StackPanel>
-                    <DataGrid x:Name="CustomersGrid" Grid.Row="1">
+                    <DataGrid x:Name="CustomersGrid" Grid.Row="1"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              CanUserResizeColumns="True">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="نام / شرکت" Binding="{Binding Name}" Width="*"/>
-                            <DataGridTextColumn Header="تلفن" Binding="{Binding Phone}" Width="170"/>
-                            <DataGridTextColumn Header="نشانی" Binding="{Binding Address}" Width="2*"/>
-                            <DataGridTextColumn Header="تاریخ ثبت" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="150"/>
+                            <DataGridTextColumn Header="کد شخص" Binding="{Binding Code}" Width="105"/>
+                            <DataGridTextColumn Header="نام / شرکت" Binding="{Binding Name}" Width="210"/>
+                            <DataGridTextColumn Header="نقش" Binding="{Binding RoleLabel}" Width="155"/>
+                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding Category}" Width="120"/>
+                            <DataGridTextColumn Header="تلفن" Binding="{Binding Phone}" Width="135"/>
+                            <DataGridTextColumn Header="ایمیل" Binding="{Binding Email}" Width="190"/>
+                            <DataGridTextColumn Header="شناسه ملی" Binding="{Binding NationalId}" Width="130"/>
+                            <DataGridTextColumn Header="نشانی" Binding="{Binding Address}" Width="250"/>
+                            <DataGridTextColumn Header="یادداشت" Binding="{Binding Notes}" Width="220"/>
+                            <DataGridTextColumn Header="ماندهٔ ذخیره‌شده*" Binding="{Binding Balance, StringFormat={}{0:N2}}" Width="145"/>
+                            <DataGridTextColumn Header="تاریخ ثبت" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="155"/>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
