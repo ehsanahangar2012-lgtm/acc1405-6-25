@@ -381,6 +381,58 @@ public sealed class AccountingBehaviorTests
         Assert.AreEqual(0, data.Vouchers.Count);
     }
 
+    [TestMethod]
+    public void InventoryVoucherDeepCopyPreservesLineAndMovementHistory()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        var product = data.Products[0];
+        var voucher = AccountingOperations.CreateVoucher(data, new VoucherRecord
+        {
+            Type = "IN", MovementType = "GOODS_RECEIPT", PersonName = "تأمین‌کننده آزمایشی",
+            Items = [new VoucherItemRecord { ProductId = product.Id, ProductName = product.Name, Quantity = 2m, Unit = product.Unit, Weight = 0.3m, ShelfLocation = "A-1", Description = "بسته سالم" }]
+        });
+        var copy = data.DeepCopy();
+
+        Assert.AreNotSame(voucher, copy.Vouchers.Single());
+        Assert.AreNotSame(voucher.Items[0], copy.Vouchers.Single().Items[0]);
+        Assert.AreEqual("تأمین‌کننده آزمایشی", copy.Vouchers.Single().PersonName);
+        Assert.AreEqual("A-1", copy.Vouchers.Single().Items[0].ShelfLocation);
+        Assert.AreEqual(2m, copy.InventoryMovements.Single().SignedQuantity);
+        AccountingDataValidator.Validate(copy);
+    }
+
+    [TestMethod]
+    public void InventoryVoucherStatusProgressionRecordsDeliveryTime()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        var voucher = AccountingOperations.CreateVoucher(data, new VoucherRecord
+        {
+            Type = "OUT", MovementType = "GOODS_ISSUE",
+            Items = [new VoucherItemRecord { ProductId = data.Products[0].Id, ProductName = data.Products[0].Name, Quantity = 1m }]
+        });
+
+        AccountingOperations.ChangeVoucherStatus(data, voucher.Id, "IN_TRANSIT");
+        Assert.AreEqual("IN_TRANSIT", voucher.Status);
+        Assert.IsNull(voucher.DeliveryTime);
+        AccountingOperations.ChangeVoucherStatus(data, voucher.Id, "DELIVERED");
+        Assert.AreEqual("DELIVERED", voucher.Status);
+        Assert.IsNotNull(voucher.DeliveryTime);
+        AccountingDataValidator.Validate(data);
+    }
+
+    [TestMethod]
+    public void RejectsVoucherWithIncompatibleReturnMovementWhenValidatingStoredData()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        var voucher = AccountingOperations.CreateVoucher(data, new VoucherRecord
+        {
+            Type = "IN", MovementType = "GOODS_RECEIPT",
+            Items = [new VoucherItemRecord { ProductId = data.Products[0].Id, ProductName = data.Products[0].Name, Quantity = 1m }]
+        });
+        voucher.MovementType = "RETURN_RECEIPT";
+        Assert.ThrowsException<InvalidDataException>(() => AccountingDataValidator.Validate(data));
+    }
+
     private static AccountingData CreateSampleData(bool includeInvoice)
     {
         var customer=new CustomerRecord{Id="customer-test-1",Name="مشتری آزمایشی",Phone="09120000000",Address="تهران"};
