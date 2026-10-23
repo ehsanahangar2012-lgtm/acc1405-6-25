@@ -1030,6 +1030,14 @@ public partial class MainWindow : Window
         return false;
     }
 
+    private bool ConfirmCanAddDocuments(int additionalDocuments)
+    {
+        var decision = NativeLicenseQuotaService.CanAddDocuments(_data, GetLiveSessionEntitlements(), additionalDocuments);
+        if (decision.Allowed) return true;
+        MessageBox.Show(this, decision.Message, "سقف استفاده از نسخه", MessageBoxButton.OK, MessageBoxImage.Information);
+        return false;
+    }
+
     private VerifiedLicensePayload? GetLiveSessionEntitlements()
     {
         if (_sessionEntitlements is null)
@@ -1689,7 +1697,8 @@ public partial class MainWindow : Window
         CheckRecord? paymentCheck = null;
         if (string.Equals(dialog.Method, "چک", StringComparison.Ordinal))
         {
-            if (!ConfirmCanAddDocument()) return;
+            // A check payment creates both a payment and a check record.
+            if (!ConfirmCanAddDocuments(2)) return;
             var invoice = _data.Invoices.FirstOrDefault(item => item.Id == dialog.InvoiceId);
             if (invoice is null)
             {
