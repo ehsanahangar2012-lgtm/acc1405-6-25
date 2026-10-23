@@ -75,7 +75,7 @@ public sealed class VoucherDialog : Window
 
         _person.ItemsSource = people;
         _person.SelectedIndex = -1;
-        _product.ItemsSource = products.Where(p => p.StockQuantity > 0m).ToList();
+        _product.ItemsSource = products;
         _movementType.SelectedItem = MovementTypes[1];
         _date.Text = FormatPersianDate(DateTimeOffset.Now);
         _lineList.ItemsSource = _lines;
