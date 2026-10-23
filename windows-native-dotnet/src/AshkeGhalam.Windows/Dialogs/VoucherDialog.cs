@@ -47,6 +47,7 @@ public sealed class VoucherDialog : Window
     private readonly IReadOnlyList<ProductRecord> _products;
     private readonly IReadOnlyList<InvoiceRecord> _invoices;
     private readonly VoucherRecord? _existing;
+    private readonly CompanyProfileRecord? _companyProfile;
     private readonly ComboBox _type = new() { Height = 34, ItemsSource = Types, DisplayMemberPath = nameof(Choice.Label), SelectedIndex = 1 };
     private readonly ComboBox _movementType = new() { Height = 34, ItemsSource = MovementTypes, DisplayMemberPath = nameof(Choice.Label) };
     private readonly ComboBox _person = new() { Height = 34, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 260 };
@@ -66,9 +67,10 @@ public sealed class VoucherDialog : Window
 
     public VoucherRecord? Result { get; private set; }
 
-    public VoucherDialog(Window owner, IReadOnlyList<CustomerRecord> people, IReadOnlyList<ProductRecord> products, IReadOnlyList<InvoiceRecord> invoices, VoucherRecord? existing = null)
+    public VoucherDialog(Window owner, IReadOnlyList<CustomerRecord> people, IReadOnlyList<ProductRecord> products, IReadOnlyList<InvoiceRecord> invoices, VoucherRecord? existing = null, CompanyProfileRecord? companyProfile = null)
     {
         _existing = existing;
+        _companyProfile = companyProfile;
         Owner = owner;
         _people = people;
         _products = products;
@@ -159,6 +161,9 @@ public sealed class VoucherDialog : Window
         AddField(root, "توضیحات سند", _notes);
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 18, 0, 0) };
+        var preview = new Button { Content = "پیش‌نمایش قبل از ثبت", Width = 155, Height = 38, Margin = new Thickness(0, 0, 8, 0) };
+        preview.Click += (_, _) => PreviewDraft();
+        buttons.Children.Add(preview);
         var save = new Button { Content = "ثبت حواله و گردش موجودی", Width = 185, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
         buttons.Children.Add(save);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
@@ -234,62 +239,79 @@ public sealed class VoucherDialog : Window
     {
         try
         {
-            if (_lines.Count == 0) throw new InvalidOperationException("برای ثبت حواله حداقل یک قلم کالا لازم است.");
-            var type = _type.SelectedItem as Choice ?? throw new InvalidOperationException("نوع سند را انتخاب کنید.");
-            var movement = _movementType.SelectedItem as Choice ?? throw new InvalidOperationException("نوع گردش را انتخاب کنید.");
-            var date = ParsePersianDate(_date.Text);
-            var person = _person.SelectedItem as CustomerRecord;
-            var invoiceChoice = _invoice.SelectedItem as InvoiceChoice;
-            if (invoiceChoice?.Invoice is not null && (person is null || invoiceChoice.Invoice.CustomerId != person.Id))
-                throw new InvalidOperationException("شخص سند باید با شخص فاکتور مرتبط یکسان باشد.");
-
-            if (type.Value == "RETURN" && movement.Value is not ("RETURN_RECEIPT" or "RETURN_ISSUE"))
-                throw new InvalidOperationException("برای برگشت کالا، نوع گردش «رسید برگشت از فروش» یا «حواله برگشت از خرید» را انتخاب کنید.");
-
-            Result = new VoucherRecord
-            {
-                Id = _existing?.Id ?? Guid.NewGuid().ToString("N"),
-                Number = _existing?.Number ?? 0,
-                TrackingCode = _existing?.TrackingCode ?? "",
-                Signature = _existing?.Signature ?? "",
-                CompanySignature = _existing?.CompanySignature ?? "",
-                SupervisorSignature = _existing?.SupervisorSignature ?? "",
-                LoadingPhotos = _existing is null ? [] : [.._existing.LoadingPhotos],
-                QrCode = _existing?.QrCode ?? "",
-                RelatedVoucherId = _existing?.RelatedVoucherId ?? "",
-                SourceWarehouseId = _existing?.SourceWarehouseId ?? "",
-                DestinationWarehouseId = _existing?.DestinationWarehouseId ?? "",
-                WarehouseId = _existing?.WarehouseId ?? "",
-                Type = type.Value,
-                MovementType = movement.Value,
-                Date = date,
-                PersonId = person?.Id ?? "",
-                PersonName = person?.Name ?? "",
-                RelatedInvoiceId = invoiceChoice?.Invoice?.Id ?? "",
-                ReturnReason = _returnReason.Text.Trim(),
-                Supervisor = _supervisor.Text.Trim(),
-                VehicleNumber = _vehicle.Text.Trim(),
-                ReceiverPhone = _receiverPhone.Text.Trim(),
-                Items = _lines.Select(x => new VoucherItemRecord
-                {
-                    ProductId = x.Product.Id,
-                    ProductName = x.Product.Name,
-                    Quantity = x.Quantity,
-                    Unit = string.IsNullOrWhiteSpace(x.Unit) ? x.Product.Unit : x.Unit,
-                    Weight = x.Weight ?? x.Product.Weight,
-                    ShelfLocation = string.IsNullOrWhiteSpace(x.ShelfLocation) ? x.Product.ShelfLocation : x.ShelfLocation,
-                    Description = string.IsNullOrWhiteSpace(x.Description) ? x.Product.Description : x.Description,
-                    ImageUrl = string.IsNullOrWhiteSpace(x.ImageUrl) ? x.Product.ImageUrl : x.ImageUrl
-                }).ToList(),
-                Notes = _notes.Text.Trim(),
-                Status = "PENDING"
-            };
+            Result = BuildVoucher();
             DialogResult = true;
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, ex.Message, "ثبت حواله", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+    }
+
+    private void PreviewDraft()
+    {
+        try
+        {
+            new VoucherPreviewWindow(this, BuildVoucher(), _companyProfile).ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "پیش‌نمایش حواله", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private VoucherRecord BuildVoucher()
+    {
+        if (_lines.Count == 0) throw new InvalidOperationException("برای ثبت حواله حداقل یک قلم کالا لازم است.");
+        var type = _type.SelectedItem as Choice ?? throw new InvalidOperationException("نوع سند را انتخاب کنید.");
+        var movement = _movementType.SelectedItem as Choice ?? throw new InvalidOperationException("نوع گردش را انتخاب کنید.");
+        var date = ParsePersianDate(_date.Text);
+        var person = _person.SelectedItem as CustomerRecord;
+        var invoiceChoice = _invoice.SelectedItem as InvoiceChoice;
+        if (invoiceChoice?.Invoice is not null && (person is null || invoiceChoice.Invoice.CustomerId != person.Id))
+            throw new InvalidOperationException("شخص سند باید با شخص فاکتور مرتبط یکسان باشد.");
+
+        if (type.Value == "RETURN" && movement.Value is not ("RETURN_RECEIPT" or "RETURN_ISSUE"))
+            throw new InvalidOperationException("برای برگشت کالا، نوع گردش «رسید برگشت از فروش» یا «حواله برگشت از خرید» را انتخاب کنید.");
+
+        return new VoucherRecord
+        {
+            Id = _existing?.Id ?? Guid.NewGuid().ToString("N"),
+            Number = _existing?.Number ?? 0,
+            TrackingCode = _existing?.TrackingCode ?? "",
+            Signature = _existing?.Signature ?? "",
+            CompanySignature = _existing?.CompanySignature ?? "",
+            SupervisorSignature = _existing?.SupervisorSignature ?? "",
+            LoadingPhotos = _existing is null ? [] : [.._existing.LoadingPhotos],
+            QrCode = _existing?.QrCode ?? "",
+            RelatedVoucherId = _existing?.RelatedVoucherId ?? "",
+            SourceWarehouseId = _existing?.SourceWarehouseId ?? "",
+            DestinationWarehouseId = _existing?.DestinationWarehouseId ?? "",
+            WarehouseId = _existing?.WarehouseId ?? "",
+            Type = type.Value,
+            MovementType = movement.Value,
+            Date = date,
+            PersonId = person?.Id ?? "",
+            PersonName = person?.Name ?? "",
+            RelatedInvoiceId = invoiceChoice?.Invoice?.Id ?? "",
+            ReturnReason = _returnReason.Text.Trim(),
+            Supervisor = _supervisor.Text.Trim(),
+            VehicleNumber = _vehicle.Text.Trim(),
+            ReceiverPhone = _receiverPhone.Text.Trim(),
+            Items = _lines.Select(x => new VoucherItemRecord
+            {
+                ProductId = x.Product.Id,
+                ProductName = x.Product.Name,
+                Quantity = x.Quantity,
+                Unit = string.IsNullOrWhiteSpace(x.Unit) ? x.Product.Unit : x.Unit,
+                Weight = x.Weight ?? x.Product.Weight,
+                ShelfLocation = string.IsNullOrWhiteSpace(x.ShelfLocation) ? x.Product.ShelfLocation : x.ShelfLocation,
+                Description = string.IsNullOrWhiteSpace(x.Description) ? x.Product.Description : x.Description,
+                ImageUrl = string.IsNullOrWhiteSpace(x.ImageUrl) ? x.Product.ImageUrl : x.ImageUrl
+            }).ToList(),
+            Notes = _notes.Text.Trim(),
+            Status = "PENDING"
+        };
     }
 
     private void RefreshInvoiceChoices()
