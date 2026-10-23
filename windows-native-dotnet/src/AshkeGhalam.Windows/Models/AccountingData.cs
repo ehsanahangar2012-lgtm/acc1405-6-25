@@ -49,7 +49,9 @@ public sealed class AccountingData
             DefaultTaxRatePercent = Preferences?.DefaultTaxRatePercent ?? 0m,
             SalesInvoicePrefix = Preferences?.SalesInvoicePrefix ?? "INV-",
             InvoiceFooter = Preferences?.InvoiceFooter ?? "",
-            SelectedInvoiceFootnotes = [..(Preferences?.SelectedInvoiceFootnotes ?? [])]
+            ApplicationTheme = Preferences?.ApplicationTheme ?? "light",
+            SelectedInvoiceFootnotes = [..(Preferences?.SelectedInvoiceFootnotes ?? [])],
+            CustomInvoiceFootnoteOptions = [..(Preferences?.CustomInvoiceFootnoteOptions ?? [])]
         },
         MoadianSettings = new MoadianSettingsRecord
         {
@@ -160,6 +162,8 @@ public sealed class CompanyProfileRecord
 public sealed class AccountingPreferences
 {
     public string InvoiceTheme { get; set; } = "modern";
+    /// <summary>Overall application palette; invoice paper templates keep their own independent themes.</summary>
+    public string ApplicationTheme { get; set; } = "light";
     public bool ShowInvoiceQr { get; set; } = true;
     public string Currency { get; set; } = "RIAL";
     public decimal DefaultTaxRatePercent { get; set; }
