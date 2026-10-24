@@ -6,6 +6,7 @@ using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using AshkeGhalam.Windows.Models;
+using AshkeGhalam.Windows.Services;
 
 namespace AshkeGhalam.Windows.Dialogs;
 
@@ -167,6 +168,7 @@ public sealed class CheckPreviewWindow : Window
             });
         }
         _document.Blocks.Add(new BlockUIContainer(summary));
+        PrintBrandingService.AppendWebsiteFooter(_document, 650);
 
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
