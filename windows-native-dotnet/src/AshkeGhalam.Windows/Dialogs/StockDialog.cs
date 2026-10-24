@@ -9,7 +9,18 @@ namespace AshkeGhalam.Windows.Dialogs;
 
 public sealed class StockDialog:Window
 {
-    private readonly ComboBox _product = new() { DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 260, Height = 34, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 280 };
+    private readonly ComboBox _product = new()
+    {
+        DisplayMemberPath = nameof(ProductRecord.Name),
+        MinWidth = 260,
+        Height = 36,
+        IsEditable = true,
+        StaysOpenOnEdit = true,
+        IsTextSearchEnabled = false,
+        IsTextSearchCaseSensitive = false,
+        MaxDropDownHeight = 320,
+        ToolTip = "نام، کد، بارکد یا شماره سریال کالا را جست‌وجو کنید و سپس نتیجه را انتخاب کنید."
+    };
     private readonly TextBlock _stockHint = new() { Margin = new Thickness(0, 6, 0, 4), TextWrapping = TextWrapping.Wrap };
     private readonly TextBox _quantity=new(){Text="1",Height=34,Padding=new Thickness(8,4,8,4)};
     public string ProductId{get;private set;}="";
@@ -20,7 +31,9 @@ public sealed class StockDialog:Window
         Owner = owner; Title = "افزایش موجودی کالا"; Width = 500; Height = 360; MinWidth = 420; MinHeight = 280; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection=FlowDirection.RightToLeft;FontFamily=new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");Background = Brushes.White; ResizeMode = ResizeMode.CanResize;
         NumericTextBoxFormatter.Attach(_quantity);
-        _product.ItemsSource = products.OrderBy(product => product.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        var productChoices = products.OrderBy(product => product.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
+        SmartComboBoxSearchService.SetItems(_product, productChoices,
+            product => new[] { product.Name, product.Code, product.Barcode, product.SerialNumber });
         if (_product.Items.Count > 0) _product.SelectedIndex = 0;
         var root = new StackPanel { Margin = new Thickness(16) };
         var productSection = new StackPanel();
