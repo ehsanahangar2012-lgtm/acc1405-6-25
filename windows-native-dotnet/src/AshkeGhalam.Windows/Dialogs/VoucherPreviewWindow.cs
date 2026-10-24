@@ -52,6 +52,7 @@ public sealed class VoucherPreviewWindow : Window
     {
         var accent = new SolidColorBrush(Color.FromRgb(15, 118, 110));
         var soft = new SolidColorBrush(Color.FromRgb(231, 248, 244));
+        var ink = new SolidColorBrush(Color.FromRgb(30, 41, 59));
         var document = new FlowDocument { FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 12,
             FlowDirection = FlowDirection.RightToLeft, PagePadding = new Thickness(28), ColumnWidth = 760,
             Background = Brushes.White, Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)) };
@@ -191,12 +192,12 @@ public sealed class VoucherPreviewWindow : Window
             }));
             row.Cells.Add(nameCell);
 
-            row.Cells.Add(new TableCell(new Paragraph(new Run(item.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
+            row.Cells.Add(new TableCell(new Paragraph(new Run(item.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))) { }) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
             {
                 Padding = new Thickness(6), Background = background,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5), FontSize = 9
             }));
-            row.Cells.Add(new TableCell(new Paragraph(new Run(string.IsNullOrWhiteSpace(item.Unit) ? "—" : item.Unit) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
+            row.Cells.Add(new TableCell(new Paragraph(new Run(string.IsNullOrWhiteSpace(item.Unit) ? "—" : item.Unit)) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
             {
                 Padding = new Thickness(6), Background = background,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5), FontSize = 9
