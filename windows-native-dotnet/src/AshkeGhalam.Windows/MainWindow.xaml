@@ -2,6 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:services="clr-namespace:AshkeGhalam.Windows.Services"
         Title="حسابداری اشک قلم — نسخه بومی ویندوز"
         Width="1360" Height="880" MinWidth="1040" MinHeight="680"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
@@ -12,6 +13,7 @@
         <shell:WindowChrome CaptionHeight="76" ResizeBorderThickness="6" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
     <Window.Resources>
+        <services:NavigationIconConverter x:Key="NavigationIconConverter"/>
         <Style TargetType="Button">
             <Setter Property="Padding" Value="12,7"/>
             <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
@@ -199,7 +201,12 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="{x:Type Button}">
                         <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9" Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
+                            <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource NavigationIconConverter}}"
+                                           FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Margin="0,0,8,0"
+                                           VerticalAlignment="Center" TextAlignment="Center"/>
+                                <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
+                            </StackPanel>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -1612,37 +1619,37 @@
                         </Border>
                         <TextBlock Text="منوی اصلی" Style="{StaticResource NavSectionLabel}"/>
                         <Button x:Name="NavigationDashboardButton" Tag="dashboard" Content="پیشخوان" Style="{StaticResource NavButton}" Background="#0F766E" Click="NavigateModule_Click"/>
-                        <Button Tag="invoices" Content="🧾  فاکتورها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="inventory" Content="📦  انبارداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="kardex" Content="📊  کارتکس کالا" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="checks" Content="🏦  مدیریت چک" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="finance" Content="💳  امور مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="customers" Content="👥  اشخاص" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="reports" Content="📈  گزارشات مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="invoices" Content="فاکتورها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="inventory" Content="انبارداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="kardex" Content="کارتکس کالا" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="checks" Content="مدیریت چک" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="finance" Content="امور مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="customers" Content="اشخاص" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="reports" Content="گزارشات مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="عملیات محلی موجود" Style="{StaticResource NavSectionLabel}"/>
-                        <Button Tag="payments" Content="💵  دریافت‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="expenses" Content="🧮  هزینه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="backup" Content="🛡️  پشتیبان‌گیری محلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="vouchers" Content="🚚  حواله‌های انبار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="payments" Content="دریافت‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="expenses" Content="هزینه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="backup" Content="پشتیبان‌گیری محلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="vouchers" Content="حواله‌های انبار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="حسابداری پیشرفته" Style="{StaticResource NavSectionLabel}"/>
-                        <Button Tag="accounting" Content="📚  حسابداری دوبل" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="cashflow-predictor" Content="💹  جریان نقدینگی و پیش‌بینی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="tax" Content="🧾  سامانه مؤدیان مالیاتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="loans" Content="🏛️  وام‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="due-calendar" Content="🗓️  تقویم سررسید و اقساط" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="bank-reconciliation" Content="🏧  تطبیق بانکی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="currency" Content="💱  مدیریت چندارزی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="workflow-rules" Content="⚙️  قواعد گردش مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="accounting" Content="حسابداری دوبل" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="cashflow-predictor" Content="جریان نقدینگی و پیش‌بینی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="tax" Content="سامانه مؤدیان مالیاتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="loans" Content="وام‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="due-calendar" Content="تقویم سررسید و اقساط" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="bank-reconciliation" Content="تطبیق بانکی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="currency" Content="مدیریت چندارزی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="workflow-rules" Content="قواعد گردش مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="گزارشات و تحلیل" Style="{StaticResource NavSectionLabel}"/>
-                        <Button Tag="financial-reports" Content="📊  گزارشات مالی پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="companies" Content="🏢  تنظیمات حسابداری و چندشرکتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="server" Content="🌐  ارتباط و همگام‌سازی سرور" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="fiscal-year" Content="📅  سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="security" Content="🔐  امنیت داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="financial-reports" Content="گزارشات مالی پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="companies" Content="تنظیمات حسابداری و چندشرکتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="server" Content="ارتباط و همگام‌سازی سرور" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="fiscal-year" Content="سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="security" Content="امنیت داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="اطلاعات و آموزش" Style="{StaticResource NavSectionLabel}"/>
-                        <Button Tag="about" Content="🏢  معرفی نرم‌افزار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="guide" Content="📘  راهنمای حسابداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="advanced-settings" Content="🎛️  تنظیمات پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="about" Content="معرفی نرم‌افزار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="guide" Content="راهنمای حسابداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="advanced-settings" Content="تنظیمات پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

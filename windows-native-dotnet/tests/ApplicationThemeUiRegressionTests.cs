@@ -1,4 +1,5 @@
 using System.Threading;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -218,6 +219,17 @@ public sealed class ApplicationThemeUiRegressionTests
     {
         Assert.IsTrue(ApplicationThemeService.ContrastRatio(foreground, background) >= 4.5,
             $"{state} foreground/background contrast must be at least 4.5:1.");
+    }
+
+
+    [TestMethod]
+    public void NavigationIconsUseKnownMonochromeWindowsGlyphs()
+    {
+        var converter = new NavigationIconConverter();
+        Assert.AreEqual("\\uE80F", converter.Convert("dashboard", typeof(string), null!, CultureInfo.InvariantCulture));
+        Assert.AreEqual("\\uE716", converter.Convert("customers", typeof(string), null!, CultureInfo.InvariantCulture));
+        Assert.AreEqual("\\uEA18", converter.Convert("security", typeof(string), null!, CultureInfo.InvariantCulture));
+        Assert.AreEqual("\\uE71D", converter.Convert("unknown-module", typeof(string), null!, CultureInfo.InvariantCulture));
     }
 
 }
