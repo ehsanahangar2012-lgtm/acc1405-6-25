@@ -93,7 +93,7 @@ public static class ApplicationThemeService
 
         // Establish control templates before theme mapping, so the newly applied
         // style brushes are remapped on the very first dark-theme pass as well.
-        PolishControls(window, elements);
+        PolishControls(window, elements, isDark);
 
         foreach (var element in elements)
             ApplyThemeValues(element, isDark);
@@ -354,10 +354,32 @@ public static class ApplicationThemeService
     private static Style CreateChoiceItemStyle(bool isDark, bool isListItem)
     {
         var style = new Style(isListItem ? typeof(ListBoxItem) : typeof(ComboBoxItem));
-        style.Setters.Add(new Setter(Control.BackgroundProperty, Brush(isDark ? "#111827" : "#FFFFFF")));
-        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F3F4F6" : "#0F172A")));
+        var surface = Brush(isDark ? "#111827" : "#FFFFFF");
+        var text = Brush(isDark ? "#F3F4F6" : "#0F172A");
+        var hover = Brush(isDark ? "#273447" : "#F0FDFA");
+        var selected = Brush(isDark ? "#115E59" : "#0F766E");
+
+        style.Setters.Add(new Setter(Control.BackgroundProperty, surface));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, text));
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(9, 6, 9, 6)));
         style.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 32d));
+        style.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Stretch));
+        style.Triggers.Add(new Trigger
+        {
+            Property = UIElement.IsMouseOverProperty,
+            Value = true,
+            Setters = { new Setter(Control.BackgroundProperty, hover) }
+        });
+        style.Triggers.Add(new Trigger
+        {
+            Property = isListItem ? ListBoxItem.IsSelectedProperty : ComboBoxItem.IsHighlightedProperty,
+            Value = true,
+            Setters =
+            {
+                new Setter(Control.BackgroundProperty, selected),
+                new Setter(Control.ForegroundProperty, Brushes.White)
+            }
+        });
         return style;
     }
 
@@ -621,17 +643,16 @@ public static class ApplicationThemeService
         return EnsureReadableContrast(preferred, surface);
     }
 
-    private static void PolishControls(Window window, IReadOnlyCollection<DependencyObject> elements)
+    private static void PolishControls(Window window, IReadOnlyCollection<DependencyObject> elements, bool isDark)
     {
         if (window.GetType().Name != "MainWindow")
         {
             PolishFormLabels(elements);
-            var buttonStyle = CreateModernButtonStyle();
-            window.Resources[typeof(Button)] = buttonStyle;
+            // Use an implicit window resource, not a local Button.Style assignment. This lets
+            // WPF refresh existing controls when the owner switches between light and dark.
+            window.Resources[typeof(Button)] = CreateModernButtonStyle(isDark);
             foreach (var button in elements.OfType<Button>())
             {
-                if (button.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
-                    button.Style = buttonStyle;
                 button.MinHeight = Math.Max(button.MinHeight, 36);
                 button.FontSize = Math.Max(button.FontSize, 12);
                 if (button.Padding.Left < 8)
@@ -683,10 +704,13 @@ public static class ApplicationThemeService
         foreach (var grid in elements.OfType<DataGrid>())
         {
             grid.FontSize = Math.Max(grid.FontSize, 12);
-            grid.RowHeight = Math.Max(grid.RowHeight, 36);
-            grid.ColumnHeaderHeight = Math.Max(grid.ColumnHeaderHeight, 40);
+            grid.RowHeight = Math.Max(grid.RowHeight, 38);
+            grid.ColumnHeaderHeight = Math.Max(grid.ColumnHeaderHeight, 42);
             grid.AlternationCount = Math.Max(grid.AlternationCount, 2);
             grid.HeadersVisibility = DataGridHeadersVisibility.Column;
+            grid.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
+            grid.CanUserResizeRows = false;
+            grid.SnapsToDevicePixels = true;
         }
     }
 
@@ -710,15 +734,15 @@ public static class ApplicationThemeService
         }
     }
 
-    private static Style CreateModernButtonStyle()
+    private static Style CreateModernButtonStyle(bool isDark)
     {
         var style = new Style(typeof(Button));
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 7, 12, 7)));
         style.Setters.Add(new Setter(Control.MinHeightProperty, 36d));
         style.Setters.Add(new Setter(Control.FontSizeProperty, 13d));
-        style.Setters.Add(new Setter(Control.BackgroundProperty, Brush("#FFFFFF")));
-        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush("#0F172A")));
-        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush("#CBD5E1")));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brush(isDark ? "#1F2937" : "#FFFFFF")));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F3F4F6" : "#0F766E")));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush(isDark ? "#475569" : "#CBD5E1")));
         style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
         style.Setters.Add(new Setter(FrameworkElement.CursorProperty, Cursors.Hand));
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
