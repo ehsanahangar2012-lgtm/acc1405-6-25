@@ -48,20 +48,20 @@ public sealed class PaymentReceiptPreviewWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 0, 0, 12) };
+        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
         var titleStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         titleStack.Children.Add(new TextBlock
         {
             Text = "رسید دریافت / پرداخت",
             FontSize = 22,
             FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42))
+            Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252))
         });
         titleStack.Children.Add(new TextBlock
         {
             Text = "قالب چاپی اختصاصی برای ثبت داخلی تسویهٔ فاکتور",
             FontSize = 11,
-            Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
+            Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
             Margin = new Thickness(0, 4, 0, 0)
         });
         toolbar.Children.Add(titleStack);
@@ -99,8 +99,10 @@ public sealed class PaymentReceiptPreviewWindow : Window
                 Padding = new Thickness(12)
             }
         };
+        var toolbarFrame = PreviewChromeService.CreateToolbarFrame(toolbar);
+        Grid.SetRow(toolbarFrame, 0);
         Grid.SetRow(paper, 1);
-        root.Children.Add(toolbar);
+        root.Children.Add(toolbarFrame);
         root.Children.Add(paper);
         Content = root;
     }

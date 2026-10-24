@@ -60,16 +60,7 @@ public sealed class VoucherPreviewWindow : Window
             Child = new FlowDocumentScrollViewer { Document = _document, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, IsToolBarVisible = false, Background = Brushes.White, Padding = new Thickness(12) }
         };
-        var toolbarFrame = new Border
-        {
-            Background = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(12),
-            Margin = new Thickness(0, 0, 0, 10),
-            Child = toolbar
-        };
+        var toolbarFrame = PreviewChromeService.CreateToolbarFrame(toolbar);
         Grid.SetRow(toolbarFrame, 0);
         Grid.SetRow(paper, 1);
         root.Children.Add(toolbarFrame);
