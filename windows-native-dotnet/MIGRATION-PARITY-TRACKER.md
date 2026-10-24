@@ -383,6 +383,8 @@
 - Removed a global no-wrap setting from text blocks so deliberate wrapped content remains controlled by each page and long operational labels can be wrapped selectively.
 - Standardized dynamically built field labels to a consistent semibold size and spacing across the native forms.
 
+- [x] فرم‌های «شخص» و «کالا» نیز به کارت‌های مشخصات، نقش‌ها، تماس، موجودی/قیمت و دسته‌بندی تفکیک شدند؛ دکمهٔ اصلی ذخیره با رنگ برند برجسته شد و منطق ذخیره و اعتبارسنجی حفظ شد. نیازمند تأیید CI و مشاهدهٔ زنده در تم روشن/تاریک است.
+
 ## رابط کاربری بومی — استانداردسازی سراسری کنترل‌ها
 
 - [x] تعریف موجود کنترل‌های مشترک TextBlock، Button، TextBox، ComboBox، PasswordBox، CheckBox، RadioButton، ListBox و DataGrid حفظ شد؛ تعریف‌های تکراری حذف شدند.

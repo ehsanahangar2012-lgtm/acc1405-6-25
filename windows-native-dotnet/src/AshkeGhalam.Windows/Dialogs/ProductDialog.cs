@@ -80,44 +80,70 @@ public sealed class ProductDialog : Window
         _imageUrl.Text = existing?.ImageUrl ?? "";
         _quantity.IsEnabled = existing is null;
 
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(new TextBlock
+        var root = new StackPanel { Margin = new Thickness(16) };
+        root.Children.Add(new Border
         {
-            Text = existing is null ? "پرونده کالا و انبار" : "ویرایش پرونده کالا",
-            FontSize = 22,
-            FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-        root.Children.Add(new TextBlock
-        {
-            Text = "فیلدهای کالا مطابق مدل نسخهٔ اصلی گسترش یافته‌اند. تغییر موجودی با عملیات مستقل «ورود موجودی» انجام می‌شود؛ موجودی رزروشده در این فرم قابل تغییر نیست.",
-            FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12)
+            Background = PaletteBrush("#ECFDF5"),
+            BorderBrush = PaletteBrush("#A7F3D0"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(11, 9, 11, 9),
+            Margin = new Thickness(0, 0, 0, 14),
+            Child = new TextBlock
+            {
+                Text = "موجودی کالای ثبت‌شده را با «ورود موجودی» یا حواله تغییر دهید؛ ویرایش پرونده موجودی رزروشده را تغییر نمی‌دهد.",
+                FontSize = 12,
+                Foreground = PaletteBrush("#065F46"),
+                TextWrapping = TextWrapping.Wrap
+            }
         });
 
-        Add(root, "نام کالا (الزامی)", _name);
-        Add(root, "کد کالا (خودکار پیشنهاد شده؛ قابل ویرایش و باید یکتا باشد)", _code);
-        Add(root, "شماره سریال اختصاصی کالا", _serialNumber);
-        Add(root, "بارکد کالا (برای اسکنر دستی)", _barcode);
-        Add(root, "واحد (مثلاً عدد، کیلوگرم، متر)", _unit);
-        Add(root, existing is null ? "موجودی اولیه" : "موجودی فعلی (فقط از «ورود موجودی» تغییر می‌کند)", _quantity);
-        Add(root, "موجودی رزروشده (فقط‌خواندنی)", _reserved);
-        Add(root, "حداقل موجودی (اختیاری)", _minStock);
-        Add(root, "قیمت خرید (اختیاری)", _buyPrice);
-        Add(root, "قیمت فروش", _sellPrice);
+        var identityPrimary = new StackPanel();
+        Add(identityPrimary, "نام کالا (الزامی)", _name);
+        Add(identityPrimary, "کد کالا (پیشنهادی؛ باید یکتا باشد)", _code);
+        Add(identityPrimary, "واحد شمارش", _unit);
+        var identitySecondary = new StackPanel();
+        Add(identitySecondary, "شماره سریال", _serialNumber);
+        Add(identitySecondary, "بارکد کالا", _barcode);
+        Add(identitySecondary, "محل قرارگیری در انبار / قفسه", _shelfLocation);
+        root.Children.Add(CreateSectionCard(
+            "۱. مشخصات و شناسایی کالا",
+            "نام، کد داخلی، بارکد و اطلاعات شناسایی",
+            CreateTwoColumnGrid(identityPrimary, identitySecondary)));
+
         foreach (var numericField in new[] { _quantity, _buyPrice, _sellPrice, _minStock, _weight })
             NumericTextBoxFormatter.Attach(numericField);
-        Add(root, "وزن (اختیاری)", _weight);
-        Add(root, "محل قرارگیری در انبار / قفسه", _shelfLocation);
-        Add(root, "دسته‌بندی اصلی", _category);
-        Add(root, "زیرگروه", _subCategory);
-        Add(root, "زیرگروه سطح دوم", _subSubCategory);
-        Add(root, "مسیر کامل دسته‌بندی (اختیاری)", _categoryPath);
-        Add(root, "توضیحات کالا", _description);
-        Add(root, "مسیر تصویر یا URL تصویر (اختیاری)", _imageUrl);
+        var stockPrimary = new StackPanel();
+        Add(stockPrimary, existing is null ? "موجودی اولیه" : "موجودی فعلی (فقط‌خواندنی در این فرم)", _quantity);
+        Add(stockPrimary, "موجودی رزروشده (فقط‌خواندنی)", _reserved);
+        Add(stockPrimary, "حداقل موجودی", _minStock);
+        var stockSecondary = new StackPanel();
+        Add(stockSecondary, "قیمت خرید (اختیاری)", _buyPrice);
+        Add(stockSecondary, "قیمت فروش", _sellPrice);
+        Add(stockSecondary, "وزن (اختیاری)", _weight);
+        root.Children.Add(CreateSectionCard(
+            "۲. موجودی و قیمت‌گذاری",
+            "مقادیر منفی پذیرفته نمی‌شوند؛ موجودی رزروشده از گردش اسناد محاسبه می‌شود.",
+            CreateTwoColumnGrid(stockPrimary, stockSecondary)));
+
+        var categoryPrimary = new StackPanel();
+        Add(categoryPrimary, "دسته‌بندی اصلی", _category);
+        Add(categoryPrimary, "زیرگروه", _subCategory);
+        var categorySecondary = new StackPanel();
+        Add(categorySecondary, "زیرگروه سطح دوم", _subSubCategory);
+        Add(categorySecondary, "مسیر کامل دسته‌بندی (اختیاری)", _categoryPath);
+        root.Children.Add(CreateSectionCard(
+            "۳. دسته‌بندی و انبار",
+            "پیشنهادهای دسته‌بندی از کالاهای موجود گرفته می‌شوند و قابل ویرایش هستند.",
+            CreateTwoColumnGrid(categoryPrimary, categorySecondary)));
+
+        var detailSection = new StackPanel();
+        Add(detailSection, "توضیحات کالا", _description);
+        Add(detailSection, "مسیر تصویر یا URL تصویر (اختیاری)", _imageUrl);
+        root.Children.Add(CreateSectionCard(
+            "۴. توضیحات و تصویر",
+            "اطلاعات کمکی برای شناسایی کالا و نمایش در اسناد",
+            detailSection));
 
         var buttons = new StackPanel
         {
@@ -131,7 +157,10 @@ public sealed class ProductDialog : Window
             Width = 120,
             Height = 36,
             IsDefault = true,
-            Margin = new Thickness(0, 0, 8, 0)
+            Margin = new Thickness(0, 0, 8, 0),
+            Background = PaletteBrush("#0F766E"),
+            Foreground = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#0F766E")
         };
         buttons.Children.Add(save);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 36, IsCancel = true });
@@ -255,6 +284,56 @@ public sealed class ProductDialog : Window
 
     private static decimal? ParseOptional(string text, string label) =>
         string.IsNullOrWhiteSpace(text) ? null : AccountingRules.Money(PersianNumberParser.ParseDecimal(text, label));
+
+    private static SolidColorBrush PaletteBrush(string value) =>
+        new((Color)ColorConverter.ConvertFromString(value)!);
+
+    private static Grid CreateTwoColumnGrid(UIElement first, UIElement second)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(first, 0);
+        Grid.SetColumn(second, 2);
+        grid.Children.Add(first);
+        grid.Children.Add(new Border { Width = 14 });
+        grid.Children.Add(second);
+        return grid;
+    }
+
+    private static Border CreateSectionCard(string title, string subtitle, UIElement content)
+    {
+        var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        heading.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 16,
+            FontWeight = FontWeights.Bold,
+            Foreground = PaletteBrush("#0F766E")
+        });
+        heading.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = 11,
+            Foreground = PaletteBrush("#64748B"),
+            Margin = new Thickness(0, 3, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+        var body = new StackPanel();
+        body.Children.Add(heading);
+        body.Children.Add(content);
+        return new Border
+        {
+            Background = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#CBD5E1"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(15),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = body
+        };
+    }
 
     private static void Add(Panel root, string label, Control box)
     {

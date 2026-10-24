@@ -51,44 +51,65 @@ public sealed class CustomerDialog : Window
         _isCustomer.IsChecked = existing?.IsCustomer ?? !defaultSupplier;
         _isSupplier.IsChecked = existing?.IsSupplier ?? defaultSupplier;
 
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(new TextBlock
+        var root = new StackPanel { Margin = new Thickness(16) };
+
+        var identityPrimary = new StackPanel();
+        AddField(identityPrimary, "کد شخص (پیشنهادی؛ باید یکتا باشد)", _code);
+        AddField(identityPrimary, "نام شخص / نام شرکت (الزامی)", _name);
+        var identitySecondary = new StackPanel();
+        AddField(identitySecondary, "گروه / دسته‌بندی", _category);
+        root.Children.Add(CreateSectionCard(
+            "۱. مشخصات پایه",
+            "کد و نامی که در فاکتورها، رسیدها و گزارش‌ها نمایش داده می‌شود",
+            CreateTwoColumnGrid(identityPrimary, identitySecondary)));
+
+        var rolesSection = new StackPanel();
+        rolesSection.Children.Add(new TextBlock
         {
-            Text = existing is null ? "پرونده شخص / مشتری / تأمین‌کننده" : "ویرایش پرونده شخص",
-            FontSize = 21,
-            FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+            Text = "یک شخص می‌تواند مشتری، تأمین‌کننده یا هر دو نقش را داشته باشد. این انتخاب تعیین می‌کند در کدام اسناد قابل انتخاب باشد.",
+            FontSize = 12,
+            Foreground = PaletteBrush("#475569"),
+            TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 0, 0, 8)
         });
-        root.Children.Add(new TextBlock
-        {
-            Text = "فیلدها از مدل اشخاص نسخهٔ اصلی اقتباس شده‌اند. ماندهٔ حساب باید از دفتر مالی محاسبه شود و در این فرم قابل دست‌کاری نیست.",
-            FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12)
-        });
+        _isCustomer.Margin = new Thickness(0, 3, 0, 3);
+        _isSupplier.Margin = new Thickness(0, 3, 0, 3);
+        rolesSection.Children.Add(_isCustomer);
+        rolesSection.Children.Add(_isSupplier);
+        root.Children.Add(CreateSectionCard("۲. نقش حسابداری", "تعیین نقش‌های فعال این پرونده", rolesSection));
 
-        AddField(root, "کد شخص (خودکار پیشنهاد شده؛ قابل ویرایش و باید یکتا باشد)", _code);
-        AddField(root, "نام شخص / نام شرکت (الزامی)", _name);
-        AddField(root, "گروه / دسته‌بندی", _category);
-        root.Children.Add(_isCustomer);
-        root.Children.Add(_isSupplier);
-        AddField(root, "شماره تماس", _phone);
-        AddField(root, "ایمیل", _email);
-        AddField(root, "شناسه ملی", _nationalId);
-        AddField(root, "نشانی", _address);
-        AddField(root, "یادداشت پرونده", _notes);
+        var contactPrimary = new StackPanel();
+        AddField(contactPrimary, "شماره تماس", _phone);
+        AddField(contactPrimary, "ایمیل", _email);
+        var contactSecondary = new StackPanel();
+        AddField(contactSecondary, "شناسه ملی", _nationalId);
+        AddField(contactSecondary, "نشانی", _address);
+        root.Children.Add(CreateSectionCard(
+            "۳. اطلاعات تماس",
+            "اطلاعات اختیاری برای شناسایی و ارتباط با طرف حساب",
+            CreateTwoColumnGrid(contactPrimary, contactSecondary)));
 
+        var notesSection = new StackPanel();
+        AddField(notesSection, "یادداشت پرونده", _notes);
         var savedBalance = existing?.Balance ?? 0m;
-        root.Children.Add(new TextBlock
+        notesSection.Children.Add(new Border
         {
-            Text = "ماندهٔ ذخیره‌شده: " + savedBalance.ToString("N2", CultureInfo.CurrentCulture) + " (این فرم ماندهٔ دفتر حساب را تغییر نمی‌دهد.)",
-            FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
-            Margin = new Thickness(0, 7, 0, 0),
-            TextWrapping = TextWrapping.Wrap
+            Background = PaletteBrush("#F1F5F9"),
+            BorderBrush = PaletteBrush("#CBD5E1"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(11, 8, 11, 8),
+            Margin = new Thickness(0, 8, 0, 0),
+            Child = new TextBlock
+            {
+                Text = "ماندهٔ ذخیره‌شده: " + savedBalance.ToString("N2", CultureInfo.CurrentCulture) +
+                    " — ماندهٔ دفتر مالی از این فرم قابل تغییر نیست.",
+                FontSize = 12,
+                Foreground = PaletteBrush("#334155"),
+                TextWrapping = TextWrapping.Wrap
+            }
         });
+        root.Children.Add(CreateSectionCard("۴. یادداشت و مانده", "یادداشت داخلی و اطلاعات صرفاً نمایشی حساب", notesSection));
 
         var buttons = new StackPanel
         {
@@ -102,6 +123,9 @@ public sealed class CustomerDialog : Window
             Width = 120,
             Height = 36,
             Margin = new Thickness(0, 0, 8, 0),
+            Background = PaletteBrush("#0F766E"),
+            Foreground = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#0F766E"),
             IsDefault = true
         };
         buttons.Children.Add(save);
@@ -155,6 +179,56 @@ public sealed class CustomerDialog : Window
             CreatedAt = _existing?.CreatedAt ?? DateTimeOffset.Now
         };
         DialogResult = true;
+    }
+
+    private static SolidColorBrush PaletteBrush(string value) =>
+        new((Color)ColorConverter.ConvertFromString(value)!);
+
+    private static Grid CreateTwoColumnGrid(UIElement first, UIElement second)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        Grid.SetColumn(first, 0);
+        Grid.SetColumn(second, 2);
+        grid.Children.Add(first);
+        grid.Children.Add(new Border { Width = 14 });
+        grid.Children.Add(second);
+        return grid;
+    }
+
+    private static Border CreateSectionCard(string title, string subtitle, UIElement content)
+    {
+        var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        heading.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 16,
+            FontWeight = FontWeights.Bold,
+            Foreground = PaletteBrush("#0F766E")
+        });
+        heading.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = 11,
+            Foreground = PaletteBrush("#64748B"),
+            Margin = new Thickness(0, 3, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+        var body = new StackPanel();
+        body.Children.Add(heading);
+        body.Children.Add(content);
+        return new Border
+        {
+            Background = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#CBD5E1"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(15),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = body
+        };
     }
 
     private static void AddField(Panel root, string label, TextBox field)
