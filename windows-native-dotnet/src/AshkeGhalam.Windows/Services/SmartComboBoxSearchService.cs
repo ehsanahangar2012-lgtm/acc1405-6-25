@@ -159,7 +159,9 @@ public static class SmartComboBoxSearchService
 
     private static void AttachEditableEditorClickHandler(ComboBox combo)
     {
-        if (combo.Template.FindName("PART_EditableTextBox", combo) is not TextBox editor ||
+        var comboTemplate = combo.Template;
+        if (comboTemplate is null ||
+            comboTemplate.FindName("PART_EditableTextBox", combo) is not TextBox editor ||
             EditableEditorClickHandlers.TryGetValue(editor, out _))
             return;
 
@@ -217,7 +219,7 @@ public static class SmartComboBoxSearchService
 
             combo.Focus();
             combo.IsDropDownOpen = true;
-            if (combo.Template.FindName("PART_EditableTextBox", combo) is TextBox editor)
+            if (combo.Template?.FindName("PART_EditableTextBox", combo) is TextBox editor)
             {
                 editor.Focus();
                 editor.CaretIndex = editor.Text.Length;
