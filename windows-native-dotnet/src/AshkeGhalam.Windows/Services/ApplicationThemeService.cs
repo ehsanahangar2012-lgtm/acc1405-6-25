@@ -587,6 +587,7 @@ public static class ApplicationThemeService
     {
         if (window.GetType().Name != "MainWindow")
         {
+            PolishFormLabels(elements);
             var buttonStyle = CreateModernButtonStyle();
             window.Resources[typeof(Button)] = buttonStyle;
             foreach (var button in elements.OfType<Button>())
@@ -648,6 +649,26 @@ public static class ApplicationThemeService
             grid.ColumnHeaderHeight = Math.Max(grid.ColumnHeaderHeight, 40);
             grid.AlternationCount = Math.Max(grid.AlternationCount, 2);
             grid.HeadersVisibility = DataGridHeadersVisibility.Column;
+        }
+    }
+
+
+    private static void PolishFormLabels(IReadOnlyCollection<DependencyObject> elements)
+    {
+        foreach (var panel in elements.OfType<StackPanel>())
+        {
+            for (var index = 0; index + 1 < panel.Children.Count; index++)
+            {
+                if (panel.Children[index] is not TextBlock label ||
+                    panel.Children[index + 1] is not Control ||
+                    string.IsNullOrWhiteSpace(label.Text))
+                    continue;
+
+                label.FontSize = Math.Clamp(label.FontSize, 12, 13);
+                label.FontWeight = FontWeights.SemiBold;
+                label.Margin = new Thickness(0, Math.Max(6, label.Margin.Top), 0, 4);
+                label.TextWrapping = TextWrapping.Wrap;
+            }
         }
     }
 

@@ -375,3 +375,9 @@
 - Refined the right-hand navigation into a stable dark sidebar in both light/dark modes, with more comfortable row spacing, clearer hover/focus/active states, and consistent selected-route colors.
 - Retained the print-document exception so branded window chrome never recolors invoice/receipt/ledger paper.
 - Verification: Windows WPF build, automated domain/UI-adjacent tests, and published executable startup smoke test must pass on this commit; screen-level review on the target Windows display remains a manual check.
+
+
+## UI priority 1 — consistency pass
+- Added rounded, keyboard-focus-aware button and input templates at application scope, keeping the text-input content host compatible with standard WPF editing/selection behavior.
+- Removed a global no-wrap setting from text blocks so deliberate wrapped content remains controlled by each page and long operational labels can be wrapped selectively.
+- Standardized dynamically built field labels to a consistent semibold size and spacing across the native forms.
