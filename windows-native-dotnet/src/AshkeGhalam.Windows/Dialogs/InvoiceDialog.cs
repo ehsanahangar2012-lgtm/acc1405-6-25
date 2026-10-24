@@ -135,8 +135,9 @@ public sealed class InvoiceDialog : Window
             ? "0"
             : _defaultTaxRatePercent.ToString("0.##", CultureInfo.InvariantCulture);
         Title = existingInvoice is null ? "ثبت فاکتور / پیش‌فاکتور" : "ویرایش پیش‌فاکتور";
-        Width = 760;
+        Width = 1060;
         Height = 900;
+        MinWidth = 900;
         MinHeight = 680;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         FlowDirection = FlowDirection.RightToLeft;
@@ -170,6 +171,14 @@ public sealed class InvoiceDialog : Window
         var root = new StackPanel { Margin = new Thickness(18) };
         root.Children.Add(CreateInvoiceHero());
 
+        // Keep party/date selection beside the live financial summary; line items and
+        // logistics remain full-width below so the form uses desktop space efficiently.
+        var topSections = new Grid { Margin = new Thickness(0, 0, 0, 2) };
+        topSections.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        topSections.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+        topSections.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        root.Children.Add(topSections);
+
         var documentSection = new StackPanel();
         AddField(documentSection, "نوع سند", _type);
         documentSection.Children.Add(_numberPreview);
@@ -200,7 +209,9 @@ public sealed class InvoiceDialog : Window
         dates.Children.Add(dateSpacer);
         dates.Children.Add(duePanel);
         documentSection.Children.Add(dates);
-        root.Children.Add(CreateSectionCard("مشخصات فاکتور", "نوع سند، طرف حساب و تاریخ‌های مرتبط", documentSection));
+        var documentCard = CreateSectionCard("مشخصات فاکتور", "نوع سند، طرف حساب و تاریخ‌های مرتبط", documentSection);
+        Grid.SetColumn(documentCard, 0);
+        topSections.Children.Add(documentCard);
 
         var itemsSection = new StackPanel();
         AddField(itemsSection, "بارکدخوان (پس از اسکن، کلید Enter)", _barcodeScan);
@@ -264,7 +275,9 @@ public sealed class InvoiceDialog : Window
         pricingSection.Children.Add(pricing);
         pricingSection.Children.Add(_totals);
         AddField(pricingSection, "دریافت/پرداخت نقدی هنگام صدور", _cashAmount);
-        root.Children.Add(CreateSectionCard("جمع‌بندی مالی", "تخفیف، مالیات و مانده سند به‌صورت خودکار محاسبه می‌شوند", pricingSection));
+        var pricingCard = CreateSectionCard("جمع‌بندی مالی", "تخفیف، مالیات و مانده سند به‌صورت خودکار محاسبه می‌شوند", pricingSection);
+        Grid.SetColumn(pricingCard, 2);
+        topSections.Children.Add(pricingCard);
 
         var extraSection = new StackPanel();
         AddField(extraSection, "شرح فاکتور / متن چاپ", _description);
@@ -449,7 +462,10 @@ public sealed class InvoiceDialog : Window
         SmartComboBoxSearchService.SetItems(_person, candidates,
             person => new[] { person.Name, person.Code, person.Phone, person.Email });
         var previous = candidates.ToList().FindIndex(person => person.Id == previousId);
-        _person.SelectedIndex = previous >= 0 ? previous : (candidates.Count > 0 ? 0 : -1);
+        // Never attach the first customer to a new invoice implicitly. The user must
+        // explicitly select a filtered result; an edit preserves its current valid party.
+        _person.SelectedIndex = previous >= 0 ? previous : -1;
+        if (previous < 0) _person.Text = "";
         _person.IsEnabled = candidates.Count > 0;
         _numberPreview.Text = BuildNumberPreview(CurrentType);
         UpdatePartyHint();
