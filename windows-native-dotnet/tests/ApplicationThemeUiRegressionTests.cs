@@ -351,7 +351,7 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
         thread.Join();
 
         if (failure is not null)
-            throw new AssertFailedException("Dark theme changed the printable paper palette.", failure);
+            throw new AssertFailedException("Dark theme changed the printable paper palette: " + failure.Message, failure);
     }
 
     private static void AssertGridStateHasReadableContrast(DataGrid grid)
