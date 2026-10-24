@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Threading;
 using System.Reflection;
 using System.Threading;
 using AshkeGhalam.Windows.Services;
@@ -193,6 +194,8 @@ public sealed class SmartComboBoxSearchServiceTests
                     WindowStyle = WindowStyle.ToolWindow
                 };
                 owner.Show();
+                // Process WPF's queued source/visibility initialization before assigning Owner.
+                owner.Dispatcher.Invoke(new Action(() => owner.UpdateLayout()), DispatcherPriority.ApplicationIdle);
 
                 var customer = new AshkeGhalam.Windows.Models.CustomerRecord
                 {
