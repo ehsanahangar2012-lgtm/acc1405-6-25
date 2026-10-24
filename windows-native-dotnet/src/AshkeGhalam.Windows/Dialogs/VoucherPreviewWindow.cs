@@ -196,12 +196,12 @@ public sealed class VoucherPreviewWindow : Window
             {
                 Padding = new Thickness(6), Background = background,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5), FontSize = 9
-            }));
+            });
             row.Cells.Add(new TableCell(new Paragraph(new Run(string.IsNullOrWhiteSpace(item.Unit) ? "—" : item.Unit)) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
             {
                 Padding = new Thickness(6), Background = background,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5), FontSize = 9
-            }));
+            });
 
             var description = string.Join(" / ", new[] { item.Description, item.ShelfLocation }
                 .Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()));
