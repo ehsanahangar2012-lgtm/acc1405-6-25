@@ -1460,6 +1460,41 @@
                                 </StackPanel>
                             </Border>
                         </UniformGrid>
+                        <Border Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="قابلیت‌ها و حدود نسخه‌ها" FontSize="20" FontWeight="Bold" Foreground="#0F172A"/>
+                                <TextBlock Text="تفکیک روشن امکانات این برنامه از ابزارهای مدیریتی و تجاری لایسنس"
+                                           FontSize="13" Foreground="#475569" TextWrapping="Wrap" Margin="0,5,0,14"/>
+                                <UniformGrid Columns="2">
+                                    <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="11" Padding="15" Margin="0,0,7,0">
+                                        <StackPanel>
+                                            <TextBlock Text="امکانات حسابداری این نسخه" FontSize="16" FontWeight="Bold" Foreground="#0F766E"/>
+                                            <TextBlock Text="• ثبت و پیش‌نمایش فاکتورهای فروش و خرید، همراه با قالب‌های چاپ و QR طبق تنظیمات"
+                                                       FontSize="13" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,9,0,0"/>
+                                            <TextBlock Text="• پروندهٔ اشخاص و کالاها، حواله و رسید انبار، گردش موجودی و کاردکس"
+                                                       FontSize="13" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                            <TextBlock Text="• دریافت و پرداخت، اسناد چک، هزینه‌ها و گزارش‌های مالی محلی"
+                                                       FontSize="13" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                            <TextBlock Text="• نگهداری داده روی رایانه و پشتیبان‌گیری رمزگذاری‌شده؛ فایل پشتیبان و رمز آن را جداگانه نگه دارید."
+                                                       FontSize="13" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="11" Padding="15" Margin="7,0,0,0">
+                                        <StackPanel>
+                                            <TextBlock Text="لایسنس و مرز نسخه‌ها" FontSize="16" FontWeight="Bold" Foreground="#0F766E"/>
+                                            <TextBlock Text="• نسخهٔ مادر وب، تنها محل مدیریت مشتریان تجاری، صدور و ابطال لایسنس و ابزار ساخت/انتشار فایل‌های EXE و APK است."
+                                                       FontSize="13" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,9,0,0"/>
+                                            <TextBlock Text="• بستهٔ ویندوز و اندروید ابزار صدور لایسنس، مدیریت مشتریان تجاری یا ساخت بستهٔ انتشار را در خود ندارند؛ فقط امکانات حسابداری مجاز همان نسخه را ارائه می‌کنند."
+                                                       FontSize="13" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                            <TextBlock Text="• فعال‌سازی خدمات ابری و همگام‌سازی به پیکربندی معتبر، لایسنس تأییدشده و ارتباط موفق با سرور وابسته است."
+                                                       FontSize="13" Foreground="#1E293B" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                            <TextBlock Text="• در این نسخه، بخش سامانهٔ مؤدیان فقط برای آماده‌سازی و ذخیرهٔ JSON است؛ ارسال رسمی فعال نیست."
+                                                       FontSize="13" Foreground="#9A3412" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
                         <Border Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18">
                             <StackPanel>
                                 <TextBlock Text="دسترسی‌های سریع" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
