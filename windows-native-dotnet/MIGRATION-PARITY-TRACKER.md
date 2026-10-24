@@ -845,4 +845,11 @@
 - [x] Loading checks the file length on an opened stream before allocating memory; files above 100 MiB are rejected before reading their contents.
 - [x] Saving applies the exact same size limit before creating/replacing the target file, so an oversized dataset cannot be saved successfully and become unreadable on next startup; the previous valid file remains untouched when rejected.
 - [x] A shared-boundary unit test covers zero, the maximum supported size and one byte over the maximum.
-- [ ] CI must confirm the data-store change; no real customer data or existing local file was touched by this implementation.
+- [x] CI run [40126345160](https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/actions/runs/40126345160) passed build, tests, visual capture generation, EXE publish and startup smoke-test; no user data file was touched.
+
+
+## Performance chunk 1 — responsive paged-grid search
+
+- [x] Sorted source snapshots for customers, products, invoices, payments and expenses are rebuilt at data-refresh boundaries; typing filters the cached order without sorting all records for every keypress.
+- [x] Search refresh is debounced by 180 ms, reducing repeated full-list scans and allocations during fast typing while preserving immediate page reset and the same matching rules.
+- [ ] CI and the latest visual-capture run must confirm no UI regression; timed benchmarks with production-sized datasets remain to be measured before making quantitative performance claims.

@@ -29,6 +29,13 @@ public partial class MainWindow : Window
     private bool _canWrite;
     private bool _uiReady;
     private readonly Dictionary<string, int> _gridPages = new(StringComparer.Ordinal);
+    private readonly List<CustomerRecord> _sortedCustomers = [];
+    private readonly List<ProductRecord> _sortedProducts = [];
+    private readonly List<InvoiceRecord> _sortedInvoices = [];
+    private readonly List<PaymentRecord> _sortedPayments = [];
+    private readonly List<ExpenseRecord> _sortedExpenses = [];
+    private readonly DispatcherTimer _gridSearchDebounceTimer = new() { Interval = TimeSpan.FromMilliseconds(180) };
+    private string _pendingGridSearchKey = "";
     private string _startupAccountingWarning = "";
     private static bool _textBoxSelectAllHandlersRegistered;
     private string _activeNavigationKey = "dashboard";
@@ -60,6 +67,7 @@ public partial class MainWindow : Window
         StateChanged += (_, _) => UpdateWindowStateButton();
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         _automaticBackupTimer.Tick += AutomaticBackupTimer_Tick;
+        _gridSearchDebounceTimer.Tick += GridSearchDebounceTimer_Tick;
         NumericTextBoxFormatter.Attach(CurrencyConvertAmount);
     }
 
@@ -282,6 +290,17 @@ public partial class MainWindow : Window
     {
         if (!_uiReady || sender is not FrameworkElement { Tag: string key }) return;
         _gridPages[key] = 1;
+        _pendingGridSearchKey = key;
+        _gridSearchDebounceTimer.Stop();
+        _gridSearchDebounceTimer.Start();
+    }
+
+    private void GridSearchDebounceTimer_Tick(object? sender, EventArgs e)
+    {
+        _gridSearchDebounceTimer.Stop();
+        var key = _pendingGridSearchKey;
+        _pendingGridSearchKey = "";
+        if (!_uiReady || !IsLoaded || string.IsNullOrWhiteSpace(key)) return;
         RefreshPagedGrid(key);
     }
 
@@ -367,46 +386,58 @@ public partial class MainWindow : Window
             next.IsEnabled = page < pageCount;
     }
 
+    private void RefreshPagedGridSnapshots()
+    {
+        // Sort each source once per data refresh. Query-as-you-type only filters these
+        // snapshots, instead of allocating a new sorted list for every keystroke.
+        _sortedCustomers.Clear();
+        _sortedCustomers.AddRange(_data.Customers.OrderBy(c => c.Name));
+        _sortedProducts.Clear();
+        _sortedProducts.AddRange(_data.Products.OrderBy(p => p.Name));
+        _sortedInvoices.Clear();
+        _sortedInvoices.AddRange(_data.Invoices.OrderByDescending(i => i.Number));
+        _sortedPayments.Clear();
+        _sortedPayments.AddRange(_data.Payments.OrderByDescending(p => p.CreatedAt));
+        _sortedExpenses.Clear();
+        _sortedExpenses.AddRange(_data.Expenses.OrderByDescending(expense => expense.CreatedAt));
+    }
+
     private void RefreshPagedGrid(string key)
     {
         var query = GridSearchText(key).Trim();
         switch (key)
         {
             case "customers":
-                BindPagedGrid(key, CustomersGrid, _data.Customers
+                BindPagedGrid(key, CustomersGrid, _sortedCustomers
                     .Where(c => MatchesSearch(query, c.Code, c.Name, c.Type, c.Category, c.Phone,
-                        c.Email, c.NationalId, c.Address, c.Notes))
-                    .OrderBy(c => c.Name).ToList());
+                        c.Email, c.NationalId, c.Address, c.Notes)).ToList());
                 break;
             case "products":
-                BindPagedGrid(key, ProductsGrid, _data.Products
+                BindPagedGrid(key, ProductsGrid, _sortedProducts
                     .Where(p => MatchesSearch(query, p.Name, p.Code, p.Barcode, p.SerialNumber, p.Unit,
-                        p.CategoryPath, p.ShelfLocation, p.Description, p.ImageUrl))
-                    .OrderBy(p => p.Name).ToList());
+                        p.CategoryPath, p.ShelfLocation, p.Description, p.ImageUrl)).ToList());
                 break;
             case "invoices":
-                BindPagedGrid(key, InvoicesGrid, _data.Invoices
+                BindPagedGrid(key, InvoicesGrid, _sortedInvoices
                     .Where(i => MatchesSearch(query, i.DisplayNumber, i.Number.ToString(CultureInfo.InvariantCulture),
-                        i.TrackingCode, i.CustomerName, i.Description, i.Status, i.TypeLabel))
-                    .OrderByDescending(i => i.Number).ToList());
+                        i.TrackingCode, i.CustomerName, i.Description, i.Status, i.TypeLabel)).ToList());
                 break;
             case "payments":
-                BindPagedGrid(key, PaymentsGrid, _data.Payments
+                BindPagedGrid(key, PaymentsGrid, _sortedPayments
                     .Where(p => MatchesSearch(query, p.InvoiceNumber.ToString(CultureInfo.InvariantCulture),
-                        p.CustomerName, p.Method, p.Reference, p.Amount.ToString(CultureInfo.CurrentCulture)))
-                    .OrderByDescending(p => p.CreatedAt).ToList());
+                        p.CustomerName, p.Method, p.Reference, p.Amount.ToString(CultureInfo.CurrentCulture))).ToList());
                 break;
             case "expenses":
-                BindPagedGrid(key, ExpensesGrid, _data.Expenses
+                BindPagedGrid(key, ExpensesGrid, _sortedExpenses
                     .Where(expense => MatchesSearch(query, expense.Title, expense.Category, expense.Notes,
-                        expense.Amount.ToString(CultureInfo.CurrentCulture)))
-                    .OrderByDescending(expense => expense.CreatedAt).ToList());
+                        expense.Amount.ToString(CultureInfo.CurrentCulture))).ToList());
                 break;
         }
     }
 
     private void RefreshAll()
     {
+        RefreshPagedGridSnapshots();
         RefreshPagedGrid("customers");
         RefreshPagedGrid("products");
         RefreshPagedGrid("invoices");
