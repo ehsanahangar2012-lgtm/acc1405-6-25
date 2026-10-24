@@ -425,6 +425,57 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
     }
 
     [TestMethod]
+    public void InvoiceHeroKeepsWhiteTypographyVisibleOnGradientInBothThemes()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var title = new TextBlock
+                {
+                    Text = "صدور فاکتور | اشک قلم",
+                    Foreground = Brushes.White,
+                    FontSize = 24,
+                    FontWeight = FontWeights.Bold
+                };
+                var hero = new Border
+                {
+                    Background = new LinearGradientBrush(
+                        Color.FromRgb(10, 25, 47),
+                        Color.FromRgb(15, 118, 110),
+                        new Point(1, 0),
+                        new Point(0, 1)),
+                    Child = title,
+                    Padding = new Thickness(18)
+                };
+                var window = new Window { Width = 620, Height = 180, Content = hero };
+
+                ApplicationThemeService.Apply(window, "light");
+                Assert.AreEqual(Colors.White, ((SolidColorBrush)title.Foreground).Color,
+                    "The authored white title on a branded gradient must not be remapped to dark ink in light mode.");
+                Assert.IsTrue(ApplicationThemeService.ContrastRatio(Colors.White, Color.FromRgb(10, 25, 47)) >= 4.5);
+                Assert.IsTrue(ApplicationThemeService.ContrastRatio(Colors.White, Color.FromRgb(15, 118, 110)) >= 4.5);
+
+                ApplicationThemeService.Apply(window, "dark");
+                Assert.AreEqual(Colors.White, ((SolidColorBrush)title.Foreground).Color,
+                    "The branded gradient title should remain white in dark mode too.");
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+            throw new AssertFailedException("Invoice hero typography did not preserve contrast on its gradient surface.", failure);
+    }
+
+    [TestMethod]
     public void TextOnCardsKeepsReadableContrastAfterBackgroundChangesInBothThemes()
     {
         Exception? failure = null;
