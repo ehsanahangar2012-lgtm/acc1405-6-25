@@ -170,21 +170,22 @@ public static class SmartComboBoxSearchService
 
         // ComboBox's editable textbox is a distinct visual child. Attach directly to the part
         // so clicks on typed text open the list even when WPF marks the parent's routed event handled.
-        editor.PreviewMouseLeftButtonDown += (_, _) =>
-        {
-            if (!combo.IsEnabled || combo.Items.Count == 0)
-                return;
-
-            combo.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        editor.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
+            new MouseButtonEventHandler((_, _) =>
             {
-                if (!combo.IsLoaded || !combo.IsEnabled)
+                if (!combo.IsEnabled || combo.Items.Count == 0)
                     return;
 
-                combo.IsDropDownOpen = true;
-                editor.Focus();
-                editor.CaretIndex = editor.Text.Length;
-            }));
-        };
+                combo.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+                {
+                    if (!combo.IsLoaded || !combo.IsEnabled)
+                        return;
+
+                    combo.IsDropDownOpen = true;
+                    editor.Focus();
+                    editor.CaretIndex = editor.Text.Length;
+                }));
+            }), handledEventsToo: true);
         EditableEditorClickHandlers.Add(editor, new object());
     }
 

@@ -624,21 +624,22 @@ public static class ApplicationThemeService
             if (combo.IsEditable && !ComboEditorClickHandlers.TryGetValue(editor, out _))
             {
                 ComboEditorClickHandlers.Add(editor, new ComboEditorClickState());
-                editor.PreviewMouseLeftButtonDown += (_, _) =>
-                {
-                    if (!combo.IsEnabled || combo.Items.Count == 0)
-                        return;
-
-                    combo.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+                editor.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
+                    new MouseButtonEventHandler((_, _) =>
                     {
-                        if (!combo.IsLoaded || !combo.IsEnabled)
+                        if (!combo.IsEnabled || combo.Items.Count == 0)
                             return;
 
-                        combo.IsDropDownOpen = true;
-                        editor.Focus();
-                        editor.CaretIndex = editor.Text.Length;
-                    }));
-                };
+                        combo.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+                        {
+                            if (!combo.IsLoaded || !combo.IsEnabled)
+                                return;
+
+                            combo.IsDropDownOpen = true;
+                            editor.Focus();
+                            editor.CaretIndex = editor.Text.Length;
+                        }));
+                    }), handledEventsToo: true);
             }
         }
 
