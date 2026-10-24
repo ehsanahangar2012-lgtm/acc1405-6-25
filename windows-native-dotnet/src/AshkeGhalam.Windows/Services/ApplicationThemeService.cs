@@ -344,10 +344,33 @@ public static class ApplicationThemeService
         {
             switch (element)
             {
-                case DataGridRow row: row.Style = rowStyle; break;
-                case DataGridCell cell: cell.Style = cellStyle; break;
-                case DataGridColumnHeader header: header.Style = headerStyle; break;
+                case DataGridRow row:
+                    row.Style = rowStyle;
+                    break;
+                case DataGridCell cell:
+                    cell.Style = cellStyle;
+                    break;
+                case DataGridColumnHeader header:
+                    header.Style = headerStyle;
+                    ApplyGridHeaderTextContrast(header, headerSurface.Color, isDark);
+                    break;
             }
+        }
+
+        // Header content is created from strings after the first visual-tree theme pass.
+        // Re-evaluate its ink only after the actual light/dark header surface is installed.
+    }
+
+    private static void ApplyGridHeaderTextContrast(DataGridColumnHeader header, Color background, bool isDark)
+    {
+        foreach (var textBlock in EnumerateTree(header).OfType<TextBlock>())
+        {
+            // The original snapshot was captured before theme mapping. Preserve it so a
+            // later light/dark toggle restores the authored value rather than the adjusted ink.
+            OriginalValues.GetValue(textBlock, CaptureOriginalValues);
+            var current = textBlock.Foreground as SolidColorBrush;
+            var preferred = current?.Color ?? (isDark ? Color.FromRgb(203, 213, 225) : Color.FromRgb(51, 65, 85));
+            textBlock.Foreground = Brush(EnsureReadableContrast(preferred, background));
         }
     }
 

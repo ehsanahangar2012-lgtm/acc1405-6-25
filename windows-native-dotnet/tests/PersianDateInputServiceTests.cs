@@ -157,6 +157,24 @@ public sealed class PersianDateInputServiceTests
     }
 
     [TestMethod]
+    public void DataGridHeaderTextResolvesAgainstTheFinalThemeSurface()
+    {
+        // A header TextBlock can be created before ConfigureDataGridTheme changes the
+        // header background. Verify the stale foreground is corrected for the final surface.
+        var darkHeader = Color.FromRgb(11, 18, 32);
+        var darkInk = ApplicationThemeService.ResolveReadableForeground(
+            Color.FromRgb(15, 23, 42), darkHeader, "dark");
+        Assert.IsTrue(ApplicationThemeService.ContrastRatio(darkInk, darkHeader) >= 4.5,
+            "Dark column headers must not retain a dark foreground after the header turns dark.");
+
+        var lightHeader = Color.FromRgb(226, 232, 240);
+        var lightInk = ApplicationThemeService.ResolveReadableForeground(
+            Colors.White, lightHeader, "light");
+        Assert.IsTrue(ApplicationThemeService.ContrastRatio(lightInk, lightHeader) >= 4.5,
+            "Light column headers must not retain white foreground from a previous dark theme.");
+    }
+
+    [TestMethod]
     public void ThemeForegroundResolutionMeetsWcagForMutedAndSemanticColors()
     {
         var lightSurfaces = new[] { Colors.White, Color.FromRgb(248, 250, 252), Color.FromRgb(226, 232, 240) };
