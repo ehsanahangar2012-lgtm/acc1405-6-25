@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Threading;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Documents;
 using System.Windows.Media;
 using AshkeGhalam.Windows.Dialogs;
@@ -197,9 +198,9 @@ public sealed class EndToEndWorkflowTests
             if (current is Table table)
                 foreach (var group in table.RowGroups) pending.Push(group);
             if (current is TableRowGroup rowGroup)
-                foreach (var row in rowGroup.Rows) pending.Push(row);
-            if (current is TableRow row)
-                foreach (var cell in row.Cells) pending.Push(cell);
+                foreach (var tableRow in rowGroup.Rows) pending.Push(tableRow);
+            if (current is TableRow tableRowItem)
+                foreach (var cell in tableRowItem.Cells) pending.Push(cell);
             if (current is TableCell cellContent)
                 foreach (var block in cellContent.Blocks) pending.Push(block);
 
