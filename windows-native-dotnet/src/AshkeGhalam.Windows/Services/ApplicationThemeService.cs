@@ -824,6 +824,12 @@ public static class ApplicationThemeService
         if (element is Border paperFrame && paperFrame.Child is FlowDocumentScrollViewer)
             return;
 
+        // A branded gradient is a deliberate design surface, not an adaptive flat palette.
+        // Keep its authored light ink in the light theme; treating an unknown gradient as white
+        // used to turn the white hero title into dark navy and make it nearly disappear.
+        if (foregroundOnly && element is TextBlock && HasGradientSurfaceAncestor(element))
+            return;
+
         if (element is ScrollBar or Thumb or FlowDocumentScrollViewer or FlowDocument or TextElement or
             DataGridRow or DataGridCell or DataGridColumnHeader)
             return;
@@ -879,6 +885,28 @@ public static class ApplicationThemeService
 
         if (!foregroundOnly && element is DataGrid grid)
             grid.Background = Brush(isDark ? "#111827" : "#FFFFFF");
+    }
+
+    private static bool HasGradientSurfaceAncestor(DependencyObject element)
+    {
+        DependencyObject? current = element;
+        var visited = new HashSet<DependencyObject>(ReferenceEqualityComparer.Instance);
+        for (var depth = 0; current is not null && depth < 32 && visited.Add(current); depth++)
+        {
+            if (current is Border { Background: LinearGradientBrush })
+                return true;
+
+            DependencyObject? parent = null;
+            try
+            {
+                if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+                    parent = VisualTreeHelper.GetParent(current);
+            }
+            catch (InvalidOperationException) { }
+            parent ??= LogicalTreeHelper.GetParent(current);
+            current = parent;
+        }
+        return false;
     }
 
     private static bool IsDataGridCellOrHeaderText(DependencyObject element)

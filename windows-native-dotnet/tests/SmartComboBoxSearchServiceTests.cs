@@ -169,7 +169,7 @@ public sealed class SmartComboBoxSearchServiceTests
                 Assert.AreEqual(1, combo.Items.Count, "Typing a fresh query after selection must filter the list.");
 
                 combo.IsDropDownOpen = false;
-                editor.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+                selectedEditor!.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
                     System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
                 {
                     RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonDownEvent

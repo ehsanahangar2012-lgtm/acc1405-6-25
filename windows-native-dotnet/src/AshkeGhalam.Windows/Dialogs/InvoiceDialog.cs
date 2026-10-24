@@ -927,6 +927,7 @@ public sealed class InvoiceDialog : Window
         content.Children.Add(mark);
         return new Border
         {
+            Name = "InvoiceHero",
             Background = new LinearGradientBrush
             {
                 StartPoint = new Point(1, 0), EndPoint = new Point(0, 1),
