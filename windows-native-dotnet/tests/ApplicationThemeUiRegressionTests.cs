@@ -174,6 +174,11 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                     Header = "شرح",
                     Binding = new Binding("Description")
                 });
+                grid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = "ماندهٔ ذخیره‌شده*",
+                    Binding = new Binding("Balance")
+                });
                 var window = new Window
                 {
                     Width = 800,
@@ -188,6 +193,11 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                 Assert.IsInstanceOfType(grid.Resources[typeof(DataGridRow)], typeof(Style));
                 Assert.IsInstanceOfType(grid.Resources[typeof(DataGridCell)], typeof(Style));
                 Assert.IsInstanceOfType(grid.Resources[typeof(DataGridColumnHeader)], typeof(Style));
+                Assert.IsTrue(grid.Columns[0].MinWidth >= 84d);
+                Assert.IsTrue(grid.Columns[1].MinWidth >= 140d,
+                    "Long Persian column headings must reserve enough width instead of collapsing into clipped glyphs.");
+                Assert.IsTrue(grid.ColumnHeaderHeight >= 48d,
+                    "Wrapped column headings need enough vertical space in both themes.");
                 AssertGridStateHasReadableContrast(grid);
 
                 ApplicationThemeService.Apply(window, "light");

@@ -271,6 +271,12 @@ public static class ApplicationThemeService
         var selectedText = Brush(isDark ? "#FFFFFF" : "#134E4A");
         var hover = Brush(isDark ? "#273447" : "#F0FDFA");
 
+        // Keep star columns from compressing every heading and value into unreadable slivers.
+        // Each column gets a minimum width derived from its Persian heading; overflow is handled
+        // by the visible horizontal scrollbar instead of crushing glyphs.
+        foreach (var column in grid.Columns)
+            column.MinWidth = Math.Max(column.MinWidth, MinimumColumnWidth(column.Header));
+
         grid.Background = surface;
         grid.Foreground = text;
         grid.RowBackground = surface;
@@ -359,7 +365,14 @@ public static class ApplicationThemeService
         headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(9, 7, 9, 7)));
         headerStyle.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.Bold));
         headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
-        headerStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 40d));
+        headerStyle.Setters.Add(new Setter(FrameworkElement.MinHeightProperty, 48d));
+        var headerText = new FrameworkElementFactory(typeof(TextBlock));
+        headerText.SetBinding(TextBlock.TextProperty, new Binding("."));
+        headerText.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+        headerText.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
+        headerText.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+        headerText.SetValue(FrameworkElement.ToolTipProperty, new Binding("."));
+        headerStyle.Setters.Add(new Setter(ContentControl.ContentTemplateProperty, new DataTemplate { VisualTree = headerText }));
 
         grid.Resources[typeof(DataGridRow)] = rowStyle;
         grid.Resources[typeof(DataGridCell)] = cellStyle;
@@ -521,6 +534,19 @@ public static class ApplicationThemeService
                 popupBorder.BorderBrush = border;
             }
         }
+    }
+
+    private static double MinimumColumnWidth(object? header)
+    {
+        var text = header switch
+        {
+            string label => label,
+            TextBlock block => block.Text,
+            _ => header?.ToString() ?? ""
+        };
+        // Short labels still need comfortable room for values; longer Persian labels wrap on
+        // two lines. 180px is enough for the longest common headings without wasting space.
+        return Math.Clamp(52d + text.Trim().Length * 6.1d, 84d, 180d);
     }
 
     private static Style CreateChoiceItemStyle(bool isDark, bool isListItem)
@@ -950,7 +976,7 @@ public static class ApplicationThemeService
         {
             grid.FontSize = Math.Max(grid.FontSize, 12);
             grid.RowHeight = Math.Max(grid.RowHeight, 38);
-            grid.ColumnHeaderHeight = Math.Max(grid.ColumnHeaderHeight, 42);
+            grid.ColumnHeaderHeight = Math.Max(grid.ColumnHeaderHeight, 48);
             grid.AlternationCount = Math.Max(grid.AlternationCount, 2);
             grid.HeadersVisibility = DataGridHeadersVisibility.Column;
             grid.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
