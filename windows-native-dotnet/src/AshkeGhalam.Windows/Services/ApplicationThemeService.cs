@@ -511,6 +511,13 @@ public static class ApplicationThemeService
         combo.BorderBrush = border;
         combo.BorderThickness = new Thickness(1);
 
+        // Popup content is hosted in a separate WPF presentation source on some themes.
+        // Put its container style and palette beside the ComboBox itself, not only on Window.
+        var itemStyle = CreateChoiceItemStyle(isDark, isListItem: false);
+        combo.Resources[typeof(ComboBoxItem)] = itemStyle;
+        combo.Resources["ComboDropDownSurfaceBrush"] = surface;
+        combo.Resources["ComboDropDownBorderBrush"] = border;
+
         if (combo.Template.FindName("PART_EditableTextBox", combo) is TextBox editor)
         {
             editor.Background = surface;
@@ -535,13 +542,31 @@ public static class ApplicationThemeService
 
         if (combo.Template.FindName("PART_Popup", combo) is Popup popup)
         {
+            // Popup and its root have their own resource lookup when opened.
+            popup.Resources[typeof(ComboBoxItem)] = itemStyle;
+            popup.Resources["ComboDropDownSurfaceBrush"] = surface;
+            popup.Resources["ComboDropDownBorderBrush"] = border;
+            if (popup.Child is FrameworkElement popupRoot)
+            {
+                popupRoot.Resources[typeof(ComboBoxItem)] = itemStyle;
+                popupRoot.Resources["ComboDropDownSurfaceBrush"] = surface;
+                popupRoot.Resources["ComboDropDownBorderBrush"] = border;
+            }
+
             foreach (var popupBorder in EnumerateTree(popup).OfType<Border>())
             {
                 if (!string.Equals(popupBorder.Name, "DropDownBorder", StringComparison.Ordinal) &&
                     !string.Equals(popupBorder.Name, "PopupBorder", StringComparison.Ordinal))
                     continue;
-                popupBorder.Background = Brush(isDark ? "#111827" : "#FFFFFF");
+                popupBorder.Background = surface;
                 popupBorder.BorderBrush = border;
+            }
+
+            foreach (var item in EnumerateTree(popup).OfType<ComboBoxItem>())
+            {
+                item.Style = itemStyle;
+                item.Background = surface;
+                item.Foreground = foreground;
             }
         }
     }
