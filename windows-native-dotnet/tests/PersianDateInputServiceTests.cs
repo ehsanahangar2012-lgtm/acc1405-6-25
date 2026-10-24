@@ -78,4 +78,32 @@ public sealed class PersianDateInputServiceTests
         Assert.AreEqual("light", ApplicationThemeService.DetectThemeFromBackground(null));
     }
 
+    [TestMethod]
+    public void ThemeForegroundResolutionMaintainsReadableContrast()
+    {
+        var darkSurface = Color.FromRgb(17, 24, 39);
+        var darkText = ApplicationThemeService.ResolveReadableForeground(
+            Color.FromRgb(15, 23, 42), darkSurface, "dark");
+        Assert.IsTrue(ApplicationThemeService.ContrastRatio(darkText, darkSurface) >= 4.5,
+            "Dark mode body text must meet WCAG AA contrast against the dark surface.");
+
+        var lightSurface = Colors.White;
+        var lightText = ApplicationThemeService.ResolveReadableForeground(
+            Colors.White, lightSurface, "light");
+        Assert.IsTrue(ApplicationThemeService.ContrastRatio(lightText, lightSurface) >= 4.5,
+            "Light mode must not leave white text on a white surface.");
+
+        var accentSurface = Color.FromRgb(15, 118, 110);
+        var accentText = ApplicationThemeService.ResolveReadableForeground(
+            Colors.White, accentSurface, "light");
+        Assert.IsTrue(ApplicationThemeService.ContrastRatio(accentText, accentSurface) >= 4.5,
+            "Branded accent buttons must retain readable foreground text.");
+
+        var warningInk = Color.FromRgb(154, 52, 18);
+        var warningText = ApplicationThemeService.ResolveReadableForeground(
+            warningInk, darkSurface, "dark");
+        Assert.IsTrue(ApplicationThemeService.ContrastRatio(warningText, darkSurface) >= 4.5,
+            "Semantic warning/error colors should lighten without losing contrast.");
+    }
+
 }
