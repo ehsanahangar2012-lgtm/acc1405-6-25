@@ -1569,7 +1569,8 @@ public partial class MainWindow : Window
             _data.Preferences.InvoiceTheme, _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
             _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
             _data.Preferences.Currency, ConfiguredInvoiceFooter(),
-            footerTemplates: InvoiceFootnoteTemplates());
+            footerTemplates: InvoiceFootnoteTemplates(),
+            accountingDataProvider: () => _data);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is InvoiceDraft draft)
         {
@@ -1645,7 +1646,8 @@ public partial class MainWindow : Window
             _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
             _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
             _data.Preferences.Currency, ConfiguredInvoiceFooter(), invoice,
-            footerTemplates: InvoiceFootnoteTemplates());
+            footerTemplates: InvoiceFootnoteTemplates(),
+            accountingDataProvider: () => _data);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not InvoiceDraft draft) return;
 

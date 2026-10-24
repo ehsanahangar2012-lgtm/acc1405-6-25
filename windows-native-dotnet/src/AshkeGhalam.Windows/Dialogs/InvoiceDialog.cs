@@ -16,6 +16,7 @@ public sealed class InvoiceDialog : Window
     private readonly List<CustomerRecord> _people;
     private readonly List<ProductRecord> _products;
     private readonly IReadOnlyList<InvoiceRecord> _invoices;
+    private readonly Func<AccountingData>? _accountingDataProvider;
     private readonly Func<Window, CustomerRecord?>? _quickAddCustomer;
     private readonly Func<Window, ProductRecord?>? _quickAddProduct;
     private readonly string _defaultInvoiceTheme;
@@ -97,9 +98,11 @@ public sealed class InvoiceDialog : Window
         string? currencyCode = "RIAL",
         string? invoiceFooter = null,
         InvoiceRecord? existingInvoice = null,
-        IReadOnlyList<string>? footerTemplates = null)
+        IReadOnlyList<string>? footerTemplates = null,
+        Func<AccountingData>? accountingDataProvider = null)
     {
         Owner = owner;
+        _accountingDataProvider = accountingDataProvider;
         _people = people.ToList();
         _products = products.ToList();
         _invoices = invoices;
@@ -449,10 +452,12 @@ public sealed class InvoiceDialog : Window
 
     private void UpdatePartyHint()
     {
+        _partyHint.ToolTip = null;
         if (_person.SelectedItem is CustomerRecord person)
         {
-            var details = string.IsNullOrWhiteSpace(person.Phone) ? "" : $" • {person.Phone}";
-            _partyHint.Text = $"طرف حساب انتخاب‌شده: {person.Name}  |  کد: {person.Code}{details}";
+            var details = string.IsNullOrWhiteSpace(person.Phone) ? "" : $" • تلفن: {person.Phone}";
+            var balance = BuildPartyBalanceDisplay(person);
+            _partyHint.Text = $"طرف حساب انتخاب‌شده: {person.Name}  |  کد: {person.Code}{details}  |  {balance}";
             _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
             return;
         }
@@ -461,6 +466,28 @@ public sealed class InvoiceDialog : Window
             ? "تأمین‌کننده‌ای با نقش فعال پیدا نشد؛ شخص جدید ثبت کنید یا نقش تأمین‌کننده را در پروندهٔ او فعال کنید."
             : "مشتری‌ای با نقش فعال پیدا نشد؛ شخص جدید ثبت کنید یا نقش مشتری را در پروندهٔ او فعال کنید.";
         _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(185, 28, 28));
+    }
+
+    private string BuildPartyBalanceDisplay(CustomerRecord person)
+    {
+        var data = _accountingDataProvider?.Invoke();
+        if (data is null)
+            return "ماندهٔ دفتر: در دسترس نیست";
+
+        try
+        {
+            // Read the live ledger-derived report, not CustomerRecord.Balance, which is a
+            // preserved legacy snapshot and may not reflect current invoices and settlements.
+            var balance = PersonKardexService.GetReport(data, person).ClosingBalance;
+            var side = balance > 0m ? "بدهکار" : balance < 0m ? "بستانکار" : "تسویه";
+            var amount = Math.Abs(balance).ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"));
+            return $"ماندهٔ دفتر: {amount} {_currencyLabel} ({side})";
+        }
+        catch (Exception ex)
+        {
+            _partyHint.ToolTip = "ماندهٔ دفتر در این لحظه محاسبه نشد: " + ex.Message;
+            return "ماندهٔ دفتر: قابل محاسبه نیست";
+        }
     }
 
     private void ApplyDefaultPrice()
