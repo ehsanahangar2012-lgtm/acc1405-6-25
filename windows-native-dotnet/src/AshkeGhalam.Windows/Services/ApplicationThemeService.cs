@@ -285,6 +285,7 @@ public static class ApplicationThemeService
             }));
             cellTextStyle.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
             cellTextStyle.Setters.Add(new Setter(TextBlock.TextWrappingProperty, TextWrapping.NoWrap));
+            cellTextStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
             cellTextStyle.Setters.Add(new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center));
             cellTextStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, new Binding(nameof(TextBlock.Text))
             {
@@ -983,6 +984,8 @@ public static class ApplicationThemeService
 
                 label.FontSize = Math.Clamp(label.FontSize, 12, 13);
                 label.FontWeight = FontWeights.SemiBold;
+                label.FlowDirection = FlowDirection.RightToLeft;
+                label.TextAlignment = TextAlignment.Right;
                 label.Margin = new Thickness(0, Math.Max(6, label.Margin.Top), 0, 4);
                 label.TextWrapping = TextWrapping.Wrap;
             }

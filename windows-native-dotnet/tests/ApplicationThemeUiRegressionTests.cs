@@ -161,6 +161,63 @@ public sealed class ApplicationThemeUiRegressionTests
     }
 
     [TestMethod]
+    public void PersianFormLabelsAndDataGridTextCellsUseConsistentRightAlignment()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var label = new TextBlock { Text = "طرف حساب" };
+                var input = new TextBox();
+                var form = new StackPanel();
+                form.Children.Add(label);
+                form.Children.Add(input);
+
+                var grid = new DataGrid { AutoGenerateColumns = false };
+                grid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = "شرح",
+                    Binding = new Binding("Description")
+                });
+
+                var layout = new StackPanel();
+                layout.Children.Add(form);
+                layout.Children.Add(grid);
+                var window = new Window { Width = 800, Height = 520, Content = layout };
+
+                ApplicationThemeService.Apply(window, "dark");
+
+                Assert.AreEqual(FlowDirection.RightToLeft, label.FlowDirection,
+                    "Persian field captions should explicitly retain RTL direction.");
+                Assert.AreEqual(TextAlignment.Right, label.TextAlignment,
+                    "Persian field captions should align to the right edge of their field.");
+                var column = (DataGridTextColumn)grid.Columns[0];
+                Assert.IsNotNull(column.ElementStyle);
+                Assert.IsTrue(column.ElementStyle!.Setters.OfType<Setter>().Any(
+                    setter => setter.Property == TextBlock.TextAlignmentProperty &&
+                              Equals(setter.Value, TextAlignment.Right)),
+                    "Generated DataGrid text cells should use right-aligned Persian text.");
+                Assert.IsTrue(column.ElementStyle.Setters.OfType<Setter>().Any(
+                    setter => setter.Property == TextBlock.TextTrimmingProperty &&
+                              Equals(setter.Value, TextTrimming.CharacterEllipsis)),
+                    "Long table text should truncate cleanly while retaining its full value as a tooltip.");
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+            throw new AssertFailedException("Persian form/table alignment regression failed.", failure);
+    }
+
+    [TestMethod]
     public void DarkThemeKeepsInvoiceAndReportPrintPaperWhite()
     {
         Exception? failure = null;
