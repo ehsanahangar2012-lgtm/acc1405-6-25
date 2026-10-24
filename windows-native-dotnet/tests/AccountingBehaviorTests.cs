@@ -222,6 +222,7 @@ public sealed class AccountingBehaviorTests
             SayadId = "1234567890123456",
             HolderName = "شرکت نمونه",
             CheckType = "RECEIVED",
+            ImageDataBase64 = "encoded-cheque-image",
             History = [new CheckHistoryRecord { Status = "PENDING", Note = "ثبت اولیه" }]
         };
         var data = new AccountingData { Checks = [check] };
@@ -232,7 +233,58 @@ public sealed class AccountingBehaviorTests
         Assert.AreNotSame(check.History[0], copy.Checks[0].History[0]);
         Assert.AreEqual("1234567890123456", copy.Checks[0].SayadId);
         Assert.AreEqual("ثبت اولیه", copy.Checks[0].History[0].Note);
+        Assert.AreEqual("encoded-cheque-image", copy.Checks[0].ImageDataBase64);
         AccountingDataValidator.Validate(copy);
+    }
+
+    [TestMethod]
+    public void CheckImageAndPaymentLinkSurviveDeepCopy()
+    {
+        var data = CreateSampleData(includeInvoice: true);
+        var invoice = data.Invoices.Single();
+        var payment = AccountingOperations.RecordPayment(data, invoice.Id, 100m, "چک", "پیوند تصویر");
+        data.Checks.Add(new CheckRecord
+        {
+            Id = "linked-check",
+            BankName = "ملی",
+            Amount = payment.Amount,
+            DueDate = DateTimeOffset.Now.AddDays(15),
+            Status = "PENDING",
+            HolderName = invoice.CustomerName,
+            RelatedInvoiceId = invoice.Id,
+            RelatedPaymentId = payment.Id,
+            ImageDataBase64 = "encoded-receipt-image",
+            CheckType = invoice.Type == "SALE" ? "RECEIVED" : "ISSUED",
+            History = [new CheckHistoryRecord { Status = "PENDING", Note = "ثبت همراه دریافت" }]
+        });
+
+        var copy = data.DeepCopy();
+        var copiedCheck = copy.Checks.Single(check => check.Id == "linked-check");
+        Assert.AreEqual(payment.Id, copiedCheck.RelatedPaymentId);
+        Assert.AreEqual("encoded-receipt-image", copiedCheck.ImageDataBase64);
+        AccountingDataValidator.Validate(copy);
+    }
+
+    [TestMethod]
+    public void RejectsChequePaymentLinkWhenAmountsDoNotMatch()
+    {
+        var data = CreateSampleData(includeInvoice: true);
+        var invoice = data.Invoices.Single();
+        var payment = AccountingOperations.RecordPayment(data, invoice.Id, 100m, "چک", "پیوند نامعتبر");
+        data.Checks.Add(new CheckRecord
+        {
+            Id = "mismatched-check",
+            BankName = "ملی",
+            Amount = 99m,
+            DueDate = DateTimeOffset.Now.AddDays(15),
+            Status = "PENDING",
+            HolderName = invoice.CustomerName,
+            RelatedInvoiceId = invoice.Id,
+            RelatedPaymentId = payment.Id,
+            CheckType = "RECEIVED",
+            History = [new CheckHistoryRecord { Status = "PENDING", Note = "آزمون" }]
+        });
+        Assert.ThrowsException<InvalidDataException>(() => AccountingDataValidator.Validate(data));
     }
 
     [TestMethod]
