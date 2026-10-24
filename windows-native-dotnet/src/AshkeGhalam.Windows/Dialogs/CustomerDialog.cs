@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using AshkeGhalam.Windows.Models;
+using AshkeGhalam.Windows.Services;
 
 namespace AshkeGhalam.Windows.Dialogs;
 
