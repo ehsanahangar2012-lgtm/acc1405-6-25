@@ -167,6 +167,18 @@ public static class ApplicationThemeService
         grid.Resources[typeof(DataGridRow)] = rowStyle;
         grid.Resources[typeof(DataGridCell)] = cellStyle;
         grid.Resources[typeof(DataGridColumnHeader)] = headerStyle;
+
+        // Implicit styles are cached on already-realized virtualized elements, so assign
+        // the freshly selected style to the rows/cells currently on screen as well.
+        foreach (var element in EnumerateTree(grid))
+        {
+            switch (element)
+            {
+                case DataGridRow row: row.Style = rowStyle; break;
+                case DataGridCell cell: cell.Style = cellStyle; break;
+                case DataGridColumnHeader header: header.Style = headerStyle; break;
+            }
+        }
     }
 
     private static Style CreateChoiceItemStyle(bool isDark, bool isListItem)
