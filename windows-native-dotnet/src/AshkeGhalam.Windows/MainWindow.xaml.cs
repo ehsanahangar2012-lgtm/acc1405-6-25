@@ -4302,6 +4302,20 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OpenDataFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AshkeGhalam", "WindowsNative");
+        try
+        {
+            Directory.CreateDirectory(folder);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "\"" + folder + "\"") { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "پوشهٔ داده‌ها", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void CheckLocalDataIntegrity_Click(object sender, RoutedEventArgs e)
     {
         if (!_canWrite)
