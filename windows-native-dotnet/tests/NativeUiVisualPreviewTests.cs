@@ -200,6 +200,33 @@ public sealed class NativeUiVisualPreviewTests
                     var personDialog = new CustomerDialog(owner, suggestedCode: "CUS-1002");
                     CaptureVisibleWindow(personDialog, theme, outputDirectory, $"person-form-{theme}.png");
 
+                    currentStage = $"product form ({theme})";
+                    var productDialog = new ProductDialog(
+                        owner, suggestedCode: "BOX-1002", knownProducts: products);
+                    CaptureVisibleWindow(productDialog, theme, outputDirectory, $"product-form-{theme}.png");
+
+                    currentStage = $"expense form ({theme})";
+                    var expenseDialog = new ExpenseDialog(
+                        owner, knownCategories: new[] { "بسته‌بندی", "حمل‌ونقل", "عمومی" });
+                    CaptureVisibleWindow(expenseDialog, theme, outputDirectory, $"expense-form-{theme}.png");
+
+                    currentStage = $"payment form ({theme})";
+                    var paymentData = new AccountingData
+                    {
+                        Customers = people,
+                        Products = products,
+                        Invoices = invoices
+                    };
+                    var paymentDialog = new PaymentDialog(
+                        owner, paymentData, invoiceTypeFilter: "SALE", currencyCode: "RIAL");
+                    CaptureVisibleWindow(paymentDialog, theme, outputDirectory, $"payment-form-{theme}.png");
+
+                    currentStage = $"check form ({theme})";
+                    var checkDialog = new CheckDialog(
+                        owner, people: people, currency: "RIAL", prefillAmount: 102000m,
+                        prefillType: "RECEIVED", personId: person.Id, personName: person.Name);
+                    CaptureVisibleWindow(checkDialog, theme, outputDirectory, $"check-form-{theme}.png");
+
                     currentStage = $"invoice form ({theme})";
                     var invoiceDialog = new InvoiceDialog(
                         owner, people, products, invoices,
@@ -229,7 +256,7 @@ public sealed class NativeUiVisualPreviewTests
 
                 owner.Close();
                 var capturedImages = Directory.GetFiles(outputDirectory, "*.png");
-                Assert.AreEqual(16, capturedImages.Length, "Expected dashboard, about page top/details, people table, person, invoice, voucher and print-preview captures for both themes.");
+                Assert.AreEqual(24, capturedImages.Length, "Expected dashboard, About top/details, people table, person, product, expense, payment, check, invoice, voucher and print-preview captures for both themes.");
             }
             catch (Exception ex)
             {
