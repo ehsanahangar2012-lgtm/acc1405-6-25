@@ -19,6 +19,7 @@ public sealed class CustomerDialog : Window
     private readonly CheckBox _isCustomer = new() { Content = "مشتری (امکان صدور فاکتور فروش)", Margin = new Thickness(0, 5, 0, 0) };
     private readonly CheckBox _isSupplier = new() { Content = "تأمین‌کننده", Margin = new Thickness(0, 5, 0, 0) };
     private readonly CustomerRecord? _existing;
+    private readonly IReadOnlyList<CustomerRecord> _knownPeople;
 
     public CustomerRecord? Result { get; private set; }
 
@@ -26,9 +27,11 @@ public sealed class CustomerDialog : Window
         Window owner,
         CustomerRecord? existing = null,
         string suggestedCode = "",
-        bool defaultSupplier = false)
+        bool defaultSupplier = false,
+        IReadOnlyList<CustomerRecord>? knownPeople = null)
     {
         _existing = existing;
+        _knownPeople = knownPeople?.ToList() ?? (existing is null ? [] : [existing]);
         Owner = owner;
         Title = existing is null ? "ثبت شخص جدید" : "ویرایش پرونده شخص";
         Width = 565;
@@ -158,6 +161,17 @@ public sealed class CustomerDialog : Window
         if (!isCustomer && !isSupplier)
         {
             MessageBox.Show(this, "شخص باید دست‌کم یکی از نقش‌های مشتری یا تأمین‌کننده را داشته باشد.", "بررسی اطلاعات", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        try
+        {
+            RecordIdentityValidationService.EnsureUniquePersonCode(_knownPeople, _code.Text, _existing?.Id);
+        }
+        catch (InvalidOperationException ex)
+        {
+            MessageBox.Show(this, ex.Message, "بررسی کد شخص", MessageBoxButton.OK, MessageBoxImage.Warning);
+            _code.Focus();
             return;
         }
 

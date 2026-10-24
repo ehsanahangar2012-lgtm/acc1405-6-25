@@ -237,6 +237,9 @@ public sealed class ProductDialog : Window
                 (weight.HasValue && weight.Value < 0m))
                 throw new InvalidOperationException("موجودی، وزن و قیمت‌ها نمی‌توانند منفی باشند.");
 
+            RecordIdentityValidationService.EnsureUniqueProductCode(_knownProducts, _code.Text, _existing?.Id);
+            RecordIdentityValidationService.EnsureUniqueProductBarcode(_knownProducts, _barcode.Text, _existing?.Id);
+
             var category = _category.Text.Trim();
             var subCategory = _subCategory.Text.Trim();
             var subSubCategory = _subSubCategory.Text.Trim();

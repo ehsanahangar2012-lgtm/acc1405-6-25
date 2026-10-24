@@ -1138,7 +1138,7 @@ public partial class MainWindow : Window
         }
 
         var suggestedCode = NextCode(_data.Customers.Select(person => person.Code), "CUS-");
-        var dialog = new CustomerDialog(dialogOwner, suggestedCode: suggestedCode);
+        var dialog = new CustomerDialog(dialogOwner, suggestedCode: suggestedCode, knownPeople: _data.Customers);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not CustomerRecord customer)
             return null;
@@ -1146,9 +1146,7 @@ public partial class MainWindow : Window
         try
         {
             var next = _data.DeepCopy();
-            if (!string.IsNullOrWhiteSpace(customer.Code) &&
-                next.Customers.Any(person => string.Equals(person.Code, customer.Code, StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidOperationException("کد شخص تکراری است.");
+            RecordIdentityValidationService.EnsureUniquePersonCode(next.Customers, customer.Code);
             next.Customers.Add(customer);
             NativeOperationalPostingService.Reconcile(next);
             AccountingDataValidator.Validate(next);
@@ -1183,9 +1181,8 @@ public partial class MainWindow : Window
         try
         {
             var next = _data.DeepCopy();
-            if (!string.IsNullOrWhiteSpace(product.Sku) &&
-                next.Products.Any(item => string.Equals(item.Sku, product.Sku, StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidOperationException("کد کالای تکراری مجاز نیست.");
+            RecordIdentityValidationService.EnsureUniqueProductCode(next.Products, product.Code);
+            RecordIdentityValidationService.EnsureUniqueProductBarcode(next.Products, product.Barcode);
             next.Products.Add(product);
             NativeOperationalPostingService.Reconcile(next);
             AccountingDataValidator.Validate(next);
@@ -1210,14 +1207,12 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable() || !ConfirmCanAddCustomer()) return;
         var suggestedCode = NextCode(_data.Customers.Select(person => person.Code), "CUS-");
-        var dialog = new CustomerDialog(this, suggestedCode: suggestedCode, defaultSupplier: defaultSupplier);
+        var dialog = new CustomerDialog(this, suggestedCode: suggestedCode, defaultSupplier: defaultSupplier, knownPeople: _data.Customers);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord customer)
             Commit(data =>
             {
-                if (!string.IsNullOrWhiteSpace(customer.Code) &&
-                    data.Customers.Any(person => string.Equals(person.Code, customer.Code, StringComparison.OrdinalIgnoreCase)))
-                    throw new InvalidOperationException("کد شخص تکراری است.");
+                RecordIdentityValidationService.EnsureUniquePersonCode(data.Customers, customer.Code);
                 data.Customers.Add(customer);
             }, defaultSupplier ? "پرونده تأمین‌کننده ذخیره شد" : "پرونده شخص ذخیره شد");
     }
@@ -1226,14 +1221,12 @@ public partial class MainWindow : Window
     {
         if (!RequireWritable()) return;
         if (CustomersGrid.SelectedItem is not CustomerRecord selected) { MessageBox.Show(this, "یک مشتری را انتخاب کنید."); return; }
-        var dialog = new CustomerDialog(this, selected);
+        var dialog = new CustomerDialog(this, selected, knownPeople: _data.Customers);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord changed)
             Commit(data =>
             {
-                if (!string.IsNullOrWhiteSpace(changed.Code) &&
-                    data.Customers.Any(p => p.Id != changed.Id && string.Equals(p.Code, changed.Code, StringComparison.OrdinalIgnoreCase)))
-                    throw new InvalidOperationException("کد شخص تکراری است.");
+                RecordIdentityValidationService.EnsureUniquePersonCode(data.Customers, changed.Code, changed.Id);
                 var index = data.Customers.FindIndex(c => c.Id == changed.Id);
                 if (index < 0) throw new InvalidOperationException("شخص پیدا نشد.");
                 data.Customers[index] = changed;
@@ -1263,10 +1256,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true && dialog.Result is ProductRecord product)
             Commit(data =>
             {
-                if (!string.IsNullOrWhiteSpace(product.Sku) && data.Products.Any(p => string.Equals(p.Sku, product.Sku, StringComparison.OrdinalIgnoreCase)))
-                    throw new InvalidOperationException("کد کالای تکراری مجاز نیست.");
-                if (!string.IsNullOrWhiteSpace(product.Barcode) && data.Products.Any(p => string.Equals(p.Barcode, product.Barcode, StringComparison.OrdinalIgnoreCase)))
-                    throw new InvalidOperationException("بارکد کالا تکراری است.");
+                RecordIdentityValidationService.EnsureUniqueProductCode(data.Products, product.Code);
+                RecordIdentityValidationService.EnsureUniqueProductBarcode(data.Products, product.Barcode);
                 data.Products.Add(product);
             }, "کالا و موجودی اولیه ذخیره شد");
     }
@@ -1280,10 +1271,8 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog() == true && dialog.Result is ProductRecord changed)
             Commit(data =>
             {
-                if (!string.IsNullOrWhiteSpace(changed.Sku) && data.Products.Any(p => p.Id != changed.Id && string.Equals(p.Sku, changed.Sku, StringComparison.OrdinalIgnoreCase)))
-                    throw new InvalidOperationException("کد کالای تکراری مجاز نیست.");
-                if (!string.IsNullOrWhiteSpace(changed.Barcode) && data.Products.Any(p => p.Id != changed.Id && string.Equals(p.Barcode, changed.Barcode, StringComparison.OrdinalIgnoreCase)))
-                    throw new InvalidOperationException("بارکد کالا تکراری است.");
+                RecordIdentityValidationService.EnsureUniqueProductCode(data.Products, changed.Code, changed.Id);
+                RecordIdentityValidationService.EnsureUniqueProductBarcode(data.Products, changed.Barcode, changed.Id);
                 var index = data.Products.FindIndex(p => p.Id == changed.Id);
                 if (index < 0) throw new InvalidOperationException("کالا پیدا نشد.");
                 data.Products[index] = changed;
