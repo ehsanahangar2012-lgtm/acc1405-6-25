@@ -975,8 +975,10 @@ public static class ApplicationThemeService
         foreach (var grid in elements.OfType<DataGrid>())
         {
             grid.FontSize = Math.Max(grid.FontSize, 12);
-            grid.RowHeight = Math.Max(grid.RowHeight, 38);
-            grid.ColumnHeaderHeight = Math.Max(grid.ColumnHeaderHeight, 48);
+            grid.RowHeight = double.IsFinite(grid.RowHeight) ? Math.Max(grid.RowHeight, 38d) : 38d;
+            grid.ColumnHeaderHeight = double.IsFinite(grid.ColumnHeaderHeight)
+                ? Math.Max(grid.ColumnHeaderHeight, 48d)
+                : 48d;
             grid.AlternationCount = Math.Max(grid.AlternationCount, 2);
             grid.HeadersVisibility = DataGridHeadersVisibility.Column;
             grid.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
