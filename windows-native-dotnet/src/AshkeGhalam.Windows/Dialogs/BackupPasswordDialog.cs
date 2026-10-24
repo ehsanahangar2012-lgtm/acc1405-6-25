@@ -142,17 +142,6 @@ public sealed class BackupPasswordDialog : Window
             }
             DialogResult = true;
         };
-        buttons.Children.Add(ok);
-        buttons.Children.Add(cancel);
-        var layout = new Grid();
-        layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var body = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = root };
-        Grid.SetRow(body, 0);
-        Grid.SetRow(buttons, 1);
-        layout.Children.Add(body);
-        layout.Children.Add(buttons);
-        Content = layout;
         Loaded += (_, _) => _password.Focus();
     }
     private static Border CreateSectionCard(string title, string hint, UIElement content)
