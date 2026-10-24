@@ -30,7 +30,7 @@ public sealed class VoucherPreviewWindow : Window
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
+        var toolbar = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0) };
         var titleBlock = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
         titleBlock.Children.Add(new TextBlock
         {
@@ -48,11 +48,11 @@ public sealed class VoucherPreviewWindow : Window
             Margin = new Thickness(0, 4, 0, 0)
         });
         toolbar.Children.Add(titleBlock);
-        var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        var buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 0) };
         var print = new Button { Content = "چاپ حواله", MinWidth = 110, Height = 36, Margin = new Thickness(0, 0, 8, 0) };
         print.Click += Print_Click; buttons.Children.Add(print);
         buttons.Children.Add(new Button { Content = "بستن", MinWidth = 90, Height = 36, IsCancel = true });
-        DockPanel.SetDock(buttons, Dock.Left); toolbar.Children.Add(buttons);
+        toolbar.Children.Add(buttons);
         var viewer = new FlowDocumentScrollViewer
         {
             Document = _document, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,

@@ -48,7 +48,7 @@ public sealed class PaymentReceiptPreviewWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
+        var toolbar = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0) };
         var titleStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         titleStack.Children.Add(new TextBlock
         {
@@ -66,7 +66,7 @@ public sealed class PaymentReceiptPreviewWindow : Window
         });
         toolbar.Children.Add(titleStack);
 
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 0) };
         var print = new Button
         {
             Content = "چاپ رسید",
@@ -79,7 +79,6 @@ public sealed class PaymentReceiptPreviewWindow : Window
         print.Click += Print_Click;
         actions.Children.Add(print);
         actions.Children.Add(new Button { Content = "بستن", MinWidth = 88, Height = 38, IsCancel = true });
-        DockPanel.SetDock(actions, Dock.Left);
         toolbar.Children.Add(actions);
 
         var viewer = new FlowDocumentScrollViewer

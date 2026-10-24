@@ -168,7 +168,7 @@ public sealed class InvoicePreviewWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
+        var toolbar = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0) };
         var title = new StackPanel { Orientation = Orientation.Vertical };
         title.Children.Add(new TextBlock
         {
@@ -187,10 +187,10 @@ public sealed class InvoicePreviewWindow : Window
         });
         toolbar.Children.Add(title);
 
-        var buttons = new StackPanel
+        var buttons = new WrapPanel
         {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Left
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 8, 0, 0)
         };
         var themeSelector = new ComboBox
         {
@@ -230,7 +230,6 @@ public sealed class InvoicePreviewWindow : Window
             Height = 38,
             IsCancel = true
         });
-        DockPanel.SetDock(buttons, Dock.Left);
         toolbar.Children.Add(buttons);
 
         var paper = new Border

@@ -175,7 +175,7 @@ public sealed class CheckPreviewWindow : Window
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
+        var toolbar = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0) };
         toolbar.Children.Add(new TextBlock
         {
             Text = "پیش‌نمایش و چاپ سند چک",
@@ -184,12 +184,11 @@ public sealed class CheckPreviewWindow : Window
             Foreground = Brushes.White,
             VerticalAlignment = VerticalAlignment.Center
         });
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        var actions = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 0) };
         var print = new Button { Content = "🖨 چاپ / انتخاب چاپگر", MinWidth = 160, Height = 38, Margin = new Thickness(0, 0, 8, 0), Background = accent, Foreground = Brushes.White };
         print.Click += Print_Click;
         actions.Children.Add(print);
         actions.Children.Add(new Button { Content = "بستن", MinWidth = 90, Height = 38, IsCancel = true });
-        DockPanel.SetDock(actions, Dock.Left);
         toolbar.Children.Add(actions);
 
         var viewer = new FlowDocumentScrollViewer

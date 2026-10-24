@@ -139,7 +139,7 @@ public sealed class ProductKardexPrintPreviewWindow : Window
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
+        var toolbar = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0) };
         toolbar.Children.Add(new TextBlock
         {
             Text = "پیش‌نمایش چاپ کاردکس کالا",
@@ -148,10 +148,10 @@ public sealed class ProductKardexPrintPreviewWindow : Window
             Foreground = Brushes.White,
             VerticalAlignment = VerticalAlignment.Center
         });
-        var actions = new StackPanel
+        var actions = new WrapPanel
         {
-            Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Left
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 8, 0, 0)
         };
         var print = new Button
         {
@@ -165,7 +165,6 @@ public sealed class ProductKardexPrintPreviewWindow : Window
         print.Click += Print_Click;
         actions.Children.Add(print);
         actions.Children.Add(new Button { Content = "بستن", MinWidth = 90, Height = 38, IsCancel = true });
-        DockPanel.SetDock(actions, Dock.Left);
         toolbar.Children.Add(actions);
         var toolbarFrame = PreviewChromeService.CreateToolbarFrame(toolbar);
         Grid.SetRow(toolbarFrame, 0);
