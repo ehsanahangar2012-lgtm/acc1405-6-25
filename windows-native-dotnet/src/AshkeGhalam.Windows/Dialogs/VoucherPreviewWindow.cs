@@ -43,7 +43,7 @@ public sealed class VoucherPreviewWindow : Window
             Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
             BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(8),
             Child = new FlowDocumentScrollViewer { Document = _document, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, IsToolBarVisible = true, Background = Brushes.White, Padding = new Thickness(12) }
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, IsToolBarVisible = false, Background = Brushes.White, Padding = new Thickness(12) }
         };
         Grid.SetRow(paper, 1); root.Children.Add(toolbar); root.Children.Add(paper); Content = root;
     }
@@ -54,7 +54,8 @@ public sealed class VoucherPreviewWindow : Window
         var soft = new SolidColorBrush(Color.FromRgb(231, 248, 244));
         var ink = new SolidColorBrush(Color.FromRgb(30, 41, 59));
         var document = new FlowDocument { FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"), FontSize = 12,
-            FlowDirection = FlowDirection.RightToLeft, PagePadding = new Thickness(28), ColumnWidth = 760,
+            FlowDirection = FlowDirection.RightToLeft, PageWidth = 794, PageHeight = 1123,
+            PagePadding = new Thickness(28), ColumnWidth = 738,
             Background = Brushes.White, Foreground = new SolidColorBrush(Color.FromRgb(30, 41, 59)) };
         var numberLabel = voucher.Number > 0 ? voucher.Number.ToString("N0", CultureInfo.GetCultureInfo("fa-IR")) : "پس از ثبت تعیین می‌شود";
         var trackingLabel = string.IsNullOrWhiteSpace(voucher.TrackingCode) ? "پس از ثبت تولید می‌شود" : voucher.TrackingCode;
