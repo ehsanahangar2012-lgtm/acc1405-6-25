@@ -251,6 +251,7 @@ public sealed class PaymentReceiptPreviewWindow : Window
                 Child = attachment
             }));
         }
+        PrintBrandingService.AppendWebsiteFooter(document, 640);
         return document;
     }
 
