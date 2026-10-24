@@ -1,46 +1,27 @@
 @echo off
 setlocal
-title Ashk Ghalam - Native WPF Preview
-set "ROOT=%~dp0"
-set "PROJECT=%ROOT%windows-native-dotnet\src\AshkeGhalam.Windows\AshkeGhalam.Windows.csproj"
+chcp 65001 >nul
+title Ashke Ghalam - Native WPF Live Preview
+set "AG_PREVIEW_PS1=%TEMP%\ashkghalam-wpf-launch-%RANDOM%-%RANDOM%.ps1"
 
 echo ============================================================
-echo  Ashk Ghalam Accounting - Native Windows WPF Preview
-echo  Builds and launches the current source from this checkout
+echo  Ashk Ghalam - Native WPF Live Preview
+echo  Fetches and runs the latest source from feature/windows-native-dotnet
 echo ============================================================
 echo.
-
-if not exist "%PROJECT%" (
-    echo [ERROR] WPF project was not found:
-    echo         "%PROJECT%"
-    echo.
-    echo Make sure this script is in the repository root and that
-    echo branch feature/windows-native-dotnet is checked out.
-    pause
-    exit /b 1
-)
-
-where dotnet >nul 2>nul
-if errorlevel 1 (
-    echo [ERROR] The .NET SDK is not installed or not on PATH.
-    echo Install the .NET 10 SDK, then run this file again.
-    pause
-    exit /b 1
-)
-
-pushd "%ROOT%windows-native-dotnet\src\AshkeGhalam.Windows"
-echo [BUILD] Building the current WPF source in Release configuration...
-echo [SOURCE] %PROJECT%
+echo The app runs on this Windows desktop. Chrome Remote Desktop only
+echo mirrors the desktop so you can view and control it remotely.
 echo.
-dotnet run --project "%PROJECT%" --configuration Release
+
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; $p=$env:AG_PREVIEW_PS1; $rc=0; try { $u='https://api.github.com/repos/ehsanahangar2012-lgtm/acc1405-6-25/contents/Run-AshkeGhalam-WPF-Preview.ps1?ref=feature%2Fwindows-native-dotnet'; $h=@{'User-Agent'='AshkeGhalam-Wpf-Local-Preview'}; $r=Invoke-RestMethod -Headers $h -Uri $u; $b=[Convert]::FromBase64String(($r.content -replace '\s','')); [IO.File]::WriteAllBytes($p,$b); & $p; if ($null -ne $LASTEXITCODE) { $rc=[int]$LASTEXITCODE } } catch { Write-Host ('Preview launcher failed: ' + $_) -ForegroundColor Red; $rc=1 } finally { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }; exit $rc"
 set "RESULT=%ERRORLEVEL%"
-popd
 
+echo.
 if not "%RESULT%"=="0" (
-    echo.
-    echo [ERROR] WPF build or startup failed with exit code %RESULT%.
-    echo The error above is from the current source build, not an old EXE.
-    pause
+  echo Preview did not start successfully. Read the error above.
+) else (
+  echo Preview finished.
 )
-
+echo.
+pause
 exit /b %RESULT%
