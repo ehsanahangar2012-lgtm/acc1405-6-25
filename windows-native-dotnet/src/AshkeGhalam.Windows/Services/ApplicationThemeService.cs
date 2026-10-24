@@ -47,58 +47,58 @@ public static class ApplicationThemeService
         var palette = isDark
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["WindowBackground"] = "#0B1220",
-                ["SurfaceBackground"] = "#111827",
-                ["SurfaceMuted"] = "#1F2937",
-                ["ReadOnlySurfaceBrush"] = "#1F2937",
-                ["PrimaryText"] = "#F8FAFC",
-                ["MutedText"] = "#CBD5E1",
-                ["OutlineBrush"] = "#475569",
-                ["ComboDropDownSurfaceBrush"] = "#111827",
-                ["ComboDropDownBorderBrush"] = "#64748B",
-                ["AccentBrush"] = "#14B8A6",
-                ["AccentSoftBrush"] = "#134E4A",
-                ["DangerBrush"] = "#FCA5A5",
-                ["WarningBrush"] = "#FDBA74",
-                ["DarkSurfaceBrush"] = "#0F172A",
-                ["ScrollTrackBrush"] = "#0B1220",
-                ["ScrollThumbBrush"] = "#64748B",
-                ["ScrollThumbHoverBrush"] = "#14B8A6",
-                ["CheckBoxBoxSurfaceBrush"] = "#111827",
-                ["CheckBoxBoxBorderBrush"] = "#94A3B8",
-                ["CheckBoxCheckedSurfaceBrush"] = "#0D9488",
+                ["WindowBackground"] = "#0D1827",
+                ["SurfaceBackground"] = "#142338",
+                ["SurfaceMuted"] = "#1B2D42",
+                ["ReadOnlySurfaceBrush"] = "#1B2D42",
+                ["PrimaryText"] = "#F5F8FB",
+                ["MutedText"] = "#B9C8D6",
+                ["OutlineBrush"] = "#3A526A",
+                ["ComboDropDownSurfaceBrush"] = "#142338",
+                ["ComboDropDownBorderBrush"] = "#526B82",
+                ["AccentBrush"] = "#60D7C4",
+                ["AccentSoftBrush"] = "#173D43",
+                ["DangerBrush"] = "#FFA39E",
+                ["WarningBrush"] = "#FFD091",
+                ["DarkSurfaceBrush"] = "#091321",
+                ["ScrollTrackBrush"] = "#0D1827",
+                ["ScrollThumbBrush"] = "#7F96AA",
+                ["ScrollThumbHoverBrush"] = "#60D7C4",
+                ["CheckBoxBoxSurfaceBrush"] = "#142338",
+                ["CheckBoxBoxBorderBrush"] = "#8CA3B7",
+                ["CheckBoxCheckedSurfaceBrush"] = "#0B9485",
                 ["CheckBoxMarkBrush"] = "#FFFFFF",
-                ["RadioButtonSurfaceBrush"] = "#111827",
-                ["RadioButtonBorderBrush"] = "#94A3B8",
-                ["RadioButtonCheckedSurfaceBrush"] = "#0D9488",
+                ["RadioButtonSurfaceBrush"] = "#142338",
+                ["RadioButtonBorderBrush"] = "#8CA3B7",
+                ["RadioButtonCheckedSurfaceBrush"] = "#0B9485",
                 ["RadioButtonMarkBrush"] = "#FFFFFF"
             }
             : new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["WindowBackground"] = "#F4F7FB",
+                ["WindowBackground"] = "#F0F5F6",
                 ["SurfaceBackground"] = "#FFFFFF",
-                ["SurfaceMuted"] = "#F1F5F9",
-                ["ReadOnlySurfaceBrush"] = "#F1F5F9",
-                ["PrimaryText"] = "#0F172A",
-                ["MutedText"] = "#334155",
-                ["OutlineBrush"] = "#CBD5E1",
+                ["SurfaceMuted"] = "#F5F8FA",
+                ["ReadOnlySurfaceBrush"] = "#EBF2F4",
+                ["PrimaryText"] = "#172D3D",
+                ["MutedText"] = "#536B7A",
+                ["OutlineBrush"] = "#D5E0E6",
                 ["ComboDropDownSurfaceBrush"] = "#FFFFFF",
-                ["ComboDropDownBorderBrush"] = "#94A3B8",
-                ["AccentBrush"] = "#0F766E",
-                ["AccentSoftBrush"] = "#CCFBF1",
-                ["DangerBrush"] = "#B91C1C",
-                ["WarningBrush"] = "#9A3412",
-                ["DarkSurfaceBrush"] = "#0F172A",
-                ["ScrollTrackBrush"] = "#F1F5F9",
-                ["ScrollThumbBrush"] = "#64748B",
-                ["ScrollThumbHoverBrush"] = "#0F766E",
+                ["ComboDropDownBorderBrush"] = "#ADBDC8",
+                ["AccentBrush"] = "#0B7C72",
+                ["AccentSoftBrush"] = "#DDF4EE",
+                ["DangerBrush"] = "#B4232A",
+                ["WarningBrush"] = "#8A4D16",
+                ["DarkSurfaceBrush"] = "#172D3D",
+                ["ScrollTrackBrush"] = "#EAF0F3",
+                ["ScrollThumbBrush"] = "#536B7D",
+                ["ScrollThumbHoverBrush"] = "#0B7C72",
                 ["CheckBoxBoxSurfaceBrush"] = "#FFFFFF",
-                ["CheckBoxBoxBorderBrush"] = "#64748B",
-                ["CheckBoxCheckedSurfaceBrush"] = "#0F766E",
+                ["CheckBoxBoxBorderBrush"] = "#607888",
+                ["CheckBoxCheckedSurfaceBrush"] = "#0B7C72",
                 ["CheckBoxMarkBrush"] = "#FFFFFF",
                 ["RadioButtonSurfaceBrush"] = "#FFFFFF",
-                ["RadioButtonBorderBrush"] = "#64748B",
-                ["RadioButtonCheckedSurfaceBrush"] = "#0F766E",
+                ["RadioButtonBorderBrush"] = "#607888",
+                ["RadioButtonCheckedSurfaceBrush"] = "#0B7C72",
                 ["RadioButtonMarkBrush"] = "#FFFFFF"
             };
 
@@ -107,8 +107,8 @@ public static class ApplicationThemeService
 
         // Window is not a Control; set its shell colors explicitly so no white/black
         // background leaks through when a new form or popup switches themes.
-        window.Background = Brush(isDark ? "#0B1220" : "#F4F7FB");
-        window.Foreground = Brush(isDark ? "#F8FAFC" : "#0F172A");
+        window.Background = Brush(isDark ? "#0D1827" : "#F0F5F6");
+        window.Foreground = Brush(isDark ? "#F5F8FB" : "#172D3D");
     }
 
     public static string Normalize(string? theme) =>
@@ -166,20 +166,20 @@ public static class ApplicationThemeService
         // therefore do not reliably appear in the main window's visual-tree enumeration.
         window.Resources[typeof(ComboBoxItem)] = CreateChoiceItemStyle(isDark, isListItem: false);
         window.Resources[typeof(ListBoxItem)] = CreateChoiceItemStyle(isDark, isListItem: true);
-        window.Resources["ComboDropDownSurfaceBrush"] = Brush(isDark ? "#111827" : "#FFFFFF");
-        window.Resources["ComboDropDownBorderBrush"] = Brush(isDark ? "#475569" : "#CBD5E1");
-        window.Resources["ReadOnlySurfaceBrush"] = Brush(isDark ? "#1F2937" : "#F1F5F9");
-        window.Resources["ScrollTrackBrush"] = Brush(isDark ? "#0B1220" : "#F1F5F9");
-        window.Resources["ScrollThumbBrush"] = Brush("#64748B");
-        window.Resources["ScrollThumbHoverBrush"] = Brush(isDark ? "#14B8A6" : "#0F766E");
-        window.Resources["AccentBrush"] = Brush(isDark ? "#14B8A6" : "#0F766E");
-        window.Resources["CheckBoxBoxSurfaceBrush"] = Brush(isDark ? "#111827" : "#FFFFFF");
-        window.Resources["CheckBoxBoxBorderBrush"] = Brush(isDark ? "#94A3B8" : "#64748B");
-        window.Resources["CheckBoxCheckedSurfaceBrush"] = Brush(isDark ? "#0D9488" : "#0F766E");
+        window.Resources["ComboDropDownSurfaceBrush"] = Brush(isDark ? "#142338" : "#FFFFFF");
+        window.Resources["ComboDropDownBorderBrush"] = Brush(isDark ? "#526B82" : "#ADBDC8");
+        window.Resources["ReadOnlySurfaceBrush"] = Brush(isDark ? "#1B2D42" : "#EBF2F4");
+        window.Resources["ScrollTrackBrush"] = Brush(isDark ? "#0D1827" : "#EAF0F3");
+        window.Resources["ScrollThumbBrush"] = Brush(isDark ? "#7F96AA" : "#536B7D");
+        window.Resources["ScrollThumbHoverBrush"] = Brush(isDark ? "#60D7C4" : "#0B7C72");
+        window.Resources["AccentBrush"] = Brush(isDark ? "#60D7C4" : "#0B7C72");
+        window.Resources["CheckBoxBoxSurfaceBrush"] = Brush(isDark ? "#142338" : "#FFFFFF");
+        window.Resources["CheckBoxBoxBorderBrush"] = Brush(isDark ? "#8CA3B7" : "#607888");
+        window.Resources["CheckBoxCheckedSurfaceBrush"] = Brush(isDark ? "#0B9485" : "#0B7C72");
         window.Resources["CheckBoxMarkBrush"] = Brushes.White;
-        window.Resources["RadioButtonSurfaceBrush"] = Brush(isDark ? "#111827" : "#FFFFFF");
-        window.Resources["RadioButtonBorderBrush"] = Brush(isDark ? "#94A3B8" : "#64748B");
-        window.Resources["RadioButtonCheckedSurfaceBrush"] = Brush(isDark ? "#0D9488" : "#0F766E");
+        window.Resources["RadioButtonSurfaceBrush"] = Brush(isDark ? "#142338" : "#FFFFFF");
+        window.Resources["RadioButtonBorderBrush"] = Brush(isDark ? "#8CA3B7" : "#607888");
+        window.Resources["RadioButtonCheckedSurfaceBrush"] = Brush(isDark ? "#0B9485" : "#0B7C72");
         window.Resources["RadioButtonMarkBrush"] = Brushes.White;
 
         // Establish control templates before theme mapping, so the newly applied
@@ -354,15 +354,15 @@ public static class ApplicationThemeService
     {
         var state = GridThemeStates.GetValue(grid, _ => new GridThemeState());
         state.IsDark = isDark;
-        var surface = Brush(isDark ? "#111827" : "#FFFFFF");
-        var alternate = Brush(isDark ? "#1F2937" : "#F8FAFC");
-        var text = Brush(isDark ? "#F3F4F6" : "#0F172A");
-        var muted = Brush(isDark ? "#CBD5E1" : "#334155");
-        var border = Brush(isDark ? "#475569" : "#CBD5E1");
-        var headerSurface = Brush(isDark ? "#0B1220" : "#E2E8F0");
-        var selected = Brush(isDark ? "#115E59" : "#CCFBF1");
-        var selectedText = Brush(isDark ? "#FFFFFF" : "#134E4A");
-        var hover = Brush(isDark ? "#273447" : "#F0FDFA");
+        var surface = Brush(isDark ? "#142338" : "#FFFFFF");
+        var alternate = Brush(isDark ? "#1B2D42" : "#F5F8FA");
+        var text = Brush(isDark ? "#F5F8FB" : "#172D3D");
+        var muted = Brush(isDark ? "#B9C8D6" : "#536B7A");
+        var border = Brush(isDark ? "#3A526A" : "#D5E0E6");
+        var headerSurface = Brush(isDark ? "#091321" : "#E4EDF1");
+        var selected = Brush(isDark ? "#174C51" : "#DDF4EE");
+        var selectedText = Brush(isDark ? "#FFFFFF" : "#0B5C55");
+        var hover = Brush(isDark ? "#22364D" : "#EFF8F6");
 
         // Keep star columns from compressing every heading and value into unreadable slivers.
         // Each column gets a minimum width derived from its Persian heading; overflow is handled
@@ -591,9 +591,9 @@ public static class ApplicationThemeService
     {
         combo.ApplyTemplate();
 
-        var surface = Brush(isDark ? "#111827" : "#FFFFFF");
-        var foreground = Brush(isDark ? "#F3F4F6" : "#0F172A");
-        var border = Brush(isDark ? "#475569" : "#CBD5E1");
+        var surface = Brush(isDark ? "#142338" : "#FFFFFF");
+        var foreground = Brush(isDark ? "#F5F8FB" : "#172D3D");
+        var border = Brush(isDark ? "#3A526A" : "#D5E0E6");
         combo.Background = surface;
         combo.Foreground = foreground;
         combo.BorderBrush = border;
