@@ -103,7 +103,7 @@ public sealed class ProductKardexPrintPreviewWindow : Window
         foreach (var width in new[] { 1.0, 1.25, 1.2, 2.5, 1.05, 1.05, 1.15 })
             table.Columns.Add(new TableColumn { Width = new GridLength(width, GridUnitType.Star) });
 
-        var headerGroup = new TableRowGroup();
+        var headerGroup = new TableRowGroup { IsHeader = true };
         var header = new TableRow
         {
             Background = accent,
@@ -195,7 +195,7 @@ public sealed class ProductKardexPrintPreviewWindow : Window
         {
             Foreground = foreground,
             Background = background,
-            Padding = new Thickness(5, 4, 5, 4),
+            Padding = new Thickness(7, 5, 7, 5),
             BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
             BorderThickness = new Thickness(0, 0, 0.5, 0.5),
             FontSize = header ? 9 : 8.5
