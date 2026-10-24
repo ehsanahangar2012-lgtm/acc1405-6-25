@@ -258,9 +258,12 @@ public static class ApplicationThemeService
 
     private static void ApplyThemeValues(DependencyObject element, bool isDark)
     {
-        // Grid rows/cells/headers are themed through styles (not local values), otherwise
-        // local Background values defeat WPF style triggers for hover and selected states.
-        if (element is DataGridRow or DataGridCell or DataGridColumnHeader)
+        // Keep the document viewport itself neutral as well as its document children:
+        // remapping FlowDocumentScrollViewer.Background tints the white paper and makes
+        // printed table ink/row fills look broken. Only the surrounding preview chrome themes.
+        // Grid rows/cells/headers use styles so local values cannot defeat hover/selection.
+        if (element is FlowDocumentScrollViewer or FlowDocument or TextElement or
+            DataGridRow or DataGridCell or DataGridColumnHeader)
             return;
 
         foreach (var property in GetBrushProperties(element))
