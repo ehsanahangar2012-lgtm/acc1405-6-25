@@ -171,7 +171,7 @@ public sealed class VoucherPreviewWindow : Window
         var table = new Table { CellSpacing = 0, Margin = new Thickness(0, 2, 0, 10) };
         foreach (var width in new[] { 1.8, 0.9, 0.8, 2.5 })
             table.Columns.Add(new TableColumn { Width = new GridLength(width, GridUnitType.Star) });
-        var headerGroup = new TableRowGroup { IsHeader = true };
+        var headerGroup = new TableRowGroup();
         var bodyGroup = new TableRowGroup();
         var header = new TableRow();
         foreach (var label in new[] { "نام کالا", "مقدار", "واحد", "شرح / قفسه" })
