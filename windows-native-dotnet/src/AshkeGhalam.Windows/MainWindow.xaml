@@ -1290,6 +1290,115 @@
                 </ScrollViewer>
             </TabItem>
 
+            <TabItem Header="معرفی نرم‌افزار">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="24" MaxWidth="1020" HorizontalAlignment="Center">
+                        <Border Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="18" Padding="26" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="اشک قلم" FontSize="30" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="شرکت چاپ و کارتن‌سازی اشک قلم" FontSize="17" FontWeight="SemiBold" Foreground="#99F6E4" Margin="0,5,0,0"/>
+                                <TextBlock Text="نسخهٔ بومی حسابداری ویندوز" FontSize="14" Foreground="#E2E8F0" Margin="0,12,0,0"/>
+                                <TextBlock Text="ثبت فاکتور، مدیریت اشخاص و کالا، گردش موجودی، چک‌ها، دریافت و پرداخت و گزارش‌های مالی. داده‌های این نسخه به‌صورت محلی روی رایانه نگهداری می‌شوند."
+                                           FontSize="13" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                <Button Content="ورود به وب‌سایت رسمی اشک قلم" Tag="https://ashkghalam.ir/" Click="OpenCompanyWebsite_Click"
+                                        HorizontalAlignment="Right" MinWidth="250" Height="42" Margin="0,18,0,0"
+                                        Background="#14B8A6" Foreground="#042F2E" FontWeight="Bold"/>
+                            </StackPanel>
+                        </Border>
+                        <UniformGrid Columns="2" Margin="0,0,0,14">
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,7,0">
+                                <StackPanel>
+                                    <TextBlock Text="مشخصات شرکت فعال" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="نام حقوقی" FontSize="11" Foreground="#64748B" Margin="0,12,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyLegalName" Text="در تنظیمات شرکت ثبت نشده" FontSize="14" FontWeight="SemiBold" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="تلفن" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyPhone" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="نشانی" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyAddress" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <Button Content="ویرایش مشخصات شرکت" Tag="تنظیمات حسابداری و چندشرکتی" Click="AdvancedOpenTab_Click" Height="36" Margin="0,14,0,0" HorizontalAlignment="Right"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="7,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="دربارهٔ نسخهٔ ویندوز" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="پلتفرم: C# / .NET 10 / WPF" FontSize="13" Foreground="#1E293B" Margin="0,12,0,4"/>
+                                    <TextBlock Text="ذخیره‌سازی محلی رمزگذاری‌شده، پشتیبان رمزگذاری‌شده و ابزار همگام‌سازی دستی در این نسخه قرار دارند. همگام‌سازی فقط با لایسنس تأییدشده و انتخاب صریح کاربر انجام می‌شود."
+                                               FontSize="12" Foreground="#475569" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                    <TextBlock Text="سامانهٔ مؤدیان در این نسخه برای آماده‌سازی و ذخیرهٔ JSON است؛ ارسال رسمی فعال اعلام نمی‌شود."
+                                               FontSize="12" Foreground="#9A3412" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+                        <Border Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="دسترسی‌های سریع" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                <WrapPanel Margin="0,12,0,0">
+                                    <Button Content="راهنمای سادهٔ حسابداری" Tag="راهنمای حسابداری" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="پشتیبان و بازیابی" Tag="پشتیبان‌گیری" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="اتصال به سرور" Tag="اتصال به سرور اصلی" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="راهنمای حسابداری">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="24" MaxWidth="1020" HorizontalAlignment="Center">
+                        <TextBlock Text="راهنمای سادهٔ استفاده از نرم‌افزار" FontSize="27" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="برای شروع کار روزمره؛ هر بار پس از ثبت، نتیجه و مانده‌ها را کنترل کنید. در صورت تفاوت نام گزینه‌ها، از منوی اصلی سمت راست وارد بخش مربوط شوید."
+                                   FontSize="13" Foreground="#64748B" TextWrapping="Wrap" Margin="0,7,0,18"/>
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۱. راه‌اندازی اولیه" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="ابتدا مشخصات شرکت را از تنظیمات شرکت وارد کنید. سپس اشخاص و کالاها را ثبت کنید. قبل از ورود اطلاعات واقعی، یک فایل پشتیبان بسازید و امکان بازیابی آن را بررسی کنید."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۲. ثبت فروش و خرید" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="در فاکتورها نوع سند را انتخاب کنید. نام مشتری یا تأمین‌کننده را تایپ کنید تا جست‌وجو شود؛ تاریخ را با دکمهٔ تقویم، Ctrl+Space یا عبارت‌های امروز/فردا/دیروز تعیین کنید. کالا، تعداد، قیمت و شرح هر قلم را وارد کنید. پیش‌نمایش را بررسی و بعد ذخیره کنید."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۳. انبار و حواله" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="برای ورود، خروج یا برگشت کالا از حواله‌های انبار استفاده کنید. نوع گردش را با دقت انتخاب کنید؛ حوالهٔ ثبت‌شده موجودی محلی را تغییر می‌دهد. پیش‌نمایش را از نظر نام کالا، تعداد، واحد و شرح کنترل کنید."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۴. دریافت، پرداخت و چک" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="برای هر دریافت یا پرداخت، طرف حساب، مبلغ، روش و مرجع را درست ثبت کنید. تصویر چک را به رکورد مربوط پیوست کنید. وضعیت چک (در انتظار، واگذار، پاس یا برگشت) را تنها بر اساس اطلاعات واقعی به‌روزرسانی کنید؛ ثبت محلی به‌تنهایی به معنی تأیید بانک نیست."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۵. گزارش‌ها و کنترل حساب‌ها" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="گزارش اشخاص، گردش انبار، دفتر و جریان نقدینگی را مرتب بررسی کنید. در حسابداری دوبل، سند باید تراز باشد. تطبیق بانکی بدون واردکردن صورت‌حساب واقعی، فقط یک بررسی محلی محسوب می‌شود."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#FFF7ED" BorderBrush="#FDBA74" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۶. پشتیبان، بازیابی و همگام‌سازی" FontSize="17" FontWeight="Bold" Foreground="#9A3412"/>
+                                <TextBlock Text="رمز پشتیبان را جدا از رایانه نگه دارید؛ بدون رمز، فایل رمزگذاری‌شده بازیابی نمی‌شود. قبل از بازیابی یا جایگزینی دادهٔ سرور از دادهٔ فعلی نسخهٔ پشتیبان بگیرید. همگام‌سازی کامل و اتصال عملیاتی باید با لایسنس معتبر و فضای کاری واقعی آزمون شود."
+                                           TextWrapping="Wrap" Foreground="#7C2D12" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <WrapPanel Margin="0,4,0,0">
+                            <Button Content="رفتن به فاکتورها" Tag="فاکتورها" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                            <Button Content="رفتن به گزارش‌ها" Tag="گزارشات مالی" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                            <Button Content="تنظیمات و پشتیبان" Tag="تنظیمات پیشرفته" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
             <TabItem Header="امور مالی">
                 <Grid Margin="22">
                     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
@@ -1374,6 +1483,9 @@
                         <Button Tag="fiscal-year" Content="📅  سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="security" Content="🔐  امنیت داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="data-sync" Content="🔄  همگام‌سازی داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="اطلاعات و آموزش" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="about" Content="🏢  معرفی نرم‌افزار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="guide" Content="📘  راهنمای حسابداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="advanced-settings" Content="🎛️  تنظیمات پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                     </StackPanel>
                 </ScrollViewer>
