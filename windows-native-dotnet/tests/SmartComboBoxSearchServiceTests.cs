@@ -142,6 +142,9 @@ public sealed class SmartComboBoxSearchServiceTests
                     "Filtering must keep the matching CustomerRecord as the item.");
 
                 combo.SelectedItem = otherParty;
+                window.Dispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.Background,
+                    new Action(() => { }));
                 Assert.AreSame(otherParty, combo.SelectedItem,
                     "The selected value must remain the original domain record, not its display text.");
                 Assert.AreEqual(2, combo.Items.Count,
