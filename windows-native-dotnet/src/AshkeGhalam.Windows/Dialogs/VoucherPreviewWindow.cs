@@ -223,8 +223,6 @@ public sealed class VoucherPreviewWindow : Window
             voucherRowIndex++;
             group.Rows.Add(row);
         }
-
-        }
         table.RowGroups.Add(group);
         document.Blocks.Add(table);
         var totals = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
