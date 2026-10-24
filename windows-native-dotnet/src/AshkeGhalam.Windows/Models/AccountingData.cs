@@ -1,4 +1,5 @@
 using System.IO;
+using System.Globalization;
 
 namespace AshkeGhalam.Windows.Models;
 
@@ -19,6 +20,11 @@ public sealed class AccountingData
     // These collections are optional in old local files; initializers keep old schema-v1 data readable.
     public List<ChartOfAccountRecord> LedgerAccounts { get; set; } = [];
     public List<AccountingEntryRecord> JournalEntries { get; set; } = [];
+    public List<LoanRecord> Loans { get; set; } = [];
+    public List<LoanInstallmentRecord> LoanInstallments { get; set; } = [];
+    public List<CurrencyRateRecord> CurrencyRates { get; set; } = [];
+    public List<BankAccountRecord> BankAccounts { get; set; } = [];
+    public List<BankTransactionRecord> BankTransactions { get; set; } = [];
 
     // Optional persisted configuration; initializers preserve compatibility with old schema-v1 files.
     public List<CompanyProfileRecord> Companies { get; set; } = [];
@@ -145,6 +151,40 @@ public sealed class AccountingData
             Id=j.Id, Number=j.Number, Date=j.Date, Description=j.Description, DebitAccountId=j.DebitAccountId,
             CreditAccountId=j.CreditAccountId, Amount=j.Amount, ReferenceId=j.ReferenceId, ReferenceType=j.ReferenceType,
             DocumentType=j.DocumentType, FiscalYear=j.FiscalYear, Status=j.Status, CreatedAt=j.CreatedAt
+        }).ToList(),
+        Loans = (Loans ?? []).Select(loan => new LoanRecord
+        {
+            Id=loan.Id, LoanNumber=loan.LoanNumber, LenderName=loan.LenderName,
+            PrincipalAmount=loan.PrincipalAmount, AnnualInterestRatePercent=loan.AnnualInterestRatePercent,
+            StartDate=loan.StartDate, InstallmentCount=loan.InstallmentCount, RemainingPrincipal=loan.RemainingPrincipal,
+            CurrencyCode=loan.CurrencyCode, FundingAccountCode=loan.FundingAccountCode,
+            Status=loan.Status, Notes=loan.Notes, CreatedAt=loan.CreatedAt
+        }).ToList(),
+        LoanInstallments = (LoanInstallments ?? []).Select(installment => new LoanInstallmentRecord
+        {
+            Id=installment.Id, LoanId=installment.LoanId, InstallmentNumber=installment.InstallmentNumber,
+            DueDate=installment.DueDate, PrincipalAmount=installment.PrincipalAmount,
+            InterestAmount=installment.InterestAmount, TotalAmount=installment.TotalAmount,
+            Status=installment.Status, PaidAt=installment.PaidAt, PaymentAccountCode=installment.PaymentAccountCode
+        }).ToList(),
+        CurrencyRates = (CurrencyRates ?? []).Select(rate => new CurrencyRateRecord
+        {
+            Code=rate.Code, Name=rate.Name, Symbol=rate.Symbol, RialPerUnit=rate.RialPerUnit,
+            IsRateConfigured=rate.IsRateConfigured, LastUpdated=rate.LastUpdated
+        }).ToList(),
+        BankAccounts = (BankAccounts ?? []).Select(account => new BankAccountRecord
+        {
+            Id=account.Id, BankName=account.BankName, AccountNumberMasked=account.AccountNumberMasked,
+            CurrencyCode=account.CurrencyCode, OpeningBalance=account.OpeningBalance,
+            IsActive=account.IsActive, Notes=account.Notes, CreatedAt=account.CreatedAt
+        }).ToList(),
+        BankTransactions = (BankTransactions ?? []).Select(transaction => new BankTransactionRecord
+        {
+            Id=transaction.Id, BankAccountId=transaction.BankAccountId, Date=transaction.Date,
+            Description=transaction.Description, Direction=transaction.Direction, Amount=transaction.Amount,
+            Reference=transaction.Reference, LinkedPaymentId=transaction.LinkedPaymentId,
+            IsReconciled=transaction.IsReconciled, ReconciliationNote=transaction.ReconciliationNote,
+            ReconciledAt=transaction.ReconciledAt
         }).ToList()
     };
 }
@@ -974,6 +1014,10 @@ public static class AccountingDataValidator
             data.Payments is null || data.Expenses is null || data.Checks is null ||
             data.Vouchers is null || data.InventoryMovements is null ||
             data.LedgerAccounts is null || data.JournalEntries is null ||
+            data.Loans is null || data.LoanInstallments is null || data.CurrencyRates is null ||
+            data.BankAccounts is null || data.BankTransactions is null ||
+            data.Loans.Count > 100_000 || data.LoanInstallments.Count > 1_000_000 ||
+            data.CurrencyRates.Count > 100 || data.BankAccounts.Count > 100_000 || data.BankTransactions.Count > 1_000_000 ||
             data.Customers.Count > 100_000 || data.Products.Count > 100_000 ||
             data.Invoices.Count > 500_000 || data.Payments.Count > 1_000_000 ||
             data.Expenses.Count > 1_000_000 || data.Checks.Count > 1_000_000 ||
@@ -1202,6 +1246,91 @@ public static class AccountingDataValidator
         }
         if (data.NextJournalNumber < 1 || data.NextJournalNumber <= data.JournalEntries.Select(j => j.Number).DefaultIfEmpty(0).Max())
             throw new InvalidDataException("شمارندهٔ شماره سند حسابداری نامعتبر است.");
+
+        var loanIds = UniqueIds(data.Loans.Select(loan => loan?.Id), "وام");
+        var loanNumbers = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var loan in data.Loans)
+        {
+            if (loan is null || string.IsNullOrWhiteSpace(loan.LenderName) ||
+                string.IsNullOrWhiteSpace(loan.LoanNumber) || !loanNumbers.Add(loan.LoanNumber.Trim()) ||
+                loan.PrincipalAmount <= 0m || loan.PrincipalAmount != AccountingRules.Money(loan.PrincipalAmount) ||
+                loan.AnnualInterestRatePercent < 0m || loan.AnnualInterestRatePercent > 100m ||
+                loan.InstallmentCount is < 1 or > 360 || loan.RemainingPrincipal < 0m ||
+                loan.RemainingPrincipal > loan.PrincipalAmount || loan.StartDate == default ||
+                !new[] { "ACTIVE", "PAID", "CANCELLED" }.Contains(loan.Status, StringComparer.Ordinal) ||
+                !new[] { "IRR", "IRT" }.Contains(loan.CurrencyCode, StringComparer.Ordinal) ||
+                !new[] { "1110", "1120" }.Contains(loan.FundingAccountCode, StringComparer.Ordinal))
+                throw new InvalidDataException("رکورد وام ناقص یا نامعتبر است.");
+        }
+
+        UniqueIds(data.LoanInstallments.Select(installment => installment?.Id), "قسط وام");
+        var uniqueInstallments = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var installment in data.LoanInstallments)
+        {
+            if (installment is null || !loanIds.Contains(installment.LoanId) ||
+                installment.InstallmentNumber < 1 || installment.DueDate == default ||
+                installment.PrincipalAmount <= 0m || installment.PrincipalAmount != AccountingRules.Money(installment.PrincipalAmount) ||
+                installment.InterestAmount < 0m || installment.InterestAmount != AccountingRules.Money(installment.InterestAmount) ||
+                installment.TotalAmount != AccountingRules.Money(installment.PrincipalAmount + installment.InterestAmount) ||
+                !new[] { "PENDING", "PAID", "CANCELLED" }.Contains(installment.Status, StringComparer.Ordinal) ||
+                (installment.Status == "PAID" && installment.PaidAt is null))
+                throw new InvalidDataException("قسط وام ناقص یا نامعتبر است.");
+            if (!uniqueInstallments.Add(installment.LoanId + ":" + installment.InstallmentNumber.ToString(CultureInfo.InvariantCulture)))
+                throw new InvalidDataException("شماره قسط تکراری برای وام وجود دارد.");
+        }
+        foreach (var loan in data.Loans)
+        {
+            var installments = data.LoanInstallments.Where(item => item.LoanId == loan.Id).ToList();
+            if (installments.Count != loan.InstallmentCount ||
+                installments.Sum(item => item.PrincipalAmount) != loan.PrincipalAmount ||
+                (loan.Status == "PAID" && installments.Any(item => item.Status == "PENDING")))
+                throw new InvalidDataException("برنامهٔ اقساط با اصل یا وضعیت وام سازگار نیست.");
+        }
+
+        var currencyCodes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rate in data.CurrencyRates)
+        {
+            if (rate is null || string.IsNullOrWhiteSpace(rate.Code) || rate.Code.Length is < 3 or > 6 ||
+                string.IsNullOrWhiteSpace(rate.Name) || rate.RialPerUnit < 0m ||
+                rate.RialPerUnit > 1_000_000_000_000_000m || !currencyCodes.Add(rate.Code.Trim()))
+                throw new InvalidDataException("نرخ یا مشخصات ارز ناقص یا تکراری است.");
+            if (rate.IsRateConfigured && rate.RialPerUnit <= 0m)
+                throw new InvalidDataException("نرخ ارز فعال باید مثبت باشد.");
+        }
+
+        var bankAccountIds = UniqueIds(data.BankAccounts.Select(account => account?.Id), "حساب بانکی");
+        foreach (var account in data.BankAccounts)
+            if (account is null || string.IsNullOrWhiteSpace(account.BankName) || account.BankName.Trim().Length < 2 ||
+                string.IsNullOrWhiteSpace(account.CurrencyCode) || account.OpeningBalance != AccountingRules.Money(account.OpeningBalance) ||
+                (data.CurrencyRates.Count > 0 && !currencyCodes.Contains(account.CurrencyCode)))
+                throw new InvalidDataException("حساب بانکی ناقص یا نامعتبر است.");
+
+        UniqueIds(data.BankTransactions.Select(transaction => transaction?.Id), "تراکنش بانکی");
+        var linkedBankPayments = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var transaction in data.BankTransactions)
+        {
+            if (transaction is null || !bankAccountIds.Contains(transaction.BankAccountId) ||
+                transaction.Date == default || string.IsNullOrWhiteSpace(transaction.Description) ||
+                transaction.Amount <= 0m || transaction.Amount != AccountingRules.Money(transaction.Amount) ||
+                !new[] { "CREDIT", "DEBIT" }.Contains(transaction.Direction, StringComparer.Ordinal) ||
+                (transaction.IsReconciled && transaction.ReconciledAt is null))
+                throw new InvalidDataException("تراکنش بانکی ناقص یا نامعتبر است.");
+            if (!string.IsNullOrWhiteSpace(transaction.LinkedPaymentId))
+            {
+                var payment = data.Payments.SingleOrDefault(item => item.Id == transaction.LinkedPaymentId);
+                var bankAccount = data.BankAccounts.SingleOrDefault(item => item.Id == transaction.BankAccountId);
+                var invoice = payment is null ? null : data.Invoices.SingleOrDefault(item => item.Id == payment.InvoiceId);
+                var expectedDirection = invoice?.Type == "SALE" ? "CREDIT" : invoice?.Type == "PURCHASE" ? "DEBIT" : "";
+                var expectedBaseCode = string.Equals(data.Preferences?.Currency, "TOMAN", StringComparison.OrdinalIgnoreCase) ? "IRT" : "IRR";
+                if (!transaction.IsReconciled || payment is null || invoice is null ||
+                    bankAccount is null || bankAccount.CurrencyCode != expectedBaseCode ||
+                    payment.Amount != transaction.Amount || transaction.Direction != expectedDirection ||
+                    !linkedBankPayments.Add(payment.Id))
+                    throw new InvalidDataException("پیوند تطبیق بانکی با سند دریافت/پرداخت معتبر نیست.");
+            }
+            else if (transaction.IsReconciled && string.IsNullOrWhiteSpace(transaction.ReconciliationNote))
+                throw new InvalidDataException("تطبیق دستی بانکی باید شرح یا مرجع داشته باشد.");
+        }
 
         return data;
     }

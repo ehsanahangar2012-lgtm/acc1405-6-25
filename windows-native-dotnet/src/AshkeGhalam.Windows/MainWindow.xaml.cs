@@ -456,6 +456,7 @@ public partial class MainWindow : Window
         RefreshCashFlowForecast();
         RefreshAccountingConfigurationPanels();
         RefreshKardexModule();
+        RefreshNativeFinancialModules();
         ApplyCurrencyLabels();
         RefreshFiscalYearLedger();
     }
@@ -817,6 +818,19 @@ public partial class MainWindow : Window
     private sealed record JournalEntryGridRow(
         string DisplayNumber, string Date, string Description, string DebitAccount, string CreditAccount,
         decimal Amount, string DocumentTypeLabel, string StatusLabel);
+
+    private sealed record CurrencySelectorRow(string Code, string Label);
+    private sealed record CurrencyRateGridRow(CurrencyRateRecord Record, string Code, string Name, string Symbol, decimal RialPerUnit, string RateStatus, string LastUpdatedLabel);
+    private sealed record LoanGridRow(LoanRecord Record, string LoanNumber, string LenderName, decimal PrincipalAmount, decimal RemainingPrincipal, decimal AnnualInterestRatePercent, int InstallmentCount, string StartDateLabel, string CurrencyCode, string StatusLabel);
+    private sealed record LoanInstallmentGridRow(LoanInstallmentRecord Record, string LoanNumber, int Number, string DueDateLabel, decimal PrincipalAmount, decimal InterestAmount, decimal TotalAmount, string StatusLabel, string PaidDateLabel);
+    private sealed record BankAccountGridRow(BankAccountRecord Record, string BankName, string AccountNumberMasked, string CurrencyName, decimal OpeningBalance, decimal Balance, string StatusLabel);
+    private sealed record BankTransactionGridRow(BankTransactionRecord Record, string DateLabel, string AccountName, string Description, string DirectionLabel, decimal Amount, string MovementLabel, string StatusLabel, string ReconciliationNote)
+    {
+        public string Reference => Record.Reference;
+    }
+    private sealed record BankAccountOption(string Id, string Label);
+    private sealed record BankPaymentOption(string Id, string Label);
+    private sealed record WorkflowRuleGridRow(string Rule, string Status, string Detail);
 
     private sealed record CashFlowProjectionGridRow(
         string Date, decimal Inflows, decimal Outflows, decimal NetChange,
@@ -2370,6 +2384,534 @@ public partial class MainWindow : Window
         }
     }
 
+
+    private static void AddFinancialField(Panel panel, string label, Control control)
+    {
+        var field = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+        field.Children.Add(new TextBlock
+        {
+            Text = label, FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+            Margin = new Thickness(0, 0, 0, 5)
+        });
+        control.MinHeight = Math.Max(control.MinHeight, 34);
+        field.Children.Add(control);
+        panel.Children.Add(field);
+    }
+
+    private void RefreshNativeFinancialModules()
+    {
+        NativeFinancialModuleService.EnsureDefaults(_data);
+        CurrencyRatesGrid.ItemsSource = null;
+        CurrencyRatesGrid.ItemsSource = _data.CurrencyRates
+            .OrderBy(rate => rate.Code is "IRR" or "IRT" ? 0 : 1)
+            .ThenBy(rate => rate.Code, StringComparer.Ordinal)
+            .Select(rate => new CurrencyRateGridRow(rate, rate.Code, rate.Name, rate.Symbol, rate.RialPerUnit,
+                rate.IsRateConfigured ? "نرخ ثبت شده" : "نیازمند ثبت نرخ",
+                rate.LastUpdated == DateTimeOffset.MinValue ? "ثبت نشده" : FormatPersianDate(rate.LastUpdated)))
+            .ToList();
+
+        FromCurrencySelector.ItemsSource = null;
+        FromCurrencySelector.ItemsSource = _data.CurrencyRates
+            .Select(rate => new CurrencySelectorRow(rate.Code, $"{rate.Name} ({rate.Code})")).ToList();
+        FromCurrencySelector.DisplayMemberPath = nameof(CurrencySelectorRow.Label);
+        FromCurrencySelector.SelectedValuePath = nameof(CurrencySelectorRow.Code);
+        if (FromCurrencySelector.SelectedValue is null)
+            FromCurrencySelector.SelectedValue = NativeFinancialModuleService.BaseCurrencyCode(_data);
+
+        ToCurrencySelector.ItemsSource = null;
+        ToCurrencySelector.ItemsSource = _data.CurrencyRates
+            .Select(rate => new CurrencySelectorRow(rate.Code, $"{rate.Name} ({rate.Code})")).ToList();
+        ToCurrencySelector.DisplayMemberPath = nameof(CurrencySelectorRow.Label);
+        ToCurrencySelector.SelectedValuePath = nameof(CurrencySelectorRow.Code);
+        if (ToCurrencySelector.SelectedValue is null)
+            ToCurrencySelector.SelectedValue = string.Equals(_data.Preferences.Currency, "TOMAN", StringComparison.Ordinal)
+                ? "IRR" : "IRT";
+        CurrencyBaseStatus.Text = $"واحد اصلی ثبت: {CurrencyUnitLabel()} • نرخ ریال/تومان ثابت است؛ نرخ ارزهای دیگر فقط پس از ثبت نرخ معتبر استفاده می‌شود.";
+
+        LoansGrid.ItemsSource = null;
+        LoansGrid.ItemsSource = _data.Loans.OrderByDescending(loan => loan.StartDate)
+            .Select(loan => new LoanGridRow(loan, loan.LoanNumber, loan.LenderName, loan.PrincipalAmount,
+                loan.RemainingPrincipal, loan.AnnualInterestRatePercent, loan.InstallmentCount,
+                FormatPersianDate(loan.StartDate), loan.CurrencyCode,
+                loan.Status == "PAID" ? "تسویه‌شده" : loan.Status == "CANCELLED" ? "لغو" : "فعال")).ToList();
+        LoanInstallmentsGrid.ItemsSource = null;
+        LoanInstallmentsGrid.ItemsSource = _data.LoanInstallments
+            .OrderBy(item => item.Status == "PENDING" ? 0 : 1).ThenBy(item => item.DueDate)
+            .ThenBy(item => item.InstallmentNumber)
+            .Select(item => new LoanInstallmentGridRow(item,
+                _data.Loans.FirstOrDefault(loan => loan.Id == item.LoanId)?.LoanNumber ?? "—",
+                item.InstallmentNumber, FormatPersianDate(item.DueDate), item.PrincipalAmount,
+                item.InterestAmount, item.TotalAmount,
+                item.Status == "PAID" ? "پرداخت شده" : item.Status == "CANCELLED" ? "لغو" : "در انتظار",
+                item.PaidAt is DateTimeOffset paidAt ? FormatPersianDate(paidAt) : "—")).ToList();
+        LoanSummaryText.Text = $"وام‌ها: {_data.Loans.Count:N0} • اقساط پرداخت‌نشده: {_data.LoanInstallments.Count(item => item.Status == "PENDING"):N0} • ماندهٔ اصل وام فعال: {FormatMoney(_data.Loans.Where(loan => loan.Status == "ACTIVE").Sum(loan => loan.RemainingPrincipal))}";
+
+        BankAccountsGrid.ItemsSource = null;
+        BankAccountsGrid.ItemsSource = _data.BankAccounts.OrderBy(account => account.BankName, StringComparer.Ordinal)
+            .Select(account => new BankAccountGridRow(account, account.BankName, account.AccountNumberMasked,
+                _data.CurrencyRates.FirstOrDefault(rate => rate.Code == account.CurrencyCode)?.Name ?? account.CurrencyCode,
+                account.OpeningBalance, NativeFinancialModuleService.BankAccountBalance(_data, account),
+                account.IsActive ? "فعال" : "غیرفعال")).ToList();
+        BankTransactionsGrid.ItemsSource = null;
+        BankTransactionsGrid.ItemsSource = _data.BankTransactions.OrderByDescending(transaction => transaction.Date)
+            .Select(transaction => new BankTransactionGridRow(transaction, FormatPersianDate(transaction.Date),
+                _data.BankAccounts.FirstOrDefault(account => account.Id == transaction.BankAccountId)?.BankName ?? "حساب حذف‌شده",
+                transaction.Description, transaction.Direction == "CREDIT" ? "واریز" : "برداشت",
+                transaction.Amount, transaction.Direction == "CREDIT" ? "ورودی" : "خروجی",
+                transaction.IsReconciled ? "بررسی/تطبیق‌شده" : "تطبیق‌نشده", transaction.ReconciliationNote)).ToList();
+
+        WorkflowRulesGrid.ItemsSource = new[]
+        {
+            new WorkflowRuleGridRow("کنترل موجودی آزاد هنگام ثبت فروش", "فعال", "فروش با موجودی ناکافی رد می‌شود."),
+            new WorkflowRuleGridRow("جلوگیری از تسویهٔ بیش از مانده", "فعال", "مبلغ دریافت/پرداخت از ماندهٔ فاکتور تجاوز نمی‌کند."),
+            new WorkflowRuleGridRow("حفاظت تاریخچهٔ اسناد مالی", "فعال", "فاکتور دارای پرداخت، چک یا سند دفتر مستقیم ویرایش نمی‌شود."),
+            new WorkflowRuleGridRow("اعتبارسنجی چک صیادی", "فعال", "شناسهٔ صیادی تکراری و پیوند ناسازگار رد می‌شود."),
+            new WorkflowRuleGridRow("تراز سند دفتر", "فعال", "هر ثبت دوبل، مبلغ مساوی در بدهکار و بستانکار دارد."),
+            new WorkflowRuleGridRow("تطبیق بانکی", "فعال", "تطبیق خودکار مبلغ و جهت ورود/خروج را بررسی می‌کند.")
+        };
+        FinancialRulesStatus.Text = "۶ قاعدهٔ عملیاتی هنگام ثبت و اعتبارسنجی داده‌ها اعمال می‌شوند.";
+    }
+
+    private void AddCurrencyRate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var codeBox = new TextBox { Text = "XXX", FlowDirection = FlowDirection.LeftToRight, MaxLength = 6 };
+        var nameBox = new TextBox();
+        var symbolBox = new TextBox { FlowDirection = FlowDirection.LeftToRight, MaxLength = 8 };
+        var form = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft };
+        form.Children.Add(new TextBlock { Text = "افزودن ارز", FontSize = 21, FontWeight = FontWeights.Bold, Margin = new Thickness(0,0,0,12) });
+        AddFinancialField(form, "کد انگلیسی ارز (۳ تا ۶ نویسه)", codeBox);
+        AddFinancialField(form, "نام ارز", nameBox);
+        AddFinancialField(form, "نماد ارز", symbolBox);
+        form.Children.Add(new TextBlock
+        {
+            Text = "نرخ ارز جدید خالی می‌ماند تا نرخ معتبر آن را وارد کنید؛ نرخ بازار به‌صورت فرضی تولید نمی‌شود.",
+            TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(146,64,14)), Margin = new Thickness(0,0,0,12)
+        });
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        var save = new Button { Content = "افزودن ارز", MinWidth = 120, Background = new SolidColorBrush(Color.FromRgb(15,118,110)), Foreground = Brushes.White };
+        var cancel = new Button { Content = "انصراف", MinWidth = 100, IsCancel = true };
+        actions.Children.Add(save); actions.Children.Add(cancel); form.Children.Add(actions);
+        var window = new Window { Owner = this, Title = "افزودن ارز", Width = 450, Height = 380, MinWidth = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResize,
+            FlowDirection = FlowDirection.RightToLeft, Content = form, Background = Brushes.White };
+        ApplyCurrentThemeTo(window);
+        save.Click += (_, _) =>
+        {
+            var code = codeBox.Text.Trim().ToUpperInvariant();
+            if (code.Length is < 3 or > 6 || !code.All(char.IsAsciiLetterOrDigit) || nameBox.Text.Trim().Length < 2)
+            {
+                MessageBox.Show(window, "کد انگلیسی ارز و نام معتبر وارد کنید.", "ارز نامعتبر", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            try
+            {
+                Commit(data =>
+                {
+                    if (data.CurrencyRates.Any(rate => string.Equals(rate.Code, code, StringComparison.OrdinalIgnoreCase)))
+                        throw new InvalidOperationException("این کد ارز از قبل وجود دارد.");
+                    data.CurrencyRates.Add(new CurrencyRateRecord
+                    {
+                        Code = code, Name = nameBox.Text.Trim(), Symbol = symbolBox.Text.Trim(),
+                        RialPerUnit = 0m, IsRateConfigured = false, LastUpdated = DateTimeOffset.MinValue
+                    });
+                }, "ارز جدید اضافه شد؛ نرخ معتبر آن را جداگانه ثبت کنید.");
+                window.DialogResult = true;
+            }
+            catch (Exception ex) { MessageBox.Show(window, ex.Message, "افزودن ارز", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        };
+        window.ShowDialog();
+    }
+
+    private void UpdateCurrencyRate_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (CurrencyRatesGrid.SelectedItem is not CurrencyRateGridRow selected)
+        {
+            MessageBox.Show(this, "ابتدا یک ارز را از جدول انتخاب کنید.");
+            return;
+        }
+        if (selected.Record.Code is "IRR" or "IRT")
+        {
+            MessageBox.Show(this, "نسبت ریال و تومان ثابت است: هر تومان برابر ۱۰ ریال.", "نرخ ثابت", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+        var rateBox = new TextBox
+        {
+            Text = selected.Record.IsRateConfigured ? selected.Record.RialPerUnit.ToString(CultureInfo.InvariantCulture) : "",
+            FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right
+        };
+        NumericTextBoxFormatter.Attach(rateBox);
+        var form = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft };
+        form.Children.Add(new TextBlock { Text = $"ثبت نرخ «{selected.Record.Name}»", FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0,0,0,10) });
+        AddFinancialField(form, "چند ریال برابر یک واحد از این ارز است؟", rateBox);
+        form.Children.Add(new TextBlock { Text = "نرخ را از منبع معتبر وارد کنید؛ برنامه آن را حدسی تعیین نمی‌کند.", TextWrapping = TextWrapping.Wrap, Foreground = new SolidColorBrush(Color.FromRgb(100,116,139)), Margin = new Thickness(0,0,0,14) });
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        var save = new Button { Content = "ذخیره نرخ", MinWidth = 110, Background = new SolidColorBrush(Color.FromRgb(15,118,110)), Foreground = Brushes.White };
+        var cancel = new Button { Content = "انصراف", MinWidth = 90, IsCancel = true };
+        actions.Children.Add(save); actions.Children.Add(cancel); form.Children.Add(actions);
+        var window = new Window { Owner = this, Title = "ثبت نرخ ارز", Width = 440, Height = 300,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResize,
+            FlowDirection = FlowDirection.RightToLeft, Content = form, Background = Brushes.White };
+        ApplyCurrentThemeTo(window);
+        save.Click += (_, _) =>
+        {
+            try
+            {
+                var rate = PersianNumberParser.ParseDecimal(rateBox.Text, "نرخ ارز");
+                var probe = _data.DeepCopy();
+                NativeFinancialModuleService.SetRate(probe, selected.Record.Code, rate);
+                AccountingDataValidator.Validate(probe);
+                Commit(data => NativeFinancialModuleService.SetRate(data, selected.Record.Code, rate), $"نرخ {selected.Record.Code} ذخیره شد.");
+                window.DialogResult = true;
+            }
+            catch (Exception ex) { MessageBox.Show(window, ex.Message, "نرخ ارز", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        };
+        window.ShowDialog();
+    }
+
+    private void ConvertCurrency_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var amount = PersianNumberParser.ParseDecimal(CurrencyConvertAmount.Text, "مبلغ");
+            var from = FromCurrencySelector.SelectedValue?.ToString() ?? "";
+            var to = ToCurrencySelector.SelectedValue?.ToString() ?? "";
+            var converted = NativeFinancialModuleService.ConvertCurrencyAmount(_data, amount, from, to);
+            var targetName = _data.CurrencyRates.FirstOrDefault(rate => rate.Code == to)?.Name ?? to;
+            CurrencyConvertedAmount.Text = $"{converted.ToString("#,##0.####", CultureInfo.InvariantCulture)} {targetName}";
+            CurrencyConvertedAmount.FlowDirection = FlowDirection.LeftToRight;
+            FooterStatus.Text = $"تبدیل ارز {from} به {to} بر اساس نرخ ثبت‌شده محاسبه شد.";
+        }
+        catch (Exception ex)
+        {
+            CurrencyConvertedAmount.Text = "قابل محاسبه نیست";
+            MessageBox.Show(this, ex.Message, "تبدیل ارز", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void AddLoan_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var lender = new TextBox();
+        var principal = new TextBox { Text = "1000000", FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right };
+        var interest = new TextBox { Text = "0", FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right };
+        var count = new TextBox { Text = "12", FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right };
+        var start = new TextBox { Text = FormatPersianDate(DateTimeOffset.Now), FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right };
+        var notes = new TextBox { MinHeight = 56, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
+        var funding = new ComboBox { MinWidth = 200 };
+        funding.Items.Add(new ComboBoxItem { Content = "واریز به بانک", Tag = "1120" });
+        funding.Items.Add(new ComboBoxItem { Content = "واریز به صندوق", Tag = "1110" });
+        funding.SelectedIndex = 0;
+        NumericTextBoxFormatter.Attach(principal);
+        NumericTextBoxFormatter.Attach(interest);
+        var form = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft };
+        form.Children.Add(new TextBlock { Text = "ثبت وام جدید", FontSize = 22, FontWeight = FontWeights.Bold, Margin = new Thickness(0,0,0,12) });
+        AddFinancialField(form, "نام وام‌دهنده", lender);
+        AddFinancialField(form, $"اصل وام ({CurrencyUnitLabel()})", principal);
+        AddFinancialField(form, "نرخ بهرهٔ سالانه (درصد)", interest);
+        AddFinancialField(form, "تعداد اقساط ماهانه", count);
+        AddFinancialField(form, "تاریخ شروع شمسی (سال/ماه/روز)", start);
+        AddFinancialField(form, "حساب دریافت وام", funding);
+        AddFinancialField(form, "توضیحات", notes);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        var save = new Button { Content = "ثبت و ایجاد اقساط", MinWidth = 160, Background = new SolidColorBrush(Color.FromRgb(15,118,110)), Foreground = Brushes.White };
+        var cancel = new Button { Content = "انصراف", MinWidth = 90, IsCancel = true };
+        actions.Children.Add(save); actions.Children.Add(cancel); form.Children.Add(actions);
+        var window = new Window { Owner = this, Title = "وام جدید", Width = 520, Height = 650, MinWidth = 480, MinHeight = 520,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResize,
+            FlowDirection = FlowDirection.RightToLeft, Content = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Content = form },
+            Background = Brushes.White };
+        ApplyCurrentThemeTo(window);
+        save.Click += (_, _) =>
+        {
+            try
+            {
+                var principalValue = PersianNumberParser.ParseDecimal(principal.Text, "اصل وام");
+                var interestValue = PersianNumberParser.ParseDecimal(interest.Text, "بهرهٔ سالانه");
+                var countValue = int.Parse(PersianNumberParser.NormalizeDigits(count.Text.Trim()), CultureInfo.InvariantCulture);
+                var startDate = NativeFinancialModuleService.ParsePersianDate(start.Text);
+                var startValue = new DateTimeOffset(startDate, TimeZoneInfo.Local.GetUtcOffset(startDate));
+                var fundingCode = (funding.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "1120";
+                var probe = _data.DeepCopy();
+                NativeFinancialModuleService.CreateLoan(probe, lender.Text, principalValue, interestValue, countValue, startValue, fundingCode, notes.Text);
+                AccountingDataValidator.Validate(probe);
+                Commit(data => NativeFinancialModuleService.CreateLoan(data, lender.Text, principalValue, interestValue, countValue, startValue, fundingCode, notes.Text),
+                    "وام ثبت شد؛ برنامهٔ اقساط و سند دریافت وام ایجاد شدند.");
+                window.DialogResult = true;
+            }
+            catch (Exception ex) { MessageBox.Show(window, ex.Message, "ثبت وام", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        };
+        window.ShowDialog();
+    }
+
+    private void PayLoanInstallment_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (LoanInstallmentsGrid.SelectedItem is not LoanInstallmentGridRow selected)
+        {
+            MessageBox.Show(this, "ابتدا یک قسط را انتخاب کنید.");
+            return;
+        }
+        if (selected.Record.Status != "PENDING")
+        {
+            MessageBox.Show(this, "فقط قسط در انتظار قابل تسویه است.");
+            return;
+        }
+        var account = (LoanPaymentAccountSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "1120";
+        if (MessageBox.Show(this,
+            $"قسط {selected.Number} وام {selected.LoanNumber} به مبلغ {FormatMoney(selected.TotalAmount)} از حساب {(account == "1120" ? "بانک" : "صندوق")} پرداخت شود؟",
+            "تأیید بازپرداخت", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        Commit(data => NativeFinancialModuleService.PayInstallment(data, selected.Record.Id, account),
+            "قسط پرداخت شد و سند اصل/بهره در دفتر ثبت شد.");
+    }
+
+    private void AddBankAccount_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var bankName = new TextBox();
+        var number = new TextBox { FlowDirection = FlowDirection.LeftToRight, MaxLength = 34 };
+        var currency = new ComboBox
+        {
+            ItemsSource = _data.CurrencyRates, DisplayMemberPath = nameof(CurrencyRateRecord.Name),
+            SelectedValuePath = nameof(CurrencyRateRecord.Code), MinWidth = 220
+        };
+        currency.SelectedValue = NativeFinancialModuleService.BaseCurrencyCode(_data);
+        var opening = new TextBox { Text = "0", FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right };
+        var notes = new TextBox();
+        NumericTextBoxFormatter.Attach(opening);
+        var form = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft };
+        form.Children.Add(new TextBlock { Text = "افزودن حساب بانکی", FontSize = 22, FontWeight = FontWeights.Bold, Margin = new Thickness(0,0,0,12) });
+        AddFinancialField(form, "نام بانک / مؤسسه", bankName);
+        AddFinancialField(form, "شماره حساب (فقط چهار رقم آخر در فهرست نشان داده می‌شود)", number);
+        AddFinancialField(form, "ارز حساب", currency);
+        AddFinancialField(form, $"مانده افتتاحیه ({CurrencyUnitLabel()})", opening);
+        AddFinancialField(form, "توضیحات", notes);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        var save = new Button { Content = "ذخیره حساب", MinWidth = 120, Background = new SolidColorBrush(Color.FromRgb(15,118,110)), Foreground = Brushes.White };
+        var cancel = new Button { Content = "انصراف", MinWidth = 90, IsCancel = true };
+        actions.Children.Add(save); actions.Children.Add(cancel); form.Children.Add(actions);
+        var window = new Window { Owner=this, Title="حساب بانکی جدید", Width=500, Height=470,
+            WindowStartupLocation=WindowStartupLocation.CenterOwner, ResizeMode=ResizeMode.CanResize,
+            FlowDirection=FlowDirection.RightToLeft, Content=form, Background=Brushes.White };
+        ApplyCurrentThemeTo(window);
+        save.Click += (_, _) =>
+        {
+            try
+            {
+                var code = currency.SelectedValue?.ToString() ?? "";
+                var digits = new string(number.Text.Where(char.IsAsciiDigit).ToArray());
+                var lastFour = digits.Length > 4 ? digits[^4..] : digits;
+                var openingValue = PersianNumberParser.ParseDecimal(opening.Text, "مانده افتتاحیه");
+                if (bankName.Text.Trim().Length < 2 || code.Length == 0 || openingValue < 0m)
+                    throw new InvalidOperationException("نام بانک، ارز و ماندهٔ افتتاحیه را بررسی کنید.");
+                Commit(data => data.BankAccounts.Add(new BankAccountRecord
+                {
+                    BankName=bankName.Text.Trim(), AccountNumberMasked=lastFour, CurrencyCode=code,
+                    OpeningBalance=AccountingRules.Money(openingValue), IsActive=true, Notes=notes.Text.Trim()
+                }), "حساب بانکی ذخیره شد.");
+                window.DialogResult = true;
+            }
+            catch (Exception ex) { MessageBox.Show(window, ex.Message, "حساب بانکی", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        };
+        window.ShowDialog();
+    }
+
+    private void AddBankTransaction_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var activeAccounts = _data.BankAccounts.Where(account => account.IsActive).ToList();
+        if (activeAccounts.Count == 0)
+        {
+            MessageBox.Show(this, "ابتدا یک حساب بانکی ثبت کنید.");
+            return;
+        }
+        var selector = new ComboBox
+        {
+            ItemsSource = activeAccounts.Select(account => new BankAccountOption(account.Id,
+                $"{account.BankName} •••• {account.AccountNumberMasked} ({account.CurrencyCode})")).ToList(),
+            DisplayMemberPath = nameof(BankAccountOption.Label), SelectedValuePath = nameof(BankAccountOption.Id),
+            MinWidth = 280, SelectedIndex = 0
+        };
+        var date = new TextBox { Text = FormatPersianDate(DateTimeOffset.Now), FlowDirection = FlowDirection.LeftToRight };
+        var description = new TextBox();
+        var direction = new ComboBox();
+        direction.Items.Add(new ComboBoxItem { Content = "واریز / ورودی", Tag = "CREDIT" });
+        direction.Items.Add(new ComboBoxItem { Content = "برداشت / خروجی", Tag = "DEBIT" });
+        direction.SelectedIndex = 0;
+        var amount = new TextBox { Text = "0", FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right };
+        var reference = new TextBox { FlowDirection = FlowDirection.LeftToRight };
+        NumericTextBoxFormatter.Attach(amount);
+        var form = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft };
+        form.Children.Add(new TextBlock { Text = "ثبت گردش صورت‌حساب بانک", FontSize = 22, FontWeight = FontWeights.Bold, Margin = new Thickness(0,0,0,12) });
+        AddFinancialField(form, "حساب بانکی", selector);
+        AddFinancialField(form, "تاریخ شمسی", date);
+        AddFinancialField(form, "شرح تراکنش", description);
+        AddFinancialField(form, "جهت گردش", direction);
+        AddFinancialField(form, $"مبلغ ({CurrencyUnitLabel()})", amount);
+        AddFinancialField(form, "شماره پیگیری / مرجع", reference);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        var save = new Button { Content = "ثبت تراکنش", MinWidth = 120, Background = new SolidColorBrush(Color.FromRgb(15,118,110)), Foreground = Brushes.White };
+        var cancel = new Button { Content = "انصراف", MinWidth = 90, IsCancel = true };
+        actions.Children.Add(save); actions.Children.Add(cancel); form.Children.Add(actions);
+        var window = new Window { Owner=this, Title="تراکنش بانکی", Width=520, Height=560,
+            WindowStartupLocation=WindowStartupLocation.CenterOwner, ResizeMode=ResizeMode.CanResize,
+            FlowDirection=FlowDirection.RightToLeft, Content=new ScrollViewer { VerticalScrollBarVisibility=ScrollBarVisibility.Auto, Content=form },
+            Background=Brushes.White };
+        ApplyCurrentThemeTo(window);
+        save.Click += (_, _) =>
+        {
+            try
+            {
+                var accountId = selector.SelectedValue?.ToString() ?? "";
+                var amountValue = PersianNumberParser.ParseDecimal(amount.Text, "مبلغ");
+                var dateValue = NativeFinancialModuleService.ParsePersianDate(date.Text);
+                var offsetDate = new DateTimeOffset(dateValue, TimeZoneInfo.Local.GetUtcOffset(dateValue));
+                var directionValue = (direction.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "CREDIT";
+                var probe = _data.DeepCopy();
+                NativeFinancialModuleService.AddBankTransaction(probe, accountId, offsetDate, description.Text, directionValue, amountValue, reference.Text);
+                AccountingDataValidator.Validate(probe);
+                Commit(data => NativeFinancialModuleService.AddBankTransaction(data, accountId, offsetDate, description.Text, directionValue, amountValue, reference.Text),
+                    "گردش صورت‌حساب ثبت شد؛ اکنون می‌توانید آن را تطبیق دهید.");
+                window.DialogResult = true;
+            }
+            catch (Exception ex) { MessageBox.Show(window, ex.Message, "تراکنش بانکی", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        };
+        window.ShowDialog();
+    }
+
+    private void ReconcileBankTransaction_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        if (BankTransactionsGrid.SelectedItem is not BankTransactionGridRow selected)
+        {
+            MessageBox.Show(this, "ابتدا یک تراکنش بانکی انتخاب کنید.");
+            return;
+        }
+        if (selected.Record.IsReconciled)
+        {
+            MessageBox.Show(this, "این تراکنش قبلاً بررسی یا تطبیق شده است.");
+            return;
+        }
+        var account = _data.BankAccounts.FirstOrDefault(item => item.Id == selected.Record.BankAccountId);
+        var baseCode = NativeFinancialModuleService.BaseCurrencyCode(_data);
+        var options = account?.CurrencyCode == baseCode
+            ? _data.Payments
+                .Where(payment => payment.Amount == selected.Record.Amount &&
+                    !_data.BankTransactions.Any(transaction => transaction.Id != selected.Record.Id && transaction.LinkedPaymentId == payment.Id))
+                .Select(payment => new { Payment = payment, Invoice = _data.Invoices.FirstOrDefault(invoice => invoice.Id == payment.InvoiceId) })
+                .Where(pair => pair.Invoice is not null &&
+                    ((selected.Record.Direction == "CREDIT" && pair.Invoice.Type == "SALE") ||
+                     (selected.Record.Direction == "DEBIT" && pair.Invoice.Type == "PURCHASE")))
+                .Select(pair => new BankPaymentOption(pair.Payment.Id,
+                    $"{pair.Invoice!.DisplayNumber} • {pair.Invoice.CustomerName} • {pair.Payment.Amount.ToString("#,##0.##", CultureInfo.InvariantCulture)} {CurrencyUnitLabel()} • {pair.Payment.Method}"))
+                .ToList()
+            : [];
+
+        if (options.Count == 0)
+        {
+            var note = new TextBox { MinHeight = 42, Padding = new Thickness(8), TextWrapping = TextWrapping.Wrap };
+            var form = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft };
+            form.Children.Add(new TextBlock { Text = "بررسی دستی گردش", FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0,0,0,10) });
+            form.Children.Add(new TextBlock { Text = "تطبیق خودکار دقیق پیدا نشد. پس از بررسی صورت‌حساب، شماره مرجع یا دلیل بررسی را وارد کنید.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,0,0,10) });
+            AddFinancialField(form, "مرجع / توضیح بررسی", note);
+            var save = new Button { Content = "ثبت بررسی دستی", MinWidth = 130, Background = new SolidColorBrush(Color.FromRgb(15,118,110)), Foreground = Brushes.White };
+            var cancel = new Button { Content = "انصراف", MinWidth = 90, IsCancel = true };
+            var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+            actions.Children.Add(save); actions.Children.Add(cancel); form.Children.Add(actions);
+            var window = new Window { Owner=this, Title="تطبیق بانکی", Width=480, Height=300,
+                WindowStartupLocation=WindowStartupLocation.CenterOwner, ResizeMode=ResizeMode.CanResize,
+                FlowDirection=FlowDirection.RightToLeft, Content=form, Background=Brushes.White };
+            ApplyCurrentThemeTo(window);
+            save.Click += (_, _) =>
+            {
+                try
+                {
+                    Commit(data => NativeFinancialModuleService.MarkBankTransactionReviewed(data, selected.Record.Id, note.Text),
+                        "تراکنش با یادداشت بررسی دستی علامت‌گذاری شد.");
+                    window.DialogResult = true;
+                }
+                catch (Exception ex) { MessageBox.Show(window, ex.Message, "تطبیق بانکی", MessageBoxButton.OK, MessageBoxImage.Warning); }
+            };
+            window.ShowDialog();
+            return;
+        }
+
+        var selector = new ComboBox { ItemsSource=options, DisplayMemberPath=nameof(BankPaymentOption.Label),
+            SelectedValuePath=nameof(BankPaymentOption.Id), MinWidth=380, SelectedIndex=0 };
+        var body = new StackPanel { Margin=new Thickness(22), FlowDirection=FlowDirection.RightToLeft };
+        body.Children.Add(new TextBlock { Text="تطبیق تراکنش با سند مالی", FontSize=20, FontWeight=FontWeights.Bold, Margin=new Thickness(0,0,0,10) });
+        body.Children.Add(new TextBlock { Text="فقط سندهای هم‌مبلغ و دارای جهت ورود/خروج سازگار نمایش داده می‌شوند.", TextWrapping=TextWrapping.Wrap, Margin=new Thickness(0,0,0,10) });
+        AddFinancialField(body, "دریافت/پرداخت متناظر", selector);
+        var confirm = new Button { Content="تأیید تطبیق", MinWidth=120, Background=new SolidColorBrush(Color.FromRgb(15,118,110)), Foreground=Brushes.White };
+        var cancel2 = new Button { Content="انصراف", MinWidth=90, IsCancel=true };
+        var actions2 = new StackPanel { Orientation=Orientation.Horizontal, HorizontalAlignment=HorizontalAlignment.Left };
+        actions2.Children.Add(confirm); actions2.Children.Add(cancel2); body.Children.Add(actions2);
+        var dialog = new Window { Owner=this, Title="تطبیق بانکی", Width=580, Height=300, MinWidth=500,
+            WindowStartupLocation=WindowStartupLocation.CenterOwner, ResizeMode=ResizeMode.CanResize,
+            FlowDirection=FlowDirection.RightToLeft, Content=body, Background=Brushes.White };
+        ApplyCurrentThemeTo(dialog);
+        confirm.Click += (_, _) =>
+        {
+            try
+            {
+                var paymentId = selector.SelectedValue?.ToString() ?? "";
+                Commit(data => NativeFinancialModuleService.ReconcileBankTransaction(data, selected.Record.Id, paymentId),
+                    "تراکنش بانکی با سند مالی تطبیق شد.");
+                dialog.DialogResult = true;
+            }
+            catch (Exception ex) { MessageBox.Show(dialog, ex.Message, "تطبیق بانکی", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        };
+        dialog.ShowDialog();
+    }
+
+    private void ValidateFinancialRules_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            AccountingDataValidator.Validate(_data.DeepCopy());
+            var candidate = _data.DeepCopy();
+            NativeOperationalPostingService.Reconcile(candidate);
+            AccountingDataValidator.Validate(candidate);
+            var added = Math.Max(0, candidate.JournalEntries.Count - _data.JournalEntries.Count);
+            FinancialRulesStatus.Text = $"اعتبارسنجی موفق • {_data.Invoices.Count:N0} فاکتور • {_data.Checks.Count:N0} چک • {_data.JournalEntries.Count:N0} سند دفتر • {added:N0} سند عملیاتی قابل بازسازی";
+            MessageBox.Show(this, FinancialRulesStatus.Text, "بررسی قواعد گردش مالی", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            FinancialRulesStatus.Text = "خطای اعتبارسنجی: " + ex.Message;
+            MessageBox.Show(this, ex.Message, "قواعد گردش مالی", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void RebuildAutomaticLedgerEntries_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        Commit(_ => { }, "قواعد گردش مالی اعمال شدند؛ اسناد عملیاتی خودکار بازسازی و داده‌ها اعتبارسنجی شدند.");
+    }
+
+    private void ExportMoadianPayload_Click(object sender, RoutedEventArgs e)
+    {
+        MoadianPayloadPreview.Text = "";
+        BuildMoadianPayload_Click(this, new RoutedEventArgs());
+        if (string.IsNullOrWhiteSpace(MoadianPayloadPreview.Text)) return;
+        var picker = new SaveFileDialog
+        {
+            Title = "ذخیرهٔ JSON آماده‌سازی مؤدیان",
+            Filter = "JSON (*.json)|*.json",
+            AddExtension = true, DefaultExt = ".json",
+            FileName = $"Moadian-Payload-{DateTime.Now:yyyyMMdd-HHmmss}.json"
+        };
+        if (picker.ShowDialog() != true) return;
+        try
+        {
+            File.WriteAllText(picker.FileName, MoadianPayloadPreview.Text, Encoding.UTF8);
+            FooterStatus.Text = "JSON نمونه ذخیره شد؛ این فایل به سازمان ارسال نشده است.";
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "ذخیره JSON", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
     private void ExportReport_Click(object sender, RoutedEventArgs e)
     {
         var activeInvoices = _data.Invoices.Where(i => i.Status != "لغو شده").ToList();
@@ -2765,6 +3307,7 @@ public partial class MainWindow : Window
         }
         _data.MoadianSettings ??= new MoadianSettingsRecord();
         _data.ServerConnection ??= new ServerConnectionSettings();
+        NativeFinancialModuleService.EnsureDefaults(_data);
 
         // Populate missing unit snapshots on older locally saved invoices without changing amounts.
         foreach (var invoice in _data.Invoices ?? [])
@@ -3114,6 +3657,27 @@ public partial class MainWindow : Window
                 IsConfigured = MoadianIsConfigured.IsChecked == true
             };
         }, "پروفایل محلی مؤدی ذخیره شد؛ ارسال رسمی هنوز فعال نیست.");
+    }
+
+    private void ExportMoadianPayload_Click(object sender, RoutedEventArgs e)
+    {
+        MoadianPayloadPreview.Text = "";
+        BuildMoadianPayload_Click(this, new RoutedEventArgs());
+        if (string.IsNullOrWhiteSpace(MoadianPayloadPreview.Text)) return;
+        var picker = new SaveFileDialog
+        {
+            Title = "ذخیرهٔ JSON آماده‌سازی مؤدیان",
+            Filter = "JSON (*.json)|*.json",
+            AddExtension = true, DefaultExt = ".json",
+            FileName = $"Moadian-Payload-{DateTime.Now:yyyyMMdd-HHmmss}.json"
+        };
+        if (picker.ShowDialog() != true) return;
+        try
+        {
+            File.WriteAllText(picker.FileName, MoadianPayloadPreview.Text, Encoding.UTF8);
+            FooterStatus.Text = "JSON نمونه ذخیره شد؛ این فایل به سازمان ارسال نشده است.";
+        }
+        catch (Exception ex) { MessageBox.Show(this, ex.Message, "ذخیره JSON", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
 
     private void BuildMoadianPayload_Click(object sender, RoutedEventArgs e)
@@ -3963,6 +4527,12 @@ public partial class MainWindow : Window
             ["backup"] = "پشتیبان‌گیری",
             ["accounting"] = "حسابداری دوبل",
             ["cashflow-predictor"] = "پیش‌بینی نقدینگی",
+            ["cashflow"] = "پیش‌بینی نقدینگی",
+            ["loans"] = "وام‌ها و اقساط",
+            ["currency"] = "مدیریت چندارزی",
+            ["bank-reconciliation"] = "تطبیق بانکی",
+            ["workflow-rules"] = "قواعد گردش مالی",
+            ["tax"] = "سامانهٔ مؤدیان",
             ["due-calendar"] = "تقویم سررسیدها",
             ["financial-reports"] = "گزارش مالی پیشرفته",
             ["moadian"] = "سامانهٔ مؤدیان",
