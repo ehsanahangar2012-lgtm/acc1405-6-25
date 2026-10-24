@@ -226,10 +226,10 @@ public sealed class ApplicationThemeUiRegressionTests
     public void NavigationIconsUseKnownMonochromeWindowsGlyphs()
     {
         var converter = new NavigationIconConverter();
-        Assert.AreEqual("\\uE80F", converter.Convert("dashboard", typeof(string), null!, CultureInfo.InvariantCulture));
-        Assert.AreEqual("\\uE716", converter.Convert("customers", typeof(string), null!, CultureInfo.InvariantCulture));
-        Assert.AreEqual("\\uEA18", converter.Convert("security", typeof(string), null!, CultureInfo.InvariantCulture));
-        Assert.AreEqual("\\uE71D", converter.Convert("unknown-module", typeof(string), null!, CultureInfo.InvariantCulture));
+        Assert.AreEqual("\uE80F", converter.Convert("dashboard", typeof(string), null!, CultureInfo.InvariantCulture));
+        Assert.AreEqual("\uE716", converter.Convert("customers", typeof(string), null!, CultureInfo.InvariantCulture));
+        Assert.AreEqual("\uEA18", converter.Convert("security", typeof(string), null!, CultureInfo.InvariantCulture));
+        Assert.AreEqual("\uE71D", converter.Convert("unknown-module", typeof(string), null!, CultureInfo.InvariantCulture));
     }
 
 }
