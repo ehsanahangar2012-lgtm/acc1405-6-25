@@ -39,6 +39,8 @@ public static class ApplicationThemeService
     private sealed class ThemeManagedStyleState { }
     private static readonly ConditionalWeakTable<Button, ThemeManagedStyleState> ThemeManagedButtons = new();
     private static readonly ConditionalWeakTable<TextBox, ThemeManagedStyleState> ThemeManagedTextBoxes = new();
+    private sealed class ComboEditorClickState { }
+    private static readonly ConditionalWeakTable<TextBox, ComboEditorClickState> ComboEditorClickHandlers = new();
     private const string DialogChromeResourceKey = "AshkeGhalam.DialogChromeApplied";
 
     private sealed class FormCardState { }
@@ -615,7 +617,29 @@ public static class ApplicationThemeService
             editor.BorderThickness = new Thickness(0);
             editor.Padding = new Thickness(0);
             editor.CaretBrush = foreground;
-            editor.SelectionBrush = Brush(isDark ? "#115E59" : "#99F6E4");
+            editor.SelectionBrush = Brush(isDark ? "#245E60" : "#BFE8DE");
+
+            // Attach to the editor that belongs to the final themed template. The theme pass
+            // may replace the ComboBox template after SmartComboBoxSearchService ran.
+            if (combo.IsEditable && !ComboEditorClickHandlers.TryGetValue(editor, out _))
+            {
+                ComboEditorClickHandlers.Add(editor, new ComboEditorClickState());
+                editor.PreviewMouseLeftButtonDown += (_, _) =>
+                {
+                    if (!combo.IsEnabled || combo.Items.Count == 0)
+                        return;
+
+                    combo.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+                    {
+                        if (!combo.IsLoaded || !combo.IsEnabled)
+                            return;
+
+                        combo.IsDropDownOpen = true;
+                        editor.Focus();
+                        editor.CaretIndex = editor.Text.Length;
+                    }));
+                };
+            }
         }
 
         // Most WPF default templates name their arrow button "ToggleButton". The fallback
