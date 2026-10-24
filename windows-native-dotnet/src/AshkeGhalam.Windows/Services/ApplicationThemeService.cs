@@ -28,7 +28,11 @@ public static class ApplicationThemeService
     }
 
     private static readonly ConditionalWeakTable<DependencyObject, Snapshot> OriginalValues = new();
-    private sealed class GridThemeState { public bool IsDark { get; set; } }
+    private sealed class GridThemeState
+    {
+        public bool IsDark { get; set; }
+        public Dictionary<DataGridTextColumn, Style?> OriginalTextStyles { get; } = [];
+    }
     private static readonly ConditionalWeakTable<DataGrid, GridThemeState> GridThemeStates = new();
     private static readonly ConditionalWeakTable<ScrollViewer, FormCardState> FormCards = new();
     private const string DialogChromeResourceKey = "AshkeGhalam.DialogChromeApplied";
@@ -247,6 +251,32 @@ public static class ApplicationThemeService
         grid.HorizontalGridLinesBrush = border;
         grid.VerticalGridLinesBrush = border;
         grid.GridLinesVisibility = DataGridGridLinesVisibility.Horizontal;
+
+        // DataGridTextColumn creates new TextBlocks as rows are virtualized. Give each
+        // generated cell a stable ellipsis tooltip and bind its ink to its DataGridCell,
+        // so newly-created cells keep the correct dark/light and selected-row foreground.
+        foreach (var column in grid.Columns.OfType<DataGridTextColumn>())
+        {
+            if (!state.OriginalTextStyles.ContainsKey(column))
+                state.OriginalTextStyles[column] = column.ElementStyle;
+
+            var baseStyle = state.OriginalTextStyles[column];
+            var cellTextStyle = baseStyle is null
+                ? new Style(typeof(TextBlock))
+                : new Style(typeof(TextBlock), baseStyle);
+            cellTextStyle.Setters.Add(new Setter(TextBlock.ForegroundProperty, new Binding(nameof(Control.Foreground))
+            {
+                RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGridCell), 1)
+            }));
+            cellTextStyle.Setters.Add(new Setter(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis));
+            cellTextStyle.Setters.Add(new Setter(TextBlock.TextWrappingProperty, TextWrapping.NoWrap));
+            cellTextStyle.Setters.Add(new Setter(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center));
+            cellTextStyle.Setters.Add(new Setter(FrameworkElement.ToolTipProperty, new Binding(nameof(TextBlock.Text))
+            {
+                RelativeSource = new RelativeSource(RelativeSourceMode.Self)
+            }));
+            column.ElementStyle = cellTextStyle;
+        }
 
         // Do not mutate realized rows/cells directly. Theme-specific styles stay in effect
         // for virtualized rows and retain working hover/selection states.
