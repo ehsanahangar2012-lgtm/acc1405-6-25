@@ -38,6 +38,8 @@ public sealed class CheckPreviewWindow : Window
         var soft = new SolidColorBrush(Color.FromRgb(240, 253, 250));
         _document = new FlowDocument
         {
+            PageWidth = 794,
+            PageHeight = 1123,
             PagePadding = new Thickness(34),
             FontFamily = FontFamily,
             FontSize = 12,
@@ -195,7 +197,7 @@ public sealed class CheckPreviewWindow : Window
             Document = _document,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            IsToolBarVisible = true,
+            IsToolBarVisible = false,
             Background = Brushes.White,
             Padding = new Thickness(12)
         };
