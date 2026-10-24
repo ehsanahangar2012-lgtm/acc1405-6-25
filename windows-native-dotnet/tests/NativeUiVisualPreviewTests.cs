@@ -157,6 +157,10 @@ public sealed class NativeUiVisualPreviewTests
                     SaveContent(dashboard, outputDirectory, $"dashboard-{theme}.png");
                     dashboard.Close();
 
+                    currentStage = $"people table ({theme})";
+                    var peopleTable = CreatePeopleTablePreview(owner);
+                    CaptureVisibleWindow(peopleTable, theme, outputDirectory, $"people-table-{theme}.png");
+
                     currentStage = $"person form ({theme})";
                     var personDialog = new CustomerDialog(owner, suggestedCode: "CUS-1002");
                     CaptureVisibleWindow(personDialog, theme, outputDirectory, $"person-form-{theme}.png");
@@ -190,7 +194,7 @@ public sealed class NativeUiVisualPreviewTests
 
                 owner.Close();
                 var capturedImages = Directory.GetFiles(outputDirectory, "*.png");
-                Assert.AreEqual(10, capturedImages.Length, "Expected dashboard, person, invoice, voucher and print-preview captures for both themes.");
+                Assert.AreEqual(12, capturedImages.Length, "Expected dashboard, people table, person, invoice, voucher and print-preview captures for both themes.");
             }
             catch (Exception ex)
             {
@@ -203,6 +207,111 @@ public sealed class NativeUiVisualPreviewTests
 
         if (failure is not null)
             throw new AssertFailedException($"Native WPF screenshot capture failed: {failure}", failure);
+    }
+
+    private static Window CreatePeopleTablePreview(Window owner)
+    {
+        var grid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            SelectionUnit = DataGridSelectionUnit.FullRow,
+            AlternationCount = 2,
+            RowHeight = 42,
+            ColumnHeaderHeight = 44,
+            MinHeight = 270,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Margin = new Thickness(0, 12, 0, 0)
+        };
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "کد",
+            Binding = new Binding("Code"),
+            Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+        });
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "نام شخص / شرکت",
+            Binding = new Binding("Name"),
+            Width = new DataGridLength(2.2, DataGridLengthUnitType.Star)
+        });
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "نوع همکاری",
+            Binding = new Binding("Role"),
+            Width = new DataGridLength(1.2, DataGridLengthUnitType.Star)
+        });
+        var amountStyle = new Style(typeof(TextBlock));
+        amountStyle.Setters.Add(new Setter(TextBlock.FlowDirectionProperty, FlowDirection.LeftToRight));
+        amountStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "ماندهٔ حساب (ریال)",
+            Binding = new Binding("Balance") { StringFormat = "{0:N0}" },
+            ElementStyle = amountStyle,
+            Width = new DataGridLength(1.4, DataGridLengthUnitType.Star)
+        });
+        grid.ItemsSource = new[]
+        {
+            new { Code = "CUS-1001", Name = "شرکت نمونه بسته‌بندی", Role = "مشتری و تأمین‌کننده", Balance = 1020000m },
+            new { Code = "CUS-1002", Name = "فروشگاه آفتاب", Role = "مشتری", Balance = 125000m },
+            new { Code = "SUP-0042", Name = "تأمین‌کننده مواد اولیه", Role = "تأمین‌کننده", Balance = -480000m },
+            new { Code = "CUS-1004", Name = "چاپخانه نمونه", Role = "مشتری", Balance = 0m }
+        };
+        grid.SelectedIndex = 1;
+
+        var root = new StackPanel { Margin = new Thickness(22) };
+        root.Children.Add(new TextBlock
+        {
+            Text = "فهرست اشخاص و طرف‌های حساب",
+            FontSize = 22,
+            FontWeight = FontWeights.Bold,
+            TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 0, 0, 5)
+        });
+        root.Children.Add(new TextBlock
+        {
+            Text = "نمایش نمونه برای بررسی راست‌چینی، وضوح سرستون‌ها، ردیف انتخاب‌شده و ستون‌های مبلغی در دو پوسته.",
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 0, 0, 10)
+        });
+        root.Children.Add(new Border
+        {
+            Background = Brushes.White,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(12),
+            Child = grid
+        });
+        root.Children.Add(new TextBlock
+        {
+            Text = "یادداشت: ماندهٔ نمونه صرفاً برای بازبینی بصری است و دادهٔ حسابداری واقعی نیست.",
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 10, 0, 0)
+        });
+
+        return new Window
+        {
+            Owner = owner,
+            Title = "پیش‌نمایش رابط جدول اشخاص",
+            Width = 1040,
+            Height = 620,
+            MinWidth = 760,
+            MinHeight = 500,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            FlowDirection = FlowDirection.RightToLeft,
+            FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
+            Background = Brushes.White,
+            Content = root,
+            ShowInTaskbar = false
+        };
     }
 
     private static void CaptureVisibleWindow(Window window, string theme, string folder, string fileName)
