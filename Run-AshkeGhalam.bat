@@ -1,51 +1,37 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal
+chcp 65001 >nul
+title Ashke Ghalam - Native Windows WPF
 cls
-echo ================================================================
-echo   1-CLICK INSTANT LAUNCHER - AshkeGhalam v16.51.0
-echo   Zero-Lag Native Window / Isolated Data: %%APPDATA%%\AshkeGhalam
-echo ================================================================
-
-:: 1. Ensure Isolated Data Directory Exists
-set "APP_DATA_DIR=%APPDATA%\AshkeGhalam"
-if not exist "%APP_DATA_DIR%" mkdir "%APP_DATA_DIR%"
-if not exist "%APP_DATA_DIR%\Backups" mkdir "%APP_DATA_DIR%\Backups"
-
-:: 2. Ensure Default Backup Directory in Documents Exists
-if not exist "%USERPROFILE%\Documents\AshkeGhalam_Backups" (
-    mkdir "%USERPROFILE%\Documents\AshkeGhalam_Backups"
-)
-
-:: 3. Check if dist/index.html exists for instant startup
-set "TARGET_HTML=%~dp0dist\index.html"
-if not exist "%TARGET_HTML%" (
-    echo [INFO] Dist folder not found. Building web assets...
-    where node >nul 2>nul
-    if %ERRORLEVEL% NEQ 0 (
-        echo [ERROR] Node.js is required to build the initial assets.
-        pause
-        exit /b 1
-    )
-    if not exist "node_modules" call npm install
-    call npm run build
-)
-
-:: 4. Search for Microsoft Edge (WebView2 Evergreen Engine for Native App Mode)
-set "EDGE_EXE="
-if exist "%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe" set "EDGE_EXE=%ProgramFiles(x86)%\Microsoft\Edge\Application\msedge.exe"
-if not defined EDGE_EXE if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" set "EDGE_EXE=%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"
-if not defined EDGE_EXE if exist "%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe" set "EDGE_EXE=%LOCALAPPDATA%\Microsoft\Edge\Application\msedge.exe"
-
-echo [STARTING] Launching application with high-performance native acceleration...
-if defined EDGE_EXE (
-    start "" "%EDGE_EXE%" --app="file:///%TARGET_HTML%" --user-data-dir="%APP_DATA_DIR%" --window-size=1280,850 --enable-gpu-rasterization --in-process-gpu
-) else (
-    start "" "explorer.exe" "%TARGET_HTML%"
-)
-
+echo ============================================================
+echo   ASHKE GHALAM - NATIVE WINDOWS ACCOUNTING
+echo   Fetches the latest feature/windows-native-dotnet source
+echo   and starts the real WPF app on this Windows desktop.
+echo ============================================================
 echo.
-echo ================================================================
-echo   AshkeGhalam is now running in independent mode!
-echo ================================================================
-timeout /t 3 >nul
-exit
+echo For Google Chrome Remote Desktop, run this BAT on the
+echo remote Windows computer. The remote session only mirrors it.
+echo.
+
+set "WPF_LAUNCHER=%~dp0Run-AshkeGhalam-WPF-Preview.bat"
+if exist "%WPF_LAUNCHER%" goto :run_existing_launcher
+
+rem Fallback for a copied BAT when the companion launcher is absent.
+set "AG_PREVIEW_PS1=%TEMP%\ashkghalam-wpf-launch-%RANDOM%-%RANDOM%.ps1"
+powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $ProgressPreference='SilentlyContinue'; $p=$env:AG_PREVIEW_PS1; $rc=0; try { $u='https://api.github.com/repos/ehsanahangar2012-lgtm/acc1405-6-25/contents/Run-AshkeGhalam-WPF-Preview.ps1?ref=feature%2Fwindows-native-dotnet'; $h=@{'User-Agent'='AshkeGhalam-Wpf-Local-Preview'}; $r=Invoke-RestMethod -Headers $h -Uri $u; $b=[Convert]::FromBase64String(($r.content -replace '\s','')); [IO.File]::WriteAllBytes($p,$b); & $p; if ($null -ne $LASTEXITCODE) { $rc=[int]$LASTEXITCODE } } catch { Write-Host ('Native WPF launch failed: ' + $_) -ForegroundColor Red; $rc=1 } finally { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }; exit $rc"
+set "RESULT=%ERRORLEVEL%"
+goto :report
+
+:run_existing_launcher
+call "%WPF_LAUNCHER%"
+set "RESULT=%ERRORLEVEL%"
+
+:report
+echo.
+if not "%RESULT%"=="0" (
+  echo WPF launch did not complete successfully. Read the error above.
+  pause
+) else (
+  echo Native WPF preview exited.
+)
+exit /b %RESULT%

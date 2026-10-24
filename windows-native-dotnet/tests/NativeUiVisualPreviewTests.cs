@@ -1,0 +1,630 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
+using System.Threading;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using AshkeGhalam.Windows.Dialogs;
+using AshkeGhalam.Windows.Models;
+using AshkeGhalam.Windows.Services;
+using Microsoft.VisualStudio.TestTools.UnitTesting;
+
+namespace AshkeGhalam.Windows.Tests;
+
+/// <summary>
+/// Produces in-memory renders of the real WPF pages in CI, so UI changes can be reviewed
+/// as images rather than inferred from compilation alone. These are layout captures, not
+/// a substitute for interactive mouse/keyboard and physical-printer testing.
+/// </summary>
+[TestClass]
+[DoNotParallelize]
+public sealed class NativeUiVisualPreviewTests
+{
+    [TestMethod]
+    public void CaptureCoreNativeScreensForVisualReviewWhenEnabled()
+    {
+        var outputDirectory = Environment.GetEnvironmentVariable("ASHKGHALAM_UI_CAPTURE_DIR");
+        if (string.IsNullOrWhiteSpace(outputDirectory))
+            return;
+
+        Exception? failure = null;
+        var currentStage = "initialization";
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                currentStage = "WPF application resources";
+                var app = Application.Current as App;
+                if (app is null)
+                {
+                    app = new App();
+                    app.InitializeComponent();
+                }
+
+                Directory.CreateDirectory(outputDirectory);
+                var owner = new Window
+                {
+                    Width = 1280,
+                    Height = 800,
+                    Background = Brushes.White,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                    ShowActivated = false
+                };
+                // WPF validates that an Owner has been shown at least once before another
+                // Window may set Owner; the capture itself remains off-screen/in-memory.
+                owner.Show();
+
+                var person = new CustomerRecord
+                {
+                    Id = "ui-person-001",
+                    Code = "CUS-1001",
+                    Name = "شرکت نمونه بسته‌بندی",
+                    Phone = "021-55501234",
+                    Email = "info@example.test",
+                    IsCustomer = true,
+                    IsSupplier = true,
+                    Type = "BOTH"
+                };
+                var product = new ProductRecord
+                {
+                    Id = "ui-product-001",
+                    Sku = "BOX-1001",
+                    Name = "کارتن سه‌لایه نمونه",
+                    Barcode = "6260001001001",
+                    Unit = "عدد",
+                    StockQuantity = 240,
+                    UnitPrice = 85000,
+                    BuyPrice = 61000,
+                    MinStock = 20,
+                    Category = "بسته‌بندی"
+                };
+                var invoice = new InvoiceRecord
+                {
+                    Id = "ui-invoice-001",
+                    Number = 1025,
+                    Prefix = "INV-",
+                    Type = "SALE",
+                    CustomerId = person.Id,
+                    CustomerName = person.Name,
+                    CreatedAt = new DateTimeOffset(2026, 10, 24, 0, 0, 0, TimeZoneInfo.Local.GetUtcOffset(DateTime.Today)),
+                    Lines =
+                    [
+                        new InvoiceLine
+                        {
+                            ProductId = product.Id,
+                            ProductName = product.Name,
+                            Unit = product.Unit,
+                            Quantity = 12,
+                            UnitPrice = product.UnitPrice,
+                            LineTotal = 12 * product.UnitPrice,
+                            Description = "چاپ اختصاصی؛ تحویل مرحله‌ای"
+                        }
+                    ],
+                    Subtotal = 12 * product.UnitPrice,
+                    Total = 12 * product.UnitPrice,
+                    Status = "صادر شده",
+                    Notes = "یادداشت نمونه برای بازبینی ظاهر سند"
+                };
+                var people = new List<CustomerRecord> { person };
+                var products = new List<ProductRecord> { product };
+                var invoices = new List<InvoiceRecord> { invoice };
+                var company = new CompanyProfileRecord
+                {
+                    Name = "شرکت چاپ و کارتن‌سازی اشک قلم",
+                    LegalName = "شرکت چاپ و کارتن‌سازی اشک قلم",
+                    Phone = "051-00000000",
+                    Address = "مشهد — نشانی نمونه برای پیش‌نمایش"
+                };
+
+                var sampleVoucher = new VoucherRecord
+                {
+                    Id = "ui-voucher-001",
+                    Number = 42,
+                    TrackingCode = "VCH-0042",
+                    Date = invoice.CreatedAt,
+                    Type = "OUT",
+                    PersonId = person.Id,
+                    PersonName = person.Name,
+                    MovementType = "GOODS_ISSUE",
+                    Items =
+                    [
+                        new VoucherItemRecord
+                        {
+                            ProductId = product.Id,
+                            ProductName = product.Name,
+                            Quantity = 12,
+                            Unit = product.Unit,
+                            Description = "تحویل نمونه برای بازبینی چاپ"
+                        }
+                    ],
+                    EstimatedValue = 12 * product.UnitPrice,
+                    TotalWeight = 24,
+                    Status = "PENDING",
+                    Notes = "دادهٔ نمونهٔ پیش‌نمایش حواله"
+                };
+                var samplePayment = new PaymentRecord
+                {
+                    Id = "ui-payment-001",
+                    InvoiceId = invoice.Id,
+                    InvoiceNumber = invoice.Number,
+                    CustomerName = person.Name,
+                    Amount = 200000,
+                    Method = "نقدی",
+                    Reference = "RCPT-1025",
+                    CreatedAt = invoice.CreatedAt
+                };
+                var sampleCheck = new CheckRecord
+                {
+                    Id = "ui-check-001",
+                    CheckNumber = "12345678",
+                    SayadId = "1234567890123456",
+                    BankName = "بانک نمونه",
+                    Amount = 400000,
+                    IssueDate = invoice.CreatedAt.AddDays(-1),
+                    DueDate = invoice.CreatedAt.AddDays(20),
+                    Status = "PENDING",
+                    HolderName = person.Name,
+                    PersonId = person.Id,
+                    PersonName = person.Name,
+                    CheckType = "RECEIVED",
+                    Description = "چک نمونه برای کنترل خوانایی"
+                };
+                var kardexRows = new List<ProductKardexPrintRow>
+                {
+                    new("1405/08/01", "ورود کالا", "VCH-0041", "موجودی ابتدای دوره", 240, 0, 240),
+                    new("1405/08/02", "حواله خروج", "VCH-0042", "تحویل نمونه", 0, 12, 228)
+                };
+
+                var previewData = new AccountingData
+                {
+                    Customers = people,
+                    Products = products,
+                    Invoices = invoices,
+                    Payments = [samplePayment],
+                    Expenses =
+                    [
+                        new ExpenseRecord
+                        {
+                            Id = "ui-expense-001",
+                            Title = "هزینه حمل نمونه",
+                            Category = "حمل‌ونقل",
+                            Amount = 630000,
+                            Notes = "هزینهٔ نمایشی"
+                        }
+                    ],
+                    Checks = [sampleCheck],
+                    Vouchers = [sampleVoucher],
+                    Companies = [company],
+                    ActiveCompanyId = company.Id,
+                    Preferences = new AccountingPreferences
+                    {
+                        ApplicationTheme = "light",
+                        InvoiceTheme = "modern",
+                        Currency = "RIAL",
+                        ShowInvoiceQr = true
+                    }
+                };
+
+                foreach (var theme in new[] { "light", "dark" })
+                {
+                    currentStage = $"dashboard ({theme})";
+                    var dashboard = new MainWindow();
+                    var themeOverrideField = typeof(MainWindow).GetField(
+                        "_themePreviewOverride", BindingFlags.Instance | BindingFlags.NonPublic);
+                    themeOverrideField?.SetValue(dashboard, theme);
+                    var previewDataField = typeof(MainWindow).GetField(
+                        "_data", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (previewDataField is null)
+                        throw new InvalidOperationException("MainWindow preview data field was not found.");
+                    previewDataField.SetValue(dashboard, previewData);
+                    if (dashboard.FindName("ApplicationThemeSelector") is ComboBox themeSelector)
+                    {
+                        themeSelector.SelectedItem = themeSelector.Items.OfType<ComboBoxItem>()
+                            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), theme, StringComparison.Ordinal));
+                    }
+                    SetText(dashboard, "CurrentModuleText", "پیشخوان • تصویر بازبینی رابط");
+                    SetText(dashboard, "StorageStatus", "ذخیره‌سازی محلی آماده");
+                    SetText(dashboard, "CustomerCount", "۱۲۸");
+                    SetText(dashboard, "ProductCount", "۸۶۴");
+                    SetText(dashboard, "InvoiceCount", "۲٬۴۱۹");
+                    SetText(dashboard, "SalesTotal", "۱۲٬۴۸۰٬۰۰۰");
+                    SetText(dashboard, "PurchasesTotal", "۸٬۲۱۰٬۰۰۰");
+                    SetText(dashboard, "PaymentsTotal", "۹٬۴۰۰٬۰۰۰");
+                    SetText(dashboard, "ReceivablesTotal", "۳٬۰۸۰٬۰۰۰");
+                    SetText(dashboard, "PayablesTotal", "۱٬۶۲۰٬۰۰۰");
+                    SetText(dashboard, "ExpensesTotal", "۶۳۰٬۰۰۰");
+                    // Keep visual-tree creation realistic but avoid reading/writing any user's
+                    // accounting file or starting background services in this visual-only test.
+                    var startupMethod = typeof(MainWindow).GetMethod(
+                        "MainWindow_Loaded", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (startupMethod is not null)
+                    {
+                        var startupHandler = (RoutedEventHandler)Delegate.CreateDelegate(
+                            typeof(RoutedEventHandler), dashboard, startupMethod);
+                        dashboard.Loaded -= startupHandler;
+                    }
+                    dashboard.Show();
+                    var refreshPreviewData = typeof(MainWindow).GetMethod(
+                        "RefreshAll", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (refreshPreviewData is null)
+                        throw new InvalidOperationException("MainWindow preview refresh method was not found.");
+                    refreshPreviewData.Invoke(dashboard, null);
+                    ApplicationThemeService.Apply(dashboard, theme);
+                    var navigationSelection = typeof(MainWindow).GetMethod(
+                        "UpdateNavigationSelection", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (navigationSelection is null)
+                        throw new InvalidOperationException("MainWindow navigation-theme method was not found.");
+                    navigationSelection.Invoke(dashboard, new object?[] { "dashboard", theme });
+                    dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                        new Action(dashboard.UpdateLayout));
+                    SaveContent(dashboard, outputDirectory, $"dashboard-{theme}.png");
+
+                    var mainTabs = dashboard.FindName("MainTabs") as TabControl;
+                    if (mainTabs is null)
+                        throw new InvalidOperationException("Main tabs were not found for table captures.");
+                    var tablePages = new[]
+                    {
+                        (Header: "مشتریان", NavigationKey: "customers", FileStem: "main-customers-table"),
+                        (Header: "کالا و انبار", NavigationKey: "inventory", FileStem: "main-products-table"),
+                        (Header: "فاکتورهای فروش/خرید", NavigationKey: "invoices", FileStem: "main-invoices-table"),
+                        (Header: "دریافت‌ها", NavigationKey: "payments", FileStem: "main-payments-table"),
+                        (Header: "مدیریت چک", NavigationKey: "checks", FileStem: "main-checks-table"),
+                        (Header: "حواله‌های انبار", NavigationKey: "vouchers", FileStem: "main-vouchers-table")
+                    };
+                    foreach (var tablePage in tablePages)
+                    {
+                        currentStage = $"{tablePage.FileStem} ({theme})";
+                        var tableTab = mainTabs.Items.OfType<TabItem>()
+                            .FirstOrDefault(tab => string.Equals(tab.Header?.ToString(), tablePage.Header, StringComparison.Ordinal));
+                        if (tableTab is null)
+                            throw new InvalidOperationException($"Table page was not found: {tablePage.Header}");
+                        mainTabs.SelectedItem = tableTab;
+                        SetText(dashboard, "CurrentModuleText", tablePage.Header + " • بازبینی رابط");
+                        navigationSelection.Invoke(dashboard, new object?[] { tablePage.NavigationKey, theme });
+                        dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                            new Action(dashboard.UpdateLayout));
+                        SaveContent(dashboard, outputDirectory, $"{tablePage.FileStem}-{theme}.png");
+                    }
+
+                    currentStage = $"about page ({theme})";
+                    var aboutTab = mainTabs.Items.OfType<TabItem>()
+                        .FirstOrDefault(tab => string.Equals(tab.Header?.ToString(), "معرفی نرم‌افزار", StringComparison.Ordinal));
+                    if (aboutTab is null)
+                        throw new InvalidOperationException("About page tab was not found for UI capture.");
+                    mainTabs.SelectedItem = aboutTab;
+                    dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                        new Action(dashboard.UpdateLayout));
+                    Assert.AreEqual(theme, ApplicationThemeService.DetectTheme(dashboard),
+                        "Navigating to the About page must preserve the active theme.");
+                    if (aboutTab.Content is not ScrollViewer aboutScroll)
+                        throw new InvalidOperationException("About page content is not a ScrollViewer.");
+                    var refreshAbout = typeof(MainWindow).GetMethod(
+                        "RefreshAboutCompanyPage", BindingFlags.Instance | BindingFlags.NonPublic);
+                    refreshAbout?.Invoke(dashboard, null);
+                    navigationSelection.Invoke(dashboard, new object?[] { "about", theme });
+                    dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                        new Action(dashboard.UpdateLayout));
+                    SaveContent(dashboard, outputDirectory, $"about-page-{theme}.png");
+                    aboutScroll.UpdateLayout();
+                    aboutScroll.ScrollToVerticalOffset(aboutScroll.ScrollableHeight);
+                    dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                        new Action(dashboard.UpdateLayout));
+                    SaveContent(dashboard, outputDirectory, $"about-page-details-{theme}.png");
+                    dashboard.Close();
+
+                    currentStage = $"people table ({theme})";
+                    var peopleTable = CreatePeopleTablePreview(owner);
+                    CaptureVisibleWindow(peopleTable, theme, outputDirectory, $"people-table-{theme}.png");
+
+                    currentStage = $"person form ({theme})";
+                    var personDialog = new CustomerDialog(owner, suggestedCode: "CUS-1002");
+                    CaptureVisibleWindow(personDialog, theme, outputDirectory, $"person-form-{theme}.png");
+
+                    currentStage = $"product form ({theme})";
+                    var productDialog = new ProductDialog(
+                        owner, suggestedCode: "BOX-1002", knownProducts: products);
+                    CaptureVisibleWindow(productDialog, theme, outputDirectory, $"product-form-{theme}.png");
+
+                    currentStage = $"expense form ({theme})";
+                    var expenseDialog = new ExpenseDialog(
+                        owner, knownCategories: new[] { "بسته‌بندی", "حمل‌ونقل", "عمومی" });
+                    CaptureVisibleWindow(expenseDialog, theme, outputDirectory, $"expense-form-{theme}.png");
+
+                    currentStage = $"payment form ({theme})";
+                    var paymentData = new AccountingData
+                    {
+                        Customers = people,
+                        Products = products,
+                        Invoices = invoices
+                    };
+                    var paymentDialog = new PaymentDialog(
+                        owner, paymentData, invoiceTypeFilter: "SALE", currencyCode: "RIAL");
+                    CaptureVisibleWindow(paymentDialog, theme, outputDirectory, $"payment-form-{theme}.png");
+
+                    currentStage = $"check form ({theme})";
+                    var checkDialog = new CheckDialog(
+                        owner, people: people, currency: "RIAL", prefillAmount: 102000m,
+                        prefillType: "RECEIVED", personId: person.Id, personName: person.Name);
+                    CaptureVisibleWindow(checkDialog, theme, outputDirectory, $"check-form-{theme}.png");
+
+                    currentStage = $"invoice form ({theme})";
+                    var invoiceDialog = new InvoiceDialog(
+                        owner, people, products, invoices,
+                        defaultInvoiceTheme: "modern",
+                        showInvoiceQr: true,
+                        companyProfile: company,
+                        currencyCode: "RIAL",
+                        accountingDataProvider: () => new AccountingData
+                        {
+                            Customers = people,
+                            Products = products,
+                            Invoices = invoices
+                        });
+                    CaptureVisibleWindow(invoiceDialog, theme, outputDirectory, $"invoice-form-{theme}.png");
+
+                    currentStage = $"voucher form ({theme})";
+                    var voucherDialog = new VoucherDialog(
+                        owner, people, products, invoices, companyProfile: company);
+                    CaptureVisibleWindow(voucherDialog, theme, outputDirectory, $"voucher-form-{theme}.png");
+
+                    currentStage = $"invoice print preview ({theme})";
+                    var preview = new InvoicePreviewWindow(
+                        owner, invoice, defaultTheme: "modern", showQr: false,
+                        company: company, currencyCode: "RIAL");
+                    CaptureVisibleWindow(preview, theme, outputDirectory, $"invoice-print-preview-{theme}.png");
+
+                    currentStage = $"voucher print preview ({theme})";
+                    var voucherPreview = new VoucherPreviewWindow(owner, sampleVoucher, company);
+                    CaptureVisibleWindow(voucherPreview, theme, outputDirectory, $"voucher-print-preview-{theme}.png");
+
+                    currentStage = $"payment receipt print preview ({theme})";
+                    var receiptPreview = new PaymentReceiptPreviewWindow(
+                        owner, samplePayment, invoice, company, currencyCode: "RIAL");
+                    CaptureVisibleWindow(receiptPreview, theme, outputDirectory, $"payment-receipt-print-preview-{theme}.png");
+
+                    currentStage = $"check print preview ({theme})";
+                    var checkPreview = new CheckPreviewWindow(owner, sampleCheck, company, currency: "RIAL");
+                    CaptureVisibleWindow(checkPreview, theme, outputDirectory, $"check-print-preview-{theme}.png");
+
+                    currentStage = $"product kardex print preview ({theme})";
+                    var kardexPreview = new ProductKardexPrintPreviewWindow(owner, product, kardexRows, openingBalance: 240);
+                    CaptureVisibleWindow(kardexPreview, theme, outputDirectory, $"product-kardex-print-preview-{theme}.png");
+
+                    // Narrow captures check toolbar wrapping and printable-paper preservation
+                    // close to each preview's supported minimum width.
+                    currentStage = $"narrow invoice print preview ({theme})";
+                    var narrowInvoicePreview = new InvoicePreviewWindow(
+                        owner, invoice, defaultTheme: "modern", showQr: false,
+                        company: company, currencyCode: "RIAL")
+                    {
+                        Width = 780,
+                        Height = 620
+                    };
+                    CaptureVisibleWindow(narrowInvoicePreview, theme, outputDirectory, $"invoice-print-preview-narrow-{theme}.png");
+
+                    currentStage = $"narrow voucher print preview ({theme})";
+                    var narrowVoucherPreview = new VoucherPreviewWindow(owner, sampleVoucher, company)
+                    {
+                        Width = 780,
+                        Height = 620
+                    };
+                    CaptureVisibleWindow(narrowVoucherPreview, theme, outputDirectory, $"voucher-print-preview-narrow-{theme}.png");
+
+                    currentStage = $"narrow payment receipt print preview ({theme})";
+                    var narrowReceiptPreview = new PaymentReceiptPreviewWindow(
+                        owner, samplePayment, invoice, company, currencyCode: "RIAL")
+                    {
+                        Width = 720,
+                        Height = 580
+                    };
+                    CaptureVisibleWindow(narrowReceiptPreview, theme, outputDirectory, $"payment-receipt-print-preview-narrow-{theme}.png");
+
+                    currentStage = $"narrow check print preview ({theme})";
+                    var narrowCheckPreview = new CheckPreviewWindow(owner, sampleCheck, company, currency: "RIAL")
+                    {
+                        Width = 700,
+                        Height = 620
+                    };
+                    CaptureVisibleWindow(narrowCheckPreview, theme, outputDirectory, $"check-print-preview-narrow-{theme}.png");
+
+                    currentStage = $"narrow product kardex print preview ({theme})";
+                    var narrowKardexPreview = new ProductKardexPrintPreviewWindow(owner, product, kardexRows, openingBalance: 240)
+                    {
+                        Width = 780,
+                        Height = 620
+                    };
+                    CaptureVisibleWindow(narrowKardexPreview, theme, outputDirectory, $"product-kardex-print-preview-narrow-{theme}.png");
+                }
+
+                owner.Close();
+                var capturedImages = Directory.GetFiles(outputDirectory, "*.png");
+                Assert.AreEqual(54, capturedImages.Length, "Expected dashboard, six real operational tables, About top/details, sample forms, and standard+narrow print previews for both themes.");
+            }
+            catch (Exception ex)
+            {
+                failure = new InvalidOperationException($"Visual capture failed at stage: {currentStage}.", ex);
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+            throw new AssertFailedException($"Native WPF screenshot capture failed: {failure}", failure);
+    }
+
+    private static Window CreatePeopleTablePreview(Window owner)
+    {
+        var grid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            IsReadOnly = true,
+            CanUserAddRows = false,
+            SelectionUnit = DataGridSelectionUnit.FullRow,
+            AlternationCount = 2,
+            RowHeight = 42,
+            ColumnHeaderHeight = 44,
+            MinHeight = 270,
+            HeadersVisibility = DataGridHeadersVisibility.Column,
+            GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+            Margin = new Thickness(0, 12, 0, 0)
+        };
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "کد",
+            Binding = new Binding("Code"),
+            Width = new DataGridLength(1, DataGridLengthUnitType.Star)
+        });
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "نام شخص / شرکت",
+            Binding = new Binding("Name"),
+            Width = new DataGridLength(2.2, DataGridLengthUnitType.Star)
+        });
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "نوع همکاری",
+            Binding = new Binding("Role"),
+            Width = new DataGridLength(1.2, DataGridLengthUnitType.Star)
+        });
+        var amountStyle = new Style(typeof(TextBlock));
+        amountStyle.Setters.Add(new Setter(TextBlock.FlowDirectionProperty, FlowDirection.LeftToRight));
+        amountStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
+        grid.Columns.Add(new DataGridTextColumn
+        {
+            Header = "ماندهٔ حساب (ریال)",
+            Binding = new Binding("Balance") { StringFormat = "{0:N0}" },
+            ElementStyle = amountStyle,
+            Width = new DataGridLength(1.4, DataGridLengthUnitType.Star)
+        });
+        grid.ItemsSource = new[]
+        {
+            new { Code = "CUS-1001", Name = "شرکت نمونه بسته‌بندی", Role = "مشتری و تأمین‌کننده", Balance = 1020000m },
+            new { Code = "CUS-1002", Name = "فروشگاه آفتاب", Role = "مشتری", Balance = 125000m },
+            new { Code = "SUP-0042", Name = "تأمین‌کننده مواد اولیه", Role = "تأمین‌کننده", Balance = -480000m },
+            new { Code = "CUS-1004", Name = "چاپخانه نمونه", Role = "مشتری", Balance = 0m }
+        };
+        grid.SelectedIndex = 1;
+
+        var root = new StackPanel { Margin = new Thickness(22) };
+        root.Children.Add(new TextBlock
+        {
+            Text = "فهرست اشخاص و طرف‌های حساب",
+            FontSize = 22,
+            FontWeight = FontWeights.Bold,
+            TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 0, 0, 5)
+        });
+        root.Children.Add(new TextBlock
+        {
+            Text = "نمایش نمونه برای بررسی راست‌چینی، وضوح سرستون‌ها، ردیف انتخاب‌شده و ستون‌های مبلغی در دو پوسته.",
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 0, 0, 10)
+        });
+        root.Children.Add(new Border
+        {
+            Background = Brushes.White,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(12),
+            Child = grid
+        });
+        root.Children.Add(new TextBlock
+        {
+            Text = "یادداشت: ماندهٔ نمونه صرفاً برای بازبینی بصری است و دادهٔ حسابداری واقعی نیست.",
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 10, 0, 0)
+        });
+
+        return new Window
+        {
+            Owner = owner,
+            Title = "پیش‌نمایش رابط جدول اشخاص",
+            Width = 1040,
+            Height = 620,
+            MinWidth = 760,
+            MinHeight = 500,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            FlowDirection = FlowDirection.RightToLeft,
+            FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
+            Background = Brushes.White,
+            Content = root,
+            ShowInTaskbar = false
+        };
+    }
+
+    private static void CaptureVisibleWindow(Window window, string theme, string folder, string fileName)
+    {
+        window.Show();
+        try
+        {
+            // Apply after Show so ComboBox, DatePicker and content presenter templates are
+            // already instantiated; this matches the application's Loaded-time theme path.
+            ApplicationThemeService.Apply(window, theme);
+            window.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                new Action(window.UpdateLayout));
+            SaveContent(window, folder, fileName);
+        }
+        finally
+        {
+            window.Hide();
+            window.Close();
+        }
+    }
+
+    private static void SetText(Window window, string name, string value)
+    {
+        if (window.FindName(name) is TextBlock text)
+            text.Text = value;
+    }
+
+    private static void SaveContent(Window window, string folder, string fileName)
+    {
+        if (window.Content is not FrameworkElement content)
+            throw new InvalidOperationException($"{window.GetType().Name} has no renderable content.");
+
+        Visual visual;
+        double measuredWidth;
+        double measuredHeight;
+        if (window.IsLoaded)
+        {
+            // Render the Window root rather than re-arranging its RTL content in isolation.
+            // Re-measuring Window.Content after Show can mirror FlowDirection a second time
+            // and produce review images that do not match the live desktop layout.
+            window.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                new Action(window.UpdateLayout));
+            visual = window;
+            measuredWidth = window.ActualWidth;
+            measuredHeight = window.ActualHeight;
+        }
+        else
+        {
+            measuredWidth = window.Width;
+            measuredHeight = window.Height;
+            var size = new Size(measuredWidth, measuredHeight);
+            content.Measure(size);
+            content.Arrange(new Rect(0, 0, measuredWidth, measuredHeight));
+            content.UpdateLayout();
+            visual = content;
+        }
+
+        var width = Math.Clamp((int)Math.Ceiling(measuredWidth), 520, 1600);
+        var height = Math.Clamp((int)Math.Ceiling(measuredHeight), 420, 1200);
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(folder, fileName));
+        encoder.Save(stream);
+    }
+}

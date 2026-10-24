@@ -1,0 +1,151 @@
+name: Windows native WPF migration CI
+
+on:
+  push:
+    branches:
+      - feature/windows-native-dotnet
+    paths:
+      - 'windows-native-dotnet/**'
+      - '.github/workflows/windows-native-wpf-parity.yml'
+  pull_request:
+    branches:
+      - feature/windows-native-dotnet
+    paths:
+      - 'windows-native-dotnet/**'
+      - '.github/workflows/windows-native-wpf-parity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-native-wpf-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-publish:
+    name: Build, smoke-test and package native Windows app
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out the isolated migration branch
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Bundle Vazirmatn font and SIL OFL license
+        shell: pwsh
+        run: |
+          $fontDir = 'windows-native-dotnet/src/AshkeGhalam.Windows/Assets/Fonts'
+          New-Item -ItemType Directory -Force -Path $fontDir | Out-Null
+          $fontBase = 'https://raw.githubusercontent.com/rastikerdar/vazirmatn/6e553e33489a8f9dfaccc76860a2e3f3c1e66de7'
+          Invoke-WebRequest -Uri "$fontBase/fonts/ttf/Vazirmatn-Regular.ttf" -OutFile (Join-Path $fontDir 'Vazirmatn-Regular.ttf')
+          Invoke-WebRequest -Uri "$fontBase/OFL.txt" -OutFile (Join-Path $fontDir 'OFL.txt')
+          if ((Get-Item (Join-Path $fontDir 'Vazirmatn-Regular.ttf')).Length -lt 50000) { throw 'Vazirmatn font download is incomplete.' }
+
+      - name: Restore WPF project
+        shell: pwsh
+        run: dotnet restore windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj
+
+      - name: Build WPF project
+        shell: pwsh
+        run: dotnet build windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj --configuration Release --no-restore
+
+      - name: Run native-domain tests when present
+        shell: pwsh
+        run: |
+          $appProject = (Resolve-Path 'windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj').Path
+          $projects = Get-ChildItem 'windows-native-dotnet' -Recurse -Filter '*.csproj' |
+            Where-Object { $_.FullName -ne $appProject -and $_.FullName -match '(?i)test' }
+          if (-not $projects) {
+            Write-Host 'No standalone test project was found. The WPF compile and startup smoke test still run.'
+          } else {
+            foreach ($project in $projects) {
+              $env:ASHKGHALAM_UI_CAPTURE_DIR = Join-Path $env:GITHUB_WORKSPACE 'artifacts/ui-previews'
+              New-Item -ItemType Directory -Force -Path $env:ASHKGHALAM_UI_CAPTURE_DIR | Out-Null
+              dotnet test $project.FullName --configuration Release --verbosity normal
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              Remove-Item Env:ASHKGHALAM_UI_CAPTURE_DIR -ErrorAction SilentlyContinue
+            }
+          }
+
+      - name: Upload WPF visual review captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-WPF-UI-Previews-${{ github.sha }}
+          path: artifacts/ui-previews/*.png
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 6
+
+      - name: Publish self-contained single-file EXE for Windows x64
+        shell: pwsh
+        run: |
+          $project = 'windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj'
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts/ashkghalam-windows-x64'
+          New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
+          dotnet publish $project --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false --output $publishDir
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
+          $exe = Join-Path $publishDir 'AshkeGhalam.Windows.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "Published EXE was not found: $exe" }
+          $length = (Get-Item -LiteralPath $exe).Length
+          if ($length -lt 10000000) { throw "Published EXE is unexpectedly small ($length bytes); self-contained packaging may be incomplete." }
+          @"
+          Ashk Ghalam Accounting - Native Windows WPF
+          Version: 16.57.0
+          Target: Windows x64
+          Package: self-contained single-file executable
+          Source commit: $env:GITHUB_SHA
+          Note: This preview build is unsigned and is not a commercially certified release.
+          "@ | Out-File -FilePath (Join-Path $publishDir 'README.txt') -Encoding utf8
+          Write-Host "Published EXE size: $length bytes"
+
+      - name: Smoke-test the published standalone EXE
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'artifacts/ashkghalam-windows-x64/AshkeGhalam.Windows.exe'
+          $startedAt = Get-Date
+          $process = Start-Process -FilePath $exe -PassThru
+          try {
+            Start-Sleep -Seconds 5
+            $process.Refresh()
+            if ($process.HasExited) {
+              $diagnostics = @()
+              try {
+                $events = Get-WinEvent -FilterHashtable @{ LogName = 'Application'; StartTime = $startedAt.AddSeconds(-2) } -ErrorAction SilentlyContinue |
+                  Where-Object { $_.ProviderName -in @('.NET Runtime', 'Application Error', 'Windows Error Reporting') } |
+                  Select-Object -First 3
+                foreach ($event in $events) { $diagnostics += "Event $($event.Id): $($event.Message)" }
+              } catch {}
+              throw "Published WPF EXE exited during startup (exit code $($process.ExitCode)). $($diagnostics -join [Environment]::NewLine)"
+            }
+            Write-Host 'Published self-contained WPF EXE stayed alive for the startup smoke-test window.'
+          } finally {
+            if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
+          }
+
+      - name: Upload downloadable Windows EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Windows-x64-${{ github.sha }}
+          path: artifacts/ashkghalam-windows-x64/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+
+      - name: Report verification scope
+        shell: pwsh
+        run: |
+          @"
+          ## Native WPF validation and package
+
+          - Source commit: $env:GITHUB_SHA
+          - WPF build and domain tests: passed if this run succeeds.
+          - Release package: self-contained Windows x64 single-file EXE.
+          - Startup smoke test: checks that the published EXE process remains alive briefly.
+          - This is an unsigned preview build. Visual interaction and physical printer testing are not covered by CI.
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append

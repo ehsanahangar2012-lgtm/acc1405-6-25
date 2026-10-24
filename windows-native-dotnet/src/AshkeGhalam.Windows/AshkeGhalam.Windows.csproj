@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AshkeGhalam.Windows</RootNamespace>
+    <AssemblyName>AshkeGhalam.Windows</AssemblyName>
+    <Version>16.57.0</Version>
+    <Product>Ashke Ghalam Accounting</Product>
+    <Description>Native Windows WPF accounting application</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="QRCoder" Version="1.8.1" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\Fonts\Vazirmatn-Regular.ttf" />
+    <None Include="Assets\Fonts\OFL.txt" Condition="Exists('Assets\Fonts\OFL.txt')" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="EnsureVazirmatnResourceExists" BeforeTargets="PrepareForBuild">
+    <Error Condition="!Exists('Assets\Fonts\Vazirmatn-Regular.ttf')"
+           Text="Vazirmatn font resource is required. Restore Assets\Fonts\Vazirmatn-Regular.ttf before building the WPF app." />
+  </Target>
+</Project>
