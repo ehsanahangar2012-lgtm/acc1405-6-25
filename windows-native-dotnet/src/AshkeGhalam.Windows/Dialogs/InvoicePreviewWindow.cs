@@ -430,7 +430,7 @@ public sealed class InvoicePreviewWindow : Window
         var detailsColumn = new StackPanel
         {
             FlowDirection = FlowDirection.RightToLeft,
-            Width = showQr ? 520 : 660
+            Width = showQrInLayout ? contentWidth - 140 : contentWidth
         };
 
         if (company is not null &&
@@ -759,7 +759,7 @@ public sealed class InvoicePreviewWindow : Window
             Height = 1, Background = accent, Opacity = 0.65,
             Margin = new Thickness(0, 8, 0, 8)
         });
-        totalsStack.Children.Add(MakeAmountRow("مبلغ نهایی قابل پرداخت (ریال و تومان)",
+        totalsStack.Children.Add(MakeAmountRow(isThermal ? $"مبلغ نهایی ({currencyLabel})" : "مبلغ نهایی قابل پرداخت (ریال و تومان)",
             BothCurrencies(invoice.Total), emphasize: true));
         totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — نقدی", BothCurrencies(invoice.CashAmount)));
         totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — چک", BothCurrencies(invoice.CheckAmount)));
