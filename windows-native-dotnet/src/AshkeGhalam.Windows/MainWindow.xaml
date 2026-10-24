@@ -1418,6 +1418,8 @@
                                 <TextBlock Text="نسخهٔ بومی حسابداری ویندوز" FontSize="14" Foreground="#E2E8F0" Margin="0,12,0,0"/>
                                 <TextBlock Text="ثبت فاکتور، مدیریت اشخاص و کالا، گردش موجودی، چک‌ها، دریافت و پرداخت و گزارش‌های مالی. داده‌های این نسخه به‌صورت محلی روی رایانه نگهداری می‌شوند."
                                            FontSize="13" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                <TextBlock Text="www.ashkghalam.ir" FlowDirection="LeftToRight" TextAlignment="Right"
+                                           FontSize="13" FontWeight="SemiBold" Foreground="#99F6E4" Margin="0,9,0,0"/>
                                 <Button Content="ورود به وب‌سایت رسمی اشک قلم" Tag="https://ashkghalam.ir/" Click="OpenCompanyWebsite_Click"
                                         HorizontalAlignment="Right" MinWidth="250" Height="42" Margin="0,18,0,0"
                                         Background="#14B8A6" Foreground="#042F2E" FontWeight="Bold"/>
