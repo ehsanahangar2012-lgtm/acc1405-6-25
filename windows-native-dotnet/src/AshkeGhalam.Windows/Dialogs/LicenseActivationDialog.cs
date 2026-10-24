@@ -12,7 +12,15 @@ public sealed class LicenseActivationDialog : Window
     private readonly TextBox _company = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _hardwareId = new() { Height = 58, Padding = new Thickness(8), IsReadOnly = true, TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 0), Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)) };
-    private readonly Button _verify = new() { Content = "تأیید آنلاین لایسنس", Width = 170, Height = 38 };
+    private readonly Button _verify = new()
+    {
+        Content = "تأیید آنلاین لایسنس",
+        Width = 175,
+        Height = 40,
+        Background = new SolidColorBrush(Color.FromRgb(15, 118, 110)),
+        Foreground = Brushes.White,
+        BorderBrush = new SolidColorBrush(Color.FromRgb(15, 118, 110))
+    };
     private readonly Button _copy = new() { Content = "کپی شناسه دستگاه", Width = 135, Height = 38, Margin = new Thickness(0, 0, 8, 0) };
     private readonly ServerLicenseClient _client = new();
 
@@ -42,40 +50,59 @@ public sealed class LicenseActivationDialog : Window
             _verify.IsEnabled = false;
         }
 
-        var root = new StackPanel { Margin = new Thickness(24) };
-        root.Children.Add(new TextBlock
+        var root = new StackPanel { Margin = new Thickness(14) };
+        root.Children.Add(new Border
         {
-            Text = "فعال‌سازی با مرجع رسمی لایسنس",
-            FontSize = 22,
-            FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-        root.Children.Add(new TextBlock
-        {
-            Text = "کلید و شناسه فضای کاری مستقیماً به سرور HTTPS ارسال می‌شوند. لایسنس فقط وقتی تأیید می‌شود که سرور فعال بودن آن را اعلام کند و رسید RSA-SHA256 با کلید عمومی سرور معتبر باشد. کلید خصوصی داخل این برنامه نیست.",
-            FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 14)
+            Background = PaletteBrush("#F0FDFA"),
+            BorderBrush = PaletteBrush("#99F6E4"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(12),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = new TextBlock
+            {
+                Text = "درخواست فعال‌سازی از طریق HTTPS انجام می‌شود. لایسنس فقط پس از تأیید سرور و اعتبارسنجی رسید RSA-SHA256 پذیرفته می‌شود؛ کلید خصوصی در این برنامه نگهداری نمی‌شود.",
+                FontSize = 12,
+                Foreground = PaletteBrush("#115E59"),
+                TextWrapping = TextWrapping.Wrap
+            }
         });
 
-        AddField(root, "شناسه فضای کاری (Workspace ID)", _workspace);
-        AddField(root, "کلید لایسنس", _licenseKey);
-        AddField(root, "نام شرکت (نمایشی؛ اختیاری)", _company);
-        AddField(root, "شناسه سخت‌افزاری این رایانه", _hardwareId);
+        var licenseSection = new StackPanel();
+        AddField(licenseSection, "شناسه فضای کاری (Workspace ID)", _workspace);
+        AddField(licenseSection, "کلید لایسنس", _licenseKey);
+        AddField(licenseSection, "نام شرکت (نمایشی؛ اختیاری)", _company);
+        root.Children.Add(CreateSectionCard(
+            "۱. مشخصات لایسنس",
+            "شناسه فضای کاری و کلید معتبر را از مرجع رسمی دریافت کنید.",
+            licenseSection));
+
+        var deviceSection = new StackPanel();
+        AddField(deviceSection, "شناسه سخت‌افزاری این رایانه", _hardwareId);
+        root.Children.Add(CreateSectionCard(
+            "۲. اتصال دستگاه",
+            "شناسه سخت‌افزاری به کلید و فضای کاری متصل است؛ فقط در صورت نیاز آن را کپی کنید.",
+            deviceSection));
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 8, 22, 8) };
         actions.Children.Add(_copy);
         actions.Children.Add(_verify);
         actions.Children.Add(new Button { Content = "بستن", Width = 80, Height = 38, Margin = new Thickness(8, 0, 0, 0), IsCancel = true });
-        root.Children.Add(new TextBlock
+        root.Children.Add(new Border
         {
-            Text = "وضعیت ذخیره‌شده به‌صورت رمزگذاری‌شده با DPAPI برای حساب جاری Windows نگهداری می‌شود. این پنجره به‌تنهایی جایگزین مهاجرت سهمیه‌ها و کنترل دسترسی همهٔ ماژول‌ها نیست.",
-            FontSize = 11,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 20, 0, 0)
+            Background = PaletteBrush("#F8FAFC"),
+            BorderBrush = PaletteBrush("#CBD5E1"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(9),
+            Padding = new Thickness(10),
+            Margin = new Thickness(0, 0, 0, 8),
+            Child = new TextBlock
+            {
+                Text = "وضعیت تأییدشده با DPAPI برای حساب جاری Windows رمزگذاری می‌شود. این پنجره به‌تنهایی اثبات‌کنندهٔ فعال بودن همهٔ ماژول‌ها نیست.",
+                FontSize = 11,
+                Foreground = PaletteBrush("#334155"),
+                TextWrapping = TextWrapping.Wrap
+            }
         });
 
         var footer = new StackPanel();
@@ -177,4 +204,38 @@ public sealed class LicenseActivationDialog : Window
         field.Margin = new Thickness(0, 0, 0, 3);
         root.Children.Add(field);
     }
+    private static Border CreateSectionCard(string title, string hint, UIElement content)
+    {
+        var body = new StackPanel();
+        body.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 15,
+            FontWeight = FontWeights.Bold,
+            Foreground = PaletteBrush("#0F766E")
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = hint,
+            FontSize = 11,
+            Foreground = PaletteBrush("#64748B"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 10)
+        });
+        body.Children.Add(content);
+        return new Border
+        {
+            Background = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#E2E8F0"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = body
+        };
+    }
+
+    private static SolidColorBrush PaletteBrush(string value) =>
+        new((Color)ColorConverter.ConvertFromString(value)!);
+
 }
