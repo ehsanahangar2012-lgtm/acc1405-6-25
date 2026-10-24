@@ -1823,12 +1823,22 @@ public partial class MainWindow : Window
             return;
         }
 
-        var relatedChecks = string.Equals(payment.Method, "چک", StringComparison.Ordinal)
-            ? _data.Checks.Where(check =>
-                string.Equals(check.RelatedInvoiceId, invoice.Id, StringComparison.Ordinal) &&
-                check.Amount == payment.Amount &&
-                string.Equals(check.CheckType, invoice.Type == "SALE" ? "RECEIVED" : "ISSUED", StringComparison.Ordinal)).ToList()
-            : [];
+        var relatedChecks = new List<CheckRecord>();
+        if (string.Equals(payment.Method, "چک", StringComparison.Ordinal))
+        {
+            // New records use a stable payment ID. Fall back to the old invoice/amount
+            // heuristic only for legacy checks created before this link existed.
+            relatedChecks = _data.Checks.Where(check =>
+                string.Equals(check.RelatedPaymentId, payment.Id, StringComparison.Ordinal)).ToList();
+            if (relatedChecks.Count == 0)
+            {
+                relatedChecks = _data.Checks.Where(check =>
+                    string.IsNullOrWhiteSpace(check.RelatedPaymentId) &&
+                    string.Equals(check.RelatedInvoiceId, invoice.Id, StringComparison.Ordinal) &&
+                    check.Amount == payment.Amount &&
+                    string.Equals(check.CheckType, invoice.Type == "SALE" ? "RECEIVED" : "ISSUED", StringComparison.Ordinal)).ToList();
+            }
+        }
         new PaymentReceiptPreviewWindow(this, payment, invoice, ActiveCompanyProfile(),
             _data.Preferences.Currency, relatedChecks).ShowDialog();
     }
@@ -1883,12 +1893,15 @@ public partial class MainWindow : Window
         };
         Commit(data =>
         {
-            AccountingOperations.RecordPayment(data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference);
+            var recordedPayment = AccountingOperations.RecordPayment(
+                data, dialog.InvoiceId, dialog.Amount, dialog.Method, dialog.Reference);
             if (paymentCheck is not null)
             {
                 if (!string.IsNullOrWhiteSpace(paymentCheck.SayadId) &&
                     data.Checks.Any(check => string.Equals(check.SayadId, paymentCheck.SayadId, StringComparison.OrdinalIgnoreCase)))
                     throw new InvalidOperationException("شناسهٔ صیادی تکراری است.");
+                paymentCheck.RelatedPaymentId = recordedPayment.Id;
+                paymentCheck.RelatedInvoiceId = recordedPayment.InvoiceId;
                 data.Checks.Add(paymentCheck);
             }
         }, message);
