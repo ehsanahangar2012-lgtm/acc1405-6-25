@@ -45,7 +45,12 @@ public sealed class InvoiceDialog : Window
     private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
     private readonly TextBox _quantity = new() { Height = 32, Width = 90, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _price = new() { Height = 32, Width = 130, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly TextBox _lineDescription = new() { Height = 32, Width = 180, Padding = new Thickness(8, 4, 8, 4) };
+    private readonly TextBox _lineDescription = new()
+    {
+        Height = 38, Width = 230, Padding = new Thickness(8, 4, 8, 4),
+        AcceptsReturn = true, TextWrapping = TextWrapping.Wrap,
+        ToolTip = "شرح تکمیلی این قلم؛ در فاکتور چاپی داخل کادر جداگانه نمایش داده می‌شود."
+    };
     private readonly TextBox _date = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4), ToolTip = "تاریخ شمسی با قالب سال/ماه/روز؛ نمونه: ۱۴۰۵/۰۷/۰۲" };
     private readonly TextBox _dueDate = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4), ToolTip = "تاریخ سررسید شمسی با قالب سال/ماه/روز؛ خالی گذاشتن مجاز است" };
     private readonly TextBox _discount = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4), Text = "0" };
@@ -190,10 +195,10 @@ public sealed class InvoiceDialog : Window
         dates.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
         dates.ColumnDefinitions.Add(new ColumnDefinition());
         var datePanel = new StackPanel();
-        AddField(datePanel, "تاریخ صدور شمسی", _date);
+        AddDateField(datePanel, "تاریخ صدور شمسی", _date, optional: false);
         Grid.SetColumn(datePanel, 0);
         var duePanel = new StackPanel();
-        AddField(duePanel, "تاریخ سررسید شمسی (اختیاری)", _dueDate);
+        AddDateField(duePanel, "تاریخ سررسید شمسی (اختیاری)", _dueDate, optional: true);
         Grid.SetColumn(duePanel, 2);
         dates.Children.Add(datePanel);
         var dateSpacer = new Border();
@@ -766,26 +771,8 @@ public sealed class InvoiceDialog : Window
         }
     }
 
-    private static DateTimeOffset ParsePersianDate(string text, string fieldName)
-    {
-        var normalized = text.Trim().Replace('-', '/').Replace('.', '/');
-        var parts = normalized.Split('/', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 3)
-            throw new InvalidOperationException(fieldName + " را به صورت سال/ماه/روز شمسی وارد کنید.");
-        try
-        {
-            var year = checked((int)PersianNumberParser.ParseDecimal(parts[0], "سال"));
-            var month = checked((int)PersianNumberParser.ParseDecimal(parts[1], "ماه"));
-            var day = checked((int)PersianNumberParser.ParseDecimal(parts[2], "روز"));
-            var calendar = new PersianCalendar();
-            var local = calendar.ToDateTime(year, month, day, 0, 0, 0, 0, PersianCalendar.PersianEra);
-            return new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            throw new InvalidOperationException(fieldName + " شمسی معتبر نیست.");
-        }
-    }
+    private static DateTimeOffset ParsePersianDate(string text, string fieldName) =>
+        PersianDateInputService.Parse(text, fieldName);
 
     private static string FormatPersianDate(DateTimeOffset value)
     {
@@ -797,6 +784,18 @@ public sealed class InvoiceDialog : Window
     private static string ToText(InvoiceLine line) =>
         $"{line.EntryOrder:N0}. {line.ProductName} | {line.Quantity:#,##0.##} × {line.UnitPrice:#,##0.##} = {line.LineTotal:#,##0.##}" +
         (string.IsNullOrWhiteSpace(line.Description) ? "" : $" | {line.Description}");
+
+    private static void AddDateField(Panel root, string label, TextBox field, bool optional)
+    {
+        root.Children.Add(new TextBlock
+        {
+            Text = label, FontSize = 12, FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+            Margin = new Thickness(0, 7, 0, 4)
+        });
+        field.Margin = new Thickness(0, 0, 0, 4);
+        root.Children.Add(PersianDateInputService.CreateDateField(field, optional));
+    }
 
     private static void AddField(Panel root, string label, Control field)
     {
