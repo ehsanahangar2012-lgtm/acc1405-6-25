@@ -456,3 +456,8 @@
 - [x] انتخاب کالا در «ورود موجودی» با جست‌وجوی زندهٔ نام، کد، بارکد و شماره سریال هماهنگ شد؛ ذخیره همچنان فقط پس از انتخاب یک رکورد واقعی انجام می‌شود.
 - [x] قاب عمومی فرم‌ها روی دو پنجرهٔ کارتکس که سربرگ و چیدمان اختصاصی خود را دارند اعمال نمی‌شود؛ از نمایش عنوان تکراری جلوگیری می‌شود و سرویس تم/کنتراست همچنان روی کنترل‌های آن‌ها اجرا می‌شود.
 - [ ] رفتار زندهٔ انتخاب کالا و بازبینی کارتکس‌ها در Windows باید در هر دو تم تأیید شود.
+
+
+## 2026-10-24 — dataset-scale and date-filter finishing pass
+- Added a no-timing-threshold regression test with 300 additional people and 300 additional products, covering dataset validation, deep copy, encrypted backup, restore, and full record retention.
+- Both ends of the person-kardex date range can now be cleared independently with the existing Persian date-picker menu.

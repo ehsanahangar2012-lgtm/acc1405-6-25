@@ -78,10 +78,10 @@ public sealed class PersonKardexWindow : Window
         var filter = new WrapPanel { Margin = new Thickness(0, 0, 0, 10), VerticalAlignment = VerticalAlignment.Center };
         filter.Children.Add(new TextBlock { Text = "از تاریخ شمسی", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
         _fromDate = new TextBox { Width = 124, Height = 34, Padding = new Thickness(8, 4, 8, 4), ToolTip = "نمونه: ۱۴۰۵/۰۱/۰۱", Margin = new Thickness(0, 0, 12, 0) };
-        filter.Children.Add(PersianDateInputService.CreateDateField(_fromDate));
+        filter.Children.Add(PersianDateInputService.CreateDateField(_fromDate, optional: true));
         filter.Children.Add(new TextBlock { Text = "تا تاریخ شمسی", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
         _toDate = new TextBox { Width = 124, Height = 34, Padding = new Thickness(8, 4, 8, 4), ToolTip = "نمونه: ۱۴۰۵/۱۲/۲۹", Margin = new Thickness(0, 0, 12, 0) };
-        filter.Children.Add(PersianDateInputService.CreateDateField(_toDate));
+        filter.Children.Add(PersianDateInputService.CreateDateField(_toDate, optional: true));
         filter.Children.Add(MakeButton("اعمال فیلتر", ApplyFilter_Click, primary: true));
         filter.Children.Add(MakeButton("پاک‌کردن تاریخ", ClearFilter_Click));
         filter.Children.Add(MakeButton("پیش‌نمایش فاکتور انتخابی", OpenSelectedInvoice_Click));

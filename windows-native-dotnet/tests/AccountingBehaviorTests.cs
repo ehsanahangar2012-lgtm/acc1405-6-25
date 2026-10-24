@@ -660,6 +660,48 @@ public sealed class AccountingBehaviorTests
         AccountingDataValidator.Validate(data);
     }
 
+
+    [TestMethod]
+    public void LargerDatasetRetainsRecordsAcrossValidationCopyAndEncryptedBackup()
+    {
+        var data = CreateSampleData(includeInvoice: false);
+        const int additionalRecords = 300;
+        for (var index = 1; index <= additionalRecords; index++)
+        {
+            data.Customers.Add(new CustomerRecord
+            {
+                Id = $"bulk-customer-{index:D4}",
+                Code = $"BULK-C-{index:D4}",
+                Name = $"مشتری انبوه {index:D4}",
+                Phone = $"09{index:D9}",
+                IsCustomer = true
+            });
+            data.Products.Add(new ProductRecord
+            {
+                Id = $"bulk-product-{index:D4}",
+                Name = $"کالای انبوه {index:D4}",
+                Sku = $"BULK-P-{index:D4}",
+                Unit = "عدد",
+                StockQuantity = 10m,
+                UnitPrice = index + 1m
+            });
+        }
+
+        AccountingDataValidator.Validate(data);
+        var copy = data.DeepCopy();
+        Assert.AreEqual(additionalRecords + 1, copy.Customers.Count);
+        Assert.AreEqual(additionalRecords + 1, copy.Products.Count);
+
+        const string backupPassword = "larger-dataset-passphrase-2026";
+        var bytes = BackupFileService.CreateEncryptedBackup(copy, backupPassword);
+        var restored = BackupFileService.ReadEncryptedBackup(bytes, backupPassword);
+
+        Assert.AreEqual(additionalRecords + 1, restored.Customers.Count);
+        Assert.AreEqual(additionalRecords + 1, restored.Products.Count);
+        Assert.AreEqual("کالای انبوه 0300", restored.Products.Last().Name);
+        AccountingDataValidator.Validate(restored);
+    }
+
     private static AccountingData CreateSampleData(bool includeInvoice)
     {
         var customer=new CustomerRecord{Id="customer-test-1",Name="مشتری آزمایشی",Phone="09120000000",Address="تهران"};
