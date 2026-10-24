@@ -367,3 +367,11 @@
 - Added a party-choice resolver that accepts legacy CUSTOMER/VENDOR type values when role booleans are absent, preserves dual-role people, shows the selected person's code/phone, and gives an actionable message when the current invoice type has no eligible party.
 - Replaced brightness-only foreground mapping with a WCAG contrast-ratio fallback targeting at least 4.5:1 when the chosen foreground fails; standardized dynamically created dialog buttons, inputs, and grids.
 - Added regression tests for legacy party filtering and contrast ratios in both themes. Automated Windows CI is the required verification gate; on-device visual review remains separate.
+
+
+## 2026-10-24 — UI priority 1: shared native design system
+- Added shared WPF design tokens and consistent default styles for labels, buttons, input controls, selection controls, lists, and data tables.
+- Standardized non-preview operational dialogs with a branded header, consistent contained form surface, padding, control sizes, and keyboard-focus affordances; the invoice editor retains its dedicated card-based design.
+- Refined the right-hand navigation into a stable dark sidebar in both light/dark modes, with more comfortable row spacing, clearer hover/focus/active states, and consistent selected-route colors.
+- Retained the print-document exception so branded window chrome never recolors invoice/receipt/ledger paper.
+- Verification: Windows WPF build, automated domain/UI-adjacent tests, and published executable startup smoke test must pass on this commit; screen-level review on the target Windows display remains a manual check.

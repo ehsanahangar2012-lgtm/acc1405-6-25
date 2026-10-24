@@ -30,6 +30,10 @@ public static class ApplicationThemeService
     private static readonly ConditionalWeakTable<DependencyObject, Snapshot> OriginalValues = new();
     private sealed class GridThemeState { public bool IsDark { get; set; } }
     private static readonly ConditionalWeakTable<DataGrid, GridThemeState> GridThemeStates = new();
+    private static readonly ConditionalWeakTable<ScrollViewer, FormCardState> FormCards = new();
+    private const string DialogChromeResourceKey = "AshkeGhalam.DialogChromeApplied";
+
+    private sealed class FormCardState { }
 
     public static string Normalize(string? theme) =>
         string.Equals(theme, DarkTheme, StringComparison.OrdinalIgnoreCase) ? DarkTheme : LightTheme;
@@ -66,6 +70,7 @@ public static class ApplicationThemeService
     public static void Apply(Window window, string? theme)
     {
         ArgumentNullException.ThrowIfNull(window);
+        ApplyDialogPresentation(window);
         var isDark = Normalize(theme) == DarkTheme;
         var elements = EnumerateTree(window).ToList();
 
@@ -89,6 +94,134 @@ public static class ApplicationThemeService
             ConfigureDataGridTheme(grid, isDark);
 
         PolishControls(window, elements);
+    }
+
+
+    /// <summary>
+    /// Gives native data-entry windows a consistent branded title band and a contained form surface.
+    /// Print/preview windows and the already-designed invoice editor are intentionally left alone.
+    /// </summary>
+    private static void ApplyDialogPresentation(Window window)
+    {
+        var name = window.GetType().Name;
+        if (name is "MainWindow" or "InvoiceDialog" or "PersianDatePickerWindow" or "BackupPasswordDialog" ||
+            name.Contains("Preview", StringComparison.OrdinalIgnoreCase) ||
+            window.Resources.Contains(DialogChromeResourceKey))
+            return;
+
+        var elements = EnumerateTree(window).ToList();
+        if (elements.OfType<FlowDocumentScrollViewer>().Any())
+            return;
+        if (!elements.Any(element => element is TextBox or ComboBox or PasswordBox or DataGrid or ListBox or DatePicker))
+            return;
+        if (window.Content is not UIElement originalContent)
+            return;
+
+        DecorateScrollableFormCard(originalContent);
+        var chrome = new DockPanel
+        {
+            LastChildFill = true,
+            FlowDirection = FlowDirection.RightToLeft,
+            Background = Brush("#F4F7FB")
+        };
+        var header = CreateDialogHeader(window.Title);
+        DockPanel.SetDock(header, Dock.Top);
+        chrome.Children.Add(header);
+
+        // Detach before re-parenting the existing root. The form controls and their events stay intact.
+        window.Content = null;
+        chrome.Children.Add(originalContent);
+        window.Content = chrome;
+        window.Resources[DialogChromeResourceKey] = true;
+    }
+
+    private static void DecorateScrollableFormCard(UIElement content)
+    {
+        var scroll = EnumerateTree(content).OfType<ScrollViewer>()
+            .FirstOrDefault(candidate => candidate.Content is StackPanel);
+        if (scroll?.Content is not StackPanel formRoot || FormCards.TryGetValue(scroll, out _))
+            return;
+
+        formRoot.Margin = new Thickness(0);
+        scroll.Content = null;
+        scroll.Content = new Border
+        {
+            Background = Brush("#FFFFFF"),
+            BorderBrush = Brush("#E2E8F0"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(18),
+            Margin = new Thickness(14),
+            Child = formRoot
+        };
+        FormCards.Add(scroll, new FormCardState());
+    }
+
+    private static Border CreateDialogHeader(string? title)
+    {
+        var headerGrid = new Grid { FlowDirection = FlowDirection.RightToLeft };
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+        var accent = new Border
+        {
+            Width = 4,
+            Height = 38,
+            VerticalAlignment = VerticalAlignment.Center,
+            CornerRadius = new CornerRadius(3),
+            Background = Brush("#14B8A6")
+        };
+        Grid.SetColumn(accent, 0);
+        headerGrid.Children.Add(accent);
+
+        var titleStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        titleStack.Children.Add(new TextBlock
+        {
+            Text = "اشک قلم",
+            FontSize = 17,
+            FontWeight = FontWeights.Bold,
+            Foreground = Brush("#F8FAFC")
+        });
+        titleStack.Children.Add(new TextBlock
+        {
+            Text = string.IsNullOrWhiteSpace(title) ? "نسخهٔ بومی ویندوز • مدیریت مالی" : title + "  •  نسخهٔ بومی ویندوز",
+            FontSize = 10,
+            Foreground = Brush("#CBD5E1"),
+            Margin = new Thickness(0, 2, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+        Grid.SetColumn(titleStack, 2);
+        headerGrid.Children.Add(titleStack);
+
+        var chip = new Border
+        {
+            Background = Brush("#1F2937"),
+            BorderBrush = Brush("#475569"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(9),
+            Padding = new Thickness(10, 6, 10, 6),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new TextBlock
+            {
+                Text = "فرم عملیاتی",
+                Foreground = Brush("#F1F5F9"),
+                FontSize = 10,
+                FontWeight = FontWeights.SemiBold
+            }
+        };
+        Grid.SetColumn(chip, 3);
+        headerGrid.Children.Add(chip);
+
+        return new Border
+        {
+            Background = Brush("#0F172A"),
+            BorderBrush = Brush("#334155"),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(18, 11, 18, 11),
+            Child = headerGrid
+        };
     }
 
     private static void ConfigureDataGridTheme(DataGrid grid, bool isDark)
@@ -457,19 +590,25 @@ public static class ApplicationThemeService
             var buttonStyle = CreateModernButtonStyle();
             window.Resources[typeof(Button)] = buttonStyle;
             foreach (var button in elements.OfType<Button>())
+            {
                 if (button.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
                     button.Style = buttonStyle;
+                button.MinHeight = Math.Max(button.MinHeight, 36);
+                button.FontSize = Math.Max(button.FontSize, 12);
+                if (button.Padding.Left < 8)
+                    button.Padding = new Thickness(12, 7, 12, 7);
+            }
         }
 
         foreach (var input in elements.OfType<TextBox>())
         {
             input.FontSize = Math.Max(input.FontSize, 13);
-            input.MinHeight = Math.Max(input.MinHeight, input.AcceptsReturn ? 52 : 34);
+            input.MinHeight = Math.Max(input.MinHeight, input.AcceptsReturn ? 52 : 36);
             input.BorderThickness = new Thickness(1);
             if (!input.AcceptsReturn)
                 input.VerticalContentAlignment = VerticalAlignment.Center;
             if (input.Padding.Left < 6)
-                input.Padding = new Thickness(8, 5, 8, 5);
+                input.Padding = new Thickness(9, 6, 9, 6);
         }
 
         foreach (var combo in elements.OfType<ComboBox>())
@@ -477,8 +616,29 @@ public static class ApplicationThemeService
             combo.FontSize = Math.Max(combo.FontSize, 13);
             combo.MinHeight = Math.Max(combo.MinHeight, 36);
             combo.BorderThickness = new Thickness(1);
-            combo.Padding = new Thickness(8, 5, 8, 5);
+            combo.Padding = new Thickness(9, 5, 9, 5);
             combo.MaxDropDownHeight = Math.Max(combo.MaxDropDownHeight, 280);
+        }
+
+        foreach (var check in elements.OfType<CheckBox>())
+        {
+            check.FontSize = Math.Max(check.FontSize, 12);
+            check.VerticalContentAlignment = VerticalAlignment.Center;
+            check.Padding = new Thickness(Math.Max(3, check.Padding.Left), 4, Math.Max(3, check.Padding.Right), 4);
+        }
+
+        foreach (var list in elements.OfType<ListBox>())
+        {
+            list.FontSize = Math.Max(list.FontSize, 12);
+            list.BorderThickness = new Thickness(1);
+            list.Padding = new Thickness(4);
+        }
+
+        foreach (var datePicker in elements.OfType<DatePicker>())
+        {
+            datePicker.FontSize = Math.Max(datePicker.FontSize, 13);
+            datePicker.MinHeight = Math.Max(datePicker.MinHeight, 36);
+            datePicker.BorderThickness = new Thickness(1);
         }
 
         foreach (var grid in elements.OfType<DataGrid>())
@@ -497,6 +657,9 @@ public static class ApplicationThemeService
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 7, 12, 7)));
         style.Setters.Add(new Setter(Control.MinHeightProperty, 36d));
         style.Setters.Add(new Setter(Control.FontSizeProperty, 13d));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brush("#FFFFFF")));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush("#0F172A")));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush("#CBD5E1")));
         style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
         style.Setters.Add(new Setter(FrameworkElement.CursorProperty, Cursors.Hand));
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
@@ -542,6 +705,11 @@ public static class ApplicationThemeService
         {
             Property = Button.IsPressedProperty, Value = true,
             Setters = { new Setter(UIElement.OpacityProperty, 0.82, "Surface") }
+        });
+        template.Triggers.Add(new Trigger
+        {
+            Property = Button.IsKeyboardFocusedProperty, Value = true,
+            Setters = { new Setter(Border.BorderBrushProperty, Brush("#14B8A6"), "Surface") }
         });
         template.Triggers.Add(new Trigger
         {

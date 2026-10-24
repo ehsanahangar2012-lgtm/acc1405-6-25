@@ -4909,15 +4909,17 @@ public partial class MainWindow : Window
             if (current is Button button && button.Tag is string key && NativeModuleLinks.ContainsKey(key))
             {
                 var isActive = string.Equals(key, activeKey, StringComparison.Ordinal);
+                // The sidebar is intentionally a stable dark navigation surface in both themes;
+                // only the active route and fine border tone change with the active state/theme.
                 button.Background = isActive
                     ? new SolidColorBrush(Color.FromRgb(15, 118, 110))
-                    : new SolidColorBrush(isDark ? Color.FromRgb(31, 41, 55) : Colors.White);
+                    : new SolidColorBrush(Color.FromRgb(31, 41, 55));
                 button.Foreground = isActive
                     ? Brushes.White
-                    : new SolidColorBrush(isDark ? Color.FromRgb(229, 231, 235) : Color.FromRgb(31, 41, 55));
+                    : new SolidColorBrush(Color.FromRgb(241, 245, 249));
                 button.BorderBrush = new SolidColorBrush(isDark
-                    ? Color.FromRgb(65, 81, 106)
-                    : Color.FromRgb(203, 213, 225));
+                    ? Color.FromRgb(71, 85, 105)
+                    : Color.FromRgb(51, 65, 85));
                 button.BorderThickness = new Thickness(1);
             }
             if (current is not Visual) continue;
