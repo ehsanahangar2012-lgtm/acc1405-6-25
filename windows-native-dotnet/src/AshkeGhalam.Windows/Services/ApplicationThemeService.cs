@@ -515,9 +515,9 @@ public static class ApplicationThemeService
 
     private static Style CreateCalendarStyle(bool isDark)
     {
-        var surface = Brush(isDark ? "#111827" : "#FFFFFF");
-        var text = Brush(isDark ? "#F3F4F6" : "#0F172A");
-        var border = Brush(isDark ? "#475569" : "#CBD5E1");
+        var surface = Brush(isDark ? "#142338" : "#FFFFFF");
+        var text = Brush(isDark ? "#F5F8FB" : "#172D3D");
+        var border = Brush(isDark ? "#3A526A" : "#D5E0E6");
         var style = new Style(typeof(Calendar));
         style.Setters.Add(new Setter(Control.BackgroundProperty, surface));
         style.Setters.Add(new Setter(Control.ForegroundProperty, text));
@@ -532,7 +532,7 @@ public static class ApplicationThemeService
     {
         var style = new Style(typeof(CalendarDayButton));
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
-        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F3F4F6" : "#0F172A")));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F5F8FB" : "#172D3D")));
         style.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(3)));
@@ -543,8 +543,8 @@ public static class ApplicationThemeService
             Value = true,
             Setters =
             {
-                new Setter(Control.BackgroundProperty, Brush(isDark ? "#273447" : "#F0FDFA")),
-                new Setter(Control.BorderBrushProperty, Brush(isDark ? "#0D9488" : "#99F6E4"))
+                new Setter(Control.BackgroundProperty, Brush(isDark ? "#22364D" : "#EFF8F6")),
+                new Setter(Control.BorderBrushProperty, Brush(isDark ? "#367E7B" : "#BFE8DE"))
             }
         });
         style.Triggers.Add(new Trigger
@@ -553,16 +553,16 @@ public static class ApplicationThemeService
             Value = true,
             Setters =
             {
-                new Setter(Control.BackgroundProperty, Brush(isDark ? "#115E59" : "#0F766E")),
+                new Setter(Control.BackgroundProperty, Brush(isDark ? "#0B9485" : "#0B7C72")),
                 new Setter(Control.ForegroundProperty, Brushes.White),
-                new Setter(Control.BorderBrushProperty, Brush("#14B8A6"))
+                new Setter(Control.BorderBrushProperty, Brush(isDark ? "#60D7C4" : "#0B7C72"))
             }
         });
         style.Triggers.Add(new Trigger
         {
             Property = CalendarDayButton.IsTodayProperty,
             Value = true,
-            Setters = { new Setter(Control.BorderBrushProperty, Brush("#14B8A6")) }
+            Setters = { new Setter(Control.BorderBrushProperty, Brush(isDark ? "#60D7C4" : "#0B7C72")) }
         });
         return style;
     }
@@ -571,7 +571,7 @@ public static class ApplicationThemeService
     {
         var style = new Style(typeof(CalendarButton));
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
-        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F3F4F6" : "#0F172A")));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F5F8FB" : "#172D3D")));
         style.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(4, 2, 4, 2)));
         style.Triggers.Add(new Trigger
@@ -580,8 +580,8 @@ public static class ApplicationThemeService
             Value = true,
             Setters =
             {
-                new Setter(Control.BackgroundProperty, Brush(isDark ? "#273447" : "#F0FDFA")),
-                new Setter(Control.BorderBrushProperty, Brush(isDark ? "#0D9488" : "#99F6E4"))
+                new Setter(Control.BackgroundProperty, Brush(isDark ? "#22364D" : "#EFF8F6")),
+                new Setter(Control.BorderBrushProperty, Brush(isDark ? "#367E7B" : "#BFE8DE"))
             }
         });
         return style;
@@ -694,10 +694,10 @@ public static class ApplicationThemeService
     private static Style CreateChoiceItemStyle(bool isDark, bool isListItem)
     {
         var style = new Style(isListItem ? typeof(ListBoxItem) : typeof(ComboBoxItem));
-        var surface = Brush(isDark ? "#111827" : "#FFFFFF");
-        var text = Brush(isDark ? "#F3F4F6" : "#0F172A");
-        var hover = Brush(isDark ? "#273447" : "#F0FDFA");
-        var selected = Brush(isDark ? "#115E59" : "#0F766E");
+        var surface = Brush(isDark ? "#142338" : "#FFFFFF");
+        var text = Brush(isDark ? "#F5F8FB" : "#172D3D");
+        var hover = Brush(isDark ? "#22364D" : "#EFF8F6");
+        var selected = Brush(isDark ? "#0B9485" : "#0B7C72");
 
         style.Setters.Add(new Setter(Control.BackgroundProperty, surface));
         style.Setters.Add(new Setter(Control.ForegroundProperty, text));
@@ -932,10 +932,10 @@ public static class ApplicationThemeService
 
         if (Saturation(color) < 0.12)
         {
-            if (brightness > 0.97) return Color.FromRgb(17, 24, 39);
-            if (brightness > 0.91) return Color.FromRgb(11, 18, 32);
-            if (brightness > 0.82) return Color.FromRgb(31, 41, 55);
-            return Color.FromRgb(39, 52, 71);
+            if (brightness > 0.97) return Color.FromRgb(20, 35, 56);
+            if (brightness > 0.91) return Color.FromRgb(13, 24, 39);
+            if (brightness > 0.82) return Color.FromRgb(27, 45, 66);
+            return Color.FromRgb(34, 54, 77);
         }
 
         // Saturated semantic surfaces must be darkened in dark mode to maintain readable
@@ -950,9 +950,9 @@ public static class ApplicationThemeService
     {
         if (isDark)
             return Saturation(color) > 0.35
-                ? Color.FromRgb(13, 148, 136)
-                : Color.FromRgb(71, 85, 105);
-        return Color.FromRgb(203, 213, 225);
+                ? Color.FromRgb(55, 127, 122)
+                : Color.FromRgb(58, 82, 106);
+        return Color.FromRgb(213, 224, 230);
     }
 
     private static Color LightenSemanticColor(Color color, double amount = 0.56) =>
@@ -967,7 +967,7 @@ public static class ApplicationThemeService
             return foreground;
 
         var light = Colors.White;
-        var dark = Color.FromRgb(15, 23, 42);
+        var dark = Color.FromRgb(23, 45, 61);
         var target = ContrastRatio(light, background) >= ContrastRatio(dark, background) ? light : dark;
         for (var step = 1; step <= 20; step++)
         {
@@ -984,7 +984,7 @@ public static class ApplicationThemeService
 
     private static Color? MapForeground(Color color, bool isDark, Color? background)
     {
-        var surface = background ?? (isDark ? Color.FromRgb(17, 24, 39) : Colors.White);
+        var surface = background ?? (isDark ? Color.FromRgb(20, 35, 56) : Colors.White);
         Color preferred;
 
         if (isDark)
@@ -999,15 +999,15 @@ public static class ApplicationThemeService
         {
             preferred = Saturation(color) > 0.4
                 ? LightenSemanticColor(color, 0.56)
-                : Color.FromRgb(248, 250, 252);
+                : Color.FromRgb(245, 248, 251);
         }
         else if (Brightness(color) > 0.84)
         {
-            preferred = Color.FromRgb(15, 23, 42);
+            preferred = Color.FromRgb(23, 45, 61);
         }
         else if (Brightness(color) > 0.52 && Saturation(color) < 0.42)
         {
-            preferred = Color.FromRgb(51, 65, 85);
+            preferred = Color.FromRgb(83, 107, 122);
         }
         else
         {
@@ -1183,16 +1183,16 @@ public static class ApplicationThemeService
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 7, 12, 7)));
         style.Setters.Add(new Setter(Control.MinHeightProperty, 36d));
         style.Setters.Add(new Setter(Control.FontSizeProperty, 13d));
-        style.Setters.Add(new Setter(Control.BackgroundProperty, Brush(isDark ? "#1F2937" : "#FFFFFF")));
-        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F3F4F6" : "#0F766E")));
-        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush(isDark ? "#475569" : "#CBD5E1")));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brush(isDark ? "#1B2D42" : "#FFFFFF")));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F5F8FB" : "#0B7C72")));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush(isDark ? "#3A526A" : "#D5E0E6")));
         style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
         style.Setters.Add(new Setter(FrameworkElement.CursorProperty, Cursors.Hand));
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
 
         var template = new ControlTemplate(typeof(Button));
         var surface = new FrameworkElementFactory(typeof(Border), "Surface");
-        surface.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        surface.SetValue(Border.CornerRadiusProperty, new CornerRadius(12));
         surface.SetBinding(Border.BackgroundProperty, new Binding(nameof(Control.Background))
         {
             RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
@@ -1209,6 +1209,7 @@ public static class ApplicationThemeService
         {
             RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
         });
+        surface.SetValue(Border.EffectProperty, new DropShadowEffect { BlurRadius = 12, ShadowDepth = 2, Opacity = 0.10, Color = Color.FromRgb(13, 24, 39) });
         var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
         presenter.SetBinding(ContentPresenter.ContentProperty, new Binding(nameof(ContentControl.Content))
         {
@@ -1234,7 +1235,7 @@ public static class ApplicationThemeService
             Property = Button.IsKeyboardFocusedProperty, Value = true,
             Setters =
             {
-                new Setter(Border.BorderBrushProperty, Brush(isDark ? "#2DD4BF" : "#0F766E"), "Surface"),
+                new Setter(Border.BorderBrushProperty, Brush(isDark ? "#60D7C4" : "#0B7C72"), "Surface"),
                 new Setter(Border.BorderThicknessProperty, new Thickness(1.5), "Surface")
             }
         });
@@ -1261,7 +1262,7 @@ public static class ApplicationThemeService
     {
         var style = new Style(typeof(TextBox));
         style.Setters.Add(new Setter(Control.BackgroundProperty, Brush(isDark ? "#111827" : "#FFFFFF")));
-        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F3F4F6" : "#0F172A")));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F5F8FB" : "#172D3D")));
         style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush(isDark ? "#475569" : "#CBD5E1")));
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(9, 6, 9, 6)));
@@ -1301,7 +1302,7 @@ public static class ApplicationThemeService
             Value = true,
             Setters =
             {
-                new Setter(Border.BorderBrushProperty, Brush(isDark ? "#2DD4BF" : "#0F766E"), "Surface"),
+                new Setter(Border.BorderBrushProperty, Brush(isDark ? "#60D7C4" : "#0B7C72"), "Surface"),
                 new Setter(Border.BorderThicknessProperty, new Thickness(1.5), "Surface")
             }
         });
