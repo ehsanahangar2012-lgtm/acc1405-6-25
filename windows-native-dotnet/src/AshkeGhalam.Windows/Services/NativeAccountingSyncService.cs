@@ -19,6 +19,7 @@ public sealed class NativeAccountingSyncService
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false
     };
     private readonly Func<Uri, HttpMessageHandler>? _testHandlerFactory;
