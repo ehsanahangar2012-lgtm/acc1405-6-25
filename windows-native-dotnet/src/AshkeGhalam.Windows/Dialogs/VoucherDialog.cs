@@ -136,7 +136,7 @@ public sealed class VoucherDialog : Window
 
         AddField(root, "نوع سند", _type);
         AddField(root, "نوع گردش موجودی", _movementType);
-        AddField(root, "تاریخ شمسی", _date);
+        AddDateField(root, "تاریخ شمسی", _date, optional: false);
         AddField(root, "شخص مرتبط (اختیاری)", _person);
         AddField(root, "فاکتور مرتبط (اختیاری)", _invoice);
 
@@ -352,31 +352,26 @@ public sealed class VoucherDialog : Window
         _totals.Text = $"اقلام: {_lines.Count:N0}   •   وزن تخمینی: {weight:#,##0.##}   •   ارزش تخمینی: {value:#,##0.##}";
     }
 
-    private static DateTimeOffset ParsePersianDate(string text)
-    {
-        var normalized = text.Trim().Replace('-', '/').Replace('.', '/');
-        var parts = normalized.Split('/', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length != 3) throw new InvalidOperationException("تاریخ را به صورت سال/ماه/روز شمسی وارد کنید.");
-        try
-        {
-            var year = checked((int)PersianNumberParser.ParseDecimal(parts[0], "سال"));
-            var month = checked((int)PersianNumberParser.ParseDecimal(parts[1], "ماه"));
-            var day = checked((int)PersianNumberParser.ParseDecimal(parts[2], "روز"));
-            var calendar = new PersianCalendar();
-            var local = calendar.ToDateTime(year, month, day, 0, 0, 0, 0, PersianCalendar.PersianEra);
-            return new DateTimeOffset(local, TimeZoneInfo.Local.GetUtcOffset(local));
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            throw new InvalidOperationException("تاریخ شمسی معتبر نیست.");
-        }
-    }
+    private static DateTimeOffset ParsePersianDate(string text) =>
+        PersianDateInputService.Parse(text, "تاریخ حواله");
 
     private static string FormatPersianDate(DateTimeOffset value)
     {
         var calendar = new PersianCalendar();
         return string.Format(CultureInfo.InvariantCulture, "{0:0000}/{1:00}/{2:00}",
             calendar.GetYear(value.DateTime), calendar.GetMonth(value.DateTime), calendar.GetDayOfMonth(value.DateTime));
+    }
+
+    private static void AddDateField(Panel root, string label, TextBox field, bool optional)
+    {
+        root.Children.Add(new TextBlock
+        {
+            Text = label, FontSize = 12, FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+            Margin = new Thickness(0, 7, 0, 4)
+        });
+        field.Margin = new Thickness(0, 0, 0, 4);
+        root.Children.Add(PersianDateInputService.CreateDateField(field, optional));
     }
 
     private static void AddField(Panel root, string label, Control field)
