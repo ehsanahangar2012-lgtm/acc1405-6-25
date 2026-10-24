@@ -55,9 +55,9 @@ public sealed class ProductKardexPrintPreviewWindow : Window
             Background = Brushes.White,
             Foreground = ink,
             PagePadding = new Thickness(28),
-            PageWidth = 816,
-            PageHeight = 1056,
-            ColumnWidth = 756
+            PageWidth = 794,
+            PageHeight = 1123,
+            ColumnWidth = 738
         };
         _document.Blocks.Add(new Paragraph(new Run("کارتکس و گردش موجودی کالا"))
         {
@@ -134,7 +134,7 @@ public sealed class ProductKardexPrintPreviewWindow : Window
         }
         table.RowGroups.Add(body);
         _document.Blocks.Add(table);
-        PrintBrandingService.AppendWebsiteFooter(_document, 756);
+        PrintBrandingService.AppendWebsiteFooter(_document, 738);
 
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
