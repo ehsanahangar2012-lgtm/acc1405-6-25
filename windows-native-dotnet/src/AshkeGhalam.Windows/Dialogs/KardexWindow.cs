@@ -13,8 +13,6 @@ namespace AshkeGhalam.Windows.Dialogs;
 
 public sealed class KardexWindow : Window
 {
-    private sealed record KardexRow(string Date, string Movement, string Document, string Description, decimal Incoming, decimal Outgoing, decimal Balance);
-
     public KardexWindow(Window owner, ProductRecord product, IReadOnlyList<InventoryMovementRecord> movements,
         IReadOnlyList<InvoiceRecord> invoices, IReadOnlyList<VoucherRecord> vouchers)
     {
@@ -33,7 +31,7 @@ public sealed class KardexWindow : Window
             .OrderBy(item => item.Date).ThenBy(item => item.Timestamp).ToList();
         var openingBalance = product.StockQuantity - history.Sum(item => item.SignedQuantity);
         var balance = openingBalance;
-        var rows = new List<KardexRow>
+        var rows = new List<ProductKardexPrintRow>
         {
             new("—", "ماندهٔ ابتدای گردش", "—", "موجودی پایه استخراج‌شده از سوابق ذخیره‌شده", 0m, 0m, balance)
         };
@@ -44,7 +42,7 @@ public sealed class KardexWindow : Window
             var document = movement.ReferenceType == "INVOICE"
                 ? invoices.FirstOrDefault(item => item.Id == reference)?.DisplayNumber ?? reference
                 : vouchers.FirstOrDefault(item => item.Id == reference)?.TrackingCode ?? reference;
-            rows.Add(new KardexRow(FormatPersianDate(movement.Date), MovementLabel(movement.MovementType), document,
+            rows.Add(new ProductKardexPrintRow(FormatPersianDate(movement.Date), MovementLabel(movement.MovementType), document,
                 movement.Description, Math.Max(0m, movement.SignedQuantity),
                 Math.Abs(Math.Min(0m, movement.SignedQuantity)), balance));
         }
@@ -114,13 +112,13 @@ public sealed class KardexWindow : Window
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto
         };
-        grid.Columns.Add(new DataGridTextColumn { Header = "تاریخ شمسی", Binding = new Binding(nameof(KardexRow.Date)), Width = 115 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "نوع گردش", Binding = new Binding(nameof(KardexRow.Movement)), Width = 160 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "سند مرجع", Binding = new Binding(nameof(KardexRow.Document)), Width = 170 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "شرح گردش", Binding = new Binding(nameof(KardexRow.Description)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "ورودی", Binding = new Binding(nameof(KardexRow.Incoming)) { StringFormat = "#,##0.##" }, Width = 110 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "خروجی", Binding = new Binding(nameof(KardexRow.Outgoing)) { StringFormat = "#,##0.##" }, Width = 110 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new Binding(nameof(KardexRow.Balance)) { StringFormat = "#,##0.##" }, Width = 120 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "تاریخ شمسی", Binding = new Binding(nameof(ProductKardexPrintRow.Date)), Width = 115 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "نوع گردش", Binding = new Binding(nameof(ProductKardexPrintRow.Movement)), Width = 160 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "سند مرجع", Binding = new Binding(nameof(ProductKardexPrintRow.Document)), Width = 170 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "شرح گردش", Binding = new Binding(nameof(ProductKardexPrintRow.Description)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+        grid.Columns.Add(new DataGridTextColumn { Header = "ورودی", Binding = new Binding(nameof(ProductKardexPrintRow.Incoming)) { StringFormat = "#,##0.##" }, Width = 110 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "خروجی", Binding = new Binding(nameof(ProductKardexPrintRow.Outgoing)) { StringFormat = "#,##0.##" }, Width = 110 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new Binding(nameof(ProductKardexPrintRow.Balance)) { StringFormat = "#,##0.##" }, Width = 120 });
 
         var headerStyle = new Style(typeof(DataGridColumnHeader));
         headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, accent));
@@ -141,15 +139,12 @@ public sealed class KardexWindow : Window
         footer.Children.Add(note);
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
         var print = new Button { Content = "چاپ کارتکس", MinWidth = 100, Height = 36, Margin = new Thickness(0, 0, 8, 0), Background = accent, Foreground = Brushes.White };
+        print.Content = "پیش‌نمایش و چاپ";
+        print.MinWidth = 145;
         print.Click += (_, _) =>
         {
-            try
-            {
-                var dialog = new PrintDialog();
-                if (dialog.ShowDialog() == true)
-                    dialog.PrintVisual(grid, $"AshkeGhalam-ProductKardex-{product.Code}");
-            }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, "چاپ کارتکس", MessageBoxButton.OK, MessageBoxImage.Error); }
+            var preview = new ProductKardexPrintPreviewWindow(this, product, rows, openingBalance);
+            preview.ShowDialog();
         };
         actions.Children.Add(print);
         var export = new Button { Content = "خروجی CSV", MinWidth = 100, Height = 36, Margin = new Thickness(0, 0, 8, 0) };
@@ -184,7 +179,7 @@ public sealed class KardexWindow : Window
         });
     }
 
-    private static void ExportRows(IReadOnlyList<KardexRow> rows, ProductRecord product)
+    private static void ExportRows(IReadOnlyList<ProductKardexPrintRow> rows, ProductRecord product)
     {
         var dialog = new SaveFileDialog
         {

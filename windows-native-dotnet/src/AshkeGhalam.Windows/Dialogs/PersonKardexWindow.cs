@@ -87,7 +87,6 @@ public sealed class PersonKardexWindow : Window
         filter.Children.Add(MakeButton("پیش‌نمایش فاکتور انتخابی", OpenSelectedInvoice_Click));
         filter.Children.Add(MakeButton("خروجی CSV", ExportCsv_Click));
         filter.Children.Add(MakeButton("پیش‌نمایش چاپ گزارش", PreviewPrint_Click, primary: true));
-        filter.Children.Add(MakeButton("چاپ مستقیم جدول", Print_Click));
         Grid.SetRow(filter, 1);
         root.Children.Add(filter);
 
