@@ -175,13 +175,13 @@ public sealed class CheckPreviewWindow : Window
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 0, 0, 10) };
+        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
         toolbar.Children.Add(new TextBlock
         {
             Text = "پیش‌نمایش و چاپ سند چک",
             FontSize = 20,
             FontWeight = FontWeights.Bold,
-            Foreground = ink,
+            Foreground = Brushes.White,
             VerticalAlignment = VerticalAlignment.Center
         });
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
@@ -210,7 +210,9 @@ public sealed class CheckPreviewWindow : Window
             Padding = new Thickness(8),
             Child = viewer
         };
-        root.Children.Add(toolbar);
+        var toolbarFrame = PreviewChromeService.CreateToolbarFrame(toolbar);
+        Grid.SetRow(toolbarFrame, 0);
+        root.Children.Add(toolbarFrame);
         Grid.SetRow(paper, 1);
         root.Children.Add(paper);
         Content = root;

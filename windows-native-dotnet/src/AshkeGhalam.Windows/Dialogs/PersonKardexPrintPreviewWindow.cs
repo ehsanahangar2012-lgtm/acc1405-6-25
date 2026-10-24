@@ -89,11 +89,11 @@ public sealed class PersonKardexPrintPreviewWindow : Window
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 0, 0, 10) };
+        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
         toolbar.Children.Add(new TextBlock
         {
             Text = "پیش‌نمایش چاپ کاردکس اشخاص", FontSize = 20, FontWeight = FontWeights.Bold,
-            Foreground = ink, VerticalAlignment = VerticalAlignment.Center
+            Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center
         });
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
         var print = new Button { Content = "🖨 چاپ گزارش", MinWidth = 130, Height = 38, Margin = new Thickness(0, 0, 8, 0), Background = accent, Foreground = Brushes.White };
@@ -102,7 +102,9 @@ public sealed class PersonKardexPrintPreviewWindow : Window
         actions.Children.Add(new Button { Content = "بستن", MinWidth = 90, Height = 38, IsCancel = true });
         DockPanel.SetDock(actions, Dock.Left);
         toolbar.Children.Add(actions);
-        root.Children.Add(toolbar);
+        var toolbarFrame = PreviewChromeService.CreateToolbarFrame(toolbar);
+        Grid.SetRow(toolbarFrame, 0);
+        root.Children.Add(toolbarFrame);
         var viewer = new FlowDocumentScrollViewer
         {
             Document = _document, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
