@@ -378,6 +378,7 @@
 
 
 ## UI priority 1 — consistency pass
+
 - Added rounded, keyboard-focus-aware button and input templates at application scope, keeping the text-input content host compatible with standard WPF editing/selection behavior.
 - Removed a global no-wrap setting from text blocks so deliberate wrapped content remains controlled by each page and long operational labels can be wrapped selectively.
 - Standardized dynamically built field labels to a consistent semibold size and spacing across the native forms.
@@ -388,3 +389,4 @@
 - [x] برای DatePicker نیز سبک مشترک افزودیم تا ارتفاع، تایپوگرافی و مرز کنترل با بقیهٔ فیلدها هماهنگ باشد.
 - [x] اعمال سبک فرم‌ها پیش از نگاشت رنگ تم انجام می‌شود تا دکمه‌های تازه‌سبک‌شده در تم تاریک از همان بار اول رنگ مناسب بگیرند؛ سبک‌های اختصاصی پنجرهٔ اصلی حفظ می‌شوند.
 - [x] این تغییرات در شاخهٔ feature/windows-native-dotnet هستند. CI باید موفق شود و بازبینی دیداری واقعی روی ویندوز هنوز شرط تأیید نهایی رابط کاربری است.
+- [x] بازطراحی مرحله‌ای فرم حواله/رسید: مشخصات سند، اقلام انبار و اطلاعات تکمیلی در سه کارت مستقل؛ پیام اثر سند بر موجودی، جمع‌بندی برجسته و افزودن قلم با دکمهٔ اصلی رنگی. منطق ثبت و رویدادها حفظ شد؛ تأیید نهایی وابسته به CI و بررسی تعاملی است.

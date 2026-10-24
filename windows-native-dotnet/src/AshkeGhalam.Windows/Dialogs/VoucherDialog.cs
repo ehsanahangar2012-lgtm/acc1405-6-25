@@ -116,49 +116,124 @@ public sealed class VoucherDialog : Window
         _invoice.ItemsSource = new[] { new InvoiceChoice(null, "بدون فاکتور مرتبط") };
         _invoice.SelectedIndex = 0;
 
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(new TextBlock
+        var root = new StackPanel { Margin = new Thickness(16) };
+        root.Children.Add(new Border
         {
-            Text = "سند گردش موجودی",
-            FontSize = 22,
-            FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-        root.Children.Add(new TextBlock
-        {
-            Text = "ثبت حواله، موجودی تجمیعی کالا را در همین نسخهٔ محلی تغییر می‌دهد. انبارهای مجزا و انتقال بین انبارها هنوز فعال نشده‌اند.",
-            FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12)
+            Background = PaletteBrush("#ECFDF5"),
+            BorderBrush = PaletteBrush("#A7F3D0"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(12),
+            Margin = new Thickness(0, 0, 0, 14),
+            Child = new TextBlock
+            {
+                Text = "ثبت این سند بر موجودی تجمیعی همین نسخهٔ محلی اثر می‌گذارد؛ پیش از ثبت، نوع گردش و اقلام را کنترل کنید.",
+                Foreground = PaletteBrush("#065F46"),
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap
+            }
         });
 
-        AddField(root, "نوع سند", _type);
-        AddField(root, "نوع گردش موجودی", _movementType);
-        AddDateField(root, "تاریخ شمسی", _date, optional: false);
-        AddField(root, "شخص مرتبط (اختیاری)", _person);
-        AddField(root, "فاکتور مرتبط (اختیاری)", _invoice);
+        var documentGrid = new Grid { Margin = new Thickness(0, 2, 0, 0) };
+        documentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        documentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+        documentGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var documentPrimary = new StackPanel();
+        AddField(documentPrimary, "نوع سند", _type);
+        AddField(documentPrimary, "نوع گردش موجودی", _movementType);
+        AddDateField(documentPrimary, "تاریخ شمسی", _date, optional: false);
+        var documentSecondary = new StackPanel();
+        AddField(documentSecondary, "شخص مرتبط (اختیاری)", _person);
+        AddField(documentSecondary, "فاکتور مرتبط (اختیاری)", _invoice);
+        Grid.SetColumn(documentPrimary, 0);
+        Grid.SetColumn(documentSecondary, 2);
+        documentGrid.Children.Add(documentPrimary);
+        documentGrid.Children.Add(new Border { Width = 14 });
+        documentGrid.Children.Add(documentSecondary);
+        root.Children.Add(CreateSectionCard(
+            "۱. مشخصات سند",
+            "نوع برگه، جهت گردش کالا، تاریخ و طرف حساب مرتبط",
+            documentGrid));
 
-        var lineHeading = new TextBlock { Text = "اقلام سند", FontWeight = FontWeights.Bold, FontSize = 16, Margin = new Thickness(0, 14, 0, 6) };
-        root.Children.Add(lineHeading);
-        AddField(root, "اسکن بارکد (اسکنر دستی با ارسال Enter)", _barcodeScan);
-        var pickRow = new WrapPanel { Margin = new Thickness(0, 4, 0, 6), VerticalAlignment = VerticalAlignment.Center };
+        var itemsSection = new StackPanel();
+        AddField(itemsSection, "بارکدخوان (پس از اسکن، کلید Enter)", _barcodeScan);
+        var pickRow = new WrapPanel { Margin = new Thickness(0, 4, 0, 8), VerticalAlignment = VerticalAlignment.Bottom };
+        _product.MinWidth = 235;
+        _product.Margin = new Thickness(0, 0, 8, 0);
+        _quantity.MinWidth = 100;
+        _quantity.Margin = new Thickness(0, 0, 8, 0);
         pickRow.Children.Add(_product);
         pickRow.Children.Add(_quantity);
-        var addLine = new Button { Content = "افزودن قلم", Height = 34, Padding = new Thickness(12, 4, 12, 4), Margin = new Thickness(8, 0, 0, 0) };
+        var addLine = new Button
+        {
+            Content = "＋ افزودن قلم",
+            Height = 38,
+            MinWidth = 132,
+            Padding = new Thickness(12, 5, 12, 5),
+            Margin = new Thickness(0, 0, 0, 0),
+            Background = PaletteBrush("#0F766E"),
+            Foreground = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#0F766E")
+        };
         pickRow.Children.Add(addLine);
-        root.Children.Add(pickRow);
-        root.Children.Add(_lineList);
-        var removeLine = new Button { Content = "حذف قلم انتخاب‌شده", Height = 32, Width = 150, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 6, 0, 0) };
-        root.Children.Add(removeLine);
-        root.Children.Add(_totals);
+        itemsSection.Children.Add(pickRow);
+        itemsSection.Children.Add(new TextBlock
+        {
+            Text = "اقلام افزوده‌شده؛ برای حذف، ابتدا یک ردیف را انتخاب کنید.",
+            FontSize = 11,
+            Foreground = PaletteBrush("#64748B"),
+            Margin = new Thickness(0, 2, 0, 6),
+            TextWrapping = TextWrapping.Wrap
+        });
+        _lineList.MinHeight = 110;
+        _lineList.Margin = new Thickness(0, 0, 0, 4);
+        itemsSection.Children.Add(_lineList);
+        var removeLine = new Button
+        {
+            Content = "حذف قلم انتخاب‌شده",
+            Height = 36,
+            MinWidth = 150,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(0, 6, 0, 0)
+        };
+        itemsSection.Children.Add(removeLine);
+        itemsSection.Children.Add(new Border
+        {
+            Background = PaletteBrush("#F0FDFA"),
+            BorderBrush = PaletteBrush("#99F6E4"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 10, 0, 0),
+            Child = _totals
+        });
+        root.Children.Add(CreateSectionCard(
+            "۲. اقلام انبار",
+            "بارکد یا کالا را انتخاب کنید؛ تعداد، فهرست اقلام و ارزش تخمینی در همین بخش دیده می‌شود.",
+            itemsSection));
 
-        AddField(root, "علت برگشت (در صورت استفاده)", _returnReason);
-        AddField(root, "مسئول / سرپرست", _supervisor);
-        AddField(root, "شماره خودرو / پلاک", _vehicle);
-        AddField(root, "تلفن تحویل‌گیرنده", _receiverPhone);
-        AddField(root, "توضیحات سند", _notes);
+        var detailsGrid = new Grid();
+        detailsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        detailsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
+        detailsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var detailsPrimary = new StackPanel();
+        AddField(detailsPrimary, "علت برگشت (در صورت استفاده)", _returnReason);
+        AddField(detailsPrimary, "مسئول / سرپرست", _supervisor);
+        var detailsSecondary = new StackPanel();
+        AddField(detailsSecondary, "شماره خودرو / پلاک", _vehicle);
+        AddField(detailsSecondary, "تلفن تحویل‌گیرنده", _receiverPhone);
+        Grid.SetColumn(detailsPrimary, 0);
+        Grid.SetColumn(detailsSecondary, 2);
+        detailsGrid.Children.Add(detailsPrimary);
+        detailsGrid.Children.Add(new Border { Width = 14 });
+        detailsGrid.Children.Add(detailsSecondary);
+        var detailsSection = new StackPanel();
+        detailsSection.Children.Add(detailsGrid);
+        AddField(detailsSection, "توضیحات سند", _notes);
+        root.Children.Add(CreateSectionCard(
+            "۳. اطلاعات تکمیلی",
+            "اطلاعات تحویل و توضیحات اختیاری سند",
+            detailsSection));
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(22, 10, 22, 18) };
         var preview = new Button { Content = "پیش‌نمایش قبل از ثبت", Width = 155, Height = 38, Margin = new Thickness(0, 0, 8, 0) };
@@ -360,6 +435,42 @@ public sealed class VoucherDialog : Window
         var calendar = new PersianCalendar();
         return string.Format(CultureInfo.InvariantCulture, "{0:0000}/{1:00}/{2:00}",
             calendar.GetYear(value.DateTime), calendar.GetMonth(value.DateTime), calendar.GetDayOfMonth(value.DateTime));
+    }
+
+    private static SolidColorBrush PaletteBrush(string value) =>
+        new((Color)ColorConverter.ConvertFromString(value)!);
+
+    private static Border CreateSectionCard(string title, string subtitle, UIElement content)
+    {
+        var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        heading.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 16,
+            FontWeight = FontWeights.Bold,
+            Foreground = PaletteBrush("#0F766E")
+        });
+        heading.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = 11,
+            Foreground = PaletteBrush("#64748B"),
+            Margin = new Thickness(0, 3, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+        var body = new StackPanel();
+        body.Children.Add(heading);
+        body.Children.Add(content);
+        return new Border
+        {
+            Background = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#CBD5E1"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(15),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = body
+        };
     }
 
     private static void AddDateField(Panel root, string label, TextBox field, bool optional)
