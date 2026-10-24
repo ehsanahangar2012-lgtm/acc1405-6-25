@@ -45,6 +45,9 @@ public static class SmartComboBoxSearchService
             combo.PreviewKeyDown += PreviewKeyDown;
             combo.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(ComboPreviewMouseLeftButtonDown), true);
             combo.Loaded += (_, _) => AttachEditableEditorClickHandler(combo);
+            // Theme services can replace ComboBox.ControlTemplate after Load. Reattach to the
+            // newly generated PART_EditableTextBox after layout, guarded by the weak table.
+            combo.LayoutUpdated += (_, _) => AttachEditableEditorClickHandler(combo);
         }
 
         state.IsUpdating = true;
