@@ -58,6 +58,50 @@ public sealed class ApplicationThemeUiRegressionTests
     }
 
     [TestMethod]
+    public void ScrollBarPaletteTracksBothThemesWithoutLosingContrast()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var window = new Window
+                {
+                    Width = 320,
+                    Height = 220,
+                    Background = Brushes.White,
+                    Content = new ScrollViewer
+                    {
+                        VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                        Content = new Border { Height = 700, Child = new TextBlock { Text = "محتوای بلند برای پیمایش" } }
+                    }
+                };
+
+                ApplicationThemeService.Apply(window, "dark");
+                Assert.AreEqual(Color.FromRgb(11, 18, 32), ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color);
+                Assert.AreEqual(Color.FromRgb(71, 85, 105), ((SolidColorBrush)window.Resources["ScrollThumbBrush"]).Color);
+                Assert.AreEqual(Color.FromRgb(20, 184, 166), ((SolidColorBrush)window.Resources["ScrollThumbHoverBrush"]).Color);
+
+                ApplicationThemeService.Apply(window, "light");
+                Assert.AreEqual(Color.FromRgb(241, 245, 249), ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color);
+                Assert.AreEqual(Color.FromRgb(203, 213, 225), ((SolidColorBrush)window.Resources["ScrollThumbBrush"]).Color);
+                Assert.AreEqual(Color.FromRgb(15, 118, 110), ((SolidColorBrush)window.Resources["ScrollThumbHoverBrush"]).Color);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+            throw new AssertFailedException("ScrollBar palette did not follow the selected application theme.", failure);
+    }
+
+    [TestMethod]
     public void EditableComboBoxEditorTracksBothThemePalettes()
     {
         Exception? failure = null;

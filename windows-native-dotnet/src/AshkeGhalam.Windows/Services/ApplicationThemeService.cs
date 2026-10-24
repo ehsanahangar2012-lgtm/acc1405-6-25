@@ -98,6 +98,9 @@ public static class ApplicationThemeService
         window.Resources["ComboDropDownSurfaceBrush"] = Brush(isDark ? "#111827" : "#FFFFFF");
         window.Resources["ComboDropDownBorderBrush"] = Brush(isDark ? "#475569" : "#CBD5E1");
         window.Resources["ReadOnlySurfaceBrush"] = Brush(isDark ? "#1F2937" : "#F1F5F9");
+        window.Resources["ScrollTrackBrush"] = Brush(isDark ? "#0B1220" : "#F1F5F9");
+        window.Resources["ScrollThumbBrush"] = Brush(isDark ? "#475569" : "#CBD5E1");
+        window.Resources["ScrollThumbHoverBrush"] = Brush(isDark ? "#14B8A6" : "#0F766E");
 
         // Establish control templates before theme mapping, so the newly applied
         // style brushes are remapped on the very first dark-theme pass as well.
@@ -619,7 +622,7 @@ public static class ApplicationThemeService
         if (element is Border paperFrame && paperFrame.Child is FlowDocumentScrollViewer)
             return;
 
-        if (element is FlowDocumentScrollViewer or FlowDocument or TextElement or
+        if (element is ScrollBar or Thumb or FlowDocumentScrollViewer or FlowDocument or TextElement or
             DataGridRow or DataGridCell or DataGridColumnHeader)
             return;
 
