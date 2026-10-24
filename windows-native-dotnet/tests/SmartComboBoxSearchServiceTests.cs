@@ -179,6 +179,10 @@ public sealed class SmartComboBoxSearchServiceTests
                     new Action(() => { }));
                 Assert.IsTrue(combo.IsDropDownOpen,
                     "Clicking the editable ComboBox field body should open the dropdown, not just the arrow.");
+                combo.IsDropDownOpen = false;
+                window.Dispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.Background,
+                    new Action(() => { }));
             }
             catch (Exception ex)
             {

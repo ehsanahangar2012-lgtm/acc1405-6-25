@@ -161,7 +161,7 @@ public static class SmartComboBoxSearchService
         DependencyObject? current = e.OriginalSource as DependencyObject;
         for (var depth = 0; current is not null && depth < 32; depth++)
         {
-            if (current is FrameworkElement { Name: "ToggleButton" })
+            if (current is ToggleButton)
                 return;
             if (ReferenceEquals(current, combo))
                 break;
