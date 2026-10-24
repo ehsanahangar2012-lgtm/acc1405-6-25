@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using QRCoder;
 using AshkeGhalam.Windows.Models;
+using AshkeGhalam.Windows.Services;
 
 namespace AshkeGhalam.Windows.Dialogs;
 
@@ -165,7 +166,7 @@ public sealed class VoucherPreviewWindow : Window
             facts.Children.Add(InfoCard("توضیحات", voucher.Notes, 300));
         document.Blocks.Add(new BlockUIContainer(facts));
 
-        var table = new Table { CellSpacing = 0 };
+        var table = new Table { CellSpacing = 0, Margin = new Thickness(0, 2, 0, 10) };
         for (var i = 0; i < 4; i++) table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
         var group = new TableRowGroup();
         var header = new TableRow();
@@ -177,14 +178,52 @@ public sealed class VoucherPreviewWindow : Window
         foreach (var item in voucher.Items)
         {
             var row = new TableRow();
-            var values = new[] { item.ProductName, item.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")), item.Unit,
-                string.Join(" / ", new[] { item.Description, item.ShelfLocation }.Where(value => !string.IsNullOrWhiteSpace(value))) };
-            foreach (var value in values)
-                row.Cells.Add(new TableCell(new Paragraph(new Run(value))) { Padding = new Thickness(8),
-                    Background = voucherRowIndex % 2 == 0 ? Brushes.White : soft,
-                    BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5) });
+            var background = voucherRowIndex % 2 == 0 ? Brushes.White : soft;
+            var nameCell = new TableCell
+            {
+                Padding = new Thickness(6), Background = background,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5)
+            };
+            nameCell.Blocks.Add(new BlockUIContainer(new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(item.ProductName) ? "—" : item.ProductName,
+                FontWeight = FontWeights.SemiBold, FontSize = 9.5, TextWrapping = TextWrapping.Wrap, Foreground = ink
+            }));
+            row.Cells.Add(nameCell);
+
+            row.Cells.Add(new TableCell(new Paragraph(new Run(item.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
+            {
+                Padding = new Thickness(6), Background = background,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5), FontSize = 9
+            }));
+            row.Cells.Add(new TableCell(new Paragraph(new Run(string.IsNullOrWhiteSpace(item.Unit) ? "—" : item.Unit) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
+            {
+                Padding = new Thickness(6), Background = background,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5), FontSize = 9
+            }));
+
+            var description = string.Join(" / ", new[] { item.Description, item.ShelfLocation }
+                .Where(value => !string.IsNullOrWhiteSpace(value)).Select(value => value.Trim()));
+            var descriptionCell = new TableCell
+            {
+                Padding = new Thickness(6), Background = background,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5), FontSize = 9
+            };
+            if (!string.IsNullOrWhiteSpace(description))
+                descriptionCell.Blocks.Add(new BlockUIContainer(new Border
+                {
+                    Background = soft, BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                    BorderThickness = new Thickness(0.7), CornerRadius = new CornerRadius(3),
+                    Padding = new Thickness(4, 3, 4, 3),
+                    Child = new TextBlock { Text = description, TextWrapping = TextWrapping.Wrap, FontSize = 8.5, Foreground = ink }
+                }));
+            else
+                descriptionCell.Blocks.Add(new Paragraph(new Run("—")) { Margin = new Thickness(0) });
+            row.Cells.Add(descriptionCell);
             voucherRowIndex++;
             group.Rows.Add(row);
+        }
+
         }
         table.RowGroups.Add(group);
         document.Blocks.Add(table);
@@ -218,6 +257,7 @@ public sealed class VoucherPreviewWindow : Window
         if (marks.Children.Count > 0) document.Blocks.Add(new BlockUIContainer(marks));
         document.Blocks.Add(new Paragraph(new Run("تحویل‌دهنده: ................................     تحویل‌گیرنده: ................................     تأیید مسئول: ................................"))
         { TextAlignment = TextAlignment.Right, Margin = new Thickness(0, 20, 0, 0) });
+        PrintBrandingService.AppendWebsiteFooter(document, 660);
         return document;
     }
 
