@@ -55,7 +55,7 @@ public sealed class PersianDateInputServiceTests
         thread.Join();
 
         if (failure is not null)
-            throw new AssertFailedException("Automatic date-field enhancement failed on an STA thread.", failure);
+            throw new AssertFailedException($"Automatic date-field enhancement failed on an STA thread: {failure}", failure);
     }
 
     [TestMethod]
