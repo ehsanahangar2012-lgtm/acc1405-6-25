@@ -52,7 +52,8 @@ public static class PreviewChromeService
             MinWidth = 44,
             Margin = new Thickness(4, 0, 4, 0)
         };
-        var fitToWidth = false;
+        // Start at a readable fit-to-width zoom; users can opt into fixed 100% / manual zoom.
+        var fitToWidth = true;
         void RefreshLabel() => label.Text = $"{viewer.Zoom:0}%";
         void FitWidth()
         {
