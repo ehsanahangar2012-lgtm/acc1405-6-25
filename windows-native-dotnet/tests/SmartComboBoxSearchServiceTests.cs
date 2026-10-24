@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Reflection;
 using System.Threading;
 using AshkeGhalam.Windows.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
