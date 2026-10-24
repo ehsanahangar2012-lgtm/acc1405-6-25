@@ -108,7 +108,7 @@ public static class ApplicationThemeService
         }));
     }
 
-    private static Snapshot CaptureOriginalValues    private static Snapshot CaptureOriginalValues(DependencyObject element)
+    private static Snapshot CaptureOriginalValues(DependencyObject element)
     {
         var snapshot = new Snapshot();
         foreach (var property in GetBrushProperties(element))
