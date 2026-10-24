@@ -78,6 +78,7 @@ public sealed class PaymentReceiptPreviewWindow : Window
         };
         print.Click += Print_Click;
         actions.Children.Add(print);
+        DocumentExportService.AddSaveButtons(actions, this, () => _document, $"AshkeGhalam-Receipt-{_payment.Id}");
         actions.Children.Add(new Button { Content = "بستن", MinWidth = 88, Height = 38, IsCancel = true });
         toolbar.Children.Add(actions);
 
