@@ -438,7 +438,7 @@ public sealed class VoucherDialog : Window
         _ => null
     };
 
-
+    private void SetDefaultMovement()
     {
         var type = (_type.SelectedItem as Choice)?.Value;
         var desired = type switch
