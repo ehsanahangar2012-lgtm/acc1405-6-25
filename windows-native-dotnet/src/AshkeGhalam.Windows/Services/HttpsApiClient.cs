@@ -16,14 +16,14 @@ public sealed class HttpsApiClient : IDisposable
     private bool _disposed;
 
     public HttpsApiClient(Uri baseAddress, TimeSpan? timeout = null)
+        : this(baseAddress, CreateDefaultHandler(), timeout)
+    {
+    }
+
+    internal HttpsApiClient(Uri baseAddress, HttpMessageHandler handler, TimeSpan? timeout = null)
     {
         _baseAddress = ApiEndpointPolicy.ValidateBaseAddress(baseAddress);
-        var handler = new HttpClientHandler
-        {
-            AllowAutoRedirect = false,
-            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
-        };
-
+        ArgumentNullException.ThrowIfNull(handler);
         _httpClient = new HttpClient(handler, disposeHandler: true)
         {
             BaseAddress = _baseAddress,
@@ -31,6 +31,12 @@ public sealed class HttpsApiClient : IDisposable
         };
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     }
+
+    private static HttpClientHandler CreateDefaultHandler() => new()
+    {
+        AllowAutoRedirect = false,
+        AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+    };
 
     public async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,

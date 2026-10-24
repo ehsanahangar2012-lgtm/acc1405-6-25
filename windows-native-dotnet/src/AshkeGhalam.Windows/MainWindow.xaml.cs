@@ -4196,6 +4196,20 @@ public partial class MainWindow : Window
                 return;
             }
 
+            var currentHardwareId = HardwareIdentityService.GetHardwareId();
+            if (!string.Equals(currentHardwareId, license.HardwareId, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("شناسهٔ دستگاه با لایسنس ذخیره‌شده یکسان نیست؛ پیش از همگام‌سازی دوباره فعال‌سازی کنید.");
+
+            var onlineLicense = await new ServerLicenseClient().VerifyAsync(
+                license.LicenseKey, license.WorkspaceId, currentHardwareId);
+            if (!onlineLicense.Success || onlineLicense.License is null)
+                throw new InvalidOperationException("لایسنس در بررسی مجدد سرور معتبر شناخته نشد: " + onlineLicense.Message);
+
+            license.Payload = onlineLicense.License.Payload;
+            license.Receipt = onlineLicense.License.Receipt;
+            license.VerifiedAtUtc = DateTimeOffset.UtcNow;
+            _licenseStore.Save(license);
+
             var settings = new ServerConnectionSettings
             {
                 BaseUrl = ServerBaseUrl.Text.Trim(),
