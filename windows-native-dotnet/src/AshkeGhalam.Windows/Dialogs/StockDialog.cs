@@ -22,16 +22,38 @@ public sealed class StockDialog:Window
         NumericTextBoxFormatter.Attach(_quantity);
         _product.ItemsSource = products.OrderBy(product => product.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         if (_product.Items.Count > 0) _product.SelectedIndex = 0;
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(new TextBlock { Text = "ورود موجودی", FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 12) });
-        root.Children.Add(new TextBlock { Text = "کالا (نام کالا را تایپ کنید تا سریع‌تر پیدا شود)", Margin = new Thickness(0, 6, 0, 4) });
-        root.Children.Add(_product);
-        root.Children.Add(_stockHint);
-        root.Children.Add(new TextBlock { Text = "مقدار افزایش", Margin = new Thickness(0, 12, 0, 4) });
-        root.Children.Add(_quantity);
+        var root = new StackPanel { Margin = new Thickness(16) };
+        var productSection = new StackPanel();
+        AddField(productSection, "کالا (نام را تایپ کنید تا سریع‌تر پیدا شود)", _product);
+        _stockHint.Margin = new Thickness(0, 8, 0, 0);
+        _stockHint.TextWrapping = TextWrapping.Wrap;
+        _stockHint.Padding = new Thickness(10, 8, 10, 8);
+        _stockHint.Background = PaletteBrush("#F0FDFA");
+        productSection.Children.Add(_stockHint);
+        root.Children.Add(CreateSectionCard(
+            "۱. انتخاب کالا",
+            "کالایی را که قرار است موجودی آن افزایش یابد انتخاب کنید.",
+            productSection));
+
+        var quantitySection = new StackPanel();
+        AddField(quantitySection, "مقدار افزایش", _quantity);
+        root.Children.Add(CreateSectionCard(
+            "۲. مقدار ورود",
+            "مقدار باید بزرگ‌تر از صفر باشد؛ موجودی فعلی در بالا نمایش داده می‌شود.",
+            quantitySection));
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 10, 22, 18) };
-        var ok = new Button { Content = "ثبت موجودی", Width = 120, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        var ok = new Button
+        {
+            Content = "ثبت موجودی",
+            Width = 130,
+            Height = 40,
+            IsDefault = true,
+            Margin = new Thickness(0, 0, 8, 0),
+            Background = PaletteBrush("#0F766E"),
+            Foreground = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#0F766E")
+        };
         buttons.Children.Add(ok);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
         var layout = new Grid();
@@ -64,6 +86,54 @@ public sealed class StockDialog:Window
         else
             _stockHint.Text = "ابتدا یک کالا انتخاب کنید.";
     }
+
+    private static void AddField(Panel root, string label, Control field)
+    {
+        root.Children.Add(new TextBlock
+        {
+            Text = label,
+            FontWeight = FontWeights.SemiBold,
+            FontSize = 12,
+            Margin = new Thickness(0, 7, 0, 4),
+            TextWrapping = TextWrapping.Wrap
+        });
+        field.Margin = new Thickness(0, 0, 0, 4);
+        root.Children.Add(field);
+    }
+
+    private static Border CreateSectionCard(string title, string hint, UIElement content)
+    {
+        var body = new StackPanel();
+        body.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 15,
+            FontWeight = FontWeights.Bold,
+            Foreground = PaletteBrush("#0F766E")
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = hint,
+            FontSize = 11,
+            Foreground = PaletteBrush("#64748B"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 10)
+        });
+        body.Children.Add(content);
+        return new Border
+        {
+            Background = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#E2E8F0"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = body
+        };
+    }
+
+    private static SolidColorBrush PaletteBrush(string value) =>
+        new((Color)ColorConverter.ConvertFromString(value)!);
 
     private static void FormatNumericField(TextBox field)
     {

@@ -106,7 +106,7 @@ public static class ApplicationThemeService
     private static void ApplyDialogPresentation(Window window)
     {
         var name = window.GetType().Name;
-        if (name is "MainWindow" or "InvoiceDialog" or "PersianDatePickerWindow" or "BackupPasswordDialog" ||
+        if (name is "MainWindow" or "InvoiceDialog" or "PersianDatePickerWindow" or "BackupPasswordDialog" or "CheckDialog" ||
             name.Contains("Preview", StringComparison.OrdinalIgnoreCase) ||
             window.Resources.Contains(DialogChromeResourceKey))
             return;

@@ -182,22 +182,32 @@ public sealed class CheckDialog : Window
         foreach (var combo in new[] { _bankName, _holderName, _personName })
             AttachDropDownOpen(combo);
 
-        var header = new StackPanel();
-        header.Children.Add(new TextBlock
+        var headerContent = new StackPanel();
+        headerContent.Children.Add(new TextBlock
         {
             Text = existing is null ? "ثبت چک جدید" : "ویرایش چک",
-            FontSize = 24,
+            FontSize = 23,
             FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42))
+            Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252))
         });
-        header.Children.Add(new TextBlock
+        headerContent.Children.Add(new TextBlock
         {
             Text = "فرم مرحله‌ای برای ثبت اطلاعات بانکی، تاریخ‌های شمسی و جزئیات پیگیری.",
             FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
+            Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
             TextWrapping = TextWrapping.Wrap,
             Margin = new Thickness(0, 5, 0, 0)
         });
+        var header = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(18),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = headerContent
+        };
 
         var stepOne = new StackPanel { Margin = new Thickness(2, 4, 2, 12) };
         AddField(stepOne, "نوع چک", _checkType);
@@ -294,7 +304,15 @@ public sealed class CheckDialog : Window
     private void ShowStep(int step)
     {
         _currentStep = Math.Clamp(step, 0, _steps.Length - 1);
-        _stepHost.Content = _steps[_currentStep];
+        _stepHost.Content = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(16),
+            Child = _steps[_currentStep]
+        };
         _stepIndicator.Text = $"مرحله {_currentStep + 1} از {_steps.Length}  •  " + new[] { "نوع، بانک و مبلغ", "تاریخ و اشخاص", "وضعیت و یادداشت" }[_currentStep];
         _previousButton.IsEnabled = _currentStep > 0;
         _nextButton.Visibility = _currentStep < _steps.Length - 1 ? Visibility.Visible : Visibility.Collapsed;

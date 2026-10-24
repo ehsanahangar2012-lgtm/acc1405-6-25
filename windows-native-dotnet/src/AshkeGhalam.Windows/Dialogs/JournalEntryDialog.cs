@@ -65,36 +65,63 @@ public sealed class JournalEntryDialog : Window
         _amount.Text = "0";
 
         var scroll = new ScrollViewer { VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(new TextBlock
+        var root = new StackPanel { Margin = new Thickness(16) };
+        root.Children.Add(new Border
         {
-            Text = "سند دوطرفه — ثبت بدهکار و بستانکار",
-            FontSize = 21,
-            FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-        root.Children.Add(new TextBlock
-        {
-            Text = "در این مدل هر سند شامل یک بدهکار و یک بستانکار با مبلغ برابر است. اسناد پس از ثبت حذف یا ویرایش نمی‌شوند؛ اصلاح را با سند جدید انجام دهید.",
-            FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 14)
+            Background = PaletteBrush("#F0FDFA"),
+            BorderBrush = PaletteBrush("#99F6E4"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(12),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = new TextBlock
+            {
+                Text = "این مدل یک بدهکار و یک بستانکار با مبلغ برابر ثبت می‌کند. ثبت سند نهایی قابل حذف یا ویرایش نیست؛ اصلاح را با سند جدید انجام دهید.",
+                Foreground = PaletteBrush("#115E59"),
+                TextWrapping = TextWrapping.Wrap,
+                FontSize = 12
+            }
         });
 
-        AddField(root, "تاریخ شمسی یا میلادی (سال/ماه/روز)", _date);
-        AddField(root, "شرح سند", _description);
-        AddField(root, "حساب بدهکار", _debit);
-        AddField(root, "حساب بستانکار", _credit);
-        AddField(root, "مبلغ", _amount);
-        AddField(root, "نوع سند", _documentType);
-        AddField(root, "سال مالی (اختیاری)", _fiscalYear);
-        AddField(root, "شناسه مرجع (اختیاری)", _referenceId);
-        AddField(root, "نوع مرجع (اختیاری)", _referenceType);
+        var identitySection = new StackPanel();
+        AddField(identitySection, "تاریخ شمسی یا میلادی (سال/ماه/روز)", _date);
+        AddField(identitySection, "شرح سند", _description);
+        AddField(identitySection, "نوع سند", _documentType);
+        root.Children.Add(CreateSectionCard(
+            "۱. مشخصات سند",
+            "تاریخ، شرح و دستهٔ ثبت حسابداری را وارد کنید.",
+            identitySection));
+
+        var postingSection = new StackPanel();
+        AddField(postingSection, "حساب بدهکار", _debit);
+        AddField(postingSection, "حساب بستانکار", _credit);
+        AddField(postingSection, "مبلغ", _amount);
+        root.Children.Add(CreateSectionCard(
+            "۲. ثبت مالی",
+            "حساب‌های بدهکار و بستانکار باید متفاوت و مبلغ باید مثبت باشد.",
+            postingSection));
+
+        var referenceSection = new StackPanel();
+        AddField(referenceSection, "سال مالی (اختیاری)", _fiscalYear);
+        AddField(referenceSection, "شناسه مرجع (اختیاری)", _referenceId);
+        AddField(referenceSection, "نوع مرجع (اختیاری)", _referenceType);
+        root.Children.Add(CreateSectionCard(
+            "۳. دوره و مرجع",
+            "برای پیگیری و تطبیق، اطلاعات مرجع را در صورت وجود وارد کنید.",
+            referenceSection));
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 10, 22, 18) };
-        var save = new Button { Content = "ثبت قطعی سند", Width = 135, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        var save = new Button
+        {
+            Content = "ثبت قطعی سند",
+            Width = 145,
+            Height = 40,
+            IsDefault = true,
+            Margin = new Thickness(0, 0, 8, 0),
+            Background = PaletteBrush("#0F766E"),
+            Foreground = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#0F766E")
+        };
         buttons.Children.Add(save);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
         var layout = new Grid();
@@ -160,4 +187,38 @@ public sealed class JournalEntryDialog : Window
         field.Margin = new Thickness(0, 0, 0, 3);
         root.Children.Add(field);
     }
+    private static Border CreateSectionCard(string title, string hint, UIElement content)
+    {
+        var body = new StackPanel();
+        body.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 15,
+            FontWeight = FontWeights.Bold,
+            Foreground = PaletteBrush("#0F766E")
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = hint,
+            FontSize = 11,
+            Foreground = PaletteBrush("#64748B"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 10)
+        });
+        body.Children.Add(content);
+        return new Border
+        {
+            Background = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#E2E8F0"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = body
+        };
+    }
+
+    private static SolidColorBrush PaletteBrush(string value) =>
+        new((Color)ColorConverter.ConvertFromString(value)!);
+
 }

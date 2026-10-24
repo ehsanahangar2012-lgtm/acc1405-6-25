@@ -51,32 +51,36 @@ public sealed class LedgerAccountDialog : Window
         _type.SelectionChanged += (_, _) => RefreshParentChoices();
         _level.SelectionChanged += (_, _) => RefreshParentChoices();
 
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(new TextBlock
-        {
-            Text = "سرفصل جدید در کدینگ حساب‌ها",
-            FontSize = 21,
-            FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            Margin = new Thickness(0, 0, 0, 8)
-        });
-        root.Children.Add(new TextBlock
-        {
-            Text = "ساختار نوع و سطح حساب مطابق مدل ChartOfAccount نسخهٔ اصلی است. کد هر سرفصل باید یکتا باشد.",
-            FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12)
-        });
+        var root = new StackPanel { Margin = new Thickness(16) };
+        var identitySection = new StackPanel();
+        AddField(identitySection, "کد حساب (الزامی)", _code);
+        AddField(identitySection, "عنوان حساب (الزامی)", _name);
+        root.Children.Add(CreateSectionCard(
+            "۱. هویت سرفصل",
+            "کد باید یکتا باشد و عنوان، ساختار حساب را روشن کند.",
+            identitySection));
 
-        AddField(root, "کد حساب (الزامی)", _code);
-        AddField(root, "عنوان حساب (الزامی)", _name);
-        AddField(root, "نوع حساب", _type);
-        AddField(root, "سطح حساب", _level);
-        AddField(root, "حساب والد (برای معین/تفصیلی الزامی)", _parent);
+        var classificationSection = new StackPanel();
+        AddField(classificationSection, "نوع حساب", _type);
+        AddField(classificationSection, "سطح حساب", _level);
+        AddField(classificationSection, "حساب والد (برای معین/تفصیلی الزامی)", _parent);
+        root.Children.Add(CreateSectionCard(
+            "۲. ساختار کدینگ",
+            "حساب‌های معین به حساب کل و حساب‌های تفصیلی به حساب معین متصل می‌شوند.",
+            classificationSection));
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 10, 22, 18) };
-        var save = new Button { Content = "ثبت سرفصل", Width = 125, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        var save = new Button
+        {
+            Content = "ثبت سرفصل",
+            Width = 135,
+            Height = 40,
+            IsDefault = true,
+            Margin = new Thickness(0, 0, 8, 0),
+            Background = PaletteBrush("#0F766E"),
+            Foreground = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#0F766E")
+        };
         buttons.Children.Add(save);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
         var layout = new Grid();
@@ -154,4 +158,38 @@ public sealed class LedgerAccountDialog : Window
         field.Margin = new Thickness(0, 0, 0, 3);
         root.Children.Add(field);
     }
+    private static Border CreateSectionCard(string title, string hint, UIElement content)
+    {
+        var body = new StackPanel();
+        body.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 15,
+            FontWeight = FontWeights.Bold,
+            Foreground = PaletteBrush("#0F766E")
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = hint,
+            FontSize = 11,
+            Foreground = PaletteBrush("#64748B"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 10)
+        });
+        body.Children.Add(content);
+        return new Border
+        {
+            Background = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#E2E8F0"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = body
+        };
+    }
+
+    private static SolidColorBrush PaletteBrush(string value) =>
+        new((Color)ColorConverter.ConvertFromString(value)!);
+
 }
