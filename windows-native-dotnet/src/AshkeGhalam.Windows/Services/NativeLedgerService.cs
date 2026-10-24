@@ -136,34 +136,8 @@ public static class NativeLedgerService
         return entry;
     }
 
-    public static string NormalizeAndValidateDate(string? value)
-    {
-        var normalized = NormalizeDigits((value ?? string.Empty).Trim()).Replace('-', '/');
-        var parts = normalized.Split('/', StringSplitOptions.TrimEntries);
-        if (parts.Length != 3 || parts.Any(p => p.Length == 0 || !p.All(char.IsAsciiDigit)))
-            throw new InvalidOperationException("تاریخ سند را به‌شکل سال/ماه/روز وارد کنید؛ نمونه: ۱۴۰۵/۰۷/۰۱.");
-
-        if (!int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var year) ||
-            !int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out var month) ||
-            !int.TryParse(parts[2], NumberStyles.None, CultureInfo.InvariantCulture, out var day))
-            throw new InvalidOperationException("تاریخ سند قابل خواندن نیست.");
-
-        try
-        {
-            if (year is >= 1300 and <= 1500)
-                _ = new PersianCalendar().ToDateTime(year, month, day, 0, 0, 0, 0);
-            else if (year is >= 1900 and <= 2200)
-                _ = new DateTime(year, month, day);
-            else
-                throw new ArgumentOutOfRangeException(nameof(value));
-        }
-        catch (ArgumentOutOfRangeException)
-        {
-            throw new InvalidOperationException("تاریخ شمسی/میلادی معتبر نیست.");
-        }
-
-        return $"{year:0000}/{month:00}/{day:00}";
-    }
+    public static string NormalizeAndValidateDate(string? value) =>
+        PersianDateInputService.Format(PersianDateInputService.Parse(value, "تاریخ سند"));
 
     public static IReadOnlyList<TrialBalanceLine> GetTrialBalance(AccountingData data)
     {
