@@ -977,6 +977,13 @@ public static class ApplicationThemeService
         });
         presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
         presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        // ContentPresenter does not reliably inherit Button.Foreground for plain string
+        // content in this programmatic template. Bind the text brush explicitly so
+        // brand, danger and secondary buttons preserve readable local foreground colors.
+        presenter.SetBinding(TextElement.ForegroundProperty, new Binding(nameof(Control.Foreground))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
         surface.AppendChild(presenter);
         template.VisualTree = surface;
         template.Triggers.Add(new Trigger

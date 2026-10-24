@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
@@ -136,6 +137,13 @@ public sealed class NativeUiVisualPreviewTests
                     SetText(dashboard, "PayablesTotal", "۱٬۶۲۰٬۰۰۰");
                     SetText(dashboard, "ExpensesTotal", "۶۳۰٬۰۰۰");
                     ApplicationThemeService.Apply(dashboard, theme);
+                    // Match the application's normal startup/navigation state. Applying only
+                    // the color service leaves the sidebar's route-specific local brushes unset.
+                    var navigationSelection = typeof(MainWindow).GetMethod(
+                        "UpdateNavigationSelection", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (navigationSelection is null)
+                        throw new InvalidOperationException("MainWindow navigation-theme method was not found.");
+                    navigationSelection.Invoke(dashboard, new object?[] { "dashboard", theme });
                     SaveContent(dashboard, outputDirectory, $"dashboard-{theme}.png");
 
                     currentStage = $"person form ({theme})";
