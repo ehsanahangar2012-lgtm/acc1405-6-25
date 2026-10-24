@@ -82,22 +82,18 @@ public sealed class PaymentReceiptPreviewWindow : Window
         DockPanel.SetDock(actions, Dock.Left);
         toolbar.Children.Add(actions);
 
+        var viewer = new FlowDocumentScrollViewer
+        {
+            Document = _document, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, IsToolBarVisible = false,
+            Background = Brushes.White, Padding = new Thickness(12)
+        };
+        actions.Children.Insert(0, PreviewChromeService.CreateZoomControls(viewer, () => _document.PageWidth));
         var paper = new Border
         {
             Background = Brushes.White,
             BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
-            BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(12),
-            Padding = new Thickness(10),
-            Child = new FlowDocumentScrollViewer
-            {
-                Document = _document,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                IsToolBarVisible = false,
-                Background = Brushes.White,
-                Padding = new Thickness(12)
-            }
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(12), Padding = new Thickness(10), Child = viewer
         };
         var toolbarFrame = PreviewChromeService.CreateToolbarFrame(toolbar);
         Grid.SetRow(toolbarFrame, 0);

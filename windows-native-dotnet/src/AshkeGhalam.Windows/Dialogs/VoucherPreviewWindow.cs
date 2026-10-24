@@ -53,12 +53,17 @@ public sealed class VoucherPreviewWindow : Window
         print.Click += Print_Click; buttons.Children.Add(print);
         buttons.Children.Add(new Button { Content = "بستن", MinWidth = 90, Height = 36, IsCancel = true });
         DockPanel.SetDock(buttons, Dock.Left); toolbar.Children.Add(buttons);
+        var viewer = new FlowDocumentScrollViewer
+        {
+            Document = _document, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, IsToolBarVisible = false,
+            Background = Brushes.White, Padding = new Thickness(12)
+        };
+        buttons.Children.Insert(0, PreviewChromeService.CreateZoomControls(viewer, () => _document.PageWidth));
         var paper = new Border
         {
             Background = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
-            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(8),
-            Child = new FlowDocumentScrollViewer { Document = _document, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, IsToolBarVisible = false, Background = Brushes.White, Padding = new Thickness(12) }
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(10), Padding = new Thickness(8), Child = viewer
         };
         var toolbarFrame = PreviewChromeService.CreateToolbarFrame(toolbar);
         Grid.SetRow(toolbarFrame, 0);

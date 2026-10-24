@@ -252,6 +252,7 @@ public sealed class InvoicePreviewWindow : Window
         };
         _viewer = viewer;
         paper.Child = viewer;
+        buttons.Children.Insert(1, PreviewChromeService.CreateZoomControls(viewer, () => _document.PageWidth));
         var toolbarFrame = PreviewChromeService.CreateToolbarFrame(toolbar);
         Grid.SetRow(toolbarFrame, 0);
         Grid.SetRow(paper, 1);

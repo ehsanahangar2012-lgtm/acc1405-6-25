@@ -180,6 +180,7 @@ public sealed class ProductKardexPrintPreviewWindow : Window
             Background = Brushes.White,
             Padding = new Thickness(12)
         };
+        actions.Children.Insert(0, PreviewChromeService.CreateZoomControls(viewer, () => _document.PageWidth));
         Grid.SetRow(viewer, 1);
         root.Children.Add(viewer);
         Content = root;

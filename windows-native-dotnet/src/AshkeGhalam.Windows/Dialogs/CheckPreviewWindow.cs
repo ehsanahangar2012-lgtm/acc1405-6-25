@@ -201,6 +201,7 @@ public sealed class CheckPreviewWindow : Window
             Background = Brushes.White,
             Padding = new Thickness(12)
         };
+        actions.Children.Insert(0, PreviewChromeService.CreateZoomControls(viewer, () => _document.PageWidth));
         var paper = new Border
         {
             Background = Brushes.White,

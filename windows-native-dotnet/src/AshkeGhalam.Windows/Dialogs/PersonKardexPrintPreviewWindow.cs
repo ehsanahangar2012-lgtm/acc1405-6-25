@@ -110,6 +110,7 @@ public sealed class PersonKardexPrintPreviewWindow : Window
             Document = _document, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, IsToolBarVisible = false
         };
+        actions.Children.Insert(0, PreviewChromeService.CreateZoomControls(viewer, () => _document.PageWidth));
         Grid.SetRow(viewer, 1);
         root.Children.Add(viewer);
         Content = root;
