@@ -1372,8 +1372,14 @@
                                     <TextBlock Text="مشخصات شرکت فعال" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
                                     <TextBlock Text="نام حقوقی" FontSize="11" Foreground="#64748B" Margin="0,12,0,3"/>
                                     <TextBlock x:Name="AboutCompanyLegalName" Text="در تنظیمات شرکت ثبت نشده" FontSize="14" FontWeight="SemiBold" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="شعبه" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyBranch" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" FontWeight="SemiBold" Foreground="#1E293B" TextWrapping="Wrap"/>
                                     <TextBlock Text="تلفن" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
                                     <TextBlock x:Name="AboutCompanyPhone" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="شناسهٔ ملی" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyNationalId" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="شناسهٔ مالیاتی" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyTaxId" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
                                     <TextBlock Text="نشانی" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
                                     <TextBlock x:Name="AboutCompanyAddress" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
                                     <Button Content="ویرایش مشخصات شرکت" Tag="تنظیمات و شرکت‌ها" Click="AdvancedOpenTab_Click" Height="36" Margin="0,14,0,0" HorizontalAlignment="Right"/>

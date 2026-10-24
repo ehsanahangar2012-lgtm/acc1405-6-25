@@ -4379,10 +4379,17 @@ public partial class MainWindow : Window
     private void RefreshAboutCompanyPage()
     {
         var company = ActiveCompanyProfile();
-        AboutCompanyLegalName.Text = string.IsNullOrWhiteSpace(company?.LegalName)
-            ? (company?.Name ?? "در تنظیمات شرکت ثبت نشده") : company.LegalName;
-        AboutCompanyPhone.Text = string.IsNullOrWhiteSpace(company?.Phone) ? "در تنظیمات شرکت ثبت نشده" : company.Phone;
-        AboutCompanyAddress.Text = string.IsNullOrWhiteSpace(company?.Address) ? "در تنظیمات شرکت ثبت نشده" : company.Address;
+        static string RegisteredValue(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? "در تنظیمات شرکت ثبت نشده" : value.Trim();
+
+        AboutCompanyLegalName.Text = RegisteredValue(
+            string.IsNullOrWhiteSpace(company?.LegalName) ? company?.Name : company.LegalName);
+        AboutCompanyBranch.Text = RegisteredValue(company?.Branch);
+        AboutCompanyPhone.Text = RegisteredValue(company?.Phone);
+        AboutCompanyNationalId.Text = RegisteredValue(company?.NationalId);
+        AboutCompanyTaxId.Text = RegisteredValue(company?.TaxId);
+        AboutCompanyAddress.Text = RegisteredValue(company?.Address);
+
         var version = typeof(MainWindow).Assembly.GetName().Version;
         AboutVersionText.Text = "نسخهٔ " + (version?.ToString(3) ?? "نامشخص");
     }
