@@ -81,7 +81,16 @@ public sealed class InvoiceDialog : Window
     };
     private int _editingLineIndex = -1;
     private readonly TextBlock _numberPreview = new() { FontSize = 13, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110)), Margin = new Thickness(0, 8, 0, 12) };
-    private readonly TextBlock _totals = new() { FontSize = 14, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)), TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 6) };
+    private readonly TextBlock _totals = new()
+    {
+        FontSize = 12,
+        FontWeight = FontWeights.SemiBold,
+        Foreground = new SolidColorBrush(Color.FromRgb(23, 45, 61)),
+        TextWrapping = TextWrapping.Wrap,
+        TextAlignment = TextAlignment.Right,
+        FlowDirection = FlowDirection.RightToLeft,
+        Margin = new Thickness(0)
+    };
 
     public InvoiceDraft? Result { get; private set; }
 
@@ -274,7 +283,16 @@ public sealed class InvoiceDialog : Window
         pricing.Children.Add(pricingSpacer);
         pricing.Children.Add(taxPanel);
         pricingSection.Children.Add(pricing);
-        pricingSection.Children.Add(_totals);
+        pricingSection.Children.Add(new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(245, 248, 250)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(213, 224, 230)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(12, 10, 12, 10),
+            Margin = new Thickness(0, 12, 0, 8),
+            Child = _totals
+        });
         AddField(pricingSection, "دریافت/پرداخت نقدی هنگام صدور", _cashAmount);
         var pricingCard = CreateSectionCard("جمع‌بندی مالی", "تخفیف، مالیات و مانده سند به‌صورت خودکار محاسبه می‌شوند", pricingSection);
         Grid.SetColumn(pricingCard, 2);
@@ -750,7 +768,16 @@ public sealed class InvoiceDialog : Window
         var total = AccountingRules.Money(subtotal - discount + tax);
         var remaining = total - cash;
         var taxLabel = isTaxAmount ? "مالیات مبلغی" : $"مالیات ({taxInput:#,##0.##}٪)";
-        _totals.Text = $"جمع کالاها: {subtotal:#,##0.##} {_currencyLabel}   |   تخفیف: {discount:#,##0.##} {_currencyLabel}   |   {taxLabel}: {tax:#,##0.##} {_currencyLabel}\nمبلغ نهایی: {total:#,##0.##} {_currencyLabel}   |   نقدی: {cash:#,##0.##} {_currencyLabel}   |   مانده پس از نقدی: {remaining:#,##0.##} {_currencyLabel}";
+        string Amount(decimal value) => $"{value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))} {_currencyLabel}";
+        _totals.Text = string.Join(Environment.NewLine, new[]
+        {
+            $"جمع کالاها: {Amount(subtotal)}",
+            $"تخفیف: {Amount(discount)}",
+            $"{taxLabel}: {Amount(tax)}",
+            $"مبلغ نهایی: {Amount(total)}",
+            $"پرداخت نقدی: {Amount(cash)}",
+            $"مانده پس از نقدی: {Amount(remaining)}"
+        });
     }
 
     private void RefreshNumberPreview() => _numberPreview.Text = BuildNumberPreview(CurrentType);
