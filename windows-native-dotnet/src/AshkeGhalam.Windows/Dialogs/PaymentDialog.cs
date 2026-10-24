@@ -211,8 +211,6 @@ public sealed class PaymentDialog : Window
         _invoice.SelectedItem = options.FirstOrDefault(option => option.Invoice.Id == previousInvoiceId)
             ?? options.FirstOrDefault(option => option.Invoice.Id == _existingPayment?.InvoiceId)
             ?? options.FirstOrDefault();
-        if (_existingPayment is null && _invoice.SelectedItem is InvoiceOption selected)
-            _amount.Text = NumericTextBoxFormatter.Format(RemainingAmount(selected.Invoice));
         RefreshRemainingHint();
     }
 
@@ -227,9 +225,21 @@ public sealed class PaymentDialog : Window
     private void RefreshRemainingHint()
     {
         if (_invoice.SelectedItem is InvoiceOption option)
+        {
+            _amount.IsEnabled = true;
+            // For a new settlement, follow the selected invoice's current open balance.
+            // Existing settlements keep the amount being edited instead of overwriting it.
+            if (_existingPayment is null)
+                _amount.Text = NumericTextBoxFormatter.Format(RemainingAmount(option.Invoice));
             _remainingHint.Text = $"ماندهٔ مجاز این فاکتور: {RemainingAmount(option.Invoice):N2} {_currencyLabel}. مبلغ دلخواه را می‌توانید کمتر وارد کنید.";
+        }
         else
+        {
+            _amount.IsEnabled = false;
+            if (_existingPayment is null)
+                _amount.Clear();
             _remainingHint.Text = "برای طرف حساب انتخاب‌شده، فاکتور قطعیِ دارای مانده‌ای وجود ندارد.";
+        }
     }
 
     private static void FormatNumericField(TextBox field)
