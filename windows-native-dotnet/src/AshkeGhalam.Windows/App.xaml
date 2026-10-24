@@ -55,6 +55,9 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Surface" Property="Opacity" Value="0.82"/>
                             </Trigger>
+                            <Trigger Property="AcceptsReturn" Value="True">
+                                <Setter TargetName="PART_ContentHost" Property="VerticalAlignment" Value="Stretch"/>
+                            </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
                                 <Setter TargetName="Surface" Property="BorderBrush" Value="#0F766E"/>
                             </Trigger>
@@ -87,7 +90,10 @@
                                 CornerRadius="8"
                                 SnapsToDevicePixels="True">
                             <ScrollViewer x:Name="PART_ContentHost"
+                                          Focusable="False"
                                           Margin="{TemplateBinding Padding}"
+                                          HorizontalScrollBarVisibility="{TemplateBinding ScrollViewer.HorizontalScrollBarVisibility}"
+                                          VerticalScrollBarVisibility="{TemplateBinding ScrollViewer.VerticalScrollBarVisibility}"
                                           VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>

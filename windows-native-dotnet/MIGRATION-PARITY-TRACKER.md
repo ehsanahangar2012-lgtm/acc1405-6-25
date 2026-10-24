@@ -461,3 +461,6 @@
 ## 2026-10-24 — dataset-scale and date-filter finishing pass
 - Added a no-timing-threshold regression test with 300 additional people and 300 additional products, covering dataset validation, deep copy, encrypted backup, restore, and full record retention.
 - Both ends of the person-kardex date range can now be cleared independently with the existing Persian date-picker menu.
+
+- [x] قالب مشترک TextBox اکنون تنظیمات واقعی ScrollViewer افقی/عمودی را از خود کنترل می‌گیرد؛ فیلدهای چندخطیِ دارای AcceptsReturn فضای عمودی را پر می‌کنند تا اسکرول و ویرایش متن بلند در همان پوستهٔ گرد مختل نشود.
+- [ ] این اصلاح قالب باید در CI و با نوشتن متن بلند/پیمایش فیلدهای چندخطی روی Windows واقعی بررسی شود.
