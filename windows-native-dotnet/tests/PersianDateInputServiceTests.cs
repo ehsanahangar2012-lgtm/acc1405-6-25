@@ -175,6 +175,14 @@ public sealed class PersianDateInputServiceTests
     }
 
     [TestMethod]
+    public void NavigationHoverPaletteMeetsWcagAA()
+    {
+        var hoverBackground = Color.FromRgb(51, 65, 85); // #334155, sidebar hover surface
+        Assert.IsTrue(ApplicationThemeService.ContrastRatio(Colors.White, hoverBackground) >= 4.5,
+            "Sidebar navigation labels must remain readable on the hover surface.");
+    }
+
+    [TestMethod]
     public void PopupChoiceAndCalendarPalettesMeetWcagInBothThemes()
     {
         // These pairs mirror the runtime ComboBox/ListBox and DatePicker popup palettes.

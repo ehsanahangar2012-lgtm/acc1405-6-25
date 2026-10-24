@@ -205,6 +205,7 @@
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Surface" Property="Background" Value="#334155"/>
                                 <Setter TargetName="Surface" Property="BorderBrush" Value="#64748B"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="Surface" Property="Background" Value="#0F766E"/>
