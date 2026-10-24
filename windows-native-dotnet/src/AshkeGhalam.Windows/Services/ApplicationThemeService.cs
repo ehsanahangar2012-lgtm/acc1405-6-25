@@ -791,6 +791,11 @@ public static class ApplicationThemeService
 
         foreach (var button in elements.OfType<Button>())
         {
+            // Do not replace implementation parts of the DatePicker/Calendar/ComboBox templates.
+            if (button.GetType() != typeof(Button) ||
+                HasVisualOrLogicalAncestor(button, typeof(ComboBox), typeof(DatePicker), typeof(Calendar), typeof(DataGrid)))
+                continue;
+
             if (ThemeManagedButtons.TryGetValue(button, out _))
                 button.Style = buttonStyle;
             else if (button.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
@@ -807,6 +812,11 @@ public static class ApplicationThemeService
 
         foreach (var input in elements.OfType<TextBox>())
         {
+            // An editable ComboBox owns a named PART_EditableTextBox. Re-templating that
+            // child as an ordinary entry field can break search and selection.
+            if (HasVisualOrLogicalAncestor(input, typeof(ComboBox), typeof(DataGrid)))
+                continue;
+
             if (ThemeManagedTextBoxes.TryGetValue(input, out _))
                 input.Style = textBoxStyle;
             else if (input.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
@@ -879,6 +889,29 @@ public static class ApplicationThemeService
         }
     }
 
+
+    private static bool HasVisualOrLogicalAncestor(DependencyObject element, params Type[] ancestorTypes)
+    {
+        var current = element;
+        var visited = new HashSet<DependencyObject>(ReferenceEqualityComparer.Instance);
+        while (current is not null && visited.Add(current))
+        {
+            DependencyObject? parent = null;
+            try
+            {
+                if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+                    parent = VisualTreeHelper.GetParent(current);
+            }
+            catch (InvalidOperationException) { }
+            parent ??= LogicalTreeHelper.GetParent(current);
+            if (parent is null)
+                return false;
+            if (ancestorTypes.Any(type => type.IsInstanceOfType(parent)))
+                return true;
+            current = parent;
+        }
+        return false;
+    }
 
     private static void PolishFormLabels(IReadOnlyCollection<DependencyObject> elements)
     {

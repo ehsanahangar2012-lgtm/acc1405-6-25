@@ -12,6 +12,49 @@ namespace AshkeGhalam.Windows.Tests;
 public sealed class ApplicationThemeUiRegressionTests
 {
     [TestMethod]
+    public void GenericButtonsAndTextInputsGetConsistentThemeAwareStyles()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var button = new Button { Content = "ثبت" };
+                var input = new TextBox { Text = "نمونه" };
+                var root = new StackPanel();
+                root.Children.Add(button);
+                root.Children.Add(input);
+                var window = new Window { Width = 480, Height = 260, Content = root };
+
+                ApplicationThemeService.Apply(window, "dark");
+                var darkButtonStyle = button.Style;
+                var darkTextBoxStyle = input.Style;
+                Assert.AreEqual(typeof(Button), darkButtonStyle.TargetType);
+                Assert.AreEqual(typeof(TextBox), darkTextBoxStyle.TargetType);
+                Assert.IsTrue(darkTextBoxStyle.Setters.OfType<Setter>()
+                    .Any(setter => setter.Property == Control.TemplateProperty));
+
+                ApplicationThemeService.Apply(window, "light");
+                Assert.AreNotSame(darkButtonStyle, button.Style);
+                Assert.AreNotSame(darkTextBoxStyle, input.Style);
+                Assert.AreEqual(typeof(Button), button.Style.TargetType);
+                Assert.AreEqual(typeof(TextBox), input.Style.TargetType);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+            throw new AssertFailedException("Shared WPF control styles failed on an STA thread.", failure);
+    }
+
+    [TestMethod]
     public void DataGridThemeSwitchRestoresReadableLightPaletteAfterDarkMode()
     {
         Exception? failure = null;
