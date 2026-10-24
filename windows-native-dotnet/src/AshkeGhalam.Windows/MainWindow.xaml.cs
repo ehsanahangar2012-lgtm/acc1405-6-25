@@ -2632,7 +2632,11 @@ public partial class MainWindow : Window
             {
                 var principalValue = PersianNumberParser.ParseDecimal(principal.Text, "اصل وام");
                 var interestValue = PersianNumberParser.ParseDecimal(interest.Text, "بهرهٔ سالانه");
-                var countValue = int.Parse(PersianNumberParser.NormalizeDigits(count.Text.Trim()).Replace(",", "", StringComparison.Ordinal), CultureInfo.InvariantCulture);
+                var installmentCountValue = PersianNumberParser.ParseDecimal(count.Text, "تعداد اقساط");
+                if (installmentCountValue != decimal.Truncate(installmentCountValue) ||
+                    installmentCountValue > int.MaxValue)
+                    throw new InvalidOperationException("تعداد اقساط باید عدد صحیح باشد.");
+                var countValue = decimal.ToInt32(installmentCountValue);
                 var startDate = NativeFinancialModuleService.ParsePersianDate(start.Text);
                 var startValue = new DateTimeOffset(startDate, TimeZoneInfo.Local.GetUtcOffset(startDate));
                 var fundingCode = (funding.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "1120";
