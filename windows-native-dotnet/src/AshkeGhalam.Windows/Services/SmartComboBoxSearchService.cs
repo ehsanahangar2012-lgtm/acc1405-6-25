@@ -21,6 +21,7 @@ public static class SmartComboBoxSearchService
         public string Query { get; set; } = "";
         public bool IsUpdating { get; set; }
         public int EditVersion { get; set; }
+        public bool IgnoreNextTextChangeAfterSelection { get; set; }
     }
 
     private static readonly ConditionalWeakTable<ComboBox, SearchState> States = new();
@@ -47,6 +48,7 @@ public static class SmartComboBoxSearchService
             ? searchableValues(typed) ?? Enumerable.Empty<string?>()
             : Enumerable.Empty<string?>();
         state.Query = "";
+        state.IgnoreNextTextChangeAfterSelection = false;
         state.View = new ListCollectionView(values);
         state.View.Filter = item => item is not null && MatchesSearch(state.SearchValues(item), state.Query);
         combo.IsEditable = true;
@@ -125,6 +127,7 @@ public static class SmartComboBoxSearchService
         // remove/recreate the clicked ComboBoxItem before the editable text box has received
         // its selected display text, making mouse selection appear to do nothing.
         state.Query = "";
+        state.IgnoreNextTextChangeAfterSelection = true;
         var selectionVersion = ++state.EditVersion;
         combo.Dispatcher.BeginInvoke(DispatcherPriority.DataBind, new Action(() =>
         {
@@ -161,6 +164,7 @@ public static class SmartComboBoxSearchService
             return;
 
         var editor = combo.Template.FindName("PART_EditableTextBox", combo) as TextBox;
+        state.IgnoreNextTextChangeAfterSelection = false;
         state.IsUpdating = true;
         try
         {
@@ -184,28 +188,25 @@ public static class SmartComboBoxSearchService
             state.IsUpdating || e.OriginalSource is not TextBox editBox)
             return;
 
-        // A WPF ComboBox may update its editable TextBox a moment after SelectionChanged.
-        // Never infer deselection from that delayed text event. Actual user edits first pass
-        // through PreviewTextInput/PreviewKeyDown and explicitly clear the selected record.
-        if (combo.SelectedItem is not null)
-        {
-            if (state.Query.Length != 0)
-            {
-                state.IsUpdating = true;
-                try
-                {
-                    state.Query = "";
-                    state.View.Refresh();
-                }
-                finally
-                {
-                    state.IsUpdating = false;
-                }
-            }
-            return;
-        }
-
         var text = editBox.Text ?? combo.Text ?? "";
+        if (combo.SelectedItem is object selected)
+        {
+            // SelectionChanged can be followed by one stale TextChanged while WPF commits
+            // the selected label. Ignore that event only; keystrokes/paste explicitly start
+            // a new query before text changes, so a real search cannot be swallowed.
+            if (state.IgnoreNextTextChangeAfterSelection)
+            {
+                state.IgnoreNextTextChangeAfterSelection = false;
+                return;
+            }
+
+            if (IsExactValue(state, selected, text))
+            {
+                state.Query = "";
+                return;
+            }
+            // If text is not one of the selected record's values, continue into filtering.
+        }
         var selectionStart = editBox.SelectionStart;
         var selectionLength = editBox.SelectionLength;
 

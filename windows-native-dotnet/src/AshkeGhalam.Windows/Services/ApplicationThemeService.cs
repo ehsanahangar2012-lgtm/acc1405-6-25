@@ -47,7 +47,7 @@ public static class ApplicationThemeService
         var palette = isDark
             ? new Dictionary<string, string>(StringComparer.Ordinal)
             {
-                ["WindowBackground"] = "#0B1220",
+                ["WindowBackground"] = "#111827",
                 ["SurfaceBackground"] = "#111827",
                 ["SurfaceMuted"] = "#1F2937",
                 ["ReadOnlySurfaceBrush"] = "#1F2937",
@@ -107,7 +107,7 @@ public static class ApplicationThemeService
 
         // Window is not a Control; set its shell colors explicitly so no white/black
         // background leaks through when a new form or popup switches themes.
-        window.Background = Brush(isDark ? "#0B1220" : "#F4F7FB");
+        window.Background = Brush(isDark ? "#111827" : "#F4F7FB");
         window.Foreground = Brush(isDark ? "#F8FAFC" : "#0F172A");
     }
 
