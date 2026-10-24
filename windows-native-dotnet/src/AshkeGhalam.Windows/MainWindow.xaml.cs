@@ -56,6 +56,7 @@ public partial class MainWindow : Window
         StateChanged += (_, _) => UpdateWindowStateButton();
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         _automaticBackupTimer.Tick += AutomaticBackupTimer_Tick;
+        NumericTextBoxFormatter.Attach(CurrencyConvertAmount);
     }
 
     private void WindowMinimize_Click(object sender, RoutedEventArgs e) =>
@@ -2606,6 +2607,7 @@ public partial class MainWindow : Window
         funding.SelectedIndex = 0;
         NumericTextBoxFormatter.Attach(principal);
         NumericTextBoxFormatter.Attach(interest);
+        NumericTextBoxFormatter.Attach(count);
         var form = new StackPanel { Margin = new Thickness(22), FlowDirection = FlowDirection.RightToLeft };
         form.Children.Add(new TextBlock { Text = "ثبت وام جدید", FontSize = 22, FontWeight = FontWeights.Bold, Margin = new Thickness(0,0,0,12) });
         AddFinancialField(form, "نام وام‌دهنده", lender);
@@ -2630,7 +2632,7 @@ public partial class MainWindow : Window
             {
                 var principalValue = PersianNumberParser.ParseDecimal(principal.Text, "اصل وام");
                 var interestValue = PersianNumberParser.ParseDecimal(interest.Text, "بهرهٔ سالانه");
-                var countValue = int.Parse(PersianNumberParser.NormalizeDigits(count.Text.Trim()), CultureInfo.InvariantCulture);
+                var countValue = int.Parse(PersianNumberParser.NormalizeDigits(count.Text.Trim()).Replace(",", "", StringComparison.Ordinal), CultureInfo.InvariantCulture);
                 var startDate = NativeFinancialModuleService.ParsePersianDate(start.Text);
                 var startValue = new DateTimeOffset(startDate, TimeZoneInfo.Local.GetUtcOffset(startDate));
                 var fundingCode = (funding.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "1120";
@@ -3657,27 +3659,6 @@ public partial class MainWindow : Window
                 IsConfigured = MoadianIsConfigured.IsChecked == true
             };
         }, "پروفایل محلی مؤدی ذخیره شد؛ ارسال رسمی هنوز فعال نیست.");
-    }
-
-    private void ExportMoadianPayload_Click(object sender, RoutedEventArgs e)
-    {
-        MoadianPayloadPreview.Text = "";
-        BuildMoadianPayload_Click(this, new RoutedEventArgs());
-        if (string.IsNullOrWhiteSpace(MoadianPayloadPreview.Text)) return;
-        var picker = new SaveFileDialog
-        {
-            Title = "ذخیرهٔ JSON آماده‌سازی مؤدیان",
-            Filter = "JSON (*.json)|*.json",
-            AddExtension = true, DefaultExt = ".json",
-            FileName = $"Moadian-Payload-{DateTime.Now:yyyyMMdd-HHmmss}.json"
-        };
-        if (picker.ShowDialog() != true) return;
-        try
-        {
-            File.WriteAllText(picker.FileName, MoadianPayloadPreview.Text, Encoding.UTF8);
-            FooterStatus.Text = "JSON نمونه ذخیره شد؛ این فایل به سازمان ارسال نشده است.";
-        }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "ذخیره JSON", MessageBoxButton.OK, MessageBoxImage.Warning); }
     }
 
     private void BuildMoadianPayload_Click(object sender, RoutedEventArgs e)

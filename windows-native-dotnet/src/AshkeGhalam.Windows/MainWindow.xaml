@@ -58,6 +58,11 @@
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
         </Style>
+        <Style x:Key="NumericCellTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FlowDirection" Value="LeftToRight"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
         <Style TargetType="DataGridColumnHeader">
             <Setter Property="Background" Value="#E2E8F0"/>
             <Setter Property="Foreground" Value="#0F172A"/>
