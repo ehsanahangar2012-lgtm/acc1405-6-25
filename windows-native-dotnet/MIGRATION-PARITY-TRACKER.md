@@ -381,3 +381,11 @@
 - Added rounded, keyboard-focus-aware button and input templates at application scope, keeping the text-input content host compatible with standard WPF editing/selection behavior.
 - Removed a global no-wrap setting from text blocks so deliberate wrapped content remains controlled by each page and long operational labels can be wrapped selectively.
 - Standardized dynamically built field labels to a consistent semibold size and spacing across the native forms.
+
+## رابط کاربری بومی — استانداردسازی سراسری کنترل‌ها
+
+- [x] اضافه‌شدن سبک مشترک برای TextBox، ComboBox، DatePicker، PasswordBox و CheckBox در سطح برنامه؛ اندازه، فاصلهٔ داخلی، حاشیه و رنگ پایه در فرم‌ها یکدست شد.
+- [x] ورودی متنی دارای گوشهٔ نرم و حالت فوکوس مشخص است؛ سبک از ویژگی‌های قابل‌تغییر تم استفاده می‌کند تا تغییر تم روشن/تاریک رنگ‌های اصلی کنترل را بازتنظیم کند.
+- [x] دکمه‌های فاقد سبک اختصاصی در پنجرهٔ اصلی و پنجره‌های فرم، سبک مشترک و حالت فوکوس صفحه‌کلید دریافت می‌کنند؛ سبک‌های صریح منوی سمت راست حفظ می‌شوند.
+- [x] ترتیب اعمال سبک و تم اصلاح شد تا رنگ‌های سبک مشترک از همان بار نخست با تم تاریک سازگار شوند.
+- [x] به‌روزرسانی روی شاخهٔ feature/windows-native-dotnet انجام شد؛ نتیجهٔ نهایی باید با بیلد و آزمون‌های CI تأیید شود. بررسی دیداری روی ویندوز واقعی هنوز برای اعلام آماده‌بودن تجاری لازم است.

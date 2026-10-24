@@ -87,13 +87,15 @@ public static class ApplicationThemeService
         window.Resources[typeof(ComboBoxItem)] = CreateChoiceItemStyle(isDark, isListItem: false);
         window.Resources[typeof(ListBoxItem)] = CreateChoiceItemStyle(isDark, isListItem: true);
 
+        // Establish control templates before theme mapping, so the newly applied
+        // style brushes are remapped on the very first dark-theme pass as well.
+        PolishControls(window, elements);
+
         foreach (var element in elements)
             ApplyThemeValues(element, isDark);
 
         foreach (var grid in elements.OfType<DataGrid>())
             ConfigureDataGridTheme(grid, isDark);
-
-        PolishControls(window, elements);
     }
 
 
@@ -585,20 +587,19 @@ public static class ApplicationThemeService
 
     private static void PolishControls(Window window, IReadOnlyCollection<DependencyObject> elements)
     {
-        if (window.GetType().Name != "MainWindow")
+        // Apply consistent labels and base buttons throughout the shell and dialogs.
+        // Explicit styles (such as the right-side navigation) remain untouched.
+        PolishFormLabels(elements);
+        var buttonStyle = CreateModernButtonStyle();
+        window.Resources[typeof(Button)] = buttonStyle;
+        foreach (var button in elements.OfType<Button>())
         {
-            PolishFormLabels(elements);
-            var buttonStyle = CreateModernButtonStyle();
-            window.Resources[typeof(Button)] = buttonStyle;
-            foreach (var button in elements.OfType<Button>())
-            {
-                if (button.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
-                    button.Style = buttonStyle;
-                button.MinHeight = Math.Max(button.MinHeight, 36);
-                button.FontSize = Math.Max(button.FontSize, 12);
-                if (button.Padding.Left < 8)
-                    button.Padding = new Thickness(12, 7, 12, 7);
-            }
+            if (button.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
+                button.Style = buttonStyle;
+            button.MinHeight = Math.Max(button.MinHeight, 36);
+            button.FontSize = Math.Max(button.FontSize, 12);
+            if (button.Padding.Left < 8)
+                button.Padding = new Thickness(12, 7, 12, 7);
         }
 
         foreach (var input in elements.OfType<TextBox>())
@@ -717,6 +718,15 @@ public static class ApplicationThemeService
         presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
         surface.AppendChild(presenter);
         template.VisualTree = surface;
+        template.Triggers.Add(new Trigger
+        {
+            Property = Button.IsKeyboardFocusedProperty, Value = true,
+            Setters =
+            {
+                new Setter(Border.BorderBrushProperty, Brush("#0F766E"), "Surface"),
+                new Setter(Border.BorderThicknessProperty, new Thickness(2), "Surface")
+            }
+        });
         template.Triggers.Add(new Trigger
         {
             Property = Button.IsMouseOverProperty, Value = true,
