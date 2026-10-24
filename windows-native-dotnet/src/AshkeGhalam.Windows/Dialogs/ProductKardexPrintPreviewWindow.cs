@@ -164,6 +164,7 @@ public sealed class ProductKardexPrintPreviewWindow : Window
         };
         print.Click += Print_Click;
         actions.Children.Add(print);
+        DocumentExportService.AddSaveButtons(actions, this, () => _document, $"AshkeGhalam-ProductKardex-{_productCode}");
         actions.Children.Add(new Button { Content = "بستن", MinWidth = 90, Height = 38, IsCancel = true });
         toolbar.Children.Add(actions);
         var toolbarFrame = PreviewChromeService.CreateToolbarFrame(toolbar);
