@@ -192,7 +192,7 @@ public sealed class VoucherPreviewWindow : Window
             }));
             row.Cells.Add(nameCell);
 
-            row.Cells.Add(new TableCell(new Paragraph(new Run(item.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))) { }) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
+            row.Cells.Add(new TableCell(new Paragraph(new Run(item.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")))) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
             {
                 Padding = new Thickness(6), Background = background,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5), FontSize = 9
