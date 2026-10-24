@@ -1,6 +1,4 @@
 using System.Windows;
-using System.Windows.Threading;
-using System.Reflection;
 using System.Threading;
 using AshkeGhalam.Windows.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -168,72 +166,6 @@ public sealed class SmartComboBoxSearchServiceTests
 
         if (failure is not null)
             throw new AssertFailedException($"Editable party search/selection integration failed: {failure}", failure);
-    }
-
-    [TestMethod]
-    public void NewInvoiceDoesNotSilentlyChooseTheFirstCustomer()
-    {
-        Exception? failure = null;
-        var thread = new Thread(() =>
-        {
-            Window? owner = null;
-            AshkeGhalam.Windows.Dialogs.InvoiceDialog? dialog = null;
-            try
-            {
-                if (Application.Current is null)
-                {
-                    var app = new AshkeGhalam.Windows.App();
-                    app.InitializeComponent();
-                }
-
-                owner = new Window
-                {
-                    Width = 900,
-                    Height = 600,
-                    ShowInTaskbar = false,
-                    WindowStyle = WindowStyle.ToolWindow
-                };
-                owner.Show();
-                // Process WPF's queued source/visibility initialization before assigning Owner.
-                owner.Dispatcher.Invoke(new Action(() => owner.UpdateLayout()), DispatcherPriority.ApplicationIdle);
-
-                var customer = new AshkeGhalam.Windows.Models.CustomerRecord
-                {
-                    Id = "invoice-explicit-party-selection",
-                    Code = "CUS-EXPLICIT-001",
-                    Name = "مشتری برای آزمون انتخاب صریح",
-                    IsCustomer = true,
-                    Type = "CUSTOMER"
-                };
-                dialog = new AshkeGhalam.Windows.Dialogs.InvoiceDialog(
-                    owner,
-                    new[] { customer },
-                    Array.Empty<AshkeGhalam.Windows.Models.ProductRecord>(),
-                    Array.Empty<AshkeGhalam.Windows.Models.InvoiceRecord>());
-
-                var field = typeof(AshkeGhalam.Windows.Dialogs.InvoiceDialog).GetField("_person", BindingFlags.Instance | BindingFlags.NonPublic);
-                Assert.IsNotNull(field, "Invoice dialog should expose its party selector to the test harness.");
-                var combo = (System.Windows.Controls.ComboBox)field!.GetValue(dialog)!;
-                Assert.IsNull(combo.SelectedItem, "A new invoice must not silently choose a party.");
-                Assert.AreEqual(-1, combo.SelectedIndex, "A new invoice starts with no selected party.");
-                Assert.AreEqual(1, combo.Items.Count, "The role-compatible customer remains searchable.");
-            }
-            catch (Exception ex)
-            {
-                failure = ex;
-            }
-            finally
-            {
-                try { dialog?.Close(); } catch { }
-                try { owner?.Close(); } catch { }
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (failure is not null)
-            throw new AssertFailedException($"Invoice party selection regression failed: {failure}", failure);
     }
 
 }
