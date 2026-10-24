@@ -44,6 +44,8 @@ public static class PreviewChromeService
         var label = new TextBlock
         {
             Text = $"{viewer.Zoom:0}%",
+            FlowDirection = FlowDirection.LeftToRight,
+            Language = System.Windows.Markup.XmlLanguage.GetLanguage("en-US"),
             Foreground = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
@@ -67,7 +69,7 @@ public static class PreviewChromeService
         Button MakeButton(string caption, string tooltip, bool accent = false) => new()
         {
             Content = caption, ToolTip = tooltip,
-            Width = accent ? 84 : 32, Height = 32, MinHeight = 32,
+            Width = accent ? 104 : 32, Height = 32, MinHeight = 32,
             Padding = new Thickness(4, 2, 4, 2), Margin = new Thickness(2, 0, 2, 0),
             Background = new SolidColorBrush(accent ? Color.FromRgb(15, 118, 110) : Color.FromRgb(31, 41, 55)),
             Foreground = Brushes.White, BorderBrush = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
