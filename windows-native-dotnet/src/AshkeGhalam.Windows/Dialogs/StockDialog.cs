@@ -34,6 +34,7 @@ public sealed class StockDialog:Window
         var productChoices = products.OrderBy(product => product.Name, StringComparer.CurrentCultureIgnoreCase).ToList();
         SmartComboBoxSearchService.SetItems(_product, productChoices,
             product => new[] { product.Name, product.Code, product.Barcode, product.SerialNumber });
+        ProductComboBoxPresentationService.ApplyProductItemTemplate(_product);
         if (_product.Items.Count > 0) _product.SelectedIndex = 0;
         var root = new StackPanel { Margin = new Thickness(16) };
         var productSection = new StackPanel();

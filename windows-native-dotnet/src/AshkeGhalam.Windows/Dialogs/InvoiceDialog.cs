@@ -164,6 +164,7 @@ public sealed class InvoiceDialog : Window
         ConfigureLineGrid();
         _lineList.ItemsSource = _lines;
         SmartComboBoxSearchService.SetItems(_product, _products, product => new[] { product.Name, product.Code, product.Barcode, product.SerialNumber });
+        ProductComboBoxPresentationService.ApplyProductItemTemplate(_product);
 
         var root = new StackPanel { Margin = new Thickness(18) };
         root.Children.Add(CreateInvoiceHero());

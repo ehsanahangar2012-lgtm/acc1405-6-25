@@ -92,6 +92,7 @@ public sealed class VoucherDialog : Window
         _person.SelectedIndex = -1;
         SmartComboBoxSearchService.SetItems(_product, products,
             product => new[] { product.Name, product.Code, product.Barcode, product.SerialNumber });
+        ProductComboBoxPresentationService.ApplyProductItemTemplate(_product);
         _movementType.SelectedItem = MovementTypes[1];
         _date.Text = FormatPersianDate(existing?.Date ?? DateTimeOffset.Now);
         if (existing is not null)
