@@ -1,0 +1,109 @@
+{
+  "name": "ashke-ghalam-cloud",
+  "productName": "AshkeGhalam",
+  "description": "Ashke Ghalam Accounting Software",
+  "author": "Ehsan Ahangar",
+  "main": "electron/main.cjs",
+  "private": true,
+  "version": "16.55.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "lint": "tsc --noEmit",
+    "build": "npm run build:web && node prepare-dist.js && node scripts/create-host-zip.js",
+    "build:native-secure": "npm run build:web && node scripts/obfuscate-release.js",
+    "build:zip": "node prepare-dist.js && node scripts/create-host-zip.js",
+    "build:installer": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js nsis --client-build",
+    "build:exe": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js portable --client-build",
+    "build:portable": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js portable --client-build",
+    "build:all": "npm run build && npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js all --client-build && npm run build:apk",
+    "build:apk": "vite build --mode android && node prepare-dist.js --client-build && node scripts/build-apk.js",
+    "apk": "npm run build:apk",
+    "prepare-dist": "node prepare-dist.js",
+    "diagnose:android": "node scripts/diagnose-android-assets.js",
+    "cleanup:builds": "node scripts/cleanup-builds.js",
+    "preview": "vite preview",
+    "build:web": "vite build",
+    "build:web:desktop": "vite build --mode desktop",
+    "build:browser-preview": "vite build --mode browser-preview && node scripts/sanitize-client-build.js dist",
+    "build:windows": "npm run build:web:desktop && node prepare-dist.js --client-build && node scripts/build-windows.js all --client-build",
+    "test:backup-encryption": "bun run scripts/test-backup-encryption.ts"
+  },
+  "dependencies": {
+    "@capacitor/camera": "^8.2.4",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@google/genai": "^1.38.0",
+    "@types/file-saver": "^2.0.7",
+    "@types/jszip": "^3.4.1",
+    "crypto-js": "^4.2.0",
+    "diff": "^9.0.0",
+    "file-saver": "^2.0.5",
+    "html2canvas": "^1.4.1",
+    "html2canvas-pro": "^2.2.0",
+    "jspdf": "^2.5.1",
+    "jszip": "^3.10.2",
+    "lucide-react": "^0.563.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-is": "^19.3.0",
+    "react-router-dom": "^7.13.0",
+    "react-signature-canvas": "^1.1.0-alpha.2",
+    "recharts": "^3.7.0",
+    "xlsx": "^0.18.5",
+    "zustand": "^5.0.10"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^22.14.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.0.6",
+    "@types/react-dom": "^19.0.6",
+    "@vitejs/plugin-react": "^5.0.0",
+    "autoprefixer": "^10.4.24",
+    "electron": "^44.4.1",
+    "electron-builder": "^26.15.3",
+    "javascript-obfuscator": "^5.9.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  },
+  "build": {
+    "appId": "ir.ashkghalam.acc",
+    "productName": "AshkeGhalam",
+    "asar": true,
+    "compression": "maximum",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "public/favicon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AshkeGhalam",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "AshkeGhalam-Setup-v${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "AshkeGhalam-Portable-v${version}.${ext}"
+    }
+  }
+}

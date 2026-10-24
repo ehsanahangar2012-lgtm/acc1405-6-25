@@ -1,0 +1,16 @@
+# محافظت از پوشه بکآپ
+Order Deny,Allow
+Deny from all
+
+# اگر میخواهید فقط از IP خاص دسترسی داشته باشید:
+# Allow from 192.168.1.100
+# Allow from YOUR_OFFICE_IP
+
+# جلوگیری از لیست کردن فایلها
+Options -Indexes
+
+# محافظت از فایلهای JSON
+<FilesMatch "\.(json|log)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>

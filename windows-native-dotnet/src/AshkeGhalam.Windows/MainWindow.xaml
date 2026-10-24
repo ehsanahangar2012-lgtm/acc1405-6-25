@@ -1,0 +1,1606 @@
+<Window x:Class="AshkeGhalam.Windows.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="حسابداری اشک قلم — نسخه بومی ویندوز"
+        Width="1360" Height="880" MinWidth="1040" MinHeight="680"
+        WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
+        Background="#F4F7FB" Foreground="#0F172A" FlowDirection="RightToLeft"
+        FontFamily="pack://application:,,,/Assets/Fonts/#Vazirmatn"
+        UseLayoutRounding="True" SnapsToDevicePixels="True">
+    <shell:WindowChrome.WindowChrome>
+        <shell:WindowChrome CaptionHeight="76" ResizeBorderThickness="6" GlassFrameThickness="0" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="12,7"/>
+            <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#1F2937"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="ButtonSurface"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonSurface" Property="Opacity" Value="0.92"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonSurface" Property="Opacity" Value="0.82"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonSurface" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ButtonSurface" Property="BorderBrush" Value="#0F766E"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
+            <Setter Property="MinHeight" Value="32"/>
+        </Style>
+        <Style TargetType="ComboBox">
+            <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
+            <Setter Property="MinHeight" Value="34"/>
+            <Setter Property="IsTextSearchEnabled" Value="True"/>
+            <Setter Property="IsTextSearchCaseSensitive" Value="False"/>
+            <Setter Property="MaxDropDownHeight" Value="320"/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Padding" Value="8,4"/>
+        </Style>
+        <Style TargetType="DataGridRow">
+            <Setter Property="MinHeight" Value="36"/>
+            <Setter Property="Foreground" Value="#1E293B"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Style.Triggers>
+                <Trigger Property="AlternationIndex" Value="1">
+                    <Setter Property="Background" Value="#F8FAFC"/>
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#CCFBF1"/>
+                    <Setter Property="Foreground" Value="#134E4A"/>
+                </Trigger>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F0FDFA"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Padding" Value="9,5"/>
+            <Setter Property="Foreground" Value="#1E293B"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+        </Style>
+        <Style x:Key="NumericCellTextStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="FlowDirection" Value="LeftToRight"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        </Style>
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#E2E8F0"/>
+            <Setter Property="Foreground" Value="#0F172A"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="9,7"/>
+            <Setter Property="BorderBrush" Value="#CBD5E1"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="DataGrid">
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="SelectionUnit" Value="FullRow"/>
+            <Setter Property="CanUserResizeColumns" Value="True"/>
+            <Setter Property="CanUserSortColumns" Value="True"/>
+            <Setter Property="AlternationCount" Value="2"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="MinColumnWidth" Value="52"/>
+            <Setter Property="ColumnWidth" Value="*"/>
+            <Setter Property="EnableColumnVirtualization" Value="True"/>
+            <Setter Property="EnableRowVirtualization" Value="True"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="RowHeight" Value="36"/>
+            <Setter Property="ColumnHeaderHeight" Value="40"/>
+            <Setter Property="BorderBrush" Value="#E2E8F0"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Margin" Value="0,12,0,0"/>
+        </Style>
+        <Style TargetType="TextBlock" x:Key="SectionHint">
+            <Setter Property="Foreground" Value="#64748B"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,5,0,0"/>
+        </Style>
+        <Style x:Key="NavButton" TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="#1F2937"/>
+            <Setter Property="Foreground" Value="#E2E8F0"/>
+            <Setter Property="BorderBrush" Value="#334155"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="MinHeight" Value="42"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Padding" Value="14,11"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Surface" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="9" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#334155"/>
+                                <Setter TargetName="Surface" Property="BorderBrush" Value="#64748B"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Surface" Property="Background" Value="#0F766E"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Surface" Property="BorderBrush" Value="#14B8A6"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.45"/></Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="NavSectionLabel" TargetType="{x:Type TextBlock}">
+            <Setter Property="Foreground" Value="#94A3B8"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="7,15,7,5"/>
+        </Style>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions><RowDefinition Height="76"/><RowDefinition Height="*"/><RowDefinition Height="30"/></Grid.RowDefinitions>
+        <Border x:Name="WindowHeader" Grid.Row="0" Background="#0F172A" BorderBrush="#1F2937" BorderThickness="0,0,0,1" Padding="24,0" MouseLeftButtonDown="WindowHeader_MouseLeftButtonDown">
+            <Grid>
+                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="اشک قلم" Foreground="#F8FAFC" FontSize="22" FontWeight="Bold"/>
+                    <TextBlock x:Name="CurrentModuleText" Text="پیشخوان • نسخهٔ بومی در کنار نسخهٔ اصلی" Foreground="#CBD5E1" FontSize="12" Margin="0,3,0,0"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border VerticalAlignment="Center" Background="#1F2937" BorderBrush="#475569" BorderThickness="1" CornerRadius="18" Padding="12,7" Margin="0,0,10,0">
+                        <TextBlock x:Name="StorageStatus" Text="در حال بارگذاری..." Foreground="#E2E8F0" FontSize="12"/>
+                    </Border>
+                    <Button x:Name="WindowMinimizeButton" Content="—" Width="34" Height="32" Padding="0" Margin="0,0,5,0" Background="#1F2937" Foreground="#E2E8F0" BorderBrush="#475569" BorderThickness="1" ToolTip="کوچک‌کردن پنجره" Click="WindowMinimize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                    <Button x:Name="WindowMaximizeButton" Content="□" Width="34" Height="32" Padding="0" Margin="0,0,5,0" Background="#1F2937" Foreground="#E2E8F0" BorderBrush="#475569" BorderThickness="1" ToolTip="تمام‌صفحه / بازگردانی" Click="WindowMaximize_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                    <Button Content="×" Width="34" Height="32" Padding="0" Margin="0" Background="#991B1B" Foreground="#FFFFFF" BorderBrush="#B91C1C" BorderThickness="1" ToolTip="بستن برنامه" Click="WindowClose_Click" shell:WindowChrome.IsHitTestVisibleInChrome="True"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+        <Grid Grid.Row="1" Margin="18" FlowDirection="LeftToRight">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="300"/>
+            </Grid.ColumnDefinitions>
+            <Grid Grid.Column="0" FlowDirection="RightToLeft">
+                <TabControl x:Name="MainTabs" SelectedIndex="0" FlowDirection="RightToLeft" Margin="0,0,14,0" Padding="0" SelectionChanged="MainTabs_SelectionChanged">
+                    <TabControl.Template>
+                        <ControlTemplate TargetType="{x:Type TabControl}">
+                            <ContentPresenter x:Name="PART_SelectedContentHost" ContentSource="SelectedContent" SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </ControlTemplate>
+                    </TabControl.Template>
+            <TabItem Header="نمای کلی">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="8">
+                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="18" Padding="20" Margin="0,0,0,18">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,18,0">
+                                    <TextBlock Text="مدیریت مالی اشک قلم" FontSize="24" FontWeight="Bold" Foreground="#F8FAFC"/>
+                                    <TextBlock Text="اطلاعات، اسناد و گردش مالی کسب‌وکار در یک نمای یکپارچه" FontSize="13" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                    <TextBlock Text="نسخهٔ بومی ویندوز  •  ذخیره‌سازی محلی رمزگذاری‌شده" FontSize="11" FontWeight="SemiBold" Foreground="#99F6E4" Margin="0,10,0,0"/>
+                                </StackPanel>
+                                <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left" MaxWidth="290">
+                                    <Button Content="＋ فاکتور جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="#FFFFFF" MinWidth="132" MinHeight="42" Margin="0,0,8,8"/>
+                                    <Button Content="＋ ثبت دریافت" Click="AddReceipt_Click" Background="#1F2937" Foreground="#F8FAFC" BorderBrush="#475569" MinWidth="132" MinHeight="42" Margin="0,0,0,8"/>
+                                </WrapPanel>
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="شاخص‌های کلیدی" FontSize="20" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="خلاصهٔ اطلاعات ذخیره‌شده در همین رایانه" Style="{StaticResource SectionHint}"/>
+                        <UniformGrid Columns="3" Margin="0,14,0,12">
+                            <Border Background="#ECFDF5" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#A7F3D0" BorderThickness="1">
+                                <StackPanel><TextBlock Text="مشتریان" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="CustomerCount" Text="۰" FontSize="27" FontWeight="Bold" Foreground="#047857" Margin="0,10,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="#EFF6FF" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#BFDBFE" BorderThickness="1">
+                                <StackPanel><TextBlock Text="کالاها" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="ProductCount" Text="۰" FontSize="27" FontWeight="Bold" Foreground="#1D4ED8" Margin="0,10,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="#F5F3FF" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#DDD6FE" BorderThickness="1">
+                                <StackPanel><TextBlock Text="اسناد صادرشده" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="InvoiceCount" Text="۰" FontSize="27" FontWeight="Bold" Foreground="#6D28D9" Margin="0,10,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="#F0FDFA" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#99F6E4" BorderThickness="1">
+                                <StackPanel><TextBlock Text="ارزش فروش" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="SalesTotal" Text="۰" FontSize="22" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
+                            </Border>
+                            <Border Background="#FFF7ED" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#FED7AA" BorderThickness="1">
+                                <StackPanel><TextBlock Text="ارزش خرید" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="PurchasesTotal" Text="۰" FontSize="22" FontWeight="Bold" Foreground="#9A3412" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
+                            </Border>
+                        </UniformGrid>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,4,0,0">
+                            <StackPanel>
+                                <TextBlock Text="وضعیت مالی" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                <UniformGrid Columns="4" Margin="0,14,0,0">
+                                    <StackPanel><TextBlock Text="دریافت ثبت‌شده" Foreground="#64748B"/><TextBlock x:Name="PaymentsTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                    <StackPanel><TextBlock Text="مطالبات فروش" Foreground="#64748B"/><TextBlock x:Name="ReceivablesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                    <StackPanel><TextBlock Text="پرداختنی خرید" Foreground="#64748B"/><TextBlock x:Name="PayablesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                    <StackPanel><TextBlock Text="هزینه‌ها" Foreground="#64748B"/><TextBlock x:Name="ExpensesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="عملیات سریع" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                <TextBlock Text="ثبت اطلاعات پایه و انجام کارهای پرتکرار، بدون جست‌وجو در منوها" Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                                <WrapPanel Margin="0,12,0,0">
+                                    <Button Content="＋ ثبت سریع شخص / مشتری" Click="AddCustomer_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                                    <Button Content="＋ ثبت تأمین‌کننده" Click="AddSupplier_Click" Margin="0,0,8,8"/>
+                                    <Button Content="＋ ثبت سریع کالا" Click="AddProduct_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                                    <Button Content="＋ فاکتور جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                                    <Button Content="ثبت دریافت از مشتری" Click="AddReceipt_Click" Margin="0,0,8,8"/>
+                                    <Button Content="پرداخت به تأمین‌کننده" Click="AddSupplierPayment_Click" Margin="0,0,8,8"/>
+                                    <Button Content="ثبت دریافت / پرداخت (همه)" Click="AddPayment_Click" Margin="0,0,8,8"/>
+                                    <Button Content="ثبت هزینه" Click="AddExpense_Click" Margin="0,0,8,8"/>
+                                    <Button Content="ورود موجودی" Click="AddStock_Click" Margin="0,0,8,8"/>
+                                    <Button Content="حواله انبار" Click="AddVoucher_Click" Margin="0,0,8,8"/>
+                                    <Button Content="پیش‌نمایش فاکتور انتخابی" Click="PreviewInvoice_Click" Margin="0,0,8,8"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="آخرین اسناد" FontSize="18" FontWeight="Bold" Margin="0,20,0,0"/>
+                        <DataGrid x:Name="RecentInvoicesGrid" Height="235">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="1.05*"/>
+                                <DataGridTextColumn Header="شماره سند" Binding="{Binding DisplayNumber}" Width="1.2*"/>
+                                <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="*"/>
+                                <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="1.5*"/>
+                                <DataGridTextColumn Header="مبلغ کل" Binding="{Binding Total, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.5*"/>
+                                <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.2*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="مشتریان">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="مدیریت اشخاص" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="پرونده شامل کد، نقش، دسته‌بندی و اطلاعات تماس است. برای گردش بدهکار/بستانکار، فاکتورها، دریافت/پرداخت و چک‌های مستقل، «کاردکس مالی شخص انتخابی» را باز کنید؛ هزینه‌های مستقیم شخص و برخی گردش‌های قدیمی هنوز نیازمند تطبیق بیشترند." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <TextBox x:Name="CustomersSearchBox" Tag="customers" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در کد، نام، تلفن، ایمیل و نشانی" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="CustomersPageSize" Tag="customers" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="CustomersPreviousPage" Tag="customers" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="CustomersPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="CustomersNextPage" Tag="customers" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="ثبت شخص جدید" Click="AddCustomer_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ثبت تأمین‌کننده" Click="AddSupplier_Click" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش شخص انتخابی" Click="EditCustomer_Click" Margin="0,0,8,8"/>
+                            <Button Content="حذف شخص انتخابی" Click="DeleteCustomer_Click" Margin="0,0,8,8"/>
+                            <Button Content="کاردکس مالی شخص انتخابی" Click="ShowPersonKardex_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV کامل پرونده‌ها" Click="ExportCustomers_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="CustomersGrid" Grid.Row="1"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              CanUserResizeColumns="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="کد شخص" Binding="{Binding Code}" Width="1.05*"/>
+                            <DataGridTextColumn Header="نام / شرکت" Binding="{Binding Name}" Width="2.1*"/>
+                            <DataGridTextColumn Header="نقش" Binding="{Binding RoleLabel}" Width="1.55*"/>
+                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding Category}" Width="1.2*"/>
+                            <DataGridTextColumn Header="تلفن" Binding="{Binding Phone}" Width="1.35*"/>
+                            <DataGridTextColumn Header="ایمیل" Binding="{Binding Email}" Width="1.9*"/>
+                            <DataGridTextColumn Header="شناسه ملی" Binding="{Binding NationalId}" Width="1.3*"/>
+                            <DataGridTextColumn Header="نشانی" Binding="{Binding Address}" Width="2.5*"/>
+                            <DataGridTextColumn Header="یادداشت" Binding="{Binding Notes}" Width="2.2*"/>
+                            <DataGridTextColumn Header="ماندهٔ ذخیره‌شده*" Binding="{Binding Balance, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.45*"/>
+                            <DataGridTextColumn Header="تاریخ ثبت" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="1.55*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="کالا و انبار">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="کالا و انبار" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="پرونده کالا با فیلدهای مدل اصلی گسترش یافته است؛ موجودی رزروشده حفظ می‌شود و گردش حواله‌های چندانباره هنوز در مرحلهٔ مهاجرت است." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <TextBox x:Name="ProductsSearchBox" Tag="products" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در کد، بارکد، نام، سریال، دسته‌بندی و قفسه" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="ProductsPageSize" Tag="products" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="ProductsPreviousPage" Tag="products" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="ProductsPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="ProductsNextPage" Tag="products" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="ثبت کالا" Click="AddProduct_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش کالای انتخابی" Click="EditProduct_Click" Margin="0,0,8,8"/>
+                            <Button Content="حذف کالای انتخابی" Click="DeleteProduct_Click" Margin="0,0,8,8"/>
+                            <Button Content="کارتکس کالای انتخابی" Click="ShowKardex_Click" Margin="0,0,8,8"/>
+                            <TextBox x:Name="ProductsBarcodeSearchBox" Width="185" Height="34" Padding="8,4" ToolTip="بارکد را اسکن کنید؛ سپس Enter بزنید" KeyDown="ProductsBarcodeSearchBox_KeyDown" Margin="0,0,8,8"/>
+                            <Button Content="ورود موجودی" Click="AddStock_Click" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV" Click="ExportProducts_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="ProductsGrid" Grid.Row="1"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              CanUserResizeColumns="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="نام کالا" Binding="{Binding Name}" Width="2.1*"/>
+                            <DataGridTextColumn Header="کد کالا" Binding="{Binding Code}" Width="1.2*"/>
+                            <DataGridTextColumn Header="شماره سریال" Binding="{Binding SerialNumber}" Width="1.4*"/>
+                            <DataGridTextColumn Header="بارکد" Binding="{Binding Barcode}" Width="1.5*"/>
+                            <DataGridTextColumn Header="واحد" Binding="{Binding Unit}" Width="0.9*"/>
+                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding CategoryPath}" Width="1.9*"/>
+                            <DataGridTextColumn Header="موجودی" Binding="{Binding StockQuantity, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                            <DataGridTextColumn Header="رزروشده" Binding="{Binding ReservedStock, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1*"/>
+                            <DataGridTextColumn Header="حداقل موجودی" Binding="{Binding MinStock, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                            <DataGridTextColumn Header="قیمت خرید" Binding="{Binding BuyPrice, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.3*"/>
+                            <DataGridTextColumn Header="قیمت فروش" Binding="{Binding SellPrice, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.3*"/>
+                            <DataGridTextColumn Header="وزن" Binding="{Binding Weight, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="0.9*"/>
+                            <DataGridTextColumn Header="قفسه" Binding="{Binding ShelfLocation}" Width="1.3*"/>
+                            <DataGridTextColumn Header="توضیحات" Binding="{Binding Description}" Width="2.2*"/>
+                            <DataGridTextColumn Header="تصویر / مسیر" Binding="{Binding ImageUrl}" Width="2.2*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="فاکتورهای فروش/خرید">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="فاکتور فروش، خرید و پیش‌فاکتور" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="هم‌ترازی با گردش اصلی: شماره‌گذاری مستقل INV-/PUR-/PRO-، تخفیف و مالیات مبلغی؛ فروش موجودی را کاهش می‌دهد، خرید افزایش می‌دهد و پیش‌فاکتور بدون اثر موجودی است." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,12,0,0">
+                            <TextBox x:Name="InvoicesSearchBox" Tag="invoices" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در شماره، طرف حساب، شرح و وضعیت" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="InvoicesPageSize" Tag="invoices" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="InvoicesPreviousPage" Tag="invoices" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="InvoicesPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="InvoicesNextPage" Tag="invoices" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="صدور سند جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش سند انتخابی" Click="EditInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="حذف پیش‌فاکتور انتخابی" Click="DeleteInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="تبدیل پیش‌فاکتور به فروش" Click="ConvertProformaToSale_Click" Margin="0,0,8,8"/>
+                            <Button Content="ثبت دریافت/پرداخت" Click="AddPayment_Click" Margin="0,0,8,8"/>
+                            <Button Content="لغو سند انتخابی" Click="CancelInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="پیش‌نمایش سند انتخابی" Click="PreviewInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="چاپ سند انتخابی" Click="PrintInvoice_Click" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV کامل" Click="ExportInvoices_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="InvoicesGrid" Grid.Row="1" MouseDoubleClick="InvoicesGrid_MouseDoubleClick"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              CanUserResizeColumns="True">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="نوع سند" Binding="{Binding TypeLabel}" Width="1.15*"/>
+                            <DataGridTextColumn Header="شماره سند" Binding="{Binding DisplayNumber}" Width="1.3*"/>
+                            <DataGridTextColumn Header="کد پیگیری" Binding="{Binding TrackingCode}" Width="1.9*"/>
+                            <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="1.8*"/>
+                            <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="2*"/>
+                            <DataGridTextColumn Header="جمع کالاها" Binding="{Binding Subtotal, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.3*"/>
+                            <DataGridTextColumn Header="تخفیف" Binding="{Binding Discount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.1*"/>
+                            <DataGridTextColumn Header="مالیات" Binding="{Binding TaxAmount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.1*"/>
+                            <DataGridTextColumn Header="مبلغ نهایی" Binding="{Binding Total, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.35*"/>
+                            <DataGridTextColumn Header="نقدی" Binding="{Binding CashAmount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.1*"/>
+                            <DataGridTextColumn Header="چک" Binding="{Binding CheckAmount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.1*"/>
+                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy}" Width="1.1*"/>
+                            <DataGridTextColumn Header="سررسید" Binding="{Binding DueDate, StringFormat=dd/MM/yyyy}" Width="1.1*"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.1*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="دریافت‌ها">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="سوابق دریافت و پرداخت" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="تسویهٔ فاکتور فروش و خرید؛ فقط تا سقف ماندهٔ سند انتخابی ثبت می‌شود." Style="{StaticResource SectionHint}"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <TextBox x:Name="PaymentsSearchBox" Tag="payments" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در شماره فاکتور، طرف حساب، روش و مرجع" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="PaymentsPageSize" Tag="payments" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="PaymentsPreviousPage" Tag="payments" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="PaymentsPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="PaymentsNextPage" Tag="payments" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="ثبت دریافت / پرداخت جدید" Click="AddPayment_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش دریافت / پرداخت" Click="EditPayment_Click" Margin="0,0,8,8"/>
+                            <Button Content="پیش‌نمایش و چاپ رسید" Click="PreviewPaymentReceipt_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="حذف دریافت / پرداخت" Click="DeletePayment_Click" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV" Click="ExportPayments_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="PaymentsGrid" Grid.Row="1">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="شماره فاکتور" Binding="{Binding InvoiceNumber}" Width="1.2*"/>
+                            <DataGridTextColumn Header="طرف حساب" Binding="{Binding CustomerName}" Width="*"/>
+                            <DataGridTextColumn Header="مبلغ تسویه" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.7*"/>
+                            <DataGridTextColumn Header="روش" Binding="{Binding Method}" Width="1.3*"/>
+                            <DataGridTextColumn Header="پیگیری" Binding="{Binding Reference}" Width="*"/>
+                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="1.45*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="هزینه‌ها">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="هزینه‌های ثبت‌شده" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="این ثبت هزینه‌ها، گردش نقدی ساده است و جایگزین دفتر کل و کدینگ حسابداری رسمی نیست." Style="{StaticResource SectionHint}"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <TextBox x:Name="ExpensesSearchBox" Tag="expenses" Width="225" Height="34" Padding="8,4" ToolTip="جست‌وجو در عنوان، دسته و یادداشت" TextChanged="GridSearch_TextChanged" Margin="0,0,8,8"/>
+                            <ComboBox x:Name="ExpensesPageSize" Tag="expenses" Width="118" Height="34" SelectedIndex="0" SelectionChanged="GridPageSize_SelectionChanged" Margin="0,0,8,8">
+                                <ComboBoxItem Content="۱۰۰ ردیف" Tag="100"/><ComboBoxItem Content="۲۵۰ ردیف" Tag="250"/><ComboBoxItem Content="۵۰۰ ردیف" Tag="500"/>
+                            </ComboBox>
+                            <Button x:Name="ExpensesPreviousPage" Tag="expenses" Content="قبلی" Click="GridPreviousPage_Click" IsEnabled="False" Margin="0,0,4,8"/>
+                            <TextBlock x:Name="ExpensesPageInfo" Text="صفحه ۱ از ۱" VerticalAlignment="Center" Margin="4,0,8,8"/>
+                            <Button x:Name="ExpensesNextPage" Tag="expenses" Content="بعدی" Click="GridNextPage_Click" IsEnabled="False" Margin="0,0,12,8"/>
+                            <Button Content="ثبت هزینه" Click="AddExpense_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                            <Button Content="ویرایش هزینه انتخابی" Click="EditExpense_Click" Margin="0,0,8,8"/>
+                            <Button Content="حذف هزینه انتخابی" Click="DeleteExpense_Click" Margin="0,0,8,8"/>
+                            <Button Content="خروجی CSV" Click="ExportExpenses_Click" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="ExpensesGrid" Grid.Row="1">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="عنوان" Binding="{Binding Title}" Width="*"/>
+                            <DataGridTextColumn Header="دسته‌بندی" Binding="{Binding Category}" Width="1.8*"/>
+                            <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.7*"/>
+                            <DataGridTextColumn Header="توضیحات" Binding="{Binding Notes}" Width="*"/>
+                            <DataGridTextColumn Header="تاریخ" Binding="{Binding CreatedAt, StringFormat=dd/MM/yyyy HH:mm}" Width="1.45*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="گزارش‌ها">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="8">
+                        <TextBlock Text="گزارش خلاصه" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="گزارش‌ها از داده‌های محلی ثبت‌شده ساخته می‌شوند؛ واحد پول ورودی را در همهٔ رکوردها یکسان نگه دارید." Style="{StaticResource SectionHint}"/>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="20" Margin="0,16,0,0">
+                            <StackPanel>
+                                <TextBlock Text="فروش خالص (بدون اسناد لغوشده)" FontSize="14" Foreground="#64748B"/>
+                                <TextBlock x:Name="ReportSales" Text="۰" FontSize="28" FontWeight="Bold" Foreground="#0F766E" Margin="0,6,0,16"/>
+                                <TextBlock Text="خرید ثبت‌شده" FontSize="13" Foreground="#64748B"/>
+                                <TextBlock x:Name="ReportPurchases" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
+                                <TextBlock Text="دریافت / پرداخت ثبت‌شده" FontSize="13" Foreground="#64748B"/>
+                                <TextBlock x:Name="ReportPayments" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
+                                <TextBlock Text="مطالبات فروش" FontSize="13" Foreground="#64748B"/>
+                                <TextBlock x:Name="ReportReceivables" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
+                                <TextBlock Text="پرداختنی خرید" FontSize="13" Foreground="#64748B"/>
+                                <TextBlock x:Name="ReportPayables" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
+                                <TextBlock Text="هزینه‌ها" FontSize="13" Foreground="#64748B"/>
+                                <TextBlock x:Name="ReportExpenses" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,16"/>
+                                <TextBlock Text="خالص جریان نقدی ساده = دریافت‌ها منهای هزینه‌ها" FontSize="12" Foreground="#64748B"/>
+                                <TextBlock x:Name="ReportCash" Text="۰" FontSize="20" FontWeight="SemiBold" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <WrapPanel HorizontalAlignment="Right" Margin="0,16,0,0">
+                            <Button Content="🖨 چاپ گزارش جامع" Click="PrintSystemReports_Click" Margin="0,0,8,0" Background="#0F766E" Foreground="White"/>
+                            <Button Content="خروجی خلاصه گزارش CSV" Click="ExportReport_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="گزارش مالی پیشرفته">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="8">
+                        <TextBlock Text="گزارش مالی و کنترل تراز" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="این گزارش فقط اسناد قطعی/تأییدشده دفتر روزنامه بومی را محاسبه می‌کند. تراز کنترل یک آزمون ریاضی است و به‌تنهایی جایگزین تطبیق با نسخه اصلی نیست." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,10"/>
+                        <WrapPanel HorizontalAlignment="Right" Margin="0,0,0,12">
+                            <Button Content="بازمحاسبه گزارش" Click="RefreshFinancialReports_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,0"/>
+                            <Button Content="🖨 چاپ گزارش جامع" Click="PrintSystemReports_Click"/>
+                        </WrapPanel>
+                        <UniformGrid Columns="4">
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="درآمد ثبت‌شده" Foreground="#64748B"/><TextBlock x:Name="FinancialRevenue" Text="۰" FontSize="20" FontWeight="Bold" Foreground="#0F766E" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="بهای تمام‌شده" Foreground="#64748B"/><TextBlock x:Name="FinancialCostOfSales" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="سود ناخالص" Foreground="#64748B"/><TextBlock x:Name="FinancialGrossProfit" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="هزینه‌های عملیاتی" Foreground="#64748B"/><TextBlock x:Name="FinancialOperatingExpenses" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="سود / زیان خالص" Foreground="#64748B"/><TextBlock x:Name="FinancialNetProfit" Text="۰" FontSize="20" FontWeight="Bold" Foreground="#0F766E" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="جمع دارایی‌ها" Foreground="#64748B"/><TextBlock x:Name="FinancialAssets" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="جمع بدهی‌ها" Foreground="#64748B"/><TextBlock x:Name="FinancialLiabilities" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="حقوق مالکانه" Foreground="#64748B"/><TextBlock x:Name="FinancialEquity" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="ورودی نقد و بانک" Foreground="#64748B"/><TextBlock x:Name="FinancialCashInflows" Text="۰" FontSize="20" FontWeight="Bold" Foreground="#0F766E" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="خروجی نقد و بانک" Foreground="#64748B"/><TextBlock x:Name="FinancialCashOutflows" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="تغییر خالص نقد" Foreground="#64748B"/><TextBlock x:Name="FinancialNetCashChange" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="مانده نقد و بانک" Foreground="#64748B"/><TextBlock x:Name="FinancialCashBalance" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                        </UniformGrid>
+                        <TextBlock x:Name="FinancialBalanceIntegrity" Text="کنترل تراز در انتظار محاسبه" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="4,10,4,16"/>
+                        <TextBlock Text="مانده و گردش حساب‌ها" FontSize="18" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <DataGrid x:Name="FinancialAccountsGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MinHeight="220" MaxHeight="420">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="0.9*"/>
+                                <DataGridTextColumn Header="نام حساب" Binding="{Binding Name}" Width="*"/>
+                                <DataGridTextColumn Header="نوع" Binding="{Binding Type}" Width="1.3*"/>
+                                <DataGridTextColumn Header="بدهکار" Binding="{Binding Debit, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.3*"/>
+                                <DataGridTextColumn Header="بستانکار" Binding="{Binding Credit, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.3*"/>
+                                <DataGridTextColumn Header="مانده (بدهکار - بستانکار)" Binding="{Binding Balance, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.9*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Button Content="خروجی CSV گزارش مالی کامل" Click="ExportFinancialReports_Click" HorizontalAlignment="Right" Margin="0,12,0,0"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="تقویم سررسیدها">
+                <DockPanel Margin="12">
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                        <TextBlock Text="تقویم سررسید دریافت‌ها و پرداخت‌ها" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="فاکتورهای بازِ دارای تاریخ سررسید و چک‌های حل‌نشده نمایش داده می‌شوند؛ سندهای تسویه‌شده و پیش‌فاکتورها حذف شده‌اند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,8"/>
+                        <DockPanel>
+                            <TextBlock x:Name="DueCalendarSummary" VerticalAlignment="Center" FontWeight="SemiBold" Text="در انتظار محاسبه"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="بازمحاسبه" Click="RefreshDueCalendar_Click" Margin="4,0"/>
+                                <Button Content="خروجی CSV سررسیدها" Click="ExportDueCalendar_Click" Margin="4,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="DueCalendarGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="تاریخ سررسید" Binding="{Binding DueDate}" Width="1.35*"/>
+                            <DataGridTextColumn Header="نوع تعهد" Binding="{Binding Kind}" Width="1.7*"/>
+                            <DataGridTextColumn Header="شماره سند/چک" Binding="{Binding DocumentNumber}" Width="1.35*"/>
+                            <DataGridTextColumn Header="طرف حساب" Binding="{Binding Contact}" Width="*"/>
+                            <DataGridTextColumn Header="مبلغ باز" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.35*"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.7*"/>
+                            <DataGridTextColumn Header="مانده تا سررسید" Binding="{Binding Days, StringFormat={}{0:#,##0}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.45*"/>
+                            <DataGridTextColumn Header="اولویت" Binding="{Binding Priority, StringFormat={}{0:#,##0}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </DockPanel>
+            </TabItem>
+            <TabItem Header="پشتیبان‌گیری">
+                <StackPanel Margin="18" MaxWidth="850" HorizontalAlignment="Right">
+                    <TextBlock Text="پشتیبان‌گیری و بازیابی" FontSize="24" FontWeight="Bold"/>
+                    <TextBlock Text="فایل پشتیبان با رمز جداگانه AES-256-GCM رمزگذاری می‌شود. رمز را در جای امن نگه دارید؛ بدون آن بازیابی امکان‌پذیر نیست."
+                               TextWrapping="Wrap" FontSize="13" Foreground="#64748B" Margin="0,8,0,20"/>
+                    <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18">
+                        <StackPanel>
+                            <TextBlock Text="ایجاد پشتیبان رمزگذاری‌شده" FontSize="16" FontWeight="Bold"/>
+                            <TextBlock Text="مناسب انتقال امن فایل داده به مسیر انتخابی شما. نسخهٔ جاری پایگاه دادهٔ ابری را شامل نمی‌شود."
+                                       TextWrapping="Wrap" FontSize="12" Foreground="#64748B" Margin="0,5,0,12"/>
+                            <Button Content="ایجاد فایل پشتیبان..." Click="CreateBackup_Click" HorizontalAlignment="Right" Background="#0F766E" Foreground="White"/>
+                        </StackPanel>
+                    </Border>
+                    <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                        <StackPanel>
+                            <TextBlock Text="بازیابی از پشتیبان" FontSize="16" FontWeight="Bold"/>
+                            <TextBlock Text="فایل و رمز قبل از هر تغییری بررسی می‌شوند. در صورت تأیید، می‌توانید پیش از جایگزینی یک پشتیبان تازه از اطلاعات فعلی بسازید؛ لایسنس و داده‌های سرور حذف نمی‌شوند."
+                                       TextWrapping="Wrap" FontSize="12" Foreground="#64748B" Margin="0,5,0,12"/>
+                            <Button Content="انتخاب فایل و بازیابی..." Click="RestoreBackup_Click" HorizontalAlignment="Right"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock Text="محل دادهٔ محلی: %LOCALAPPDATA%\AshkeGhalam\WindowsNative\accounting-data.dat"
+                               TextWrapping="Wrap" FontSize="12" Foreground="#64748B" Margin="0,18,0,0"/>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="مدیریت چک">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="مدیریت چک‌های دریافتی و پرداختی" FontSize="23" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="سوابق چک به‌صورت محلی نگهداری می‌شود. تغییر وضعیت دستی است؛ این نسخه استعلام صیادی یا اتصال بانکی انجام نمی‌دهد." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <Button Content="➕ ثبت چک" Click="AddCheck_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="✏️ ویرایش چک" Click="EditCheck_Click"/>
+                            <Button Content="🖨 پیش‌نمایش / چاپ" Click="PreviewCheck_Click"/>
+                            <Button Content="↗️ خرج کردن چک دریافتی" Click="SpendCheck_Click"/>
+                            <Button Content="🔄 تغییر وضعیت / سابقه" Click="ChangeCheckStatus_Click"/>
+                            <Button Content="🗑 حذف چک در انتظار" Click="DeleteCheck_Click"/>
+                            <Button Content="📄 خروجی CSV" Click="ExportChecks_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="ChecksGrid" Grid.Row="1">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="1*"/>
+                            <DataGridTextColumn Header="دارنده / ذی‌نفع" Binding="{Binding HolderName}" Width="1.9*"/>
+                            <DataGridTextColumn Header="بانک" Binding="{Binding BankName}" Width="1.1*"/>
+                            <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.4*"/>
+                            <DataGridTextColumn Header="شناسه صیادی" Binding="{Binding SayadId}" Width="1.5*"/>
+                            <DataGridTextColumn Header="شماره چک" Binding="{Binding CheckNumber}" Width="1.1*"/>
+                            <DataGridTextColumn Header="سررسید شمسی" Binding="{Binding DueDateLabel}" Width="1.1*"/>
+                            <DataGridTextColumn Header="تاریخ صدور" Binding="{Binding IssueDateLabel}" Width="1*"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="1.3*"/>
+                            <DataGridTextColumn Header="اولویت" Binding="{Binding PriorityLabel}" Width="0.95*"/>
+                            <DataGridTextColumn Header="شخص مرتبط" Binding="{Binding PersonName}" Width="1.5*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="حواله‌های انبار">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="حواله‌ها و گردش موجودی" FontSize="23" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="رسید ورود، حواله خروج، برگشت از فروش/خرید و تعدیل با ثبت گردش موجودی؛ انتقال بین چند انبار تا تکمیل موجودی تفکیک‌شده فعال نیست." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,14,0,0">
+                            <Button Content="ثبت حواله / رسید" Click="AddVoucher_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="پیش‌نمایش حواله انتخابی" Click="PreviewVoucher_Click"/>
+                            <Button Content="ویرایش حوالهٔ در انتظار" Click="EditVoucher_Click"/>
+                            <Button Content="تغییر مرحله تحویل" Click="AdvanceVoucherStatus_Click"/>
+                            <Button Content="حذف حواله در انتظار و برگشت موجودی" Click="DeleteVoucher_Click"/>
+                            <Button Content="خروجی CSV" Click="ExportVouchers_Click"/>
+                        </WrapPanel>
+                    </StackPanel>
+                    <DataGrid x:Name="VouchersGrid" Grid.Row="1" MouseDoubleClick="VouchersGrid_MouseDoubleClick" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="شماره" Binding="{Binding Number}" Width="0.75*"/>
+                            <DataGridTextColumn Header="کد پیگیری" Binding="{Binding TrackingCode}" Width="1.75*"/>
+                            <DataGridTextColumn Header="نوع سند" Binding="{Binding TypeLabel}" Width="1.1*"/>
+                            <DataGridTextColumn Header="نوع گردش" Binding="{Binding MovementTypeLabel}" Width="1.45*"/>
+                            <DataGridTextColumn Header="تاریخ شمسی" Binding="{Binding DateLabel}" Width="1.1*"/>
+                            <DataGridTextColumn Header="شخص مرتبط" Binding="{Binding PersonName}" Width="1.75*"/>
+                            <DataGridTextColumn Header="تعداد اقلام" Binding="{Binding ItemCount, StringFormat={}{0:#,##0}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="0.85*"/>
+                            <DataGridTextColumn Header="جمع تعداد" Binding="{Binding QuantityTotal, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.1*"/>
+                            <DataGridTextColumn Header="ارزش تخمینی" Binding="{Binding EstimatedValue, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.3*"/>
+                            <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="1.1*"/>
+                            <DataGridTextColumn Header="توضیحات" Binding="{Binding Notes}" Width="2.4*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+            <TabItem Header="حسابداری دوبل">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0">
+                        <TextBlock Text="حسابداری دوبل و دفتر روزنامه" FontSize="23" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="این بخش بر مبنای مدل ChartOfAccount و AccountingEntry نسخهٔ اصلی ساخته شده است. هر سند ثبت‌شده یک بدهکار و یک بستانکار برابر دارد؛ هنوز از فاکتورها/دریافت‌ها به‌صورت خودکار سند تولید نمی‌شود و با دفتر نسخهٔ اصلی همگام نیست."
+                                   Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                        <WrapPanel Margin="0,12,0,0">
+                            <Button Content="ایجاد سرفصل‌های پایه" Click="SeedLedgerAccounts_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="افزودن سرفصل" Click="AddLedgerAccount_Click"/>
+                            <Button Content="ثبت سند دوبل" Click="AddJournalEntry_Click"/>
+                            <Button Content="خروجی دفتر روزنامه CSV" Click="ExportJournalEntries_Click"/>
+                            <Button Content="خروجی تراز آزمایشی CSV" Click="ExportTrialBalance_Click"/>
+                        </WrapPanel>
+                        <TextBlock x:Name="LedgerSummary" Text="برای شروع، سرفصل‌های پایه را ایجاد کنید." FontWeight="SemiBold" Foreground="#0F766E" Margin="0,12,0,0"/>
+                    </StackPanel>
+                    <TabControl Grid.Row="1" Margin="0,12,0,0">
+                        <TabItem Header="دفتر روزنامه">
+                            <DataGrid x:Name="LedgerEntriesGrid" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="شماره" Binding="{Binding DisplayNumber}" Width="0.9*"/>
+                                    <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="1.05*"/>
+                                    <DataGridTextColumn Header="شرح سند" Binding="{Binding Description}" Width="*"/>
+                                    <DataGridTextColumn Header="بدهکار" Binding="{Binding DebitAccount}" Width="1.9*"/>
+                                    <DataGridTextColumn Header="بستانکار" Binding="{Binding CreditAccount}" Width="1.9*"/>
+                                    <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.45*"/>
+                                    <DataGridTextColumn Header="نوع سند" Binding="{Binding DocumentTypeLabel}" Width="1.1*"/>
+                                    <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="0.95*"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem Header="کدینگ حساب‌ها">
+                            <DataGrid x:Name="LedgerAccountsGrid" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="1*"/>
+                                    <DataGridTextColumn Header="عنوان حساب" Binding="{Binding Name}" Width="*"/>
+                                    <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="1.4*"/>
+                                    <DataGridTextColumn Header="سطح" Binding="{Binding LevelLabel}" Width="1.1*"/>
+                                    <DataGridTextColumn Header="حساب والد" Binding="{Binding ParentName}" Width="2.2*"/>
+                                    <DataGridCheckBoxColumn Header="فعال" Binding="{Binding IsActive}" Width="70"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem Header="تراز آزمایشی">
+                            <DataGrid x:Name="TrialBalanceGrid" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="کد حساب" Binding="{Binding Code}" Width="1*"/>
+                                    <DataGridTextColumn Header="حساب" Binding="{Binding Name}" Width="*"/>
+                                    <DataGridTextColumn Header="نوع" Binding="{Binding TypeLabel}" Width="1.35*"/>
+                                    <DataGridTextColumn Header="گردش بدهکار" Binding="{Binding Debit, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.55*"/>
+                                    <DataGridTextColumn Header="گردش بستانکار" Binding="{Binding Credit, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.55*"/>
+                                    <DataGridTextColumn Header="مانده (بدهکار منهای بستانکار)" Binding="{Binding Balance, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="2.05*"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                    </TabControl>
+                </Grid>
+            </TabItem>
+            <TabItem Header="اتصال و لایسنس">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12" MaxWidth="900" HorizontalAlignment="Right">
+                        <TextBlock Text="اتصال به سرور و مجوز استفاده" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="مرجع لایسنس مطابق نسخهٔ اصلی روی acc.ashkghalam.ir ثابت است. این پنجره از مسیر HTTPS و رسید RSA-SHA256 استفاده می‌کند؛ لایسنس یا سهمیه به‌صورت محلی جعل نمی‌شود."
+                                   Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,18"/>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="شناسه این رایانه" FontSize="17" FontWeight="Bold" Foreground="#0F172A"/>
+                                <TextBox x:Name="LicenseHardwareId" IsReadOnly="True" TextWrapping="Wrap" MinHeight="50" Padding="10" Margin="0,12,0,4" FlowDirection="LeftToRight"/>
+                                <WrapPanel Margin="0,8,0,0">
+                                    <Button Content="کپی شناسه دستگاه" Click="CopyHardwareId_Click"/>
+                                    <Button Content="اتصال و بررسی آنلاین" Click="VerifyLicense_Click" Background="#0F766E" Foreground="White"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="وضعیت رسید ذخیره‌شده" FontSize="17" FontWeight="Bold" Foreground="#0F172A"/>
+                                <TextBlock x:Name="LicenseStatusText" Text="وضعیت هنوز خوانده نشده است." FontSize="13" Foreground="#475569" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                                <TextBlock x:Name="LicensePlanText" Text="طرح: —" FontSize="13" Foreground="#0F766E" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="LicenseQuotaText" Text="سهمیه: —" FontSize="12" Foreground="#475569" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                                <TextBlock x:Name="LicenseFeaturesText" Text="امکانات: —" FontSize="12" Foreground="#475569" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                                <TextBlock Text="نکته: نمایش رسید ذخیره‌شده به معنی تأیید زنده و اعمال مجوزها بر تمام ماژول‌های WPF نیست. برای اطمینان، اتصال و بررسی آنلاین را انجام دهید. اعمال کامل سهمیه‌ها و مجوزها در تمام عملیات هنوز در حال مهاجرت است."
+                                           FontSize="12" Foreground="#9A3412" TextWrapping="Wrap" Margin="0,14,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="پیش‌بینی نقدینگی">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12">
+                        <TextBlock Text="پیش‌بینی جریان نقدینگی" FontSize="23" FontWeight="Bold"/>
+                        <TextBlock Text="پیش‌بینی بر اساس ماندهٔ ثبت‌شدهٔ صندوق و بانک، فاکتورهای بازِ دارای تاریخ سررسید و چک‌های مستقلِ در انتظار است. چک متصل به فاکتور برای جلوگیری از شمارش دوباره در این برآورد جداگانه شمرده نمی‌شود."
+                                   Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,10"/>
+                        <DockPanel Margin="0,0,0,12">
+                            <TextBlock x:Name="CashFlowStatusSummary" VerticalAlignment="Center" FontWeight="SemiBold" Text="در انتظار محاسبه"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <ComboBox x:Name="CashFlowHorizonCombo" Width="130" SelectedIndex="0" Margin="4,0">
+                                    <ComboBoxItem Content="۳۰ روز آینده" Tag="30"/>
+                                    <ComboBoxItem Content="۶۰ روز آینده" Tag="60"/>
+                                    <ComboBoxItem Content="۹۰ روز آینده" Tag="90"/>
+                                </ComboBox>
+                                <Button Content="محاسبه مجدد" Click="RefreshCashFlowForecast_Click" Margin="4,0"/>
+                                <Button Content="خروجی CSV" Click="ExportCashFlowForecast_Click" Margin="4,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <UniformGrid Columns="4">
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="ماندهٔ نقد و بانک فعلی" Foreground="#64748B"/><TextBlock x:Name="CashFlowOpeningBalance" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="ورودی مورد انتظار" Foreground="#64748B"/><TextBlock x:Name="CashFlowExpectedInflows" Text="۰" FontSize="20" FontWeight="Bold" Foreground="#0F766E" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="خروجی مورد انتظار" Foreground="#64748B"/><TextBlock x:Name="CashFlowExpectedOutflows" Text="۰" FontSize="20" FontWeight="Bold" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="8" Padding="14" Margin="3">
+                                <StackPanel><TextBlock Text="ماندهٔ پیش‌بینی‌شده" Foreground="#64748B"/><TextBlock x:Name="CashFlowProjectedClosingBalance" Text="۰" FontSize="20" FontWeight="Bold" Foreground="#0F766E" Margin="0,5,0,0"/></StackPanel>
+                            </Border>
+                        </UniformGrid>
+                        <TextBlock Text="روند روزانه ماندهٔ پیش‌بینی‌شده" FontSize="18" FontWeight="Bold" Margin="4,16,4,8"/>
+                        <DataGrid x:Name="CashFlowProjectionGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MinHeight="130" MaxHeight="290">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="1.3*"/>
+                                <DataGridTextColumn Header="ورودی" Binding="{Binding Inflows, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.45*"/>
+                                <DataGridTextColumn Header="خروجی" Binding="{Binding Outflows, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.45*"/>
+                                <DataGridTextColumn Header="تغییر خالص" Binding="{Binding NetChange, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.45*"/>
+                                <DataGridTextColumn Header="مانده پس از رخدادها" Binding="{Binding ProjectedBalance, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.9*"/>
+                                <DataGridTextColumn Header="تعداد تعهدها" Binding="{Binding MovementCount, StringFormat={}{0:#,##0}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                                <DataGridTextColumn Header="موارد سررسیدگذشته" Binding="{Binding OverdueCount, StringFormat={}{0:#,##0}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.5*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <TextBlock Text="جزئیات تعهدهای لحاظ‌شده در پیش‌بینی" FontSize="18" FontWeight="Bold" Margin="4,16,4,8"/>
+                        <DataGrid x:Name="CashFlowMovementsGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" MinHeight="160" MaxHeight="360">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="تاریخ پیش‌بینی" Binding="{Binding Date}" Width="1.3*"/>
+                                <DataGridTextColumn Header="جهت" Binding="{Binding Direction}" Width="1*"/>
+                                <DataGridTextColumn Header="نوع تعهد" Binding="{Binding Kind}" Width="1.7*"/>
+                                <DataGridTextColumn Header="شماره" Binding="{Binding DocumentNumber}" Width="1.3*"/>
+                                <DataGridTextColumn Header="طرف حساب" Binding="{Binding Counterparty}" Width="*"/>
+                                <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.4*"/>
+                                <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1.3*"/>
+                                <DataGridTextColumn Header="سررسید" Binding="{Binding DueStatus}" Width="1.3*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="وام‌ها و اقساط">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="18">
+                        <TextBlock Text="مدیریت وام‌ها و اقساط" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="ثبت وام، ساخت اقساط اصل و بهره و ثبت سندهای دریافت و بازپرداخت در دفتر دوبل." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,12"/>
+                        <TextBlock x:Name="LoanSummaryText" Text="وام‌ها هنوز بارگذاری نشده‌اند." FontWeight="SemiBold" Foreground="#0F766E" Margin="0,0,0,8"/>
+                        <WrapPanel Margin="0,0,0,8">
+                            <Button Content="＋ ثبت وام" Click="AddLoan_Click" Background="#0F766E" Foreground="White"/>
+                            <TextBlock Text="پرداخت قسط از:" VerticalAlignment="Center" Margin="8,0,6,0"/>
+                            <ComboBox x:Name="LoanPaymentAccountSelector" Width="170" SelectedIndex="1">
+                                <ComboBoxItem Content="بانک" Tag="1120"/><ComboBoxItem Content="صندوق" Tag="1110"/>
+                            </ComboBox>
+                            <Button Content="تسویهٔ قسط انتخاب‌شده" Click="PayLoanInstallment_Click" Margin="8,0,0,0"/>
+                        </WrapPanel>
+                        <DataGrid x:Name="LoansGrid" MinHeight="155" MaxHeight="250">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="شماره" Binding="{Binding LoanNumber}" Width="1.2*"/>
+                                <DataGridTextColumn Header="وام‌دهنده" Binding="{Binding LenderName}" Width="2*"/>
+                                <DataGridTextColumn Header="اصل وام" Binding="{Binding PrincipalAmount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.4*"/>
+                                <DataGridTextColumn Header="مانده اصل" Binding="{Binding RemainingPrincipal, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.4*"/>
+                                <DataGridTextColumn Header="بهره سالانه (%)" Binding="{Binding AnnualInterestRatePercent, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                                <DataGridTextColumn Header="اقساط" Binding="{Binding InstallmentCount, StringFormat={}{0:#,##0}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="0.8*"/>
+                                <DataGridTextColumn Header="شروع" Binding="{Binding StartDateLabel}" Width="1.1*"/>
+                                <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="1*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <TextBlock Text="برنامهٔ اقساط" FontSize="17" FontWeight="Bold" Margin="0,18,0,4"/>
+                        <DataGrid x:Name="LoanInstallmentsGrid" MinHeight="230" MaxHeight="400">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="وام" Binding="{Binding LoanNumber}" Width="1.2*"/>
+                                <DataGridTextColumn Header="قسط" Binding="{Binding Number}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="0.6*"/>
+                                <DataGridTextColumn Header="سررسید" Binding="{Binding DueDateLabel}" Width="1*"/>
+                                <DataGridTextColumn Header="اصل" Binding="{Binding PrincipalAmount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                                <DataGridTextColumn Header="بهره" Binding="{Binding InterestAmount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                                <DataGridTextColumn Header="جمع" Binding="{Binding TotalAmount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.3*"/>
+                                <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="1*"/>
+                                <DataGridTextColumn Header="تاریخ پرداخت" Binding="{Binding PaidDateLabel}" Width="1.1*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="مدیریت چندارزی">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="18">
+                        <TextBlock Text="مدیریت نرخ ارز و تبدیل مبالغ" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="نرخ هر ارز برابر تعداد ریال برای یک واحد ارز است. نرخ دلار، یورو و سایر ارزها را از منبع معتبر وارد کنید؛ نرخ بازار حدسی یا ساختگی تولید نمی‌شود." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,12"/>
+                        <TextBlock x:Name="CurrencyBaseStatus" Text="واحد اصلی ثبت" FontWeight="SemiBold" Foreground="#0F766E" Margin="0,0,0,8"/>
+                        <WrapPanel Margin="0,0,0,8">
+                            <Button Content="＋ افزودن ارز" Click="AddCurrencyRate_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="ویرایش نرخ ارز انتخاب‌شده" Click="UpdateCurrencyRate_Click"/>
+                        </WrapPanel>
+                        <DataGrid x:Name="CurrencyRatesGrid" MinHeight="170" MaxHeight="300">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="کد" Binding="{Binding Code}" Width="0.7*"/>
+                                <DataGridTextColumn Header="ارز" Binding="{Binding Name}" Width="1.5*"/>
+                                <DataGridTextColumn Header="نماد" Binding="{Binding Symbol}" Width="0.7*"/>
+                                <DataGridTextColumn Header="ریال برای یک واحد" Binding="{Binding RialPerUnit, StringFormat={}{0:#,##0.####}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.6*"/>
+                                <DataGridTextColumn Header="وضعیت نرخ" Binding="{Binding RateStatus}" Width="1.1*"/>
+                                <DataGridTextColumn Header="آخرین به‌روزرسانی" Binding="{Binding LastUpdatedLabel}" Width="1.2*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,18,0,0">
+                            <StackPanel>
+                                <TextBlock Text="ماشین‌حساب تبدیل ارز" FontSize="18" FontWeight="Bold"/>
+                                <UniformGrid Columns="2" Margin="0,12,0,0">
+                                    <StackPanel Margin="0,0,10,10"><TextBlock Text="مبلغ" Margin="0,0,0,5"/><TextBox x:Name="CurrencyConvertAmount" Text="1" FlowDirection="LeftToRight" HorizontalContentAlignment="Right" MinHeight="36"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="ارز مبدا" Margin="0,0,0,5"/><ComboBox x:Name="FromCurrencySelector" MinHeight="36"/></StackPanel>
+                                    <StackPanel Margin="0,0,10,10"><TextBlock Text="ارز مقصد" Margin="0,0,0,5"/><ComboBox x:Name="ToCurrencySelector" MinHeight="36"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="نتیجه" Margin="0,0,0,5"/><TextBlock x:Name="CurrencyConvertedAmount" Text="—" FlowDirection="LeftToRight" FontSize="18" FontWeight="Bold" Foreground="#0F766E" Margin="0,6,0,0"/></StackPanel>
+                                </UniformGrid>
+                                <Button Content="محاسبه با نرخ ثبت‌شده" Click="ConvertCurrency_Click" HorizontalAlignment="Right" Background="#0F766E" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="تطبیق بانکی">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="18">
+                        <TextBlock Text="حساب‌های بانکی و تطبیق گردش‌ها" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="تطبیق خودکار فقط هنگام یکسان بودن مبلغ، جهت گردش و واحد پول اصلی انجام می‌شود؛ موارد دیگر باید با توضیح بررسی شوند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,12"/>
+                        <WrapPanel Margin="0,0,0,8">
+                            <Button Content="＋ حساب بانکی" Click="AddBankAccount_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="＋ گردش صورت‌حساب" Click="AddBankTransaction_Click"/>
+                            <Button Content="تطبیق تراکنش انتخاب‌شده" Click="ReconcileBankTransaction_Click"/>
+                        </WrapPanel>
+                        <TextBlock Text="حساب‌ها" FontSize="17" FontWeight="Bold" Margin="0,4,0,4"/>
+                        <DataGrid x:Name="BankAccountsGrid" MinHeight="130" MaxHeight="240">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="بانک" Binding="{Binding BankName}" Width="1.4*"/>
+                                <DataGridTextColumn Header="۴ رقم آخر" Binding="{Binding AccountNumberMasked}" Width="1*"/>
+                                <DataGridTextColumn Header="ارز" Binding="{Binding CurrencyName}" Width="0.9*"/>
+                                <DataGridTextColumn Header="مانده افتتاحیه" Binding="{Binding OpeningBalance, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                                <DataGridTextColumn Header="مانده صورت‌حساب" Binding="{Binding Balance, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.3*"/>
+                                <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="0.8*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <TextBlock Text="تراکنش‌های صورت‌حساب" FontSize="17" FontWeight="Bold" Margin="0,18,0,4"/>
+                        <DataGrid x:Name="BankTransactionsGrid" MinHeight="240" MaxHeight="430">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="تاریخ" Binding="{Binding DateLabel}" Width="1*"/>
+                                <DataGridTextColumn Header="حساب" Binding="{Binding AccountName}" Width="1.2*"/>
+                                <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="2*"/>
+                                <DataGridTextColumn Header="جهت" Binding="{Binding DirectionLabel}" Width="0.8*"/>
+                                <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                                <DataGridTextColumn Header="مرجع" Binding="{Binding Reference}" Width="1.1*"/>
+                                <DataGridTextColumn Header="وضعیت" Binding="{Binding StatusLabel}" Width="1*"/>
+                                <DataGridTextColumn Header="یادداشت بررسی" Binding="{Binding ReconciliationNote}" Width="1.7*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="قواعد گردش مالی">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="18">
+                        <TextBlock Text="قواعد کنترل و گردش مالی" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="قواعد زیر روی ثبت اسناد و اعتبارسنجی داده‌های بومی اعمال می‌شوند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,12"/>
+                        <TextBlock x:Name="FinancialRulesStatus" Text="قواعد مالی هنوز بررسی نشده‌اند." FontWeight="SemiBold" Foreground="#0F766E" Margin="0,0,0,8"/>
+                        <WrapPanel Margin="0,0,0,8">
+                            <Button Content="اعتبارسنجی قواعد فعلی" Click="ValidateFinancialRules_Click" Background="#0F766E" Foreground="White"/>
+                            <Button Content="بازسازی ثبت‌های عملیاتی دفتر" Click="RebuildAutomaticLedgerEntries_Click"/>
+                        </WrapPanel>
+                        <DataGrid x:Name="WorkflowRulesGrid" MinHeight="250" MaxHeight="500">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="قاعده" Binding="{Binding Rule}" Width="2*"/>
+                                <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="0.7*"/>
+                                <DataGridTextColumn Header="رفتار" Binding="{Binding Detail}" Width="3*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="تنظیمات و شرکت‌ها">
+                <ScrollViewer x:Name="AccountingSettingsScrollViewer" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12" MaxWidth="1050" HorizontalAlignment="Right">
+                        <TextBlock Text="تنظیمات حسابداری و پروفایل شرکت‌ها" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="پروفایل شرکت فعال، مشخصات چاپ فاکتور و گزینه‌های محلی را مدیریت کنید. تنظیمات در فایل دادهٔ محلی ذخیره می‌شوند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,18"/>
+                        <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="10" Padding="13" Margin="0,0,0,14">
+                            <TextBlock Text="فضای کاری اشخاص، کالاها، فاکتورها، موجودی، دریافت/پرداخت، چک‌ها و دفتر برای هر شرکت جدا ذخیره می‌شود. دادهٔ قدیمی نخستین بار به شرکت فعال فعلی نسبت داده می‌شود و به شرکت‌های تازه کپی نمی‌شود. پیش از استفادهٔ عملی، پشتیبان‌گیری و بازیابی چندشرکتی را با دادهٔ آزمایشی بررسی کنید؛ این آزمون میدانی هنوز انجام نشده است." Foreground="#9A3412" TextWrapping="Wrap"/>
+                        </Border>
+                        <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,0,0,14">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="220"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Margin="0,0,14,0" VerticalAlignment="Center">
+                                    <TextBlock Text="پوستهٔ رابط کاربری" FontWeight="Bold" FontSize="15"/>
+                                    <TextBlock Text="رنگ کلی برنامه" Foreground="#475569" FontSize="11" Margin="0,3,0,0"/>
+                                </StackPanel>
+                                <ComboBox x:Name="ApplicationThemeSelector" Grid.Column="1" MinHeight="36" VerticalContentAlignment="Center" SelectionChanged="ApplicationThemeSelector_SelectionChanged">
+                                    <ComboBoxItem Content="روشن — محیط کلاسیک" Tag="light"/>
+                                    <ComboBoxItem Content="تیره — محیط کم‌نور" Tag="dark"/>
+                                </ComboBox>
+                                <TextBlock Grid.Column="2" Text="برای اعمال تم، گزینه را انتخاب و «ذخیره تنظیمات حسابداری» را بزنید. کنتراست متن، فیلدها و سطوح در تم تیره تنظیم می‌شود." Foreground="#475569" TextWrapping="Wrap" VerticalAlignment="Center" Margin="14,0,0,0"/>
+                            </Grid>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="مشخصات شرکت / شعبه" FontSize="17" FontWeight="Bold"/>
+                                <DockPanel Margin="0,10,0,12">
+                                    <TextBlock Text="پروفایل" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <ComboBox x:Name="CompanyProfileSelector" Width="330" DisplayMemberPath="Name" SelectionChanged="CompanyProfileSelector_SelectionChanged"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                                        <Button Content="شرکت فعال شود" Click="ActivateCompanyProfile_Click" Margin="4,0"/>
+                                        <Button Content="شرکت جدید" Click="AddCompanyProfile_Click" Margin="4,0" Background="#0F766E" Foreground="White"/>
+                                    </StackPanel>
+                                </DockPanel>
+                                <UniformGrid Columns="2" Margin="0,0,0,8">
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="نام قابل نمایش" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileName" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="نام حقوقی" Margin="0,0,0,5"/><TextBox x:Name="CompanyLegalName" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="شناسه ملی" Margin="0,0,0,5"/><TextBox x:Name="CompanyNationalId" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="شناسه / کد مالیاتی" Margin="0,0,0,5"/><TextBox x:Name="CompanyTaxId" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="تلفن" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfilePhone" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="شعبه" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileBranch" MinHeight="34" Padding="8" Text="مرکزی"/></StackPanel>
+                                </UniformGrid>
+                                <TextBlock Text="نشانی" Margin="0,0,0,5"/><TextBox x:Name="CompanyProfileAddress" MinHeight="64" Padding="8" AcceptsReturn="True" TextWrapping="Wrap"/>
+                                <WrapPanel Margin="0,10,0,0">
+                                    <Button Content="انتخاب لوگوی شرکت" Click="ChooseCompanyImage_Click" Tag="LogoDataBase64" Margin="0,0,8,8"/>
+                                    <Button Content="انتخاب مهر شرکت" Click="ChooseCompanyImage_Click" Tag="StampDataBase64" Margin="0,0,8,8"/>
+                                    <Button Content="انتخاب امضای شرکت" Click="ChooseCompanyImage_Click" Tag="SignatureDataBase64" Margin="0,0,8,8"/>
+                                </WrapPanel>
+                                <TextBlock Text="فایل PNG یا JPG؛ هر تصویر حداکثر ۲ مگابایت و داخل دادهٔ محلی ذخیره می‌شود." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                                <Button Content="ذخیره مشخصات شرکت" Click="SaveCompanyProfile_Click" HorizontalAlignment="Right" Margin="0,12,0,0" Background="#0F766E" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="تنظیمات فاکتور و چاپ" FontSize="17" FontWeight="Bold"/>
+                                <UniformGrid Columns="2" Margin="0,12,0,0">
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="قالب پیش‌فرض" Margin="0,0,0,5"/><ComboBox x:Name="InvoiceThemeSelector" MinHeight="34" SelectedIndex="0">
+                                        <ComboBoxItem Content="شرکتی مدرن" Tag="modern"/><ComboBoxItem Content="رسمی و اداری" Tag="official"/><ComboBoxItem Content="لوکس / مدیریتی" Tag="premium"/><ComboBoxItem Content="حرارتی" Tag="thermal"/><ComboBoxItem Content="مینیمال" Tag="minimal"/><ComboBoxItem Content="کلاسیک" Tag="classic"/><ComboBoxItem Content="هوشمند" Tag="smart"/><ComboBoxItem Content="رنگی" Tag="colorful"/><ComboBoxItem Content="صنعتی" Tag="industrial"/><ComboBoxItem Content="خلاقانه" Tag="creative"/><ComboBoxItem Content="ایرانی" Tag="persian"/>
+                                    </ComboBox></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="واحد پول" Margin="0,0,0,5"/><ComboBox x:Name="SettingsCurrencySelector" MinHeight="34"><ComboBoxItem Content="ریال" Tag="RIAL"/><ComboBoxItem Content="تومان" Tag="TOMAN"/></ComboBox></StackPanel>
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="نرخ مالیات پیش‌فرض (درصد)" Margin="0,0,0,5"/><TextBox x:Name="SettingsTaxRate" MinHeight="34" Padding="8" Text="0"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="پیشوند فاکتور فروش" Margin="0,0,0,5"/><TextBox x:Name="SettingsInvoicePrefix" MinHeight="34" Padding="8" Text="INV-"/></StackPanel>
+                                </UniformGrid>
+                                <CheckBox x:Name="SettingsShowInvoiceQr" Content="درج خودکار QR در پیش‌نمایش و چاپ فاکتور" Margin="0,2,0,10" IsChecked="True"/>
+                                <TextBlock Text="پانویس‌های آماده (هر مورد را جداگانه انتخاب کنید)" Margin="0,12,0,5" FontWeight="SemiBold"/>
+                                <WrapPanel Margin="0,0,0,8">
+                                    <CheckBox x:Name="SettingsFooterNoReturns" Content="کالای فروخته‌شده پس گرفته نمی‌شود" Margin="0,0,14,8"/>
+                                    <CheckBox x:Name="SettingsFooterPaymentTerms" Content="لطفاً هنگام پرداخت شماره فاکتور را ذکر کنید" Margin="0,0,14,8"/>
+                                    <CheckBox x:Name="SettingsFooterDeliveryTerms" Content="تحویل طبق توافق طرفین انجام می‌شود" Margin="0,0,14,8"/>
+                                </WrapPanel>
+                                <TextBlock Text="پانویس ثابت سفارشی (در صورت نیاز، چند خط وارد کنید)" Margin="0,0,0,5"/>
+                                <TextBox x:Name="SettingsInvoiceFooter" MinHeight="54" Padding="8" AcceptsReturn="True" TextWrapping="Wrap"/>
+                                <TextBlock Text="گزینه‌های پانویس سفارشی (هر خط یک گزینه؛ گزینه‌ها را بارگذاری و سپس انتخاب کنید)" Margin="0,12,0,5" FontWeight="SemiBold"/>
+                                <TextBox x:Name="SettingsCustomFootnoteOptions" MinHeight="70" Padding="8" AcceptsReturn="True" TextWrapping="Wrap" ToolTip="هر خط به‌عنوان گزینهٔ جداگانه نمایش داده می‌شود."/>
+                                <Button Content="بارگذاری گزینه‌های پانویس" Click="LoadCustomInvoiceFootnotes_Click" HorizontalAlignment="Right" Margin="0,6,0,6"/>
+                                <ListBox x:Name="CustomInvoiceFootnoteSelector" SelectionMode="Extended" MinHeight="90" MaxHeight="160" BorderBrush="#CBD5E1" BorderThickness="1" Padding="6" ToolTip="برای انتخاب چند گزینه از Ctrl یا Shift استفاده کنید."/>
+                                <Button Content="ذخیره تنظیمات حسابداری" Click="SaveAccountingPreferences_Click" HorizontalAlignment="Right" Margin="0,12,0,0" Background="#0F766E" Foreground="White"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="سامانهٔ مؤدیان">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12" MaxWidth="980" HorizontalAlignment="Right">
+                        <TextBlock Text="سامانهٔ مؤدیان مالیاتی" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="پروفایل مؤدی و آماده‌سازی دادهٔ صورتحساب برای بازبینی قبل از اتصال رسمی." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,16"/>
+                        <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="10" Padding="14">
+                            <TextBlock Text="ارسال به سازمان امور مالیاتی در این نسخه فعال نیست. تا زمان تطبیق دقیق قرارداد API، گواهی و الزامات رسمی با نسخهٔ اصلی، این صفحه فقط تنظیمات محلی و JSON نمونه تولید می‌کند." Foreground="#9A3412" TextWrapping="Wrap"/>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="تنظیمات مؤدی" FontSize="17" FontWeight="Bold"/>
+                                <UniformGrid Columns="2" Margin="0,12,0,0">
+                                    <StackPanel Margin="0,0,12,10"><TextBlock Text="شناسه / شناسهٔ اقتصادی" Margin="0,0,0,5"/><TextBox x:Name="MoadianTaxpayerId" MinHeight="34" Padding="8"/></StackPanel>
+                                    <StackPanel Margin="0,0,0,10"><TextBlock Text="محیط" Margin="0,0,0,5"/><ComboBox x:Name="MoadianEnvironmentSelector" MinHeight="34"><ComboBoxItem Content="آزمایشی" Tag="Sandbox"/><ComboBoxItem Content="عملیاتی" Tag="Production"/></ComboBox></StackPanel>
+                                    <StackPanel Grid.ColumnSpan="2"><TextBlock Text="نشانی API تأییدشده (در حالت فعلی فقط ذخیره می‌شود)" Margin="0,0,0,5"/><TextBox x:Name="MoadianApiBaseUrl" MinHeight="34" Padding="8" FlowDirection="LeftToRight"/></StackPanel>
+                                </UniformGrid>
+                                <CheckBox x:Name="MoadianIsConfigured" Content="پروفایل مؤدی توسط مدیر سیستم بررسی شده است" Margin="0,12,0,8"/>
+                                <WrapPanel HorizontalAlignment="Right"><Button Content="ذخیره پروفایل مؤدی" Click="SaveMoadianSettings_Click" Background="#0F766E" Foreground="White" Margin="4"/><Button Content="ساخت JSON نمونه از فاکتور انتخاب‌شده" Click="BuildMoadianPayload_Click" Margin="4"/><Button Content="ذخیره JSON" Click="ExportMoadianPayload_Click" Margin="4"/></WrapPanel>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                            <StackPanel><TextBlock Text="JSON نمونه — ارسال نمی‌شود" FontSize="17" FontWeight="Bold" Margin="0,0,0,8"/><TextBox x:Name="MoadianPayloadPreview" MinHeight="250" Padding="10" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" FlowDirection="LeftToRight" FontFamily="Consolas"/></StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="اتصال به سرور اصلی">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="12" MaxWidth="930" HorizontalAlignment="Right">
+                        <TextBlock Text="اتصال سرور، لایسنس و همگام‌سازی" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="همگام‌سازی دستی فضای کاری از مسیر HTTPS و با لایسنس تأییدشده انجام می‌شود؛ تعارض‌ها فقط با انتخاب صریح شما حل می‌شوند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,14"/>
+                        <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="10" Padding="14">
+                            <TextBlock Text="دادهٔ حسابداری فقط به سرور اصلی HTTPS اشک قلم و با لایسنس معتبر ارسال می‌شود. پیش از جایگزینی دادهٔ متفاوت، تهیهٔ پشتیبان و انتخاب صریح لازم است. صدور/ابطال لایسنس و ابزار انتشار فقط در نسخهٔ مادر وب باقی می‌ماند." Foreground="#9A3412" TextWrapping="Wrap"/>
+                        </Border>
+                        <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="نشانی میزبان" FontSize="17" FontWeight="Bold"/>
+                                <TextBox x:Name="ServerBaseUrl" MinHeight="36" Padding="8" Margin="0,12,0,10" Text="https://acc.ashkghalam.ir/" FlowDirection="LeftToRight"/>
+                                <TextBlock Text="شناسهٔ فضای کاری / شرکت" Margin="0,0,0,5"/><TextBox x:Name="ServerWorkspaceId" MinHeight="34" Padding="8"/>
+                                <TextBlock Text="سیاست همگام‌سازی" Margin="0,12,0,5"/><ComboBox x:Name="ServerSyncModeSelector" MinHeight="34"><ComboBoxItem Content="دستی" Tag="manual"/><ComboBoxItem Content="پس از تأیید" Tag="approval"/><ComboBoxItem Content="غیرفعال" Tag="disabled"/></ComboBox>
+                                <TextBlock x:Name="ServerConnectionStatusText" Text="وضعیت: هنوز بررسی نشده" FontWeight="Bold" Foreground="#475569" Margin="0,12,0,8"/>
+                                <WrapPanel HorizontalAlignment="Right">
+                                    <Button Content="ذخیره تنظیمات اتصال" Click="SaveServerConnection_Click" Background="#0F766E" Foreground="White" Margin="4"/>
+                                    <Button Content="اعتبارسنجی نشانی HTTPS" Click="ValidateServerConnection_Click" Margin="4"/>
+                                    <Button Content="آزمون واقعی اتصال API" Click="TestServerStorage_Click" Margin="4"/>
+                                    <Button Content="فعال‌سازی لایسنس" Click="VerifyLicense_Click" Margin="4"/>
+                                    <Button Content="🔄 همگام‌سازی امن داده‌ها" Click="SyncAccountingData_Click" Background="#0F766E" Foreground="White" Margin="4"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+                            <TabItem Header="کارتکس کالا">
+                <Grid Margin="18">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="کارتکس و گردش ریز موجودی کالا" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="گردش ثبت‌شدهٔ ورود، خروج، تعدیل و اسناد مرتبط با هر کالا را به‌ترتیب تاریخ مشاهده کنید." Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <WrapPanel Grid.Row="1" Margin="0,14,0,0">
+                        <ComboBox x:Name="KardexModuleProductSelector" MinWidth="320" Height="36" Padding="8,4" DisplayMemberPath="Name" SelectionChanged="KardexModuleProductSelector_SelectionChanged" Margin="0,0,8,8"/>
+                        <Button Content="📊 بازکردن کارتکس کامل" Click="ShowKardexFromModule_Click" Background="#0F766E" Foreground="White" Margin="0,0,8,8"/>
+                        <Button Content="🖨 چاپ کارتکس" Click="PrintKardexModule_Click" Margin="0,0,8,8"/>
+                        <Button Content="📄 خروجی CSV" Click="ExportKardexModule_Click" Margin="0,0,8,8"/>
+                    </WrapPanel>
+                    <StackPanel Grid.Row="2">
+                        <TextBlock x:Name="KardexModuleSummary" Text="برای مشاهدهٔ گردش، کالا را انتخاب کنید." Foreground="#334155" FontWeight="SemiBold" Margin="0,4,0,4"/>
+                        <DataGrid x:Name="KardexModuleGrid" MinHeight="280" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="تاریخ" Binding="{Binding Date}" Width="1.1*"/>
+                                <DataGridTextColumn Header="نوع گردش" Binding="{Binding Movement}" Width="1.55*"/>
+                                <DataGridTextColumn Header="سند مرجع" Binding="{Binding Document}" Width="1.6*"/>
+                                <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="*"/>
+                                <DataGridTextColumn Header="ورودی" Binding="{Binding Incoming, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.1*"/>
+                                <DataGridTextColumn Header="خروجی" Binding="{Binding Outgoing, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.1*"/>
+                                <DataGridTextColumn Header="مانده" Binding="{Binding Balance, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </StackPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="سال مالی">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="18" MaxWidth="1000" HorizontalAlignment="Right">
+                        <TextBlock Text="📅  مدیریت سال مالی" FontSize="26" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="سال مالی فعال و بازهٔ شمسی گزارش‌های دفتر را تعیین کنید. بستن قطعی سال و ثبت سند اختتامیه تا تکمیل گردش کامل حساب‌ها جداگانه کنترل می‌شود." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,16"/>
+                        <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="تنظیم بازهٔ مالی" FontSize="17" FontWeight="Bold"/>
+                                <UniformGrid Columns="3" Margin="0,14,0,0">
+                                    <StackPanel Margin="0,0,12,8">
+                                        <TextBlock Text="سال مالی فعال" Margin="0,0,0,5"/>
+                                        <ComboBox x:Name="FiscalYearSelector" MinHeight="36" SelectionChanged="FiscalYearSelector_SelectionChanged"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,12,8">
+                                        <TextBlock Text="شروع سال (شمسی)" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="FiscalYearStartDate" MinHeight="36" Padding="8" FlowDirection="LeftToRight"/>
+                                    </StackPanel>
+                                    <StackPanel Margin="0,0,0,8">
+                                        <TextBlock Text="پایان سال (شمسی)" Margin="0,0,0,5"/>
+                                        <TextBox x:Name="FiscalYearEndDate" MinHeight="36" Padding="8" FlowDirection="LeftToRight"/>
+                                    </StackPanel>
+                                </UniformGrid>
+                                <Button Content="💾 ذخیره سال مالی و بازه" Click="SaveFiscalYear_Click" Background="#0F766E" Foreground="White" HorizontalAlignment="Right" MinWidth="220" Height="38" Margin="0,8,0,0"/>
+                                <TextBlock x:Name="FiscalYearStatus" Text="سال مالی هنوز بارگذاری نشده است." Foreground="#475569" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="14" Margin="0,14,0,0">
+                            <StackPanel>
+                                <TextBlock Text="اسناد دفتر در سال انتخابی" FontSize="17" FontWeight="Bold" Margin="0,0,0,8"/>
+                                <DataGrid x:Name="FiscalYearLedgerGrid" MinHeight="250" MaxHeight="420">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="تاریخ شمسی" Binding="{Binding Date}" Width="1.1*"/>
+                                        <DataGridTextColumn Header="شرح" Binding="{Binding Description}" Width="2.5*"/>
+                                        <DataGridTextColumn Header="سال مالی" Binding="{Binding FiscalYear}" Width="1*"/>
+                                        <DataGridTextColumn Header="مبلغ" Binding="{Binding Amount, StringFormat={}{0:#,##0.##}}" ElementStyle="{StaticResource NumericCellTextStyle}" Width="1.2*"/>
+                                        <DataGridTextColumn Header="وضعیت" Binding="{Binding Status}" Width="1*"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="امنیت داده‌ها">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="18" MaxWidth="1000" HorizontalAlignment="Right">
+                        <TextBlock Text="🔐  امنیت و سلامت داده‌ها" FontSize="26" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="فایل دادهٔ محلی با DPAPI ویندوز و حساب کاربر فعلی محافظت می‌شود. این صفحه امکان بررسی سلامت داده و بازکردن محل ذخیره‌سازی را می‌دهد." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,16"/>
+                        <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="وضعیت حفاظت محلی" FontSize="17" FontWeight="Bold"/>
+                                <TextBlock x:Name="SecurityStatusText" Text="وضعیت در حال بررسی..." Margin="0,8,0,12" TextWrapping="Wrap"/>
+                                <TextBlock Text="%LOCALAPPDATA%\AshkeGhalam\WindowsNative\accounting-data.dat" FontFamily="Consolas" FlowDirection="LeftToRight" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                <WrapPanel>
+                                    <Button Content="🔎 بررسی سلامت داده‌ها" Click="AuditLocalData_Click" Height="38" Margin="0,0,8,8" Background="#0F766E" Foreground="White"/>
+                                    <Button Content="📂 بازکردن پوشهٔ داده‌ها" Click="OpenDataFolder_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="🛡️ تنظیم پشتیبان خودکار" Click="OpenAdvancedBackup_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="⚠ پاک‌سازی کامل داده‌های محلی" Click="ResetAllAccountingData_Click" Height="38" Margin="0,0,8,8" Background="#B91C1C" Foreground="White"/>
+                                </WrapPanel>
+                                <TextBlock Text="یادآوری: DPAPI حفاظت دادهٔ این حساب ویندوز است، نه سیستم چندکاربره با نقش‌های دسترسی. رمزگذاری داده نیز جایگزین نسخهٔ پشتیبان جداگانه نیست." Foreground="#92400E" TextWrapping="Wrap" Margin="0,10,0,0"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="تنظیمات پیشرفته">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="20" MaxWidth="1180" HorizontalAlignment="Center">
+                        <Border Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="18" Padding="24" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="مرکز کنترل و تنظیمات پیشرفته" FontSize="27" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock Text="پشتیبان‌گیری، بازیابی، سلامت داده، اتصال امن، ظاهر برنامه و ابزارهای نگهداری را از یکجا مدیریت کنید."
+                                               FontSize="13" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="20,0,0,0">
+                                    <Button Content="بازیابی از فایل پشتیبان" Click="RestoreBackup_Click" Height="40" Margin="0,0,0,8" Background="#14B8A6" Foreground="#052F2E" FontWeight="Bold"/>
+                                    <Button Content="رفتن به اتصال و همگام‌سازی" Tag="اتصال به سرور اصلی" Click="AdvancedOpenTab_Click" Height="38"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <UniformGrid Columns="2" Margin="0,0,0,14">
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,7,0">
+                                <StackPanel>
+                                    <TextBlock Text="بازیابی و نگهداری اطلاعات" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="فایل پشتیبان رمزگذاری‌شده را بسازید یا برگردانید. پیش از جایگزینی اطلاعات، می‌توانید از داده‌های فعلی نسخهٔ امن تهیه کنید."
+                                               Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,12"/>
+                                    <WrapPanel>
+                                        <Button Content="ساخت پشتیبان دستی" Click="CreateBackup_Click" Height="36" Margin="0,0,8,8" Background="#0F766E" Foreground="White"/>
+                                        <Button Content="بازیابی پشتیبان…" Click="RestoreBackup_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="بازکردن پوشهٔ پشتیبان‌ها" Click="OpenBackupFolder_Click" Height="36" Margin="0,0,8,8"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="7,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="سلامت داده و پوشهٔ محلی" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="اعتبار ساختار حسابداری را بررسی کنید یا پوشهٔ داده را برای نگهداری باز کنید. پاک‌سازی با تأیید دوم انجام می‌شود."
+                                               Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,12"/>
+                                    <WrapPanel>
+                                        <Button Content="بررسی سلامت داده" Click="CheckLocalDataIntegrity_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="بازکردن پوشهٔ داده‌ها" Click="OpenDataFolder_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="پاک‌سازی کامل داده‌ها" Click="ResetAllAccountingData_Click" Height="36" Margin="0,0,8,8" Background="#B91C1C" Foreground="White"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="20" Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="پشتیبان‌گیری خودکار رمزگذاری‌شده" FontSize="19" FontWeight="Bold" Foreground="#0F172A"/>
+                                <TextBlock Text="رمز پشتیبان خودکار برای حساب کاربری فعلی ویندوز محافظت می‌شود. رمز فایل پشتیبان دستی را جداگانه نگه دارید؛ بازیابی بدون رمز ممکن نیست."
+                                           Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,14"/>
+                                <CheckBox x:Name="AutoBackupEnabled" Content="فعال‌سازی پشتیبان‌گیری زمان‌بندی‌شده" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12"/>
+                                <Grid Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="210"/><ColumnDefinition Width="160"/><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="فاصلهٔ پشتیبان‌ها" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                    <ComboBox x:Name="AutoBackupIntervalSelector" Grid.Column="1" MinHeight="36" SelectedIndex="3">
+                                        <ComboBoxItem Content="هر ۱ ساعت" Tag="1"/>
+                                        <ComboBoxItem Content="هر ۶ ساعت" Tag="6"/>
+                                        <ComboBoxItem Content="هر ۱۲ ساعت" Tag="12"/>
+                                        <ComboBoxItem Content="روزانه" Tag="24"/>
+                                        <ComboBoxItem Content="هفتگی" Tag="168"/>
+                                    </ComboBox>
+                                    <TextBlock Grid.Column="2" Text="نگهداری نسخه‌ها" VerticalAlignment="Center" Margin="16,0,8,0"/>
+                                    <ComboBox x:Name="AutoBackupRetentionSelector" Grid.Column="3" MinHeight="36" SelectedIndex="3">
+                                        <ComboBoxItem Content="۳ نسخه" Tag="3"/>
+                                        <ComboBoxItem Content="۵ نسخه" Tag="5"/>
+                                        <ComboBoxItem Content="۱۰ نسخه" Tag="10"/>
+                                        <ComboBoxItem Content="۲۰ نسخه" Tag="20"/>
+                                    </ComboBox>
+                                </Grid>
+                                <CheckBox x:Name="AskBackupOnExit" Content="هنگام خروج، پرسش تهیهٔ پشتیبان نمایش داده شود (پیشنهادی)" IsChecked="True" Margin="0,0,0,12"/>
+                                <TextBlock Text="مسیر فعلی پشتیبان خودکار" FontWeight="SemiBold" Margin="0,0,0,5"/>
+                                <TextBlock x:Name="AutoBackupPathText" Text="پوشهٔ پشتیبان در حال بارگذاری..." TextWrapping="Wrap" FontFamily="Consolas" FlowDirection="LeftToRight" Margin="0,0,0,8"/>
+                                <TextBlock x:Name="AutoBackupStatusText" Text="پشتیبان خودکار هنوز پیکربندی نشده است." TextWrapping="Wrap" Foreground="#475569" Margin="0,0,0,12"/>
+                                <WrapPanel>
+                                    <Button Content="تعیین / تغییر رمز" Click="SetAutoBackupPassword_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="ذخیرهٔ زمان‌بندی" Click="SaveAutoBackupSettings_Click" Height="38" Margin="0,0,8,8" Background="#0F766E" Foreground="White"/>
+                                    <Button Content="اجرای پشتیبان همین الان" Click="CreateAutomaticBackupNow_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="انتخاب پوشه" Click="ChooseAutoBackupFolder_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="بازکردن پوشه" Click="OpenBackupFolder_Click" Height="38" Margin="0,0,8,8"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <UniformGrid Columns="2" Margin="0,0,0,14">
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,7,0">
+                                <StackPanel>
+                                    <TextBlock Text="اتصال سرور و همگام‌سازی" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="همگام‌سازی پس از تأیید آنلاین لایسنس مجاز است. آزمون اتصال API دادهٔ محلی را تغییر نمی‌دهد؛ دریافت/ارسال اصلی با انتخاب صریح شما انجام می‌شود."
+                                               Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,12"/>
+                                    <WrapPanel>
+                                        <Button Content="تنظیمات اتصال" Tag="اتصال به سرور اصلی" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8" Background="#0F766E" Foreground="White"/>
+                                        <Button Content="فعال‌سازی / بررسی لایسنس" Click="VerifyLicense_Click" Height="36" Margin="0,0,8,8"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="7,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="تنظیمات حسابداری و خروجی‌ها" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="دسترسی سریع به ظاهر برنامه، قالب فاکتور، گزارش‌های چاپی و آماده‌سازی صورتحساب مالیاتی."
+                                               Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,12"/>
+                                    <WrapPanel>
+                                        <Button Content="ظاهر و تنظیمات شرکت" Tag="تنظیمات و شرکت‌ها" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="گزارش‌های چاپی" Tag="گزارش‌ها" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="سامانهٔ مؤدیان" Tag="سامانهٔ مؤدیان" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="قواعد گردش مالی" Tag="قواعد گردش مالی" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Border Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="میانبرهای صفحه‌کلید" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                <UniformGrid Columns="2" Margin="0,12,0,0">
+                                    <TextBlock Text="Ctrl + N  •  فاکتور جدید" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl + Shift + C  •  ثبت چک" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl + B  •  ساخت پشتیبان رمزگذاری‌شده" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl + P  •  چاپ / پیش‌نمایش ردیف انتخابی" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl + 1 تا 6  •  پیشخوان، اشخاص، کالا، فاکتور، دریافت‌ها، هزینه‌ها" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="معرفی نرم‌افزار">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="24" MaxWidth="1020" HorizontalAlignment="Center">
+                        <Border Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="18" Padding="26" Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="اشک قلم" FontSize="30" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock Text="شرکت چاپ و کارتن‌سازی اشک قلم" FontSize="17" FontWeight="SemiBold" Foreground="#99F6E4" Margin="0,5,0,0"/>
+                                <TextBlock Text="نسخهٔ بومی حسابداری ویندوز" FontSize="14" Foreground="#E2E8F0" Margin="0,12,0,0"/>
+                                <TextBlock Text="ثبت فاکتور، مدیریت اشخاص و کالا، گردش موجودی، چک‌ها، دریافت و پرداخت و گزارش‌های مالی. داده‌های این نسخه به‌صورت محلی روی رایانه نگهداری می‌شوند."
+                                           FontSize="13" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                <Button Content="ورود به وب‌سایت رسمی اشک قلم" Tag="https://ashkghalam.ir/" Click="OpenCompanyWebsite_Click"
+                                        HorizontalAlignment="Right" MinWidth="250" Height="42" Margin="0,18,0,0"
+                                        Background="#14B8A6" Foreground="#042F2E" FontWeight="Bold"/>
+                            </StackPanel>
+                        </Border>
+                        <UniformGrid Columns="2" Margin="0,0,0,14">
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,7,0">
+                                <StackPanel>
+                                    <TextBlock Text="مشخصات شرکت فعال" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <Border x:Name="AboutCompanyLogoFrame" Background="#F8FAFC" BorderBrush="#E2E8F0"
+                                            BorderThickness="1" CornerRadius="10" Padding="8" Margin="0,12,0,4"
+                                            HorizontalAlignment="Right" Visibility="Collapsed">
+                                        <Image x:Name="AboutCompanyLogo" Width="132" Height="84" Stretch="Uniform"
+                                               SnapsToDevicePixels="True"/>
+                                    </Border>
+                                    <TextBlock Text="نام حقوقی" FontSize="11" Foreground="#64748B" Margin="0,12,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyLegalName" Text="در تنظیمات شرکت ثبت نشده" FontSize="14" FontWeight="SemiBold" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="شعبه" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyBranch" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" FontWeight="SemiBold" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="تلفن" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyPhone" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="شناسهٔ ملی" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyNationalId" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="شناسهٔ مالیاتی" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyTaxId" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <TextBlock Text="نشانی" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
+                                    <TextBlock x:Name="AboutCompanyAddress" Text="در تنظیمات شرکت ثبت نشده" FontSize="13" Foreground="#1E293B" TextWrapping="Wrap"/>
+                                    <Button Content="ویرایش مشخصات شرکت" Tag="تنظیمات و شرکت‌ها" Click="AdvancedOpenTab_Click" Height="36" Margin="0,14,0,0" HorizontalAlignment="Right"/>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="7,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="دربارهٔ نسخهٔ ویندوز" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="پلتفرم: C# / .NET 10 / WPF" FontSize="13" Foreground="#1E293B" Margin="0,12,0,4"/>
+                                    <TextBlock x:Name="AboutVersionText" Text="نسخهٔ برنامه" FontSize="12" Foreground="#475569" Margin="0,0,0,4"/>
+                                    <TextBlock Text="ذخیره‌سازی محلی رمزگذاری‌شده، پشتیبان رمزگذاری‌شده و ابزار همگام‌سازی دستی در این نسخه قرار دارند. همگام‌سازی فقط با لایسنس تأییدشده و انتخاب صریح کاربر انجام می‌شود."
+                                               FontSize="12" Foreground="#475569" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                    <TextBlock Text="سامانهٔ مؤدیان در این نسخه برای آماده‌سازی و ذخیرهٔ JSON است؛ ارسال رسمی فعال اعلام نمی‌شود."
+                                               FontSize="12" Foreground="#9A3412" TextWrapping="Wrap" Margin="0,12,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+                        <Border Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18">
+                            <StackPanel>
+                                <TextBlock Text="دسترسی‌های سریع" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                <WrapPanel Margin="0,12,0,0">
+                                    <Button Content="راهنمای سادهٔ حسابداری" Tag="راهنمای حسابداری" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="پشتیبان و بازیابی" Tag="پشتیبان‌گیری" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="اتصال به سرور" Tag="اتصال به سرور اصلی" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                                </WrapPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+            <TabItem Header="راهنمای حسابداری">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel Margin="24" MaxWidth="1020" HorizontalAlignment="Center">
+                        <TextBlock Text="راهنمای سادهٔ استفاده از نرم‌افزار" FontSize="27" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="برای شروع کار روزمره؛ هر بار پس از ثبت، نتیجه و مانده‌ها را کنترل کنید. در صورت تفاوت نام گزینه‌ها، از منوی اصلی سمت راست وارد بخش مربوط شوید."
+                                   FontSize="13" Foreground="#64748B" TextWrapping="Wrap" Margin="0,7,0,18"/>
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="10" Margin="0,0,0,18">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="GuideSearchBox" MinHeight="38" Padding="10,6" FontSize="13"
+                                         ToolTip="در عنوان‌ها و متن راهنما جست‌وجو کنید"
+                                         AutomationProperties.Name="جست‌وجو در راهنمای حسابداری"
+                                         TextChanged="GuideSearch_TextChanged"/>
+                                <TextBlock x:Name="GuideSearchResultText" Grid.Column="1" Text="نمایش همهٔ موضوعات"
+                                           VerticalAlignment="Center" Margin="12,0,4,0" Foreground="#64748B"/>
+                            </Grid>
+                        </Border>
+                        <Border x:Name="GuideSetupSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۱. راه‌اندازی اولیه" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="ابتدا مشخصات شرکت را از تنظیمات شرکت وارد کنید. سپس اشخاص و کالاها را ثبت کنید. قبل از ورود اطلاعات واقعی، یک فایل پشتیبان بسازید و امکان بازیابی آن را بررسی کنید."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuideInvoiceSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۲. ثبت فروش و خرید" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="در فاکتورها نوع سند را انتخاب کنید. نام مشتری یا تأمین‌کننده را تایپ کنید تا جست‌وجو شود؛ تاریخ را با دکمهٔ تقویم، Ctrl+Space یا عبارت‌های امروز/فردا/دیروز تعیین کنید. کالا، تعداد، قیمت و شرح هر قلم را وارد کنید. پیش‌نمایش را بررسی و بعد ذخیره کنید."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuideVoucherSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۳. انبار و حواله" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="برای ورود، خروج یا برگشت کالا از حواله‌های انبار استفاده کنید. نوع گردش را با دقت انتخاب کنید؛ حوالهٔ ثبت‌شده موجودی محلی را تغییر می‌دهد. پیش‌نمایش را از نظر نام کالا، تعداد، واحد و شرح کنترل کنید."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuidePaymentSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۴. دریافت، پرداخت و چک" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="برای هر دریافت یا پرداخت، طرف حساب، مبلغ، روش و مرجع را درست ثبت کنید. تصویر چک را به رکورد مربوط پیوست کنید. وضعیت چک (در انتظار، واگذار، پاس یا برگشت) را تنها بر اساس اطلاعات واقعی به‌روزرسانی کنید؛ ثبت محلی به‌تنهایی به معنی تأیید بانک نیست."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuideReportsSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۵. گزارش‌ها و کنترل حساب‌ها" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="گزارش اشخاص، گردش انبار، دفتر و جریان نقدینگی را مرتب بررسی کنید. در حسابداری دوبل، سند باید تراز باشد. تطبیق بانکی بدون واردکردن صورت‌حساب واقعی، فقط یک بررسی محلی محسوب می‌شود."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuideBackupSection" Background="#FFF7ED" BorderBrush="#FDBA74" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۶. پشتیبان، بازیابی و همگام‌سازی" FontSize="17" FontWeight="Bold" Foreground="#9A3412"/>
+                                <TextBlock Text="رمز پشتیبان را جدا از رایانه نگه دارید؛ بدون رمز، فایل رمزگذاری‌شده بازیابی نمی‌شود. قبل از بازیابی یا جایگزینی دادهٔ سرور از دادهٔ فعلی نسخهٔ پشتیبان بگیرید. همگام‌سازی کامل و اتصال عملیاتی باید با لایسنس معتبر و فضای کاری واقعی آزمون شود."
+                                           TextWrapping="Wrap" Foreground="#7C2D12" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuideDebitCreditSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۷. بدهکار، بستانکار و مانده" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="بدهکار و بستانکار دو سمت ثبت حسابداری‌اند؛ به‌تنهایی به معنی خوب یا بد بودن وضعیت نیستند. برای نمونه، وقتی مشتری بابت فاکتور ۱٬۰۰۰٬۰۰۰ ریال بدهکار می‌شود، ماندهٔ حساب او افزایش می‌یابد؛ با ثبت دریافت واقعی ۴۰۰٬۰۰۰ ریال، ماندهٔ باز ۶۰۰٬۰۰۰ ریال خواهد بود. گزارش دفتر و کاردکس را برای ماندهٔ نهایی بررسی کنید."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuideProfitCashSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۸. سود و زیان و جریان نقدینگی" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="سود و زیان، درآمدها و هزینه‌های دوره را مقایسه می‌کند؛ جریان نقدینگی ورود و خروج پول را نشان می‌دهد. ممکن است فروش ثبت شده باشد اما هنوز پول آن دریافت نشده باشد، بنابراین سود و موجودی نقد یکی نیستند. پیش‌بینی نقدینگی بر اساس اسناد ثبت‌شده است و جای صورت‌حساب واقعی بانک را نمی‌گیرد."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuideTroubleshootingSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۹. خطاهای رایج و راه‌حل" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="اگر تاریخ پذیرفته نشد، آن را از تقویم انتخاب یا با قالب سال/ماه/روز وارد کنید. اگر ثبت فاکتور به‌علت موجودی کافی متوقف شد، موجودی کالا و تعداد را بررسی کنید. اگر پشتیبان باز نشد، رمز همان فایل را کنترل کنید و فایل اصلی را حذف نکنید. در خطای شبکه یا لایسنس، ابتدا اتصال و وضعیت لایسنس را بررسی کنید؛ خطای ارتباطی به معنی ثبت یا همگام‌سازی موفق نیست."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <WrapPanel Margin="0,4,0,0">
+                            <Button Content="رفتن به فاکتورها" Tag="فاکتورها" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                            <Button Content="رفتن به گزارش‌ها" Tag="گزارش‌ها" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                            <Button Content="تنظیمات و پشتیبان" Tag="تنظیمات پیشرفته" Click="AdvancedOpenTab_Click" Height="38" Margin="0,0,8,8"/>
+                        </WrapPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="امور مالی">
+                <Grid Margin="22">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+                    <StackPanel>
+                        <TextBlock Text="مرکز امور مالی" FontSize="24" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="دسترسی یکپارچه به بخش‌های مالی منتقل‌شدهٔ نسخهٔ بومی؛ هر دکمه صفحه و عملیات واقعی همان بخش را باز می‌کند." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,8,0,18"/>
+                    </StackPanel>
+                    <UniformGrid Grid.Row="1" Columns="3" Rows="3" Margin="0,0,0,8">
+                        <Button Content="دریافت‌ها و رسیدها" Tag="دریافت‌ها" Click="FinanceShortcut_Click" Margin="6" MinHeight="72"/>
+                        <Button Content="هزینه‌ها" Tag="هزینه‌ها" Click="FinanceShortcut_Click" Margin="6" MinHeight="72"/>
+                        <Button Content="مدیریت چک و واگذاری گروهی" Tag="مدیریت چک" Click="FinanceShortcut_Click" Margin="6" MinHeight="72"/>
+                        <Button Content="حسابداری دوبل" Tag="حسابداری دوبل" Click="FinanceShortcut_Click" Margin="6" MinHeight="72"/>
+                        <Button Content="گزارش مالی پیشرفته" Tag="گزارش مالی پیشرفته" Click="FinanceShortcut_Click" Margin="6" MinHeight="72"/>
+                        <Button Content="پیش‌بینی نقدینگی" Tag="پیش‌بینی نقدینگی" Click="FinanceShortcut_Click" Margin="6" MinHeight="72"/>
+                        <Button Content="تقویم سررسیدها" Tag="تقویم سررسیدها" Click="FinanceShortcut_Click" Margin="6" MinHeight="72"/>
+                        <Button Content="پشتیبان‌گیری" Tag="پشتیبان‌گیری" Click="FinanceShortcut_Click" Margin="6" MinHeight="72"/>
+                        <Button Content="بازگشت به نمای کلی" Tag="نمای کلی" Click="FinanceShortcut_Click" Margin="6" MinHeight="72" Background="#0F766E" Foreground="White"/>
+                    </UniformGrid>
+                </Grid>
+            </TabItem>
+</TabControl>
+                <Border x:Name="MigrationPanel" Visibility="Collapsed" Background="#F1F5F9" CornerRadius="14" Padding="28">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel VerticalAlignment="Top" MaxWidth="850" HorizontalAlignment="Right">
+                            <TextBlock Text="مهاجرت نسخهٔ بومی اشک قلم" FontSize="12" FontWeight="Bold" Foreground="#0F766E"/>
+                            <TextBlock x:Name="MigrationPageTitle" Text="ماژول" FontSize="30" FontWeight="Bold" Foreground="#0F172A" Margin="0,12,0,0"/>
+                            <TextBlock x:Name="MigrationPageGroup" Text="گروه و مسیر" FontSize="12" Foreground="#64748B" Margin="0,8,0,20" TextWrapping="Wrap"/>
+                            <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="14" Padding="20">
+                                <StackPanel>
+                                    <TextBlock Text="این بخش در نسخهٔ اصلی اشک قلم موجود است." FontSize="17" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="قرار است منطق، اطلاعات، فرم‌ها، قواعد و ارتباطات همین بخش به کد بومی C# و WPF منتقل شود؛ این پنجره فعلاً صفحهٔ عملیاتی جعلی جایگزین آن نمی‌سازد." TextWrapping="Wrap" FontSize="13" Foreground="#475569" Margin="0,8,0,0"/>
+                                    <Border Background="#FFF7ED" BorderBrush="#FED7AA" BorderThickness="1" CornerRadius="9" Padding="14" Margin="0,18,0,0">
+                                        <StackPanel>
+                                            <TextBlock x:Name="MigrationPageState" Text="وضعیت: هنوز پیاده‌سازی و با نسخهٔ اصلی آزمون تطبیقی نشده است." FontWeight="Bold" Foreground="#9A3412" TextWrapping="Wrap"/>
+                                            <TextBlock Text="تا زمان تکمیل و آزمون، برای این عملیات از نسخهٔ اصلی قبلی استفاده کنید. این نسخه به‌صورت مستقل و در کنار آن توسعه می‌یابد." Foreground="#7C2D12" FontSize="12" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Button Content="بازگشت به پیشخوان بومی" Click="ReturnToDashboard_Click" HorizontalAlignment="Right" Margin="0,18,0,0" Background="#0F766E" Foreground="White"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
+            <Border Grid.Column="1" Background="#0B1220" CornerRadius="15" Padding="10" FlowDirection="RightToLeft">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="NavigationRoot">
+                        <Border Background="#111827" BorderBrush="#334155" BorderThickness="1" CornerRadius="12" Padding="13" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="اشک قلم" Foreground="#F8FAFC" FontSize="21" FontWeight="Bold"/>
+                                <TextBlock Text="نسخهٔ بومی ویندوز" Foreground="#CBD5E1" FontSize="12" Margin="0,4,0,0"/>
+                                <TextBlock Text="مهاجرت مستقل از نسخهٔ اصلی" Foreground="#94A3B8" FontSize="10" Margin="0,5,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="منوی اصلی" Style="{StaticResource NavSectionLabel}"/>
+                        <Button x:Name="NavigationDashboardButton" Tag="dashboard" Content="پیشخوان" Style="{StaticResource NavButton}" Background="#0F766E" Click="NavigateModule_Click"/>
+                        <Button Tag="invoices" Content="🧾  فاکتورها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="inventory" Content="📦  انبارداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="kardex" Content="📊  کارتکس کالا" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="checks" Content="🏦  مدیریت چک" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="finance" Content="💳  امور مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="customers" Content="👥  اشخاص" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="reports" Content="📈  گزارشات مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="عملیات محلی موجود" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="payments" Content="💵  دریافت‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="expenses" Content="🧮  هزینه‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="backup" Content="🛡️  پشتیبان‌گیری محلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="vouchers" Content="🚚  حواله‌های انبار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="حسابداری پیشرفته" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="accounting" Content="📚  حسابداری دوبل" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="cashflow-predictor" Content="💹  جریان نقدینگی و پیش‌بینی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="tax" Content="🧾  سامانه مؤدیان مالیاتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="loans" Content="🏛️  وام‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="due-calendar" Content="🗓️  تقویم سررسید و اقساط" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="bank-reconciliation" Content="🏧  تطبیق بانکی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="currency" Content="💱  مدیریت چندارزی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="workflow-rules" Content="⚙️  قواعد گردش مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="گزارشات و تحلیل" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="financial-reports" Content="📊  گزارشات مالی پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="companies" Content="🏢  تنظیمات حسابداری و چندشرکتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="server" Content="🌐  ارتباط و همگام‌سازی سرور" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="fiscal-year" Content="📅  سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="security" Content="🔐  امنیت داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <TextBlock Text="اطلاعات و آموزش" Style="{StaticResource NavSectionLabel}"/>
+                        <Button Tag="about" Content="🏢  معرفی نرم‌افزار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="guide" Content="📘  راهنمای حسابداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="advanced-settings" Content="🎛️  تنظیمات پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+        <Border Grid.Row="2" Background="#111827" Padding="12,4">
+            <TextBlock x:Name="FooterStatus" Text="اطلاعات محلی — ذخیره‌سازی خودکار پس از هر عملیات" FontSize="11" Foreground="#CBD5E1"/>
+        </Border>
+    </Grid>
+</Window>

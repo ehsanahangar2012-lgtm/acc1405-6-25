@@ -1,0 +1,456 @@
+name: Build Android APK
+
+# Avoid dozens of stale builds when a PR receives multiple small fixes.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ main, master, fix/core-data-integrity ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+
+  verify-host-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build mother-web assets
+        run: bun run build:web
+
+      - name: Test host package excludes private data
+        run: node scripts/test-host-package-safety.mjs
+
+  build-browser-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check project
+        run: bun run lint && bun run test:backup-encryption
+
+      - name: Setup PHP for server syntax checks
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: openssl, sqlite3, pdo_sqlite, mbstring
+
+      - name: Validate PHP server endpoints syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -l host-backend/license_validator.php
+          php -l host-backend/tenant-manager.php
+          php -l host-backend/storage.php
+          php -l host-backend/host-storage-api.php
+          php -l host-backend/server-api-backup.php
+          php -l host-backend/backup-system.php
+          php -l host-backend/api.php
+          php -l host-backend/audit-trail-api.php
+          php -l host-backend/digital-signature-api.php
+          php -l host-backend/digital-signature-config.php
+          php -l host-backend/host-api.php
+          php -l host-backend/remote-signature-api.php
+          php -l host-backend/signature-api-simple.php
+          php -l host-backend/deleted-records-api.php
+          php -l host-backend/gemini-api.php
+          php -l host-backend/certificate-api.php
+          php -l host-backend/signature-api.php
+          php -l host-backend/install.php
+          php -l host-backend/setup-folders.php
+          php -l host-backend/setup-check.php
+          php -l host-backend/backup-signatures.php
+          php -l host-backend/daily-cron.php
+          php -l host-backend/server-api-database.php
+          php -l host-backend/server-api-upload.php
+          php -l android/app/src/main/assets/public/license_validator.php
+          php -l android/app/src/main/assets/public/tenant-manager.php
+          php -l android/app/src/main/assets/public/storage.php
+          php -l android/app/src/main/assets/public/host-storage-api.php
+          php -l android/app/src/main/assets/public/server-api-backup.php
+          php -l android/app/src/main/assets/public/backup-system.php
+          php -l android/app/src/main/assets/public/digital-signature-api.php
+          php -l android/app/src/main/assets/public/digital-signature-config.php
+          php -l android/app/src/main/assets/public/remote-signature-api.php
+          php -l public/signature-api-simple.php
+          php -l android/app/src/main/assets/public/signature-api-simple.php
+          php -l android/app/src/main/assets/public/deleted-records-api.php
+          php -l android/app/src/main/assets/public/gemini-api.php
+          php -l android/app/src/main/assets/public/certificate-api.php
+          php -l android/app/src/main/assets/public/signature-api.php
+          php -l android/app/src/main/assets/public/install.php
+          php -l android/app/src/main/assets/public/setup-folders.php
+          php -l android/app/src/main/assets/public/setup-check.php
+          php -l android/app/src/main/assets/public/backup-signatures.php
+          php -l android/app/src/main/assets/public/daily-cron.php
+
+      - name: Test server license registration and lifecycle
+        shell: bash
+        run: bash scripts/test-license-server.sh
+
+      - name: Build local-only browser preview
+        run: bun run build:browser-preview
+
+      - name: Mark preview build version
+        shell: bash
+        run: printf '{"sha":"%s"}\n' "$GITHUB_SHA" > dist/version.json
+
+      - name: Smoke-test local preview server and safety headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/serve-browser-preview.mjs > /tmp/ashke-browser-preview.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:4173/ -o /tmp/browser-preview-index.html; then
+              break
+            fi
+            sleep 1
+          done
+          grep -q 'id="root"' /tmp/browser-preview-index.html
+          curl --silent --show-error --fail --head http://127.0.0.1:4173/ | grep -qi "content-security-policy:.*connect-src 'self'"
+          curl --silent --show-error --fail http://127.0.0.1:4173/invoices -o /tmp/browser-preview-route.html
+          grep -q 'id="root"' /tmp/browser-preview-route.html
+
+      - name: Package browser preview
+        run: |
+          mkdir -p browser-preview-package
+          cp -R dist browser-preview-package/dist
+          cp scripts/serve-browser-preview.mjs browser-preview-package/serve-browser-preview.mjs
+          cp Preview-Browser.bat browser-preview-package/Preview-Browser.bat
+          cp README-BROWSER-PREVIEW.md browser-preview-package/README-BROWSER-PREVIEW.md
+
+      - name: Upload browser preview artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Browser-Preview
+          path: browser-preview-package/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload isolated online preview
+        if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/fix/core-data-integrity'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy-browser-preview:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/fix/core-data-integrity'
+    needs: build-browser-preview
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy isolated browser preview
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  build-apk:
+    environment:
+      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'commercial-signing' || 'ci' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+
+      - name: Install Android SDK packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ANDROID_HOME:?ANDROID_HOME is not set on the GitHub runner}"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -path '*/bin/sdkmanager' -type f | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          # sdkmanager may exit cleanly before 'yes' finishes; avoid treating yes's
+          # expected broken pipe as a license-acceptance failure.
+          set +o pipefail
+          yes | "$SDKMANAGER" --sdk_root="$ANDROID_HOME" --licenses >/dev/null
+          SDKMANAGER_LICENSE_STATUS="${PIPESTATUS[1]}"
+          set -o pipefail
+          if [ "$SDKMANAGER_LICENSE_STATUS" -ne 0 ]; then
+            exit "$SDKMANAGER_LICENSE_STATUS"
+          fi
+          "$SDKMANAGER" --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check project
+        run: bun run lint && bun run test:backup-encryption
+
+      - name: Restore optional Android release keystore
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "No release keystore configured; building an obfuscated debug/test APK."
+            exit 0
+          fi
+          if [ -z "${ANDROID_KEYSTORE_PASSWORD:-}" ] || [ -z "${ANDROID_KEY_ALIAS:-}" ] || [ -z "${ANDROID_KEY_PASSWORD:-}" ]; then
+            echo "::error::Set all four Android signing secrets to enable release signing."
+            exit 1
+          fi
+          KEYSTORE_PATH="$GITHUB_WORKSPACE/android/app/ashk-release.p12"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          {
+            echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH"
+            echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD"
+            echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS"
+            echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+
+      - name: Build real Android APK
+        env:
+          # Produce an installable, non-commercially-signed distribution APK on branch builds.
+          # Android still requires an APK signature; this uses Gradle's debug signing identity.
+          ANDROID_NONCOMMERCIAL_DISTRIBUTION: ${{ startsWith(github.ref, 'refs/tags/v') && '0' || '1' }}
+        run: bun run build:apk
+
+      - name: Verify APK signature and enforce release build type
+        shell: bash
+        env:
+          EXPECTED_ANDROID_SIGNER_SHA256: ${{ vars.ANDROID_SIGNER_SHA256 }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")"
+            APK_PATH="downloads/AshkeGhalam-v${VERSION}.apk"
+            test -f "$APK_PATH" || { echo "::error::A commercial tag must produce the signed release APK, not a debug APK."; exit 1; }
+            if compgen -G 'downloads/*-debug.apk' >/dev/null; then
+              echo "::error::Debug APKs cannot be used for a commercial release."
+              exit 1
+            fi
+          else
+            APK_PATH="$(find downloads -maxdepth 1 -type f -name 'AshkeGhalam-v*.apk' -print -quit)"
+            test -n "$APK_PATH" || { echo "::error::No APK was produced."; exit 1; }
+          fi
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -x "$APKSIGNER" || { echo "::error::Android apksigner tool is missing."; exit 1; }
+          VERIFY_OUTPUT="$("$APKSIGNER" verify --verbose --print-certs "$APK_PATH" 2>&1)"
+          printf '%s\n' "$VERIFY_OUTPUT"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            ACTUAL_SHA256="$(printf '%s\n' "$VERIFY_OUTPUT" | sed -nE 's/.*Signer #1 certificate SHA-256 digest: ([0-9a-fA-F:]+).*/\1/p' | head -n 1 | tr -d ':' | tr '[:lower:]' '[:upper:]')"
+            EXPECTED_SHA256="$(printf '%s' "${EXPECTED_ANDROID_SIGNER_SHA256:-}" | tr -d ':[:space:]' | tr '[:lower:]' '[:upper:]')"
+            [[ "$EXPECTED_SHA256" =~ ^[0-9A-F]{64}$ ]] || { echo "::error::Set the environment variable ANDROID_SIGNER_SHA256 to the release certificate SHA-256 fingerprint."; exit 1; }
+            [[ "$ACTUAL_SHA256" == "$EXPECTED_SHA256" ]] || { echo "::error::APK signer fingerprint does not match ANDROID_SIGNER_SHA256."; exit 1; }
+            echo "Android release signer fingerprint matches the approved identity."
+          fi
+
+      - name: Verify Android package excludes server and admin tooling
+        run: node scripts/sanitize-client-build.js android/app/src/main/assets/public --verify-only
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Android-APK
+          path: downloads/AshkeGhalam-v*.apk
+          if-no-files-found: error
+  build-windows:
+    environment:
+      name: ${{ startsWith(github.ref, 'refs/tags/v') && 'commercial-signing' || 'ci' }}
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type-check project
+        run: bun run lint && bun run test:backup-encryption
+
+      - name: Restore optional Windows signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_SIGNING_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_PFX_BASE64 }}
+          WINDOWS_SIGNING_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_PFX_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_BASE64)) {
+            Write-Host "No Windows signing certificate configured; EXE files will be unsigned."
+            exit 0
+          }
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNING_PFX_PASSWORD)) {
+            Write-Error "Set WINDOWS_SIGNING_PFX_PASSWORD when a certificate is configured."
+            exit 1
+          }
+          $pfxPath = Join-Path $env:RUNNER_TEMP "ashk-codesign.pfx"
+          [System.IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:WINDOWS_SIGNING_PFX_BASE64))
+          "CSC_LINK=$pfxPath" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "CSC_KEY_PASSWORD=$env:WINDOWS_SIGNING_PFX_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build Windows installer for manual distribution
+        run: bun run build:installer
+
+      - name: Verify Windows Authenticode signature when optional certificate is supplied
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          EXPECTED_WINDOWS_SIGNING_PUBLISHER: ${{ vars.WINDOWS_SIGNING_PUBLISHER }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CSC_LINK) -or -not (Test-Path $env:CSC_LINK)) {
+            Write-Host "No Windows code-signing certificate configured. The installer is intentionally unsigned for manual distribution; continuing."
+            exit 0
+          }
+          $version = node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)"
+          $files = @(
+            "dist_electron/AshkeGhalam-Setup-v$version.exe",
+            "dist_electron/AshkeGhalam-Portable-v$version.exe"
+          )
+          foreach ($file in $files) {
+            if (-not (Test-Path $file)) {
+              throw "Required commercial EXE is missing: $file"
+            }
+            $signature = Get-AuthenticodeSignature -FilePath $file
+            if ($signature.Status -ne 'Valid' -or -not $signature.SignerCertificate) {
+              throw "Commercial EXE is not signed by a currently trusted publisher: $file (status: $($signature.Status))"
+            }
+            $publisher = $signature.SignerCertificate.GetNameInfo([System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName, $false)
+            $expectedPublisher = $env:EXPECTED_WINDOWS_SIGNING_PUBLISHER
+            if ([string]::IsNullOrWhiteSpace($expectedPublisher)) {
+              throw "Set the commercial-signing environment variable WINDOWS_SIGNING_PUBLISHER to the exact legal publisher name."
+            }
+            if ($publisher -ne $expectedPublisher) {
+              throw "Unexpected EXE publisher. Expected '$expectedPublisher', got '$publisher'."
+            }
+            Write-Host "$file signature verified. Publisher: $publisher"
+            Write-Host "Publisher certificate SHA-256: $([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($signature.SignerCertificate.RawData)))"
+          }
+
+      - name: Verify Windows renderer excludes server and admin tooling
+        run: node scripts/sanitize-client-build.js dist --verify-only
+
+      - name: Upload Windows installer for manual delivery
+        if: github.event_name == 'push' && github.event.repository.private == true
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Windows-Installer
+          path: dist_electron/AshkeGhalam-Setup-v*.exe
+          if-no-files-found: error
+
+  publish-native-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-windows, build-apk]
+    environment:
+      name: commercial-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install locked dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build host deployment package
+        run: bun run build:web && bun run build:zip
+
+      - name: Download Android artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AshkeGhalam-Android-APK
+          path: release-assets/android
+
+      - name: Validate production release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -e "console.log(JSON.parse(require('fs').readFileSync('package.json','utf8')).version)")"
+          test "${GITHUB_REF_NAME}" = "v${VERSION}" || { echo "::error::Tag must match package.json version: v${VERSION}"; exit 1; }
+          test -f "release-assets/android/AshkeGhalam-v${VERSION}.apk"
+          if find release-assets/android -maxdepth 1 -name '*-debug.apk' -print -quit | grep -q .; then
+            echo "::error::Debug APKs cannot be published as a production release."
+            exit 1
+          fi
+          mkdir -p release-assets/host
+          cp "downloads/ashke-ghalam-host-v${VERSION}.zip" release-assets/host/
+
+      - name: Publish versioned GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: AshkeGhalam ${{ github.ref_name }}
+          generate_release_notes: true
+          draft: true
+          files: |
+            release-assets/android/AshkeGhalam-v*.apk
+            release-assets/host/*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

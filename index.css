@@ -1,0 +1,1042 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --color-primary: #3B82F6;
+  --color-secondary: #1E40AF;
+  --color-accent: #60A5FA;
+  --color-background: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-text: #1F2937;
+}
+
+.dark {
+  --color-primary: #60A5FA;
+  --color-secondary: #3B82F6;
+  --color-accent: #93C5FD;
+  --color-background: #0F172A;
+  --color-surface: #1E293B;
+  --color-text: #F1F5F9;
+}
+
+/* Base Light Mode Page Background */
+body.light, html.light, .light {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+/* Modal Backdrops & Dark Overlays (Keep Dark Semi-Transparent for High Contrast on Fixed Overlays Only) */
+body.light .fixed.inset-0[class*="bg-slate"],
+body.light .fixed.inset-0[class*="bg-black"],
+body.light .fixed.inset-0[class*="backdrop-blur"] {
+  background-color: rgba(15, 23, 42, 0.72) !important;
+}
+
+/* Main Cards & Top-level Containers in Light Theme */
+body.light [class*="bg-slate-900"]:not(button):not(a):not(.fixed):not(input):not(select):not(textarea),
+body.light [class*="bg-slate-950"]:not(button):not(a):not(.fixed):not(input):not(select):not(textarea),
+body.light .bg-\\[\\#111827\\],
+body.light .bg-\\[\\#0f172a\\],
+body.light .bg-\\[\\#0d1527\\] {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Inner Panels, Sub-Cards & Filter Boxes in Light Theme */
+body.light [class*="bg-slate-800"]:not(button):not(a):not(input):not(select):not(textarea),
+body.light [class*="bg-slate-900/50"],
+body.light [class*="bg-slate-950/50"],
+body.light [class*="bg-slate-900/80"],
+body.light [class*="bg-slate-950/40"],
+body.light [class*="bg-slate-900/40"] {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Dark Solid Primary Buttons (Keep Dark High-Contrast Background in Light Mode) */
+body.light button[class*="bg-slate-900"],
+body.light button[class*="bg-slate-950"],
+body.light button.bg-black,
+body.light a[class*="bg-slate-900"],
+body.light a[class*="bg-slate-950"],
+body.light a.bg-black {
+  background-color: #0f172a !important;
+  color: #ffffff !important;
+  border-color: #020617 !important;
+}
+
+body.light button[class*="bg-slate-900"]:hover,
+body.light button[class*="bg-slate-950"]:hover,
+body.light button.bg-black:hover {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+}
+
+body.light button[class*="bg-slate-900"] *,
+body.light button[class*="bg-slate-950"] *,
+body.light button.bg-black * {
+  color: #ffffff !important;
+}
+
+/* Neutral Secondary Buttons / Controls in Light Theme */
+body.light button[class*="bg-slate-700"],
+body.light button[class*="bg-slate-800"],
+body.light .bg-slate-700:not(input):not(select) {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+  font-weight: 700 !important;
+}
+
+body.light button[class*="bg-slate-700"]:hover,
+body.light button[class*="bg-slate-800"]:hover {
+  background-color: #e2e8f0 !important;
+  color: #020617 !important;
+}
+
+/* Text Hierarchy in Light Theme (WCAG AAA High Contrast) */
+body.light .text-white,
+body.light .text-slate-100,
+body.light .text-slate-200,
+body.light .text-slate-300 {
+  color: #0f172a !important;
+}
+
+body.light .text-slate-400 {
+  color: #1e293b !important;
+}
+
+body.light .text-slate-500 {
+  color: #334155 !important;
+}
+
+body.light .text-slate-600 {
+  color: #475569 !important;
+}
+
+/* Borders in Light Theme */
+body.light [class*="border-white/"],
+body.light .border-slate-800,
+body.light .border-slate-700,
+body.light .border-slate-800\/80 {
+  border-color: #cbd5e1 !important;
+}
+
+/* CRITICAL: Solid Accent Buttons & Action Badges with Pure White Text */
+body.light button.bg-teal-600,
+body.light button.bg-teal-500,
+body.light button.bg-teal-700,
+body.light button.bg-indigo-600,
+body.light button.bg-indigo-500,
+body.light button.bg-indigo-700,
+body.light button.bg-blue-600,
+body.light button.bg-blue-500,
+body.light button.bg-emerald-600,
+body.light button.bg-emerald-500,
+body.light button.bg-rose-600,
+body.light button.bg-rose-500,
+body.light button.bg-red-600,
+body.light button.bg-red-500,
+body.light button.bg-purple-600,
+body.light button.bg-amber-600,
+body.light button[class*="bg-gradient"],
+body.light a.bg-teal-600,
+body.light a.bg-indigo-600,
+body.light a.bg-blue-600,
+body.light a.bg-emerald-600,
+body.light a.bg-rose-600,
+body.light a.bg-red-600,
+body.light a[class*="bg-gradient"],
+body.light .bg-indigo-600,
+body.light .bg-teal-600,
+body.light .bg-emerald-600,
+body.light .bg-rose-600,
+body.light .bg-blue-600 {
+  color: #ffffff !important;
+}
+
+body.light button.bg-teal-600 *,
+body.light button.bg-teal-500 *,
+body.light button.bg-teal-700 *,
+body.light button.bg-indigo-600 *,
+body.light button.bg-indigo-500 *,
+body.light button.bg-indigo-700 *,
+body.light button.bg-blue-600 *,
+body.light button.bg-blue-500 *,
+body.light button.bg-emerald-600 *,
+body.light button.bg-emerald-500 *,
+body.light button.bg-rose-600 *,
+body.light button.bg-rose-500 *,
+body.light button.bg-red-600 *,
+body.light button.bg-red-500 *,
+body.light button.bg-purple-600 *,
+body.light button.bg-amber-600 *,
+body.light button[class*="bg-gradient"] *,
+body.light a.bg-teal-600 *,
+body.light a.bg-indigo-600 *,
+body.light a.bg-blue-600 *,
+body.light a.bg-emerald-600 *,
+body.light a.bg-rose-600 *,
+body.light a.bg-red-600 *,
+body.light a[class*="bg-gradient"] *,
+body.light .bg-indigo-600 *,
+body.light .bg-teal-600 *,
+body.light .bg-emerald-600 *,
+body.light .bg-rose-600 *,
+body.light .bg-blue-600 * {
+  color: #ffffff !important;
+}
+
+/* Status Badges, Chips & Highlights in Light Theme (High Contrast WCAG AAA) */
+body.light .text-teal-400,
+body.light .text-teal-300 {
+  color: #0f766e !important;
+}
+body.light [class*="bg-teal-500/"],
+body.light [class*="bg-teal-600/"],
+body.light [class*="bg-teal-900/"],
+body.light [class*="bg-teal-950/"] {
+  background-color: #f0fdfa !important;
+  border-color: #5eead4 !important;
+}
+body.light [class*="bg-teal-500/"] *,
+body.light [class*="bg-teal-600/"] *,
+body.light [class*="bg-teal-900/"] *,
+body.light [class*="bg-teal-950/"] * {
+  color: #0f766e !important;
+}
+
+body.light .text-emerald-400,
+body.light .text-emerald-300,
+body.light .text-green-400 {
+  color: #047857 !important;
+}
+body.light [class*="bg-emerald-500/"],
+body.light [class*="bg-emerald-600/"],
+body.light [class*="bg-emerald-900/"],
+body.light [class*="bg-emerald-950/"],
+body.light [class*="bg-green-500/"] {
+  background-color: #ecfdf5 !important;
+  border-color: #6ee7b7 !important;
+}
+body.light [class*="bg-emerald-500/"] *,
+body.light [class*="bg-emerald-600/"] *,
+body.light [class*="bg-emerald-900/"] *,
+body.light [class*="bg-emerald-950/"] * {
+  color: #047857 !important;
+}
+
+body.light .text-rose-400,
+body.light .text-rose-300,
+body.light .text-red-400 {
+  color: #9f1239 !important;
+}
+body.light [class*="bg-rose-500/"],
+body.light [class*="bg-rose-600/"],
+body.light [class*="bg-rose-900/"],
+body.light [class*="bg-rose-950/"],
+body.light [class*="bg-red-500/"] {
+  background-color: #fff1f2 !important;
+  border-color: #fca5a5 !important;
+}
+body.light [class*="bg-rose-500/"] *,
+body.light [class*="bg-rose-600/"] *,
+body.light [class*="bg-rose-900/"] *,
+body.light [class*="bg-rose-950/"] * {
+  color: #9f1239 !important;
+}
+
+body.light .text-amber-400,
+body.light .text-amber-300,
+body.light .text-amber-200,
+body.light .text-yellow-400 {
+  color: #78350f !important;
+}
+body.light [class*="bg-amber-500/"],
+body.light [class*="bg-amber-600/"],
+body.light [class*="bg-amber-900/"],
+body.light [class*="bg-amber-950/"],
+body.light [class*="bg-yellow-500/"] {
+  background-color: #fffbeb !important;
+  border-color: #fcd34d !important;
+}
+body.light [class*="bg-amber-500/"] *,
+body.light [class*="bg-amber-600/"] *,
+body.light [class*="bg-amber-900/"] *,
+body.light [class*="bg-amber-950/"] * {
+  color: #78350f !important;
+}
+
+body.light .text-blue-400,
+body.light .text-blue-300,
+body.light .text-sky-400 {
+  color: #1e40af !important;
+}
+body.light [class*="bg-blue-500/"],
+body.light [class*="bg-blue-600/"],
+body.light [class*="bg-blue-900/"],
+body.light [class*="bg-blue-950/"],
+body.light [class*="bg-sky-500/"] {
+  background-color: #eff6ff !important;
+  border-color: #93c5fd !important;
+}
+body.light [class*="bg-blue-500/"] *,
+body.light [class*="bg-blue-600/"] *,
+body.light [class*="bg-blue-900/"] *,
+body.light [class*="bg-blue-950/"] * {
+  color: #1e40af !important;
+}
+
+body.light .text-indigo-400,
+body.light .text-indigo-300,
+body.light .text-violet-400 {
+  color: #3730a3 !important;
+}
+body.light [class*="bg-indigo-500/"],
+body.light [class*="bg-indigo-600/"],
+body.light [class*="bg-indigo-900/"],
+body.light [class*="bg-indigo-950/"] {
+  background-color: #eef2ff !important;
+  border-color: #a5b4fc !important;
+}
+body.light [class*="bg-indigo-500/"] *,
+body.light [class*="bg-indigo-600/"] *,
+body.light [class*="bg-indigo-900/"] *,
+body.light [class*="bg-indigo-950/"] * {
+  color: #3730a3 !important;
+}
+
+body.light .text-purple-400,
+body.light .text-purple-300 {
+  color: #581c87 !important;
+}
+body.light [class*="bg-purple-500/"],
+body.light [class*="bg-purple-600/"],
+body.light [class*="bg-purple-900/"],
+body.light [class*="bg-purple-950/"] {
+  background-color: #faf5ff !important;
+  border-color: #e9d5ff !important;
+}
+body.light [class*="bg-purple-500/"] *,
+body.light [class*="bg-purple-600/"] *,
+body.light [class*="bg-purple-900/"] *,
+body.light [class*="bg-purple-950/"] * {
+  color: #581c87 !important;
+}
+
+/* Inputs, Selects & Textareas in Light Theme (High Contrast Crisp Input Fields) */
+body.light input:not([type="checkbox"]):not([type="radio"]),
+body.light select,
+body.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border: 1.5px solid #cbd5e1 !important;
+  font-weight: 600 !important;
+}
+
+body.light input::placeholder,
+body.light textarea::placeholder {
+  color: #64748b !important;
+}
+
+body.light input:focus,
+body.light select:focus,
+body.light textarea:focus {
+  border-color: #0d9488 !important;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.2) !important;
+  background-color: #ffffff !important;
+}
+
+body.light input:disabled,
+body.light select:disabled,
+body.light textarea:disabled {
+  background-color: #f1f5f9 !important;
+  color: #64748b !important;
+  border-color: #e2e8f0 !important;
+}
+
+/* Tables in Light Theme (Sharp Headers & Rows) */
+body.light table {
+  border-color: #cbd5e1 !important;
+}
+
+body.light th {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  font-weight: 800 !important;
+  border-bottom: 2px solid #cbd5e1 !important;
+}
+
+body.light td {
+  color: #0f172a !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  font-weight: 500 !important;
+}
+
+body.light tr:nth-child(even) td {
+  background-color: #f8fafc !important;
+}
+
+body.light tr:hover td {
+  background-color: #e2e8f0 !important;
+}
+
+body.light .divide-slate-800,
+body.light [class*="divide-white/"] {
+  border-color: #e2e8f0 !important;
+}
+
+/* Sidebar Navigation in Light Theme */
+body.light aside {
+  background-color: #ffffff !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 2px 0 16px rgba(0, 0, 0, 0.06) !important;
+}
+
+body.light aside .text-white {
+  color: #0f172a !important;
+}
+
+body.light aside .text-slate-400 {
+  color: #1e293b !important;
+}
+
+body.light aside .text-slate-500 {
+  color: #334155 !important;
+}
+
+body.light aside a.text-slate-400:hover,
+body.light aside button:hover {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+body.light aside a[class*="text-teal-400"],
+body.light aside button[class*="text-teal-400"] {
+  background-color: #f0fdfa !important;
+  color: #0f766e !important;
+  border-color: #5eead4 !important;
+  font-weight: 700 !important;
+}
+
+body.light aside [class*="bg-white/"] {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+}
+
+/* Mobile Bottom Navigation in Light Theme */
+body.light nav.fixed.bottom-4 {
+  background-color: rgba(255, 255, 255, 0.98) !important;
+  border-color: #cbd5e1 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
+}
+
+body.light nav.fixed.bottom-4 .text-slate-500 {
+  color: #334155 !important;
+}
+
+body.light nav.fixed.bottom-4 .text-teal-400 {
+  color: #0f766e !important;
+}
+
+body.light nav.fixed.bottom-4 [class*="bg-white/"] {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+
+* {
+  font-family: 'Vazirmatn', Vazir, Tahoma, Arial, sans-serif !important;
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-text);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Standard Sheet Paper for Invoices and Documents (Always Pure Paper White) */
+.invoice-paper,
+.sheet-a4-white,
+.print-content {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.25) !important;
+}
+
+.invoice-paper *,
+.sheet-a4-white *,
+.print-content * {
+  border-color: #e2e8f0;
+}
+
+/* Ensure pure white background on invoice sections */
+.invoice-paper .bg-white,
+.sheet-a4-white .bg-white {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+.invoice-paper .bg-slate-50,
+.sheet-a4-white .bg-slate-50 {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+.invoice-paper .bg-slate-100,
+.sheet-a4-white .bg-slate-100 {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+.invoice-paper .text-slate-950,
+.sheet-a4-white .text-slate-950 {
+  color: #020617 !important;
+}
+
+.invoice-paper .text-slate-900,
+.sheet-a4-white .text-slate-900 {
+  color: #0f172a !important;
+}
+
+.invoice-paper .text-slate-800,
+.sheet-a4-white .text-slate-800 {
+  color: #1e293b !important;
+}
+
+.invoice-paper .text-slate-700,
+.sheet-a4-white .text-slate-700 {
+  color: #334155 !important;
+}
+
+.invoice-paper .text-slate-600,
+.sheet-a4-white .text-slate-600 {
+  color: #475569 !important;
+}
+
+.invoice-paper .text-slate-500,
+.sheet-a4-white .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Animations */
+@keyframes slide-in {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+.toggle {
+  position: relative;
+  display: inline-flex;
+  height: 1.5rem;
+  width: 2.75rem;
+  align-items: center;
+  border-radius: 9999px;
+  background-color: #e5e7eb;
+  transition: background-color 0.2s;
+}
+
+.toggle:checked {
+  background-color: #2563eb;
+}
+
+.toggle::before {
+  content: '';
+  position: absolute;
+  left: 0.25rem;
+  top: 0.25rem;
+  height: 1rem;
+  width: 1rem;
+  border-radius: 9999px;
+  background-color: white;
+  transition: transform 0.2s;
+}
+
+.toggle:checked::before {
+  transform: translateX(1.25rem);
+}
+
+@keyframes bounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0,0,0);
+  }
+  40%, 43% {
+    transform: translate3d(0, -8px, 0);
+  }
+  70% {
+    transform: translate3d(0, -4px, 0);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 2s infinite;
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-left {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.3s ease-out;
+}
+
+.animate-slide-left {
+  animation: slide-left 0.3s ease-out;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .modal-container {
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+  }
+  
+  input[type="text"],
+  input[type="number"],
+  input[type="password"],
+  input[type="email"],
+  input[type="tel"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  
+  .grid {
+    gap: 0.75rem !important;
+  }
+  
+  button {
+    min-height: 44px !important;
+  }
+}
+
+/* Prevent horizontal scroll */
+html, body {
+  overflow-x: hidden !important;
+  width: 100% !important;
+  position: relative !important;
+}
+
+/* Custom scrollbar */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(45, 212, 191, 0.4) rgba(15, 23, 42, 0.6);
+  -webkit-overflow-scrolling: touch;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(45, 212, 191, 0.35);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(45, 212, 191, 0.7);
+}
+
+/* Sidebar Dedicated High-Visibility Smooth Scrollbar */
+.sidebar-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(20, 184, 166, 0.75) rgba(15, 23, 42, 0.95);
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar {
+  width: 7px;
+  display: block !important;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-track {
+  background: rgba(10, 16, 31, 0.95);
+  border-radius: 8px;
+  margin: 2px 0;
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: #0d9488;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #14b8a6;
+}
+
+body.light .sidebar-scrollbar {
+  scrollbar-color: #0d9488 #f1f5f9;
+}
+
+body.light .sidebar-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+body.light .sidebar-scrollbar::-webkit-scrollbar-thumb {
+  background: #0d9488;
+  border: 1px solid #cbd5e1;
+}
+
+/* Print Styles */
+@media print {
+  * {
+    font-family: 'Vazirmatn', Vazir, Tahoma, Arial, sans-serif !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  html, body, #root, .min-h-screen, main {
+    background: white !important;
+    color: #111827 !important;
+    position: static !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    width: 100% !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  main {
+    margin-right: 0 !important;
+    margin-left: 0 !important;
+    padding: 0 !important;
+  }
+  
+  aside, nav, header, footer, iframe, .no-print, [class*="FAB"], [class*="SupportChat"], [class*="MobileNav"], [class*="Sidebar"] {
+    display: none !important;
+  }
+
+  /* Target the preview screen layout returned in Invoices.tsx / Contracts.tsx / PersonLedger.tsx specifically */
+  .print-preview-modal,
+  div.fixed.inset-0.z-\[6000\],
+  div.fixed.inset-0.z-6000,
+  div.fixed.inset-0.z-7000 {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    background: white !important;
+    background-color: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Fix scroll container clipping in print previews */
+  .print-preview-modal div.overflow-y-auto,
+  .print-preview-modal .custom-scrollbar,
+  .print-preview-modal > div,
+  div.fixed.inset-0.z-\[6000\] div.overflow-y-auto,
+  div.fixed.inset-0.z-\[6000\] > div,
+  div.fixed.inset-0.z-6000 div.overflow-y-auto,
+  div.fixed.inset-0.z-7000 div.overflow-y-auto {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+    background-color: white !important;
+  }
+
+  /* Target the print element specifically */
+  .print-content {
+    display: block !important;
+    width: 210mm !important; /* Standard A4 Width */
+    height: 297mm !important; /* Standard A4 Height */
+    max-height: 297mm !important;
+    background: white !important;
+    color: black !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    overflow: hidden !important;
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Reset shadows and border radius for all printed elements */
+  .print-content *, .print-contract-page * {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Remove gradients inside print - prevent oklch errors */
+  [class*="bg-gradient"] {
+    background-image: none !important;
+    background-color: #f3f4f6 !important;
+  }
+
+  /* Allow contracts to flow across pages properly */
+  .print-contract-page {
+    width: 210mm !important;
+    min-height: 0 !important;
+    height: auto !important;
+    padding: 20mm !important;
+    margin: 0 auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    color: black !important;
+    overflow: visible !important;
+    display: block !important;
+    position: static !important;
+  }
+
+  .print-contract-page h4 {
+    page-break-after: avoid !important;
+  }
+
+  .print-contract-page table {
+    page-break-inside: auto !important;
+  }
+
+  .print-contract-page tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+
+  .print-contract-page .grid {
+    page-break-inside: avoid !important;
+  }
+
+  .contract-double-border {
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+  
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+}
+
+/* Premium print and preview helper classes (Screen & Print compatible) */
+.print-contract-page {
+  background-color: white !important;
+  color: #0f172a !important;
+  min-height: 297mm;
+  height: auto !important;
+  display: block;
+}
+
+.contract-double-border {
+  border: 4px double #475569 !important;
+  padding: 1.5rem;
+  min-height: 265mm;
+  height: auto !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.contract-party-card {
+  border: 1px solid #cbd5e1 !important;
+  padding: 1rem;
+  background-color: #f8fafc !important;
+  border-radius: 0.75rem;
+}
+
+.stamp-zone {
+  width: 120px;
+  height: 120px;
+  border: 2px dashed #94a3b8;
+  border-radius: 50% !important;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 0.75rem auto 0;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 800;
+  background-color: #f8fafc;
+}
+
+/* ==========================================================================
+   Responsive Financial Table & Compact Density Engine
+   ========================================================================== */
+
+/* 1. Compact Density Mode */
+.ag-compact-density table th {
+  padding-top: 0.375rem !important;
+  padding-bottom: 0.375rem !important;
+  font-size: 0.75rem !important;
+}
+
+.ag-compact-density table td {
+  padding-top: 0.375rem !important;
+  padding-bottom: 0.375rem !important;
+  font-size: 0.775rem !important;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 2. Max Table Viewport Mode for Mobile */
+[data-max-table="true"] main {
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
+}
+
+@media (max-width: 768px) {
+  [data-max-table="true"] .bg-slate-900,
+  [data-max-table="true"] .bg-slate-900\/50,
+  [data-max-table="true"] .bg-slate-900\/80 {
+    border-radius: 1rem !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  [data-max-table="true"] table {
+    min-width: 100% !important;
+  }
+
+  [data-max-table="true"] table th,
+  [data-max-table="true"] table td {
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+    font-size: 0.7rem !important;
+  }
+
+  /* Sticky table headers in mobile view */
+  .table-responsive-sticky th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    backdrop-filter: blur(12px);
+  }
+}
+
+/* ==========================================================================
+   Toast & Android Heads-Up 1-Second Auto Fade-Out Engine
+   ========================================================================== */
+@keyframes notifFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes notifFadeOut {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+}
+
+.animate-notif-in {
+  animation: notifFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-notif-out {
+  animation: notifFadeOut 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Enhanced Light Theme Input & Form Styling */
+body.light input:not([type="checkbox"]):not([type="radio"]),
+body.light select,
+body.light textarea {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+body.light input:not([type="checkbox"]):not([type="radio"]):focus,
+body.light select:focus,
+body.light textarea:focus {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+
+

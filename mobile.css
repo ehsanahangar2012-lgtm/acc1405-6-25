@@ -1,0 +1,522 @@
+/* Mobile-First Responsive Design - Enhanced */
+
+/* Safe Area Support for iOS */
+@supports (padding: max(0px)) {
+  .safe-area-pb, .pb-safe {
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom)) !important;
+  }
+  
+  .safe-area-pt {
+    padding-top: max(1rem, env(safe-area-inset-top)) !important;
+  }
+}
+
+/* Prevent Zoom on Input Focus (iOS) */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="password"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="search"],
+  input[type="date"],
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  
+  /* Better Font Sizes for Mobile */
+  body {
+    font-size: 14px;
+  }
+  
+  /* Headings */
+  h1 {
+    font-size: 1.75rem !important;
+    line-height: 1.2 !important;
+  }
+  
+  h2 {
+    font-size: 1.5rem !important;
+    line-height: 1.3 !important;
+  }
+  
+  h3 {
+    font-size: 1.25rem !important;
+    line-height: 1.4 !important;
+  }
+  
+  .text-4xl { font-size: 2rem !important; }
+  .text-3xl { font-size: 1.75rem !important; }
+  .text-2xl { font-size: 1.5rem !important; }
+  .text-xl { font-size: 1.25rem !important; }
+  .text-lg { font-size: 1.125rem !important; }
+}
+
+/* Modal Responsive Fixes */
+@media (max-width: 768px) {
+  .modal-container,
+  [class*="fixed inset-0"] > div:not(.backdrop) {
+    max-height: 90vh !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+  
+  /* Bottom Sheet Style */
+  .animate-slide-up {
+    border-radius: 1.5rem 1.5rem 0 0 !important;
+  }
+  
+  /* Touch Target Minimum Size (Apple HIG) */
+  button:not(.no-min-size),
+  a:not(.no-min-size),
+  [role="button"]:not(.no-min-size) {
+    min-height: 44px !important;
+    min-width: 44px !important;
+  }
+  
+  /* Reduce Padding on Mobile */
+  .p-12 { padding: 1rem !important; }
+  .p-10 { padding: 0.875rem !important; }
+  .p-8 { padding: 0.75rem !important; }
+  .p-6 { padding: 0.5rem !important; }
+  
+  .px-12 { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .px-10 { padding-left: 0.875rem !important; padding-right: 0.875rem !important; }
+  .px-8 { padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+  .px-6 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+  
+  .py-8 { padding-top: 0.75rem !important; padding-bottom: 0.75rem !important; }
+  .py-6 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+  
+  /* Smaller Border Radius */
+  .rounded-\[3rem\] { border-radius: 1.5rem !important; }
+  .rounded-\[2\.5rem\] { border-radius: 1.25rem !important; }
+  .rounded-\[2rem\] { border-radius: 1rem !important; }
+  
+  /* Grid Gaps */
+  .gap-8 { gap: 0.75rem !important; }
+  .gap-6 { gap: 0.5rem !important; }
+  .gap-4 { gap: 0.375rem !important; }
+  
+  /* Button Sizes */
+  button:not(.no-min-size) {
+    min-height: 44px;
+    font-size: 0.875rem;
+  }
+  
+  /* Thermal POS Receipt Responsive & Print Rules */
+  .thermal-receipt {
+    width: 100% !important;
+    max-width: 80mm !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* Specific Thermal POS 80mm / 58mm Receipt Print Rules */
+@media print {
+  @page {
+    margin: 0 !important;
+  }
+  .thermal-receipt {
+    width: 78mm !important;
+    max-width: 80mm !important;
+    padding: 3mm !important;
+    margin: 0 auto !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    color: black !important;
+    font-size: 10px !important;
+  }
+  .thermal-receipt * {
+    color: black !important;
+  }
+}
+
+/* Prevent Horizontal Scroll */
+html, body {
+  overflow-x: hidden !important;
+  width: 100% !important;
+  position: relative !important;
+  -webkit-overflow-scrolling: touch;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Custom Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.3);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.4);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6);
+}
+
+/* Slide Up Animation for Mobile Modals */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pop-up {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-slide-down {
+  animation: slide-down 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-pop-up {
+  animation: pop-up 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-in-out;
+}
+
+/* Prevent Text Selection on Buttons */
+button, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+/* Active State for Touch */
+button:active,
+[role="button"]:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+/* Mobile Table Responsive */
+@media (max-width: 768px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  thead {
+    position: sticky;
+    top: 0;
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+  }
+  
+  th, td {
+    font-size: 0.75rem !important;
+    padding: 0.625rem !important;
+    min-width: 80px;
+  }
+  
+  th:first-child,
+  td:first-child {
+    position: sticky;
+    left: 0;
+    background: inherit;
+    z-index: 5;
+  }
+}
+
+/* Fix for iOS Input Shadow */
+input, textarea, select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  border-radius: 0.75rem;
+}
+
+/* Better Focus States for Mobile */
+input:focus,
+textarea:focus,
+select:focus {
+  outline: 2px solid rgba(99, 102, 241, 0.5);
+  outline-offset: 2px;
+}
+
+/* Landscape Mode Adjustments */
+@media (max-width: 768px) and (orientation: landscape) {
+  .modal-container {
+    max-height: 88vh !important;
+  }
+  
+  h1 { font-size: 1.5rem !important; }
+  h2 { font-size: 1.25rem !important; }
+  h3 { font-size: 1.125rem !important; }
+}
+
+/* Fix Modal Backdrop Click */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+}
+
+.modal-content {
+  position: relative;
+  z-index: 9999;
+}
+
+/* Bottom Sheet Style for Mobile */
+@media (max-width: 768px) {
+  .bottom-sheet {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    border-radius: 1.5rem 1.5rem 0 0;
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    animation: slide-up 0.3s ease-out;
+  }
+}
+
+/* Floating Action Button */
+.fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+}
+
+@media (max-width: 768px) {
+  .fab {
+    bottom: calc(1rem + env(safe-area-inset-bottom));
+    right: 1rem;
+  }
+}
+
+/* Card Hover Effects (Disabled on Touch) */
+@media (hover: none) {
+  .hover\:scale-105:hover {
+    transform: none !important;
+  }
+  
+  .hover\:shadow-xl:hover {
+    box-shadow: inherit !important;
+  }
+}
+
+/* Better Spacing for Mobile Forms */
+@media (max-width: 768px) {
+  form .space-y-6 > * + * {
+    margin-top: 1rem !important;
+  }
+  
+  form .space-y-4 > * + * {
+    margin-top: 0.75rem !important;
+  }
+  
+  form .space-y-3 > * + * {
+    margin-top: 0.5rem !important;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+  }
+}
+
+/* Dark Mode Optimizations */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #0f172a;
+  }
+}
+
+/* Reduce Motion for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+  button,
+  input,
+  select,
+  textarea {
+    border: 2px solid currentColor !important;
+  }
+}
+
+/* ==========================================================
+   Android Native WebView & Touch Optimization (تخصصی اندروید)
+   ========================================================== */
+
+/* حذف کامل تاخیر تاچ و هایلایت خاکستری در وب‌ویوی اندروید */
+html, body {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+/* بهینه‌سازی فیلدهای ورودی عددی و ریالی برای کیبورد بومی اندروید */
+input[inputmode="numeric"],
+input[type="number"],
+input[type="tel"] {
+  direction: ltr !important;
+  text-align: right !important;
+  font-family: inherit;
+}
+
+/* ارگونومی لمسی استاندارد گوگل متریال برای دکمه‌ها در موبایل (حداقل ۴۸ پیکسل) */
+@media (max-width: 768px) {
+  .btn-touch,
+  button:not(.btn-compact):not(.no-min-size) {
+    min-height: 48px;
+    touch-action: manipulation;
+  }
+
+  /* اسکرول افقی نرم کارت‌ها و جداول در نمایشگرهای کوچک اندروید */
+  .table-responsive-touch {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  /* سازگاری با ناچ و نوار ناوبری پایین اندروید */
+  .android-safe-bottom {
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .android-safe-top {
+    padding-top: max(0.75rem, env(safe-area-inset-top, 0px));
+  }
+}
+
+
+
+/* Native document scroll and touch scrolling across every application section. */
+html {
+  height: auto !important;
+  min-height: 100%;
+  width: 100%;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  position: static !important;
+  overscroll-behavior-y: auto !important;
+}
+
+body {
+  height: auto !important;
+  min-height: 100vh !important;
+  width: 100%;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  position: static !important;
+  overscroll-behavior-y: auto !important;
+  touch-action: pan-y pinch-zoom !important;
+}
+
+#root {
+  height: auto !important;
+  min-height: 100vh;
+  width: 100%;
+  overflow: visible !important;
+}
+
+#root > div.min-h-screen {
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important;
+}
+
+#root main {
+  height: auto !important;
+  min-height: 0;
+  overflow: visible !important;
+}
+
+[class~="overflow-y-auto"],
+[class~="overflow-y-scroll"],
+[class~="overflow-auto"],
+.custom-scrollbar,
+.sidebar-scrollbar,
+.modal-container,
+.bottom-sheet,
+.table-responsive-touch {
+  min-height: 0;
+  -webkit-overflow-scrolling: touch !important;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y !important;
+}
+
+@supports (height: 100dvh) {
+  #root,
+  #root > div.min-h-screen {
+    min-height: 100dvh !important;
+  }
+}
