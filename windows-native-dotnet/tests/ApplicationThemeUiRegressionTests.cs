@@ -331,7 +331,7 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
 
                 ApplicationThemeService.Apply(window, "dark");
 
-                Assert.AreEqual(Color.FromRgb(17, 24, 39), ((SolidColorBrush)window.Background).Color);
+                Assert.AreEqual(Color.FromRgb(11, 18, 32), ((SolidColorBrush)window.Background).Color);
                 Assert.AreEqual(Colors.White, ((SolidColorBrush)paper.Background).Color);
                 Assert.AreEqual(Colors.White, ((SolidColorBrush)viewer.Background).Color);
                 Assert.AreEqual(Colors.White, ((SolidColorBrush)document.Background).Color);
