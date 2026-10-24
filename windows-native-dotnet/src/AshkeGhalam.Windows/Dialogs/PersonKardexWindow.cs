@@ -132,9 +132,10 @@ public sealed class PersonKardexWindow : Window
         _grid.Columns.Add(new DataGridTextColumn { Header = "نوع سند", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Type)), Width = 125 });
         _grid.Columns.Add(new DataGridTextColumn { Header = "شماره / مرجع", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Reference)), Width = 150 });
         _grid.Columns.Add(new DataGridTextColumn { Header = "شرح گردش", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Description)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        _grid.Columns.Add(new DataGridTextColumn { Header = "بدهکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Debit)) { StringFormat = "#,##0.##" }, Width = 115 });
-        _grid.Columns.Add(new DataGridTextColumn { Header = "بستانکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Credit)) { StringFormat = "#,##0.##" }, Width = 115 });
-        _grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Balance)) { StringFormat = "#,##0.##" }, Width = 125 });
+        var numericCellStyle = CreateNumericCellStyle();
+        _grid.Columns.Add(new DataGridTextColumn { Header = "بدهکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Debit)) { StringFormat = "#,##0.##" }, ElementStyle = numericCellStyle, Width = 115 });
+        _grid.Columns.Add(new DataGridTextColumn { Header = "بستانکار", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Credit)) { StringFormat = "#,##0.##" }, ElementStyle = numericCellStyle, Width = 115 });
+        _grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new System.Windows.Data.Binding(nameof(PersonKardexEntry.Balance)) { StringFormat = "#,##0.##" }, ElementStyle = numericCellStyle, Width = 125 });
         _grid.AlternationCount = 2;
         _grid.RowBackground = Brushes.White;
         _grid.AlternatingRowBackground = soft;
@@ -164,6 +165,15 @@ public sealed class PersonKardexWindow : Window
         Content = root;
 
         Loaded += (_, _) => ReloadReport();
+    }
+
+    private static Style CreateNumericCellStyle()
+    {
+        var style = new Style(typeof(TextBlock));
+        style.Setters.Add(new Setter(FrameworkElement.FlowDirectionProperty, FlowDirection.LeftToRight));
+        style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
+        style.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch));
+        return style;
     }
 
     private Button MakeButton(string label, RoutedEventHandler handler, bool primary = false)

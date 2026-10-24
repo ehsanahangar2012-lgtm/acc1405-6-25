@@ -116,9 +116,10 @@ public sealed class KardexWindow : Window
         grid.Columns.Add(new DataGridTextColumn { Header = "نوع گردش", Binding = new Binding(nameof(ProductKardexPrintRow.Movement)), Width = 160 });
         grid.Columns.Add(new DataGridTextColumn { Header = "سند مرجع", Binding = new Binding(nameof(ProductKardexPrintRow.Document)), Width = 170 });
         grid.Columns.Add(new DataGridTextColumn { Header = "شرح گردش", Binding = new Binding(nameof(ProductKardexPrintRow.Description)), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
-        grid.Columns.Add(new DataGridTextColumn { Header = "ورودی", Binding = new Binding(nameof(ProductKardexPrintRow.Incoming)) { StringFormat = "#,##0.##" }, Width = 110 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "خروجی", Binding = new Binding(nameof(ProductKardexPrintRow.Outgoing)) { StringFormat = "#,##0.##" }, Width = 110 });
-        grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new Binding(nameof(ProductKardexPrintRow.Balance)) { StringFormat = "#,##0.##" }, Width = 120 });
+        var numericCellStyle = CreateNumericCellStyle();
+        grid.Columns.Add(new DataGridTextColumn { Header = "ورودی", Binding = new Binding(nameof(ProductKardexPrintRow.Incoming)) { StringFormat = "#,##0.##" }, ElementStyle = numericCellStyle, Width = 110 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "خروجی", Binding = new Binding(nameof(ProductKardexPrintRow.Outgoing)) { StringFormat = "#,##0.##" }, ElementStyle = numericCellStyle, Width = 110 });
+        grid.Columns.Add(new DataGridTextColumn { Header = "مانده", Binding = new Binding(nameof(ProductKardexPrintRow.Balance)) { StringFormat = "#,##0.##" }, ElementStyle = numericCellStyle, Width = 120 });
 
         var headerStyle = new Style(typeof(DataGridColumnHeader));
         headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, accent));
@@ -158,6 +159,15 @@ public sealed class KardexWindow : Window
 
         root.Children.Add(grid);
         Content = root;
+    }
+
+    private static Style CreateNumericCellStyle()
+    {
+        var style = new Style(typeof(TextBlock));
+        style.Setters.Add(new Setter(FrameworkElement.FlowDirectionProperty, FlowDirection.LeftToRight));
+        style.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Right));
+        style.Setters.Add(new Setter(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Stretch));
+        return style;
     }
 
     private static void AddMetric(Panel parent, string label, string value, Brush accent, Brush ink, Brush soft)
