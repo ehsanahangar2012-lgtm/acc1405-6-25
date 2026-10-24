@@ -61,7 +61,7 @@ public sealed class PersonKardexPrintPreviewWindow : Window
         var table = new Table { CellSpacing = 0 };
         foreach (var width in new[] { 1.0, 1.0, 1.0, 2.2, 1.1, 1.1, 1.1 })
             table.Columns.Add(new TableColumn { Width = new GridLength(width, GridUnitType.Star) });
-        var headerGroup = new TableRowGroup { IsHeader = true };
+        var headerGroup = new TableRowGroup();
         var headerRow = new TableRow { Background = accent, Foreground = Brushes.White, FontWeight = FontWeights.Bold };
         foreach (var label in new[] { "تاریخ", "نوع", "شماره", "شرح", "بدهکار", "بستانکار", "مانده" })
             headerRow.Cells.Add(CreateCell(label, Brushes.White, accent, true));
