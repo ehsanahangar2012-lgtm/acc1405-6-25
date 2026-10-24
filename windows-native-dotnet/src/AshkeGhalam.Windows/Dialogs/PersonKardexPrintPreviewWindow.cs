@@ -83,6 +83,7 @@ public sealed class PersonKardexPrintPreviewWindow : Window
         }
         table.RowGroups.Add(body);
         _document.Blocks.Add(table);
+        PrintBrandingService.AppendWebsiteFooter(_document, 756);
 
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
