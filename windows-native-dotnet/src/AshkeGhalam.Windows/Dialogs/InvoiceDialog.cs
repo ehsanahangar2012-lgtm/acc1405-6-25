@@ -873,8 +873,9 @@ public sealed class InvoiceDialog : Window
         {
             StringFormat = "کد: {0}"
         });
-        details.SetValue(TextBlock.FontSizeProperty, 10d);
-        details.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush(Color.FromRgb(100, 116, 139)));
+        details.SetValue(TextBlock.FontSizeProperty, 11d);
+        details.SetValue(TextBlock.FontWeightProperty, FontWeights.Medium);
+        // Inherit the theme-aware ComboBoxItem foreground so code text remains readable in dark mode.
         panel.AppendChild(name);
         panel.AppendChild(details);
         return new DataTemplate(typeof(CustomerRecord)) { VisualTree = panel };
