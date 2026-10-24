@@ -57,7 +57,6 @@ public sealed class NativeUiVisualPreviewTests
                 // WPF validates that an Owner has been shown at least once before another
                 // Window may set Owner; the capture itself remains off-screen/in-memory.
                 owner.Show();
-                owner.Hide();
 
                 var person = new CustomerRecord
                 {
@@ -136,20 +135,31 @@ public sealed class NativeUiVisualPreviewTests
                     SetText(dashboard, "ReceivablesTotal", "۳٬۰۸۰٬۰۰۰");
                     SetText(dashboard, "PayablesTotal", "۱٬۶۲۰٬۰۰۰");
                     SetText(dashboard, "ExpensesTotal", "۶۳۰٬۰۰۰");
+                    // Keep visual-tree creation realistic but avoid reading/writing any user's
+                    // accounting file or starting background services in this visual-only test.
+                    var startupMethod = typeof(MainWindow).GetMethod(
+                        "MainWindow_Loaded", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (startupMethod is not null)
+                    {
+                        var startupHandler = (RoutedEventHandler)Delegate.CreateDelegate(
+                            typeof(RoutedEventHandler), dashboard, startupMethod);
+                        dashboard.Loaded -= startupHandler;
+                    }
+                    dashboard.Show();
                     ApplicationThemeService.Apply(dashboard, theme);
-                    // Match the application's normal startup/navigation state. Applying only
-                    // the color service leaves the sidebar's route-specific local brushes unset.
                     var navigationSelection = typeof(MainWindow).GetMethod(
                         "UpdateNavigationSelection", BindingFlags.Instance | BindingFlags.NonPublic);
                     if (navigationSelection is null)
                         throw new InvalidOperationException("MainWindow navigation-theme method was not found.");
                     navigationSelection.Invoke(dashboard, new object?[] { "dashboard", theme });
+                    dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                        new Action(dashboard.UpdateLayout));
                     SaveContent(dashboard, outputDirectory, $"dashboard-{theme}.png");
+                    dashboard.Close();
 
                     currentStage = $"person form ({theme})";
                     var personDialog = new CustomerDialog(owner, suggestedCode: "CUS-1002");
-                    ApplicationThemeService.Apply(personDialog, theme);
-                    SaveContent(personDialog, outputDirectory, $"person-form-{theme}.png");
+                    CaptureVisibleWindow(personDialog, theme, outputDirectory, $"person-form-{theme}.png");
 
                     currentStage = $"invoice form ({theme})";
                     var invoiceDialog = new InvoiceDialog(
@@ -164,24 +174,23 @@ public sealed class NativeUiVisualPreviewTests
                             Products = products,
                             Invoices = invoices
                         });
-                    ApplicationThemeService.Apply(invoiceDialog, theme);
-                    SaveContent(invoiceDialog, outputDirectory, $"invoice-form-{theme}.png");
+                    CaptureVisibleWindow(invoiceDialog, theme, outputDirectory, $"invoice-form-{theme}.png");
 
                     currentStage = $"voucher form ({theme})";
                     var voucherDialog = new VoucherDialog(
                         owner, people, products, invoices, companyProfile: company);
-                    ApplicationThemeService.Apply(voucherDialog, theme);
-                    SaveContent(voucherDialog, outputDirectory, $"voucher-form-{theme}.png");
+                    CaptureVisibleWindow(voucherDialog, theme, outputDirectory, $"voucher-form-{theme}.png");
 
                     currentStage = $"invoice print preview ({theme})";
                     var preview = new InvoicePreviewWindow(
                         owner, invoice, defaultTheme: "modern", showQr: false,
                         company: company, currencyCode: "RIAL");
-                    ApplicationThemeService.Apply(preview, theme);
-                    SaveContent(preview, outputDirectory, $"invoice-print-preview-{theme}.png");
+                    CaptureVisibleWindow(preview, theme, outputDirectory, $"invoice-print-preview-{theme}.png");
                 }
 
                 owner.Close();
+                var capturedImages = Directory.GetFiles(outputDirectory, "*.png");
+                Assert.AreEqual(10, capturedImages.Length, "Expected dashboard, person, invoice, voucher and print-preview captures for both themes.");
             }
             catch (Exception ex)
             {
@@ -194,6 +203,25 @@ public sealed class NativeUiVisualPreviewTests
 
         if (failure is not null)
             throw new AssertFailedException($"Native WPF screenshot capture failed: {failure}", failure);
+    }
+
+    private static void CaptureVisibleWindow(Window window, string theme, string folder, string fileName)
+    {
+        window.Show();
+        try
+        {
+            // Apply after Show so ComboBox, DatePicker and content presenter templates are
+            // already instantiated; this matches the application's Loaded-time theme path.
+            ApplicationThemeService.Apply(window, theme);
+            window.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                new Action(window.UpdateLayout));
+            SaveContent(window, folder, fileName);
+        }
+        finally
+        {
+            window.Hide();
+            window.Close();
+        }
     }
 
     private static void SetText(Window window, string name, string value)
