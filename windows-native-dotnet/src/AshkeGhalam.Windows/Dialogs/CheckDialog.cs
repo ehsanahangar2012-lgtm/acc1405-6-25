@@ -320,6 +320,10 @@ public sealed class CheckDialog : Window
         _nextButton.IsDefault = _currentStep < _steps.Length - 1;
         _saveButton.IsDefault = _currentStep == _steps.Length - 1;
         _stepHost.ScrollToTop();
+        // The step content is replaced dynamically after the first window-load theme pass.
+        // Reapply the owner theme so each newly-created Border and its descendants keep readable colors.
+        if (IsLoaded)
+            ApplicationThemeService.Apply(this, ApplicationThemeService.DetectTheme(Owner));
     }
 
     private bool ValidateCurrentStep()

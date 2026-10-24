@@ -45,8 +45,7 @@ public sealed class LicenseActivationDialog : Window
         catch (Exception ex)
         {
             _hardwareId.Text = "";
-            _status.Text = ex.Message;
-            _status.Foreground = Brushes.Firebrick;
+            SetStatus(ex.Message, Color.FromRgb(220, 38, 38));
             _verify.IsEnabled = false;
         }
 
@@ -126,13 +125,11 @@ public sealed class LicenseActivationDialog : Window
             {
                 if (string.IsNullOrWhiteSpace(_hardwareId.Text)) throw new InvalidOperationException("شناسه دستگاه آماده نیست.");
                 Clipboard.SetText(_hardwareId.Text);
-                _status.Text = "شناسه دستگاه کپی شد.";
-                _status.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+                SetStatus("شناسه دستگاه کپی شد.", Color.FromRgb(15, 118, 110));
             }
             catch
             {
-                _status.Text = "کپی شناسه دستگاه انجام نشد.";
-                _status.Foreground = Brushes.Firebrick;
+                SetStatus("کپی شناسه دستگاه انجام نشد.", Color.FromRgb(220, 38, 38));
             }
         };
 
@@ -144,22 +141,19 @@ public sealed class LicenseActivationDialog : Window
             var workspaceId = _workspace.Text.Trim();
             if (key.Length == 0 || workspaceId.Length == 0)
             {
-                _status.Text = "شناسه فضای کاری و کلید لایسنس را وارد کنید.";
-                _status.Foreground = Brushes.Firebrick;
+                SetStatus("شناسه فضای کاری و کلید لایسنس را وارد کنید.", Color.FromRgb(220, 38, 38));
                 return;
             }
 
             _verify.IsEnabled = false;
             _copy.IsEnabled = false;
-            _status.Text = "در حال اتصال امن و بررسی رسید امضاشده...";
-            _status.Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105));
+            SetStatus("در حال اتصال امن و بررسی رسید امضاشده...", Color.FromRgb(71, 85, 105));
             try
             {
                 var result = await _client.VerifyAsync(key, workspaceId, _hardwareId.Text);
                 if (!result.Success || result.License is null)
                 {
-                    _status.Text = result.Message;
-                    _status.Foreground = Brushes.Firebrick;
+                    SetStatus(result.Message, Color.FromRgb(220, 38, 38));
                     return;
                 }
 
@@ -175,14 +169,14 @@ public sealed class LicenseActivationDialog : Window
                     Receipt = result.License.Receipt,
                     VerifiedAtUtc = DateTimeOffset.UtcNow
                 };
-                _status.Text = $"لایسنس تأیید شد • طرح: {result.License.Payload.Plan} • پایان: {result.License.Payload.ExpireDate}";
-                _status.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+                SetStatus($"لایسنس تأیید شد • طرح: {result.License.Payload.Plan} • پایان: {result.License.Payload.ExpireDate}",
+                    Color.FromRgb(15, 118, 110));
                 DialogResult = true;
             }
             catch
             {
-                _status.Text = "تأیید لایسنس کامل نشد. کلید یا اطلاعات حساس در گزارش خطا ذخیره نشده است.";
-                _status.Foreground = Brushes.Firebrick;
+                SetStatus("تأیید لایسنس کامل نشد. کلید یا اطلاعات حساس در گزارش خطا ذخیره نشده است.",
+                    Color.FromRgb(220, 38, 38));
             }
             finally
             {
@@ -237,5 +231,16 @@ public sealed class LicenseActivationDialog : Window
 
     private static SolidColorBrush PaletteBrush(string value) =>
         new((Color)ColorConverter.ConvertFromString(value)!);
+
+    private void SetStatus(string text, Color preferredForeground)
+    {
+        _status.Text = text;
+        var theme = ApplicationThemeService.DetectTheme(Owner);
+        var expectedSurface = string.Equals(theme, "dark", StringComparison.Ordinal)
+            ? Color.FromRgb(17, 24, 39)
+            : Colors.White;
+        var readable = ApplicationThemeService.ResolveReadableForeground(preferredForeground, expectedSurface, theme);
+        _status.Foreground = new SolidColorBrush(readable);
+    }
 
 }
