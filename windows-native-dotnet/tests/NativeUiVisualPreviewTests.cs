@@ -49,8 +49,14 @@ public sealed class NativeUiVisualPreviewTests
                     Width = 1280,
                     Height = 800,
                     Background = Brushes.White,
-                    ShowInTaskbar = false
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow,
+                    ShowActivated = false
                 };
+                // WPF validates that an Owner has been shown at least once before another
+                // Window may set Owner; the capture itself remains off-screen/in-memory.
+                owner.Show();
+                owner.Hide();
 
                 var person = new CustomerRecord
                 {
