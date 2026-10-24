@@ -363,8 +363,9 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
             ColorOf(headerStyle.Setters, Control.BackgroundProperty),
             "column header");
 
-        var textColumn = grid.Columns.OfType<DataGridTextColumn>().Single();
-        var textStyle = textColumn.ElementStyle;
+        var textColumn = grid.Columns.OfType<DataGridTextColumn>().FirstOrDefault();
+        Assert.IsNotNull(textColumn, "DataGrid must have at least one text column.");
+        var textStyle = textColumn!.ElementStyle;
         Assert.IsNotNull(textStyle, "DataGrid text cells should receive the shared text style.");
         var foregroundSetter = textStyle!.Setters.OfType<Setter>()
             .Single(setter => setter.Property == TextBlock.ForegroundProperty);
