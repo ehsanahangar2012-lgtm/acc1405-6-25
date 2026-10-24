@@ -4376,6 +4376,30 @@ public partial class MainWindow : Window
         FooterStatus.Text = "صفحهٔ «" + header + "» باز شد.";
     }
 
+    private static BitmapImage? DecodeCompanyLogo(string? base64)
+    {
+        if (string.IsNullOrWhiteSpace(base64)) return null;
+        try
+        {
+            var bytes = Convert.FromBase64String(base64);
+            if (bytes.Length == 0 || bytes.Length > 2 * 1024 * 1024) return null;
+            using var stream = new MemoryStream(bytes);
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = 264;
+            image.StreamSource = stream;
+            image.EndInit();
+            if (image.PixelWidth < 1 || image.PixelHeight < 1 || image.PixelWidth > 5000 || image.PixelHeight > 5000)
+                return null;
+            image.Freeze();
+            return image;
+        }
+        catch (FormatException) { return null; }
+        catch (InvalidDataException) { return null; }
+        catch (NotSupportedException) { return null; }
+    }
+
     private void RefreshAboutCompanyPage()
     {
         var company = ActiveCompanyProfile();
@@ -4389,6 +4413,9 @@ public partial class MainWindow : Window
         AboutCompanyNationalId.Text = RegisteredValue(company?.NationalId);
         AboutCompanyTaxId.Text = RegisteredValue(company?.TaxId);
         AboutCompanyAddress.Text = RegisteredValue(company?.Address);
+
+        AboutCompanyLogo.Source = DecodeCompanyLogo(company?.LogoDataBase64);
+        AboutCompanyLogoFrame.Visibility = AboutCompanyLogo.Source is null ? Visibility.Collapsed : Visibility.Visible;
 
         var version = typeof(MainWindow).Assembly.GetName().Version;
         AboutVersionText.Text = "نسخهٔ " + (version?.ToString(3) ?? "نامشخص");

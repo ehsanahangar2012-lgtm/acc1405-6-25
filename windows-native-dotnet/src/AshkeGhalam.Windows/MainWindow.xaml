@@ -1370,6 +1370,12 @@
                             <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,7,0">
                                 <StackPanel>
                                     <TextBlock Text="مشخصات شرکت فعال" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <Border x:Name="AboutCompanyLogoFrame" Background="#F8FAFC" BorderBrush="#E2E8F0"
+                                            BorderThickness="1" CornerRadius="10" Padding="8" Margin="0,12,0,4"
+                                            HorizontalAlignment="Right" Visibility="Collapsed">
+                                        <Image x:Name="AboutCompanyLogo" Width="132" Height="84" Stretch="Uniform"
+                                               SnapsToDevicePixels="True"/>
+                                    </Border>
                                     <TextBlock Text="نام حقوقی" FontSize="11" Foreground="#64748B" Margin="0,12,0,3"/>
                                     <TextBlock x:Name="AboutCompanyLegalName" Text="در تنظیمات شرکت ثبت نشده" FontSize="14" FontWeight="SemiBold" Foreground="#1E293B" TextWrapping="Wrap"/>
                                     <TextBlock Text="شعبه" FontSize="11" Foreground="#64748B" Margin="0,10,0,3"/>
