@@ -64,10 +64,23 @@ jobs:
             Write-Host 'No standalone test project was found. The WPF compile and startup smoke test still run.'
           } else {
             foreach ($project in $projects) {
+              $env:ASHKGHALAM_UI_CAPTURE_DIR = Join-Path $env:GITHUB_WORKSPACE 'artifacts/ui-previews'
+              New-Item -ItemType Directory -Force -Path $env:ASHKGHALAM_UI_CAPTURE_DIR | Out-Null
               dotnet test $project.FullName --configuration Release --verbosity normal
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+              Remove-Item Env:ASHKGHALAM_UI_CAPTURE_DIR -ErrorAction SilentlyContinue
             }
           }
+
+      - name: Upload WPF visual review captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-WPF-UI-Previews-${{ github.sha }}
+          path: artifacts/ui-previews/*.png
+          if-no-files-found: warn
+          retention-days: 1
+          compression-level: 6
 
       - name: Publish self-contained single-file EXE for Windows x64
         shell: pwsh
