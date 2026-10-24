@@ -1576,10 +1576,9 @@
                         <TextBlock Text="گزارشات و تحلیل" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="financial-reports" Content="📊  گزارشات مالی پیشرفته" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="companies" Content="🏢  تنظیمات حسابداری و چندشرکتی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="server" Content="🌐  ارتباط با سرور اصلی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
+                        <Button Tag="server" Content="🌐  ارتباط و همگام‌سازی سرور" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="fiscal-year" Content="📅  سال مالی" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="security" Content="🔐  امنیت داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
-                        <Button Tag="data-sync" Content="🔄  همگام‌سازی داده‌ها" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <TextBlock Text="اطلاعات و آموزش" Style="{StaticResource NavSectionLabel}"/>
                         <Button Tag="about" Content="🏢  معرفی نرم‌افزار" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>
                         <Button Tag="guide" Content="📘  راهنمای حسابداری" Style="{StaticResource NavButton}" Click="NavigateModule_Click"/>

@@ -4768,13 +4768,12 @@ public partial class MainWindow : Window
             ["multi-user-lan"] = new("شبکه محلی چندکاربره", "خدمات تجاری و ابری", "/multi-user-lan"),
             ["client-broadcast"] = new("اطلاعیه‌ها", "خدمات تجاری و ابری", "/client-broadcast"),
             ["activation"] = new("اتصال سرور و فعال‌سازی لایسنس", "ارتباط با سرور", "/install-android (فقط اتصال/فعال‌سازی کلاینت)"),
-            ["server"] = new("ارتباط با سرور اصلی", "تنظیمات حسابداری", "/data-sync"),
+            ["server"] = new("ارتباط و همگام‌سازی سرور", "تنظیمات حسابداری", "/data-sync"),
             ["mobile-catalog"] = new("کاتالوگ ویزیتوری همراه", "خدمات تجاری و ابری", "/mobile-catalog"),
             ["catalog"] = new("کاتالوگ محصول", "خدمات تجاری و ابری", "/catalog"),
             ["support-sla"] = new("پشتیبانی و تمدید", "خدمات تجاری و ابری", "/support-sla"),
             ["fiscal-year"] = new("سال مالی", "تنظیمات و سیستم", "/fiscal-year"),
             ["security"] = new("امنیت داده‌ها", "تنظیمات و سیستم", "/security"),
-            ["data-sync"] = new("همگام‌سازی داده‌ها", "ارتباط با سرور اصلی", "/data-sync"),
             ["advanced-settings"] = new("تنظیمات پیشرفته", "تنظیمات برنامه", "/advanced-settings"),
             ["settings"] = new("تنظیمات حسابداری", "تنظیمات حسابداری", "/settings"),
             ["help"] = new("آموزش و راهنما", "تنظیمات و سیستم", "/help"),
@@ -4812,7 +4811,6 @@ public partial class MainWindow : Window
             ["moadian"] = "سامانهٔ مؤدیان",
             ["activation"] = "اتصال و لایسنس",
             ["server"] = "اتصال به سرور اصلی",
-            ["data-sync"] = "اتصال به سرور اصلی",
             ["fiscal-year"] = "سال مالی",
             ["security"] = "امنیت داده‌ها",
             ["advanced-settings"] = "تنظیمات پیشرفته",
@@ -4822,9 +4820,63 @@ public partial class MainWindow : Window
             ["help"] = "راهنمای حسابداری"
         };
 
+    private Button? FindNavigationButton(string route)
+    {
+        if (string.Equals(route, "dashboard", StringComparison.Ordinal) &&
+            FindName("NavigationDashboardButton") is Button dashboard)
+            return dashboard;
+
+        if (FindName("NavigationRoot") is not DependencyObject root)
+            return null;
+
+        var pending = new Stack<DependencyObject>();
+        var visited = new HashSet<DependencyObject>(ReferenceEqualityComparer.Instance);
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            if (!visited.Add(current))
+                continue;
+
+            if (current is Button button &&
+                string.Equals(button.Tag?.ToString(), route, StringComparison.Ordinal))
+                return button;
+
+            try
+            {
+                foreach (var child in LogicalTreeHelper.GetChildren(current).OfType<DependencyObject>())
+                    pending.Push(child);
+            }
+            catch (InvalidOperationException) { }
+
+            if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+            {
+                try
+                {
+                    for (var index = 0; index < VisualTreeHelper.GetChildrenCount(current); index++)
+                        pending.Push(VisualTreeHelper.GetChild(current, index));
+                }
+                catch (InvalidOperationException) { }
+            }
+        }
+
+        return null;
+    }
+
     private void FinanceShortcut_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not FrameworkElement { Tag: string header }) return;
+
+        // Finance-center shortcuts use the same route as the sidebar to keep the active
+        // item, module title, status text, and destination synchronized.
+        var route = NativeTabHeaders.FirstOrDefault(pair =>
+            string.Equals(pair.Value, header, StringComparison.Ordinal)).Key;
+        if (!string.IsNullOrWhiteSpace(route) && FindNavigationButton(route) is Button navigationButton)
+        {
+            NavigateModule_Click(navigationButton, e);
+            return;
+        }
+
         var target = MainTabs.Items.OfType<TabItem>().FirstOrDefault(tab =>
             string.Equals(tab.Header?.ToString(), header, StringComparison.Ordinal));
         if (target is null) return;
