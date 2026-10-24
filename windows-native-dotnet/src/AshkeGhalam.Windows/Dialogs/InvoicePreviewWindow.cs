@@ -7,6 +7,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using QRCoder;
 using AshkeGhalam.Windows.Models;
+using AshkeGhalam.Windows.Services;
 
 namespace AshkeGhalam.Windows.Dialogs;
 
@@ -584,7 +585,7 @@ public sealed class InvoicePreviewWindow : Window
         invoiceTopLayout.Children.Add(detailsColumn);
         document.Blocks.Add(new BlockUIContainer(invoiceTopLayout));
 
-        var table = new Table { CellSpacing = 0 };
+        var table = new Table { CellSpacing = 0, Margin = new Thickness(0, 2, 0, 10) };
         table.Columns.Add(new TableColumn { Width = new GridLength(5, GridUnitType.Star) });
         table.Columns.Add(new TableColumn { Width = new GridLength(1.2, GridUnitType.Star) });
         table.Columns.Add(new TableColumn { Width = new GridLength(1.2, GridUnitType.Star) });
@@ -611,29 +612,57 @@ public sealed class InvoicePreviewWindow : Window
         foreach (var line in invoiceLines)
         {
             var row = new TableRow();
+            var itemPanel = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
+            itemPanel.Children.Add(new TextBlock
+            {
+                Text = string.IsNullOrWhiteSpace(line.ProductName) ? "—" : line.ProductName,
+                FontWeight = FontWeights.SemiBold, FontSize = 9.5,
+                TextWrapping = TextWrapping.Wrap, Foreground = ink
+            });
+            if (!string.IsNullOrWhiteSpace(line.Description))
+            {
+                itemPanel.Children.Add(new Border
+                {
+                    Background = soft,
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                    BorderThickness = new Thickness(0.7),
+                    CornerRadius = new CornerRadius(3),
+                    Padding = new Thickness(4, 3, 4, 3),
+                    Margin = new Thickness(0, 4, 0, 0),
+                    Child = new TextBlock
+                    {
+                        Text = line.Description.Trim(), FontSize = 8.5,
+                        TextWrapping = TextWrapping.Wrap, Foreground = ink
+                    }
+                });
+            }
+            var background = invoiceRowIndex % 2 == 0 ? Brushes.White : soft;
+            var itemCell = new TableCell
+            {
+                Padding = new Thickness(6), Background = background,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                BorderThickness = new Thickness(0.5), FontSize = 9
+            };
+            itemCell.Blocks.Add(new BlockUIContainer(itemPanel));
+            row.Cells.Add(itemCell);
+
             var values = new[]
             {
-                string.IsNullOrWhiteSpace(line.Description) ? line.ProductName : $"{line.ProductName}\n{line.Description}",
-                line.Quantity.ToString("#,##0.##", CultureInfo.CurrentCulture),
+                line.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")),
                 string.IsNullOrWhiteSpace(line.Unit) ? "—" : line.Unit,
                 BothCurrencies(line.UnitPrice),
                 BothCurrencies(line.LineTotal)
             };
-
             foreach (var value in values)
             {
-                row.Cells.Add(new TableCell(new Paragraph(new Run(value)))
+                row.Cells.Add(new TableCell(new Paragraph(new Run(value)) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
                 {
-                    Padding = new Thickness(theme == "thermal" ? 5 : 8),
-                    Background = invoiceRowIndex % 2 == 0 ? Brushes.White : soft,
-                    BorderBrush = new SolidColorBrush(theme == "thermal"
-                        ? Color.FromRgb(75, 85, 99)
-                        : Color.FromRgb(203, 213, 225)),
-                    BorderThickness = new Thickness(0.5)
+                    Padding = new Thickness(theme == "thermal" ? 4 : 6), Background = background,
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                    BorderThickness = new Thickness(0.5), FontSize = 8.5
                 });
             }
-            invoiceRowIndex++;
-            group.Rows.Add(row);
+
         }
 
         if (invoiceLines.Count == 0)
@@ -761,6 +790,7 @@ public sealed class InvoicePreviewWindow : Window
             Padding = new Thickness(0, 12, 0, 12)
         });
 
+        PrintBrandingService.AppendWebsiteFooter(document, 660);
         return document;
     }
 
