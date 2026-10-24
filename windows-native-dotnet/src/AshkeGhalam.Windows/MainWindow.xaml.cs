@@ -1446,6 +1446,7 @@ public partial class MainWindow : Window
         }
         table.RowGroups.Add(body);
         document.Blocks.Add(table);
+        PrintBrandingService.AppendWebsiteFooter(document, 740);
 
         var dialog = new PrintDialog();
         if (dialog.ShowDialog() != true) return;
@@ -2414,6 +2415,7 @@ public partial class MainWindow : Window
                 FontSize = 9, Foreground = Brushes.DimGray,
                 TextAlignment = TextAlignment.Right, Margin = new Thickness(0,16,0,0)
             });
+            PrintBrandingService.AppendWebsiteFooter(document, 720);
 
             var printDialog = new PrintDialog();
             if (printDialog.ShowDialog() != true) return;
