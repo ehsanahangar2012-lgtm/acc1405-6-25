@@ -188,6 +188,7 @@ public sealed class CheckPreviewWindow : Window
         var print = new Button { Content = "🖨 چاپ / انتخاب چاپگر", MinWidth = 160, Height = 38, Margin = new Thickness(0, 0, 8, 0), Background = accent, Foreground = Brushes.White };
         print.Click += Print_Click;
         actions.Children.Add(print);
+        DocumentExportService.AddSaveButtons(actions, this, () => _document, "AshkeGhalam-Check");
         actions.Children.Add(new Button { Content = "بستن", MinWidth = 90, Height = 38, IsCancel = true });
         toolbar.Children.Add(actions);
 
