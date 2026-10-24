@@ -13,6 +13,8 @@
         <SolidColorBrush x:Key="PrimaryText" Color="#0F172A"/>
         <SolidColorBrush x:Key="MutedText" Color="#475569"/>
         <SolidColorBrush x:Key="OutlineBrush" Color="#CBD5E1"/>
+        <SolidColorBrush x:Key="ComboDropDownSurfaceBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ComboDropDownBorderBrush" Color="#CBD5E1"/>
         <SolidColorBrush x:Key="AccentBrush" Color="#0F766E"/>
         <SolidColorBrush x:Key="AccentSoftBrush" Color="#CCFBF1"/>
         <SolidColorBrush x:Key="DangerBrush" Color="#B91C1C"/>
@@ -113,7 +115,7 @@
             </Setter>
         </Style>
 
-        <Style TargetType="{x:Type ComboBox}">
+        <Style x:Key="ModernComboBoxBaseStyle" TargetType="{x:Type ComboBox}">
             <Setter Property="MinHeight" Value="36"/>
             <Setter Property="Padding" Value="9,5"/>
             <Setter Property="FontSize" Value="13"/>
@@ -125,7 +127,106 @@
             <Setter Property="IsTextSearchCaseSensitive" Value="False"/>
             <Setter Property="MaxDropDownHeight" Value="320"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type ComboBox}">
+                        <Grid SnapsToDevicePixels="True">
+                            <Border x:Name="ComboSurface"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8"/>
+                            <DockPanel LastChildFill="True" FlowDirection="RightToLeft">
+                                <ToggleButton x:Name="ToggleButton"
+                                              DockPanel.Dock="Right"
+                                              Width="32"
+                                              Margin="0"
+                                              Padding="0"
+                                              Focusable="False"
+                                              Background="{TemplateBinding Background}"
+                                              Foreground="{TemplateBinding Foreground}"
+                                              BorderThickness="0"
+                                              IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                                              ClickMode="Press">
+                                    <ToggleButton.Template>
+                                        <ControlTemplate TargetType="{x:Type ToggleButton}">
+                                            <Border Background="{TemplateBinding Background}" CornerRadius="0,8,8,0">
+                                                <Path Data="M 0,0 L 4,4 L 8,0"
+                                                      Stroke="{TemplateBinding Foreground}"
+                                                      StrokeThickness="1.7"
+                                                      HorizontalAlignment="Center"
+                                                      VerticalAlignment="Center"/>
+                                            </Border>
+                                        </ControlTemplate>
+                                    </ToggleButton.Template>
+                                </ToggleButton>
+                                <Grid>
+                                    <ContentPresenter x:Name="SelectionBox"
+                                                      Margin="{TemplateBinding Padding}"
+                                                      IsHitTestVisible="False"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                      ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                                                      VerticalAlignment="Center"
+                                                      HorizontalAlignment="Stretch"
+                                                      TextElement.Foreground="{TemplateBinding Foreground}"
+                                                      RecognizesAccessKey="True"/>
+                                    <TextBox x:Name="PART_EditableTextBox"
+                                             Margin="{TemplateBinding Padding}"
+                                             Visibility="Hidden"
+                                             Background="{TemplateBinding Background}"
+                                             Foreground="{TemplateBinding Foreground}"
+                                             BorderThickness="0"
+                                             Padding="0"
+                                             IsReadOnly="{TemplateBinding IsReadOnly}"
+                                             Focusable="True"
+                                             VerticalContentAlignment="Center"
+                                             Text="{Binding Path=Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                </Grid>
+                            </DockPanel>
+                            <Popup x:Name="PART_Popup"
+                                   Placement="Bottom"
+                                   PlacementTarget="{Binding RelativeSource={RelativeSource TemplatedParent}}"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   StaysOpen="False"
+                                   PopupAnimation="Fade">
+                                <Grid MinWidth="{TemplateBinding ActualWidth}"
+                                      MaxHeight="{TemplateBinding MaxDropDownHeight}">
+                                    <Border x:Name="DropDownBorder"
+                                            Background="{DynamicResource ComboDropDownSurfaceBrush}"
+                                            BorderBrush="{DynamicResource ComboDropDownBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="8"/>
+                                    <ScrollViewer Margin="1"
+                                                  CanContentScroll="True"
+                                                  VerticalScrollBarVisibility="Auto"
+                                                  HorizontalScrollBarVisibility="Disabled">
+                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Contained"
+                                                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEditable" Value="True">
+                                <Setter TargetName="SelectionBox" Property="Visibility" Value="Hidden"/>
+                                <Setter TargetName="PART_EditableTextBox" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ComboSurface" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ComboSurface" Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
+        <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource ModernComboBoxBaseStyle}"/>
         <Style TargetType="{x:Type DatePicker}">
             <Setter Property="MinHeight" Value="36"/>
             <Setter Property="FontSize" Value="13"/>

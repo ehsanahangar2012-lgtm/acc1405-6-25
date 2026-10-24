@@ -232,40 +232,41 @@ public sealed class NativeUiVisualPreviewTests
 
     private static void SaveContent(Window window, string folder, string fileName)
     {
-        var width = Math.Clamp((int)Math.Ceiling(window.Width), 520, 1600);
-        var height = Math.Clamp((int)Math.Ceiling(window.Height), 420, 1200);
         if (window.Content is not FrameworkElement content)
             throw new InvalidOperationException($"{window.GetType().Name} has no renderable content.");
 
-        // A transparent root Grid is rendered as black by RenderTargetBitmap when the
-        // Window itself is not rendered. Temporarily apply the window surface to that root
-        // panel instead of re-parenting Window.Content, which would violate WPF ownership.
-        var panel = content as Panel;
-        var originalBackground = panel?.Background;
-        var appliedWindowBackground = panel is not null &&
-            (originalBackground is null ||
-             originalBackground is SolidColorBrush { Color.A: 0 });
-        if (appliedWindowBackground)
-            panel!.Background = window.Background ?? Brushes.Transparent;
-
-        try
+        Visual visual;
+        double measuredWidth;
+        double measuredHeight;
+        if (window.IsLoaded)
         {
-            var size = new Size(width, height);
+            // Render the Window root rather than re-arranging its RTL content in isolation.
+            // Re-measuring Window.Content after Show can mirror FlowDirection a second time
+            // and produce review images that do not match the live desktop layout.
+            window.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                new Action(window.UpdateLayout));
+            visual = window;
+            measuredWidth = window.ActualWidth;
+            measuredHeight = window.ActualHeight;
+        }
+        else
+        {
+            measuredWidth = window.Width;
+            measuredHeight = window.Height;
+            var size = new Size(measuredWidth, measuredHeight);
             content.Measure(size);
-            content.Arrange(new Rect(0, 0, width, height));
+            content.Arrange(new Rect(0, 0, measuredWidth, measuredHeight));
             content.UpdateLayout();
+            visual = content;
+        }
 
-            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-            bitmap.Render(content);
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            using var stream = File.Create(Path.Combine(folder, fileName));
-            encoder.Save(stream);
-        }
-        finally
-        {
-            if (appliedWindowBackground)
-                panel!.Background = originalBackground;
-        }
+        var width = Math.Clamp((int)Math.Ceiling(measuredWidth), 520, 1600);
+        var height = Math.Clamp((int)Math.Ceiling(measuredHeight), 420, 1200);
+        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using var stream = File.Create(Path.Combine(folder, fileName));
+        encoder.Save(stream);
     }
 }

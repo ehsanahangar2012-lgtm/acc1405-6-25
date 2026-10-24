@@ -100,7 +100,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <Style TargetType="{x:Type ComboBox}">
+        <Style TargetType="{x:Type ComboBox}" BasedOn="{StaticResource ModernComboBoxBaseStyle}">
             <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
             <Setter Property="MinHeight" Value="36"/>
             <Setter Property="FontSize" Value="13"/>
