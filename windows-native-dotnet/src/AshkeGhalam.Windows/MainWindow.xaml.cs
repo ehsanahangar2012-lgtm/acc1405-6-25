@@ -4370,7 +4370,32 @@ public partial class MainWindow : Window
             string.Equals(pair.Value, header, StringComparison.Ordinal)).Key;
         if (!string.IsNullOrWhiteSpace(route)) UpdateNavigationSelection(route);
         if (FindName("CurrentModuleText") is TextBlock current) current.Text = header + " • نسخهٔ بومی";
+        if (header == "معرفی نرم‌افزار") RefreshAboutCompanyPage();
         FooterStatus.Text = "صفحهٔ «" + header + "» باز شد.";
+    }
+
+    private void RefreshAboutCompanyPage()
+    {
+        var company = ActiveCompanyProfile();
+        AboutCompanyLegalName.Text = string.IsNullOrWhiteSpace(company?.LegalName)
+            ? (company?.Name ?? "در تنظیمات شرکت ثبت نشده") : company.LegalName;
+        AboutCompanyPhone.Text = string.IsNullOrWhiteSpace(company?.Phone) ? "در تنظیمات شرکت ثبت نشده" : company.Phone;
+        AboutCompanyAddress.Text = string.IsNullOrWhiteSpace(company?.Address) ? "در تنظیمات شرکت ثبت نشده" : company.Address;
+    }
+
+    private void OpenCompanyWebsite_Click(object sender, RoutedEventArgs e)
+    {
+        // Intentionally restrict shell launches to the company's known HTTPS origin.
+        const string target = "https://ashkghalam.ir/";
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(target) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "بازکردن وب‌سایت انجام نشد: " + ex.Message, "وب‌سایت اشک قلم",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private async Task<NativeLicenseState?> LoadFreshSyncLicenseAsync()
@@ -4632,6 +4657,8 @@ public partial class MainWindow : Window
         new Dictionary<string, NativeModuleLink>(StringComparer.Ordinal)
         {
             ["dashboard"] = new("پیشخوان", "منوی اصلی", "/"),
+            ["about"] = new("معرفی نرم‌افزار", "اطلاعات و آموزش", "/about"),
+            ["guide"] = new("راهنمای حسابداری", "اطلاعات و آموزش", "/help"),
             ["invoices"] = new("فاکتورها", "منوی اصلی", "/invoices"),
             ["inventory"] = new("انبارداری", "منوی اصلی", "/inventory"),
             ["kardex"] = new("کارتکس کالا", "عملیات محلی موجود", "/inventory/kardex"),
@@ -4718,7 +4745,10 @@ public partial class MainWindow : Window
             ["fiscal-year"] = "سال مالی",
             ["security"] = "امنیت داده‌ها",
             ["advanced-settings"] = "تنظیمات پیشرفته",
-            ["settings"] = "تنظیمات و شرکت‌ها"
+            ["settings"] = "تنظیمات و شرکت‌ها",
+            ["about"] = "معرفی نرم‌افزار",
+            ["guide"] = "راهنمای حسابداری",
+            ["help"] = "راهنمای حسابداری"
         };
 
     private void FinanceShortcut_Click(object sender, RoutedEventArgs e)
@@ -4756,6 +4786,7 @@ public partial class MainWindow : Window
             migrationPanel.Visibility = Visibility.Collapsed;
             tabs.Visibility = Visibility.Visible;
             tabs.SelectedItem = targetTab;
+            if (key == "about") RefreshAboutCompanyPage();
 
             // Company profile and accounting preferences share one page; advanced settings
             // is its own tab, so it is never scrolled into a different page by index.
