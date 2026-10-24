@@ -25,11 +25,18 @@ public sealed class StockDialog:Window
         var root = new StackPanel { Margin = new Thickness(16) };
         var productSection = new StackPanel();
         AddField(productSection, "کالا (نام را تایپ کنید تا سریع‌تر پیدا شود)", _product);
-        _stockHint.Margin = new Thickness(0, 8, 0, 0);
+        _stockHint.Margin = new Thickness(0);
         _stockHint.TextWrapping = TextWrapping.Wrap;
-        _stockHint.Padding = new Thickness(10, 8, 10, 8);
-        _stockHint.Background = PaletteBrush("#F0FDFA");
-        productSection.Children.Add(_stockHint);
+        productSection.Children.Add(new Border
+        {
+            Background = PaletteBrush("#F0FDFA"),
+            BorderBrush = PaletteBrush("#99F6E4"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 8, 0, 0),
+            Child = _stockHint
+        });
         root.Children.Add(CreateSectionCard(
             "۱. انتخاب کالا",
             "کالایی را که قرار است موجودی آن افزایش یابد انتخاب کنید.",
