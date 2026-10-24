@@ -151,12 +151,22 @@ public sealed class SmartComboBoxSearchServiceTests
                     "Selecting a party should clear the filter so the next search starts from all parties.");
                 var selectedEditor = combo.Template.FindName("PART_EditableTextBox", combo) as System.Windows.Controls.TextBox;
                 Assert.IsNotNull(selectedEditor);
-                selectedEditor!.Text = "CUS-010";
+
+                // A delayed echo of the committed display name must not clear the record.
+                selectedEditor!.Text = otherParty.Name + "  ";
                 window.Dispatcher.Invoke(
                     System.Windows.Threading.DispatcherPriority.Background,
                     new Action(() => { }));
                 Assert.AreSame(otherParty, combo.SelectedItem,
-                    "A stale editable-text update after dropdown selection must not clear the selected party.");
+                    "A delayed editable-text update matching the selected name must preserve the record.");
+
+                // A genuinely different search query must clear the previous selection and filter.
+                selectedEditor.Text = "CUS-010";
+                window.Dispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.Background,
+                    new Action(() => { }));
+                Assert.IsNull(combo.SelectedItem, "A new query must not keep the previous party selected.");
+                Assert.AreEqual(1, combo.Items.Count, "Typing a fresh query after selection must filter the list.");
             }
             catch (Exception ex)
             {
