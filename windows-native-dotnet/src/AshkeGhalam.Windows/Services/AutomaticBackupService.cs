@@ -24,11 +24,30 @@ public static class AutomaticBackupService
         public int RetentionCount { get; set; } = DefaultRetention;
         public string ProtectedPassphrase { get; set; } = "";
         public DateTimeOffset? LastBackupUtc { get; set; }
+        public string BackupDirectoryPath { get; set; } = "";
     }
 
-    public static string BackupDirectory => Path.Combine(
+    public static string DefaultBackupDirectory => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "AshkeGhalam", "WindowsNative", "Backups");
+
+    public static string BackupDirectory => GetBackupDirectory(LoadSettings());
+
+    private static string GetBackupDirectory(Settings settings) =>
+        Path.GetFullPath(string.IsNullOrWhiteSpace(settings.BackupDirectoryPath)
+            ? DefaultBackupDirectory
+            : settings.BackupDirectoryPath.Trim());
+
+    public static void SetBackupDirectory(string directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory))
+            throw new ArgumentException("مسیر پوشهٔ پشتیبان را انتخاب کنید.", nameof(directory));
+        var normalized = Path.GetFullPath(directory.Trim());
+        Directory.CreateDirectory(normalized);
+        var settings = LoadSettings();
+        settings.BackupDirectoryPath = normalized;
+        SaveSettings(settings);
+    }
 
     private static string SettingsPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -37,7 +56,7 @@ public static class AutomaticBackupService
     public static Settings LoadSettings()
     {
         if (!File.Exists(SettingsPath))
-            return new Settings();
+            return new Settings { BackupDirectoryPath = DefaultBackupDirectory };
 
         try
         {
@@ -47,6 +66,8 @@ public static class AutomaticBackupService
                 settings.IntervalHours = 24;
             settings.RetentionCount = Math.Clamp(settings.RetentionCount, 1, 20);
             settings.ProtectedPassphrase ??= "";
+            settings.BackupDirectoryPath = string.IsNullOrWhiteSpace(settings.BackupDirectoryPath)
+                ? DefaultBackupDirectory : Path.GetFullPath(settings.BackupDirectoryPath);
             return settings;
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
@@ -97,7 +118,7 @@ public static class AutomaticBackupService
             return null;
 
         var passphrase = UnprotectPassphrase(settings);
-        var path = CreateBackupFile(data, passphrase, BackupDirectory, settings.RetentionCount, now);
+        var path = CreateBackupFile(data, passphrase, GetBackupDirectory(settings), settings.RetentionCount, now);
         settings.LastBackupUtc = now;
         SaveSettings(settings);
         return path;
@@ -108,7 +129,7 @@ public static class AutomaticBackupService
         var settings = LoadSettings();
         var passphrase = UnprotectPassphrase(settings);
         var now = DateTimeOffset.UtcNow;
-        var path = CreateBackupFile(data, passphrase, BackupDirectory, settings.RetentionCount, now);
+        var path = CreateBackupFile(data, passphrase, GetBackupDirectory(settings), settings.RetentionCount, now);
         settings.LastBackupUtc = now;
         SaveSettings(settings);
         return path;

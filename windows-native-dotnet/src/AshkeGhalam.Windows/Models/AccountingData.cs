@@ -96,7 +96,7 @@ public sealed class AccountingData
             }).ToList(),
             Subtotal=i.Subtotal, TaxRatePercent=i.TaxRatePercent, TaxAmount=i.TaxAmount, TaxIsAmount=i.TaxIsAmount,
             Discount=i.Discount, Total=i.Total, CashAmount=i.CashAmount, CheckAmount=i.CheckAmount,
-            CreatedAt=i.CreatedAt, DueDate=i.DueDate, Notes=i.Notes, Status=i.Status,
+            CreatedAt=i.CreatedAt, DueDate=i.DueDate, Notes=i.Notes, InvoiceFooter=i.InvoiceFooter, Status=i.Status,
             DriverName=i.DriverName, DriverPhone=i.DriverPhone, VehiclePlate=i.VehiclePlate,
             TaxId=i.TaxId, ShowPreviousBalance=i.ShowPreviousBalance
         }).ToList(),
@@ -304,6 +304,7 @@ public sealed class InvoiceRecord
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.Now;
     public DateTimeOffset? DueDate { get; set; }
     public string Notes { get; set; } = "";
+    public string InvoiceFooter { get; set; } = "";
     public string Status { get; set; } = "صادر شده";
     public string DriverName { get; set; } = "";
     public string DriverPhone { get; set; } = "";
@@ -482,6 +483,7 @@ public sealed class InvoiceDraft
     public decimal CashAmount { get; init; }
     public string Description { get; init; } = "";
     public string Notes { get; init; } = "";
+    public string InvoiceFooter { get; init; } = "";
     public string DriverName { get; init; } = "";
     public string DriverPhone { get; init; } = "";
     public string VehiclePlate { get; init; } = "";
@@ -627,6 +629,7 @@ public static class AccountingOperations
             CreatedAt = createdAt,
             DueDate = draft.DueDate,
             Notes = draft.Notes.Trim(),
+            InvoiceFooter = draft.InvoiceFooter.Trim(),
             DriverName = draft.DriverName.Trim(),
             DriverPhone = draft.DriverPhone.Trim(),
             VehiclePlate = draft.VehiclePlate.Trim(),

@@ -33,6 +33,8 @@ public static class NumericTextBoxFormatter
         if (States.TryGetValue(textBox, out _)) return;
         var state = new FormatState();
         States.Add(textBox, state);
+        textBox.FlowDirection = System.Windows.FlowDirection.LeftToRight;
+        textBox.HorizontalContentAlignment = System.Windows.HorizontalAlignment.Right;
         textBox.TextChanged += (_, _) => FormatLive(textBox, state);
         textBox.LostKeyboardFocus += (_, _) => Normalize(textBox, state);
     }
