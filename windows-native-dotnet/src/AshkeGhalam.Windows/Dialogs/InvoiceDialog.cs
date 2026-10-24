@@ -951,9 +951,21 @@ public sealed class InvoiceDialog : Window
         });
         details.SetValue(TextBlock.FontSizeProperty, 11d);
         details.SetValue(TextBlock.FontWeightProperty, FontWeights.Medium);
-        // Inherit the theme-aware ComboBoxItem foreground so code text remains readable in dark mode.
+
+        var phone = new FrameworkElementFactory(typeof(TextBlock));
+        phone.SetBinding(TextBlock.TextProperty, new Binding(nameof(CustomerRecord.Phone))
+        {
+            StringFormat = "تلفن: {0}"
+        });
+        phone.SetValue(TextBlock.FontSizeProperty, 10d);
+        phone.SetValue(TextBlock.OpacityProperty, 0.88d);
+        phone.SetValue(TextBlock.TextTrimmingProperty, TextTrimming.CharacterEllipsis);
+
+        // Inherit the theme-aware ComboBoxItem foreground so party details remain readable
+        // in both themes. The selected party's live ledger balance is shown below the field.
         panel.AppendChild(name);
         panel.AppendChild(details);
+        panel.AppendChild(phone);
         return new DataTemplate(typeof(CustomerRecord)) { VisualTree = panel };
     }
 
