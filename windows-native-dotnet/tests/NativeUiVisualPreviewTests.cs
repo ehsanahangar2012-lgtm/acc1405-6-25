@@ -180,6 +180,36 @@ public sealed class NativeUiVisualPreviewTests
                     new("1405/08/02", "حواله خروج", "VCH-0042", "تحویل نمونه", 0, 12, 228)
                 };
 
+                var previewData = new AccountingData
+                {
+                    Customers = people,
+                    Products = products,
+                    Invoices = invoices,
+                    Payments = [samplePayment],
+                    Expenses =
+                    [
+                        new ExpenseRecord
+                        {
+                            Id = "ui-expense-001",
+                            Title = "هزینه حمل نمونه",
+                            Category = "حمل‌ونقل",
+                            Amount = 630000,
+                            Notes = "هزینهٔ نمایشی"
+                        }
+                    ],
+                    Checks = [sampleCheck],
+                    Vouchers = [sampleVoucher],
+                    Companies = [company],
+                    ActiveCompanyId = company.Id,
+                    Preferences = new AccountingPreferences
+                    {
+                        ApplicationTheme = "light",
+                        InvoiceTheme = "modern",
+                        Currency = "RIAL",
+                        ShowInvoiceQr = true
+                    }
+                };
+
                 foreach (var theme in new[] { "light", "dark" })
                 {
                     currentStage = $"dashboard ({theme})";
@@ -187,6 +217,11 @@ public sealed class NativeUiVisualPreviewTests
                     var themeOverrideField = typeof(MainWindow).GetField(
                         "_themePreviewOverride", BindingFlags.Instance | BindingFlags.NonPublic);
                     themeOverrideField?.SetValue(dashboard, theme);
+                    var previewDataField = typeof(MainWindow).GetField(
+                        "_data", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (previewDataField is null)
+                        throw new InvalidOperationException("MainWindow preview data field was not found.");
+                    previewDataField.SetValue(dashboard, previewData);
                     if (dashboard.FindName("ApplicationThemeSelector") is ComboBox themeSelector)
                     {
                         themeSelector.SelectedItem = themeSelector.Items.OfType<ComboBoxItem>()
@@ -214,6 +249,11 @@ public sealed class NativeUiVisualPreviewTests
                         dashboard.Loaded -= startupHandler;
                     }
                     dashboard.Show();
+                    var refreshPreviewData = typeof(MainWindow).GetMethod(
+                        "RefreshAll", BindingFlags.Instance | BindingFlags.NonPublic);
+                    if (refreshPreviewData is null)
+                        throw new InvalidOperationException("MainWindow preview refresh method was not found.");
+                    refreshPreviewData.Invoke(dashboard, null);
                     ApplicationThemeService.Apply(dashboard, theme);
                     var navigationSelection = typeof(MainWindow).GetMethod(
                         "UpdateNavigationSelection", BindingFlags.Instance | BindingFlags.NonPublic);
@@ -224,11 +264,37 @@ public sealed class NativeUiVisualPreviewTests
                         new Action(dashboard.UpdateLayout));
                     SaveContent(dashboard, outputDirectory, $"dashboard-{theme}.png");
 
-                    currentStage = $"about page ({theme})";
                     var mainTabs = dashboard.FindName("MainTabs") as TabControl;
-                    var aboutTab = mainTabs?.Items.OfType<TabItem>()
+                    if (mainTabs is null)
+                        throw new InvalidOperationException("Main tabs were not found for table captures.");
+                    var tablePages = new[]
+                    {
+                        (Header: "مشتریان", NavigationKey: "customers", FileStem: "main-customers-table"),
+                        (Header: "کالا و انبار", NavigationKey: "inventory", FileStem: "main-products-table"),
+                        (Header: "فاکتورهای فروش/خرید", NavigationKey: "invoices", FileStem: "main-invoices-table"),
+                        (Header: "دریافت‌ها", NavigationKey: "payments", FileStem: "main-payments-table"),
+                        (Header: "مدیریت چک", NavigationKey: "checks", FileStem: "main-checks-table"),
+                        (Header: "حواله‌های انبار", NavigationKey: "vouchers", FileStem: "main-vouchers-table")
+                    };
+                    foreach (var tablePage in tablePages)
+                    {
+                        currentStage = $"{tablePage.FileStem} ({theme})";
+                        var tableTab = mainTabs.Items.OfType<TabItem>()
+                            .FirstOrDefault(tab => string.Equals(tab.Header?.ToString(), tablePage.Header, StringComparison.Ordinal));
+                        if (tableTab is null)
+                            throw new InvalidOperationException($"Table page was not found: {tablePage.Header}");
+                        mainTabs.SelectedItem = tableTab;
+                        SetText(dashboard, "CurrentModuleText", tablePage.Header + " • بازبینی رابط");
+                        navigationSelection.Invoke(dashboard, new object?[] { tablePage.NavigationKey, theme });
+                        dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                            new Action(dashboard.UpdateLayout));
+                        SaveContent(dashboard, outputDirectory, $"{tablePage.FileStem}-{theme}.png");
+                    }
+
+                    currentStage = $"about page ({theme})";
+                    var aboutTab = mainTabs.Items.OfType<TabItem>()
                         .FirstOrDefault(tab => string.Equals(tab.Header?.ToString(), "معرفی نرم‌افزار", StringComparison.Ordinal));
-                    if (mainTabs is null || aboutTab is null)
+                    if (aboutTab is null)
                         throw new InvalidOperationException("About page tab was not found for UI capture.");
                     mainTabs.SelectedItem = aboutTab;
                     dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
@@ -377,7 +443,7 @@ public sealed class NativeUiVisualPreviewTests
 
                 owner.Close();
                 var capturedImages = Directory.GetFiles(outputDirectory, "*.png");
-                Assert.AreEqual(42, capturedImages.Length, "Expected dashboard, About top/details, people table, person, product, expense, payment, check, invoice, voucher, and standard+narrow print previews for both themes.");
+                Assert.AreEqual(54, capturedImages.Length, "Expected dashboard, six real operational tables, About top/details, sample forms, and standard+narrow print previews for both themes.");
             }
             catch (Exception ex)
             {
