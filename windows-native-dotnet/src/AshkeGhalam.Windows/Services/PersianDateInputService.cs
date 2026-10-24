@@ -66,15 +66,7 @@ public static class PersianDateInputService
         input.ToolTip=string.IsNullOrWhiteSpace(input.ToolTip?.ToString())
             ? "تاریخ شمسی. با دکمهٔ تقویم یا Ctrl+Space انتخاب کنید؛ امروز، فردا و دیروز هم پذیرفته می‌شوند."
             : input.ToolTip;
-        var button=new Button
-        {
-            Content="▦", Width=40, Height=Math.Max(32,input.Height), Margin=new Thickness(6,0,0,4),
-            ToolTip="تقویم شمسی (Ctrl+Space)", FontSize=16,
-            Background=new SolidColorBrush(Color.FromRgb(236,253,250)),
-            Foreground=new SolidColorBrush(Color.FromRgb(15,118,110)),
-            BorderBrush=new SolidColorBrush(Color.FromRgb(153,246,228))
-        };
-        button.Click+=(_,_)=>OpenPicker(input);
+        var button = CreateCalendarButton(input);
         var row=new DockPanel { FlowDirection=FlowDirection.RightToLeft, LastChildFill=true };
         DockPanel.SetDock(button,Dock.Right); row.Children.Add(button); row.Children.Add(input);
         return row;
@@ -107,14 +99,15 @@ public static class PersianDateInputService
     }
 
     /// <summary>
-    /// Adds the Persian calendar affordance to form inputs that follow a visible date label.
-    /// This covers hand-built dialogs whose text boxes don't carry XAML names.
-    /// Existing explicit date-field configuration always wins.
+    /// Adds a visible Persian calendar button and keyboard/context-menu shortcuts to inputs
+    /// that immediately follow a date label. Existing explicit date-field configuration wins.
     /// </summary>
     public static void AttachDateFieldsByLabels(DependencyObject root)
     {
         ArgumentNullException.ThrowIfNull(root);
-        foreach (var panel in EnumerateTree(root).OfType<Panel>())
+        // Snapshot panels before wrapping fields: a newly-created DockPanel must not alter
+        // the tree while the enumeration is being advanced.
+        foreach (var panel in EnumerateTree(root).OfType<Panel>().ToList())
         {
             for (var index = 0; index + 1 < panel.Children.Count; index++)
             {
@@ -123,7 +116,8 @@ public static class PersianDateInputService
                     !label.Text.Contains("تاریخ", StringComparison.CurrentCultureIgnoreCase))
                     continue;
 
-                var candidates = EnumerateTree(panel.Children[index + 1]).OfType<TextBox>().Distinct().ToList();
+                var container = panel.Children[index + 1];
+                var candidates = EnumerateTree(container).OfType<TextBox>().Distinct().ToList();
                 if (candidates.Count != 1)
                     continue;
 
@@ -131,9 +125,52 @@ public static class PersianDateInputService
                 if (Inputs.TryGetValue(input, out _))
                     continue;
 
-                Attach(input, label.Text.Contains("اختیاری", StringComparison.CurrentCultureIgnoreCase));
+                var optional = label.Text.Contains("اختیاری", StringComparison.CurrentCultureIgnoreCase);
+                if (ReferenceEquals(container, input))
+                {
+                    // Detach before adding the TextBox to its new row; WPF elements can
+                    // only have one parent.
+                    panel.Children.RemoveAt(index + 1);
+                    panel.Children.Insert(index + 1, CreateDateField(input, optional));
+                    index++;
+                    continue;
+                }
+
+                if (container is DockPanel row && row.Children.Count == 1 &&
+                    ReferenceEquals(row.Children[0], input))
+                {
+                    Attach(input, optional);
+                    var button = CreateCalendarButton(input);
+                    DockPanel.SetDock(button, Dock.Right);
+                    row.Children.Insert(0, button);
+                    continue;
+                }
+
+                // Unusual custom layouts keep their existing arrangement but receive shortcuts.
+                Attach(input, optional);
             }
         }
+    }
+
+    private static Button CreateCalendarButton(TextBox input)
+    {
+        var button = new Button
+        {
+            Content = "▦",
+            Width = 40,
+            Height = Math.Max(32, input.Height),
+            MinHeight = 34,
+            Margin = new Thickness(6, 0, 0, 4),
+            ToolTip = "انتخاب از تقویم شمسی (Ctrl+Space یا F4)",
+            FontSize = 16,
+            Padding = new Thickness(4, 0, 4, 0),
+            Background = new SolidColorBrush(Color.FromRgb(236, 253, 250)),
+            Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(153, 246, 228)),
+            VerticalContentAlignment = VerticalAlignment.Center
+        };
+        button.Click += (_, _) => OpenPicker(input);
+        return button;
     }
 
     private static IEnumerable<DependencyObject> EnumerateTree(DependencyObject root)

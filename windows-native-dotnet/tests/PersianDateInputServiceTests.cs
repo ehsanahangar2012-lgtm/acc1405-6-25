@@ -38,6 +38,10 @@ public sealed class PersianDateInputServiceTests
 
                 Assert.IsNotNull(requiredInput.ContextMenu, "Required date fields should get date shortcuts.");
                 Assert.IsNotNull(optionalInput.ContextMenu, "Optional date fields should get date shortcuts.");
+                Assert.IsTrue(requiredRow.Children.OfType<Button>().Any(),
+                    "A date-labeled row should show a visible calendar button.");
+                Assert.IsTrue(optionalRow.Children.OfType<Button>().Any(),
+                    "An optional date-labeled row should show a visible calendar button.");
                 Assert.AreEqual(5, requiredInput.ContextMenu.Items.Count,
                     "Required date fields should offer relative dates and the calendar, but not clear.");
                 Assert.AreEqual(6, optionalInput.ContextMenu.Items.Count,
