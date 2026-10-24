@@ -1261,18 +1261,21 @@ public static class ApplicationThemeService
     private static Style CreateModernTextBoxStyle(bool isDark)
     {
         var style = new Style(typeof(TextBox));
-        style.Setters.Add(new Setter(Control.BackgroundProperty, Brush(isDark ? "#111827" : "#FFFFFF")));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brush(isDark ? "#142338" : "#FFFFFF")));
         style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F5F8FB" : "#172D3D")));
-        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush(isDark ? "#475569" : "#CBD5E1")));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush(isDark ? "#3A526A" : "#D5E0E6")));
         style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
         style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(9, 6, 9, 6)));
         style.Setters.Add(new Setter(Control.MinHeightProperty, 36d));
         style.Setters.Add(new Setter(Control.FontSizeProperty, 13d));
         style.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+        style.Setters.Add(new Setter(TextBox.TextAlignmentProperty, TextAlignment.Right));
+        style.Setters.Add(new Setter(FrameworkElement.FlowDirectionProperty, FlowDirection.RightToLeft));
+        style.Setters.Add(new Setter(TextBox.CaretBrushProperty, Brush(isDark ? "#F5F8FB" : "#172D3D")));
 
         var template = new ControlTemplate(typeof(TextBox));
         var surface = new FrameworkElementFactory(typeof(Border), "Surface");
-        surface.SetValue(Border.CornerRadiusProperty, new CornerRadius(7));
+        surface.SetValue(Border.CornerRadiusProperty, new CornerRadius(9));
         surface.SetBinding(Border.BackgroundProperty, new Binding(nameof(Control.Background))
         {
             RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
