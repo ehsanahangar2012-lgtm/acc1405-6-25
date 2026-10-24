@@ -27,12 +27,16 @@ public sealed class LocalDataStore
     {
         if (!File.Exists(_filePath))
             return new AccountingData();
+
+        byte[]? encrypted = null;
+        byte[]? json = null;
         try
         {
-            var encrypted = File.ReadAllBytes(_filePath);
+            encrypted = File.ReadAllBytes(_filePath);
             if (encrypted.Length == 0 || encrypted.Length > 100 * 1024 * 1024)
                 throw new InvalidDataException("حجم فایل دادهٔ محلی معتبر نیست.");
-            var json = ProtectedData.Unprotect(encrypted, Entropy, DataProtectionScope.CurrentUser);
+
+            json = ProtectedData.Unprotect(encrypted, Entropy, DataProtectionScope.CurrentUser);
             var data = JsonSerializer.Deserialize<AccountingData>(json);
             return AccountingDataValidator.Validate(data);
         }
@@ -42,19 +46,28 @@ public sealed class LocalDataStore
                 "فایل دادهٔ محلی خوانده یا تأیید نشد. برای جلوگیری از بازنویسی ناخواسته، ثبت اطلاعات غیرفعال شد؛ از بخش بازیابی، یک بک‌آپ معتبر بازیابی کنید.",
                 ex);
         }
+        finally
+        {
+            if (encrypted is not null)
+                CryptographicOperations.ZeroMemory(encrypted);
+            if (json is not null)
+                CryptographicOperations.ZeroMemory(json);
+        }
     }
 
     public void Save(AccountingData data)
     {
         AccountingDataValidator.Validate(data);
         var json = JsonSerializer.SerializeToUtf8Bytes(data, JsonOptions);
-        var encrypted = ProtectedData.Protect(json, Entropy, DataProtectionScope.CurrentUser);
-        var directory = Path.GetDirectoryName(_filePath)
-            ?? throw new InvalidOperationException("مسیر ذخیره‌سازی محلی معتبر نیست.");
-        Directory.CreateDirectory(directory);
+        byte[]? encrypted = null;
         var temp = _filePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
+            encrypted = ProtectedData.Protect(json, Entropy, DataProtectionScope.CurrentUser);
+            var directory = Path.GetDirectoryName(_filePath)
+                ?? throw new InvalidOperationException("مسیر ذخیره‌سازی محلی معتبر نیست.");
+            Directory.CreateDirectory(directory);
+
             using (var stream = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 64 * 1024, FileOptions.WriteThrough))
             {
                 stream.Write(encrypted, 0, encrypted.Length);
@@ -64,7 +77,11 @@ public sealed class LocalDataStore
         }
         finally
         {
+            CryptographicOperations.ZeroMemory(json);
+            if (encrypted is not null)
+                CryptographicOperations.ZeroMemory(encrypted);
             if (File.Exists(temp)) File.Delete(temp);
         }
     }
+
 }
