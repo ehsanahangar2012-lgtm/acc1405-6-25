@@ -103,7 +103,7 @@ public sealed class ProductKardexPrintPreviewWindow : Window
         foreach (var width in new[] { 1.0, 1.25, 1.2, 2.5, 1.05, 1.05, 1.15 })
             table.Columns.Add(new TableColumn { Width = new GridLength(width, GridUnitType.Star) });
 
-        var headerGroup = new TableRowGroup { IsHeader = true };
+        var headerGroup = new TableRowGroup();
         var header = new TableRow
         {
             Background = accent,
