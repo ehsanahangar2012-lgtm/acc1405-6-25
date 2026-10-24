@@ -195,25 +195,35 @@ public sealed class NativeUiVisualPreviewTests
         if (window.Content is not FrameworkElement content)
             throw new InvalidOperationException($"{window.GetType().Name} has no renderable content.");
 
-        // Render the window's actual background as a surface behind its content.
-        // Rendering Content directly makes transparent areas opaque black in PNG output,
-        // which can falsely suggest that the light theme has lost its background.
-        var renderSurface = new Border
-        {
-            Background = window.Background ?? Brushes.Transparent,
-            Child = content,
-            SnapsToDevicePixels = true
-        };
-        var size = new Size(width, height);
-        renderSurface.Measure(size);
-        renderSurface.Arrange(new Rect(0, 0, width, height));
-        renderSurface.UpdateLayout();
+        // A transparent root Grid is rendered as black by RenderTargetBitmap when the
+        // Window itself is not rendered. Temporarily apply the window surface to that root
+        // panel instead of re-parenting Window.Content, which would violate WPF ownership.
+        var panel = content as Panel;
+        var originalBackground = panel?.Background;
+        var appliedWindowBackground = panel is not null &&
+            (originalBackground is null ||
+             originalBackground is SolidColorBrush { Color.A: 0 });
+        if (appliedWindowBackground)
+            panel!.Background = window.Background ?? Brushes.Transparent;
 
-        var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(renderSurface);
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var stream = File.Create(Path.Combine(folder, fileName));
-        encoder.Save(stream);
+        try
+        {
+            var size = new Size(width, height);
+            content.Measure(size);
+            content.Arrange(new Rect(0, 0, width, height));
+            content.UpdateLayout();
+
+            var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(content);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using var stream = File.Create(Path.Combine(folder, fileName));
+            encoder.Save(stream);
+        }
+        finally
+        {
+            if (appliedWindowBackground)
+                panel!.Background = originalBackground;
+        }
     }
 }
