@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using AshkeGhalam.Windows.Models;
@@ -272,6 +273,8 @@ public sealed class VoucherDialog : Window
         Content = layout;
 
         _person.SelectionChanged += (_, _) => RefreshInvoiceChoices();
+        _person.AddHandler(TextBoxBase.TextChangedEvent,
+            new TextChangedEventHandler((_, _) => UpdatePersonHint()), handledEventsToo: true);
         _type.SelectionChanged += (_, _) => SetDefaultMovement();
         _movementType.SelectionChanged += (_, _) => RefreshInvoiceChoices();
         _lines.CollectionChanged += (_, _) => RefreshTotals();
@@ -422,20 +425,30 @@ public sealed class VoucherDialog : Window
         };
     }
 
-    private void RefreshInvoiceChoices()
+    private void UpdatePersonHint()
     {
-        var person = _person.SelectedItem as CustomerRecord;
-        if (person is null)
-        {
-            _personHint.Text = "با انتخاب شخص، کد، تلفن و نقش حسابداری او نمایش داده می‌شود.";
-        }
-        else
+        if (_person.SelectedItem is CustomerRecord person)
         {
             var code = string.IsNullOrWhiteSpace(person.Code) ? "بدون کد" : person.Code.Trim();
             var phone = string.IsNullOrWhiteSpace(person.Phone) ? "تلفن ثبت نشده" : person.Phone.Trim();
             _personHint.Text = $"{person.Name}  •  کد: {code}  •  {phone}  •  نقش: {person.RoleLabel}";
+            ApplicationThemeService.SetReadableForeground(_personHint, Color.FromRgb(15, 118, 110));
+            return;
         }
 
+        var query = (_person.Text ?? "").Trim();
+        _personHint.Text = query.Length > 0
+            ? $"برای «{query}» جست‌وجو شد؛ یک شخص را از نتایج انتخاب کنید. تایپ متن به‌تنهایی انتخاب محسوب نمی‌شود."
+            : "با انتخاب شخص، کد، تلفن و نقش حسابداری او نمایش داده می‌شود.";
+        ApplicationThemeService.SetReadableForeground(_personHint, query.Length > 0
+            ? Color.FromRgb(15, 118, 110)
+            : Color.FromRgb(71, 85, 105));
+    }
+
+    private void RefreshInvoiceChoices()
+    {
+        UpdatePersonHint();
+        var person = _person.SelectedItem as CustomerRecord;
         var movementType = (_movementType.SelectedItem as Choice)?.Value;
         var requiredInvoiceType = RequiredInvoiceTypeForMovement(movementType);
         var choices = new List<InvoiceChoice> { new(null, "بدون فاکتور مرتبط") };

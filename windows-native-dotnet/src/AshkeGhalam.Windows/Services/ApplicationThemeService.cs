@@ -78,6 +78,7 @@ public static class ApplicationThemeService
     {
         ArgumentNullException.ThrowIfNull(window);
         ApplyDialogPresentation(window);
+        PersianDateInputService.AttachDateFieldsByLabels(window);
         var isDark = Normalize(theme) == DarkTheme;
         var elements = EnumerateTree(window).ToList();
 

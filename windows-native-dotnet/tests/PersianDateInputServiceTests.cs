@@ -1,5 +1,8 @@
 using System;
 using System.Globalization;
+using System.Threading;
+using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using AshkeGhalam.Windows.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -9,6 +12,52 @@ namespace AshkeGhalam.Windows.Tests;
 [TestClass]
 public sealed class PersianDateInputServiceTests
 {
+    [TestMethod]
+    public void DateLabeledFieldsReceiveCalendarAndOptionalClearInGenericWindows()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var requiredInput = new TextBox();
+                var requiredRow = new DockPanel();
+                requiredRow.Children.Add(requiredInput);
+                var optionalInput = new TextBox();
+                var optionalRow = new DockPanel();
+                optionalRow.Children.Add(optionalInput);
+
+                var root = new StackPanel();
+                root.Children.Add(new TextBlock { Text = "تاریخ سند" });
+                root.Children.Add(requiredRow);
+                root.Children.Add(new TextBlock { Text = "تاریخ سررسید (اختیاری)" });
+                root.Children.Add(optionalRow);
+                var window = new Window { Content = root };
+
+                PersianDateInputService.AttachDateFieldsByLabels(window);
+
+                Assert.IsNotNull(requiredInput.ContextMenu, "Required date fields should get date shortcuts.");
+                Assert.IsNotNull(optionalInput.ContextMenu, "Optional date fields should get date shortcuts.");
+                Assert.AreEqual(5, requiredInput.ContextMenu.Items.Count,
+                    "Required date fields should offer relative dates and the calendar, but not clear.");
+                Assert.AreEqual(6, optionalInput.ContextMenu.Items.Count,
+                    "Optional date fields should also offer a clear-date action.");
+                StringAssert.Contains(requiredInput.ToolTip?.ToString() ?? "", "تقویم");
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+            throw new AssertFailedException("Automatic date-field enhancement failed on an STA thread.", failure);
+    }
+
     [TestMethod]
     public void ParsesPersianDigitsAndNormalizesSingleDigitParts()
     {

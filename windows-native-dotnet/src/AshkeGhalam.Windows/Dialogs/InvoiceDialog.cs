@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Data;
@@ -348,6 +349,8 @@ public sealed class InvoiceDialog : Window
         };
         _person.SelectionChanged += (_, _) => { RefreshTotals(); UpdatePartyHint(); };
         _person.DropDownClosed += (_, _) => UpdatePartyHint();
+        _person.AddHandler(TextBoxBase.TextChangedEvent,
+            new TextChangedEventHandler((_, _) => UpdatePartyHint()), handledEventsToo: true);
         _product.SelectionChanged += (_, _) => ApplyDefaultPrice();
         _discount.TextChanged += (_, _) => RefreshTotals();
         _tax.TextChanged += (_, _) => RefreshTotals();

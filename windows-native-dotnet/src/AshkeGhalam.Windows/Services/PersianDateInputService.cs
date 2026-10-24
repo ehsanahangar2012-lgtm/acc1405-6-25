@@ -104,6 +104,67 @@ public static class PersianDateInputService
         };
     }
 
+    /// <summary>
+    /// Adds the Persian calendar affordance to form inputs that follow a visible date label.
+    /// This covers hand-built dialogs whose text boxes don't carry XAML names.
+    /// Existing explicit date-field configuration always wins.
+    /// </summary>
+    public static void AttachDateFieldsByLabels(DependencyObject root)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        foreach (var panel in EnumerateTree(root).OfType<Panel>())
+        {
+            for (var index = 0; index + 1 < panel.Children.Count; index++)
+            {
+                if (panel.Children[index] is not TextBlock label ||
+                    string.IsNullOrWhiteSpace(label.Text) ||
+                    !label.Text.Contains("تاریخ", StringComparison.CurrentCultureIgnoreCase))
+                    continue;
+
+                var candidates = EnumerateTree(panel.Children[index + 1]).OfType<TextBox>().Distinct().ToList();
+                if (candidates.Count != 1)
+                    continue;
+
+                var input = candidates[0];
+                if (Inputs.TryGetValue(input, out _))
+                    continue;
+
+                Attach(input, label.Text.Contains("اختیاری", StringComparison.CurrentCultureIgnoreCase));
+            }
+        }
+    }
+
+    private static IEnumerable<DependencyObject> EnumerateTree(DependencyObject root)
+    {
+        var visited = new HashSet<DependencyObject>(ReferenceEqualityComparer.Instance);
+        var stack = new Stack<DependencyObject>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (!visited.Add(current))
+                continue;
+
+            yield return current;
+            try
+            {
+                foreach (var child in LogicalTreeHelper.GetChildren(current).OfType<DependencyObject>())
+                    stack.Push(child);
+            }
+            catch (InvalidOperationException) { }
+
+            if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+            {
+                try
+                {
+                    for (var index = 0; index < VisualTreeHelper.GetChildrenCount(current); index++)
+                        stack.Push(VisualTreeHelper.GetChild(current, index));
+                }
+                catch (InvalidOperationException) { }
+            }
+        }
+    }
+
     public static void AttachNamedDateFields(DependencyObject root)
     {
         var visited=new HashSet<DependencyObject>(ReferenceEqualityComparer.Instance);
