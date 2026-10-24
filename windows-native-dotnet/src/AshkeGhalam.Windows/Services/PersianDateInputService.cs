@@ -141,6 +141,7 @@ public static class PersianDateInputService
         var initial=TryParse(input.Text,out var value)?value:DateTimeOffset.Now;
         var state=Inputs.TryGetValue(input,out var existing)?existing:new State();
         var picker=new PersianDatePickerWindow(owner,initial,state.Optional);
+        ApplicationThemeService.ApplyWhenLoaded(picker, ApplicationThemeService.DetectTheme(owner));
         if(picker.ShowDialog()!=true)return;
         input.Text=picker.SelectedDate is DateTimeOffset chosen?Format(chosen):"";
         input.Focus(); input.CaretIndex=input.Text.Length;

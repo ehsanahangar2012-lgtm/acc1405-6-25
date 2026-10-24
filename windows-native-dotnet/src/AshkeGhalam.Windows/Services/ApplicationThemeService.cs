@@ -30,6 +30,17 @@ public static class ApplicationThemeService
     public static string Normalize(string? theme) =>
         string.Equals(theme, DarkTheme, StringComparison.OrdinalIgnoreCase) ? DarkTheme : LightTheme;
 
+    /// <summary>Resolve the palette for pop-up windows from the owning window's current surface.</summary>
+    public static string DetectTheme(Window? reference)
+    {
+        var background = (reference?.Background as SolidColorBrush)?.Color;
+        return DetectThemeFromBackground(background);
+    }
+
+    /// <summary>A pure brightness-based resolver so dark/light palette selection can be unit-tested.</summary>
+    public static string DetectThemeFromBackground(Color? background) =>
+        background is Color color && Brightness(color) < 0.32 ? DarkTheme : LightTheme;
+
     public static void ApplyWhenLoaded(Window window, string? theme)
     {
         ArgumentNullException.ThrowIfNull(window);

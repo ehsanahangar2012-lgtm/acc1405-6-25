@@ -4383,6 +4383,75 @@ public partial class MainWindow : Window
             ? (company?.Name ?? "در تنظیمات شرکت ثبت نشده") : company.LegalName;
         AboutCompanyPhone.Text = string.IsNullOrWhiteSpace(company?.Phone) ? "در تنظیمات شرکت ثبت نشده" : company.Phone;
         AboutCompanyAddress.Text = string.IsNullOrWhiteSpace(company?.Address) ? "در تنظیمات شرکت ثبت نشده" : company.Address;
+        var version = typeof(MainWindow).Assembly.GetName().Version;
+        AboutVersionText.Text = "نسخهٔ " + (version?.ToString(3) ?? "نامشخص");
+    }
+
+    private void GuideSearch_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (GuideSearchResultText is null || GuideSearchBox is null) return;
+        var query = GuideSearchBox.Text.Trim().Replace('\u200c', ' ');
+        var sections = new[]
+        {
+            GuideSetupSection, GuideInvoiceSection, GuideVoucherSection,
+            GuidePaymentSection, GuideReportsSection, GuideBackupSection,
+            GuideDebitCreditSection, GuideProfitCashSection, GuideTroubleshootingSection
+        };
+        var visibleCount = 0;
+        foreach (var section in sections)
+        {
+            var matches = query.Length == 0 || GuideContentContains(section, query);
+            section.Visibility = matches ? Visibility.Visible : Visibility.Collapsed;
+            if (matches) visibleCount++;
+        }
+
+        GuideSearchResultText.Text = query.Length == 0
+            ? "نمایش همهٔ موضوعات"
+            : visibleCount == 0
+                ? "نتیجه‌ای پیدا نشد"
+                : string.Format(CultureInfo.GetCultureInfo("fa-IR"), "موضوع‌های مرتبط: {0:N0}", visibleCount);
+    }
+
+    private static bool GuideContentContains(DependencyObject root, string query)
+    {
+        var visited = new HashSet<DependencyObject>(ReferenceEqualityComparer.Instance);
+        var stack = new Stack<DependencyObject>();
+        stack.Push(root);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            if (!visited.Add(current)) continue;
+
+            var text = current switch
+            {
+                TextBlock block => block.Text,
+                TextBox box => box.Text,
+                HeaderedContentControl header => header.Header?.ToString(),
+                ContentControl control => control.Content?.ToString(),
+                _ => null
+            };
+            if (!string.IsNullOrEmpty(text) &&
+                text.Replace('\u200c', ' ').Contains(query, StringComparison.CurrentCultureIgnoreCase))
+                return true;
+
+            try
+            {
+                foreach (var child in LogicalTreeHelper.GetChildren(current).OfType<DependencyObject>())
+                    stack.Push(child);
+            }
+            catch (InvalidOperationException) { }
+
+            if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+            {
+                try
+                {
+                    for (var index = 0; index < VisualTreeHelper.GetChildrenCount(current); index++)
+                        stack.Push(VisualTreeHelper.GetChild(current, index));
+                }
+                catch (InvalidOperationException) { }
+            }
+        }
+        return false;
     }
 
     private void OpenCompanyWebsite_Click(object sender, RoutedEventArgs e)

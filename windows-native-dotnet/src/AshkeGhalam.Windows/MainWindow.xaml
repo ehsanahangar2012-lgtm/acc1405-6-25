@@ -1322,6 +1322,7 @@
                                 <StackPanel>
                                     <TextBlock Text="دربارهٔ نسخهٔ ویندوز" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
                                     <TextBlock Text="پلتفرم: C# / .NET 10 / WPF" FontSize="13" Foreground="#1E293B" Margin="0,12,0,4"/>
+                                    <TextBlock x:Name="AboutVersionText" Text="نسخهٔ برنامه" FontSize="12" Foreground="#475569" Margin="0,0,0,4"/>
                                     <TextBlock Text="ذخیره‌سازی محلی رمزگذاری‌شده، پشتیبان رمزگذاری‌شده و ابزار همگام‌سازی دستی در این نسخه قرار دارند. همگام‌سازی فقط با لایسنس تأییدشده و انتخاب صریح کاربر انجام می‌شود."
                                                FontSize="12" Foreground="#475569" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                     <TextBlock Text="سامانهٔ مؤدیان در این نسخه برای آماده‌سازی و ذخیرهٔ JSON است؛ ارسال رسمی فعال اعلام نمی‌شود."
@@ -1348,46 +1349,82 @@
                         <TextBlock Text="راهنمای سادهٔ استفاده از نرم‌افزار" FontSize="27" FontWeight="Bold" Foreground="#0F172A"/>
                         <TextBlock Text="برای شروع کار روزمره؛ هر بار پس از ثبت، نتیجه و مانده‌ها را کنترل کنید. در صورت تفاوت نام گزینه‌ها، از منوی اصلی سمت راست وارد بخش مربوط شوید."
                                    FontSize="13" Foreground="#64748B" TextWrapping="Wrap" Margin="0,7,0,18"/>
-                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="10" Margin="0,0,0,18">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="GuideSearchBox" MinHeight="38" Padding="10,6" FontSize="13"
+                                         ToolTip="در عنوان‌ها و متن راهنما جست‌وجو کنید"
+                                         AutomationProperties.Name="جست‌وجو در راهنمای حسابداری"
+                                         TextChanged="GuideSearch_TextChanged"/>
+                                <TextBlock x:Name="GuideSearchResultText" Grid.Column="1" Text="نمایش همهٔ موضوعات"
+                                           VerticalAlignment="Center" Margin="12,0,4,0" Foreground="#64748B"/>
+                            </Grid>
+                        </Border>
+                        <Border x:Name="GuideSetupSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="۱. راه‌اندازی اولیه" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
                                 <TextBlock Text="ابتدا مشخصات شرکت را از تنظیمات شرکت وارد کنید. سپس اشخاص و کالاها را ثبت کنید. قبل از ورود اطلاعات واقعی، یک فایل پشتیبان بسازید و امکان بازیابی آن را بررسی کنید."
                                            TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
-                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                        <Border x:Name="GuideInvoiceSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="۲. ثبت فروش و خرید" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
                                 <TextBlock Text="در فاکتورها نوع سند را انتخاب کنید. نام مشتری یا تأمین‌کننده را تایپ کنید تا جست‌وجو شود؛ تاریخ را با دکمهٔ تقویم، Ctrl+Space یا عبارت‌های امروز/فردا/دیروز تعیین کنید. کالا، تعداد، قیمت و شرح هر قلم را وارد کنید. پیش‌نمایش را بررسی و بعد ذخیره کنید."
                                            TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
-                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                        <Border x:Name="GuideVoucherSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="۳. انبار و حواله" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
                                 <TextBlock Text="برای ورود، خروج یا برگشت کالا از حواله‌های انبار استفاده کنید. نوع گردش را با دقت انتخاب کنید؛ حوالهٔ ثبت‌شده موجودی محلی را تغییر می‌دهد. پیش‌نمایش را از نظر نام کالا، تعداد، واحد و شرح کنترل کنید."
                                            TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
-                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                        <Border x:Name="GuidePaymentSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="۴. دریافت، پرداخت و چک" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
                                 <TextBlock Text="برای هر دریافت یا پرداخت، طرف حساب، مبلغ، روش و مرجع را درست ثبت کنید. تصویر چک را به رکورد مربوط پیوست کنید. وضعیت چک (در انتظار، واگذار، پاس یا برگشت) را تنها بر اساس اطلاعات واقعی به‌روزرسانی کنید؛ ثبت محلی به‌تنهایی به معنی تأیید بانک نیست."
                                            TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
-                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                        <Border x:Name="GuideReportsSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="۵. گزارش‌ها و کنترل حساب‌ها" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
                                 <TextBlock Text="گزارش اشخاص، گردش انبار، دفتر و جریان نقدینگی را مرتب بررسی کنید. در حسابداری دوبل، سند باید تراز باشد. تطبیق بانکی بدون واردکردن صورت‌حساب واقعی، فقط یک بررسی محلی محسوب می‌شود."
                                            TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
-                        <Border Background="#FFF7ED" BorderBrush="#FDBA74" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                        <Border x:Name="GuideBackupSection" Background="#FFF7ED" BorderBrush="#FDBA74" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="۶. پشتیبان، بازیابی و همگام‌سازی" FontSize="17" FontWeight="Bold" Foreground="#9A3412"/>
                                 <TextBlock Text="رمز پشتیبان را جدا از رایانه نگه دارید؛ بدون رمز، فایل رمزگذاری‌شده بازیابی نمی‌شود. قبل از بازیابی یا جایگزینی دادهٔ سرور از دادهٔ فعلی نسخهٔ پشتیبان بگیرید. همگام‌سازی کامل و اتصال عملیاتی باید با لایسنس معتبر و فضای کاری واقعی آزمون شود."
                                            TextWrapping="Wrap" Foreground="#7C2D12" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        </Border>
+                        <Border x:Name="GuideDebitCreditSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۷. بدهکار، بستانکار و مانده" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="بدهکار و بستانکار دو سمت ثبت حسابداری‌اند؛ به‌تنهایی به معنی خوب یا بد بودن وضعیت نیستند. برای نمونه، وقتی مشتری بابت فاکتور ۱٬۰۰۰٬۰۰۰ ریال بدهکار می‌شود، ماندهٔ حساب او افزایش می‌یابد؛ با ثبت دریافت واقعی ۴۰۰٬۰۰۰ ریال، ماندهٔ باز ۶۰۰٬۰۰۰ ریال خواهد بود. گزارش دفتر و کاردکس را برای ماندهٔ نهایی بررسی کنید."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuideProfitCashSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۸. سود و زیان و جریان نقدینگی" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="سود و زیان، درآمدها و هزینه‌های دوره را مقایسه می‌کند؛ جریان نقدینگی ورود و خروج پول را نشان می‌دهد. ممکن است فروش ثبت شده باشد اما هنوز پول آن دریافت نشده باشد، بنابراین سود و موجودی نقد یکی نیستند. پیش‌بینی نقدینگی بر اساس اسناد ثبت‌شده است و جای صورت‌حساب واقعی بانک را نمی‌گیرد."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="GuideTroubleshootingSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="۹. خطاهای رایج و راه‌حل" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
+                                <TextBlock Text="اگر تاریخ پذیرفته نشد، آن را از تقویم انتخاب یا با قالب سال/ماه/روز وارد کنید. اگر ثبت فاکتور به‌علت موجودی کافی متوقف شد، موجودی کالا و تعداد را بررسی کنید. اگر پشتیبان باز نشد، رمز همان فایل را کنترل کنید و فایل اصلی را حذف نکنید. در خطای شبکه یا لایسنس، ابتدا اتصال و وضعیت لایسنس را بررسی کنید؛ خطای ارتباطی به معنی ثبت یا همگام‌سازی موفق نیست."
+                                           TextWrapping="Wrap" Foreground="#334155" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
                         <WrapPanel Margin="0,4,0,0">

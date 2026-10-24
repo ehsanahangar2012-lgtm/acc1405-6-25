@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Windows.Media;
 using AshkeGhalam.Windows.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -50,4 +51,31 @@ public sealed class PersianDateInputServiceTests
         var error=Assert.ThrowsException<InvalidOperationException>(()=>PersianDateInputService.Parse("bad","تاریخ فاکتور"));
         StringAssert.Contains(error.Message,"تاریخ فاکتور");
     }
+
+    [TestMethod]
+    public void ParsesZwnjRelativeDatesAndCompactPersianDigits()
+    {
+        Assert.IsTrue(PersianDateInputService.TryParse("  پس‌فردا  ", out var afterTomorrow));
+        Assert.AreEqual(DateTime.Today.AddDays(2), afterTomorrow.LocalDateTime.Date);
+
+        Assert.IsTrue(PersianDateInputService.TryParse("۱۴۰۵۰۷۰۲", out var compact));
+        Assert.AreEqual("1405/07/02", PersianDateInputService.Format(compact));
+    }
+
+    [TestMethod]
+    public void RejectsImpossiblePersianAndGregorianDates()
+    {
+        Assert.IsFalse(PersianDateInputService.TryParse("۱۴۰۵/۱۳/۰۱", out _));
+        Assert.IsFalse(PersianDateInputService.TryParse("2026/02/30", out _));
+        Assert.IsFalse(PersianDateInputService.TryParse("1405/00/01", out _));
+    }
+
+    [TestMethod]
+    public void ThemeDetectionUsesOwnerBackgroundBrightness()
+    {
+        Assert.AreEqual("dark", ApplicationThemeService.DetectThemeFromBackground(Color.FromRgb(11, 18, 32)));
+        Assert.AreEqual("light", ApplicationThemeService.DetectThemeFromBackground(Color.FromRgb(241, 245, 249)));
+        Assert.AreEqual("light", ApplicationThemeService.DetectThemeFromBackground(null));
+    }
+
 }
