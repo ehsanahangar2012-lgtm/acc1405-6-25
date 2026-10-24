@@ -79,12 +79,20 @@ public sealed class ApplicationThemeUiRegressionTests
 
                 ApplicationThemeService.Apply(window, "dark");
                 Assert.AreEqual(Color.FromRgb(11, 18, 32), ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color);
-                Assert.AreEqual(Color.FromRgb(71, 85, 105), ((SolidColorBrush)window.Resources["ScrollThumbBrush"]).Color);
+                var darkThumb = ((SolidColorBrush)window.Resources["ScrollThumbBrush"]).Color;
+Assert.AreEqual(Color.FromRgb(100, 116, 139), darkThumb);
+Assert.IsTrue(ApplicationThemeService.ContrastRatio(
+    ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color, darkThumb) >= 3.0,
+    "Dark-theme scrollbar thumb must have at least 3:1 visual contrast.");
                 Assert.AreEqual(Color.FromRgb(20, 184, 166), ((SolidColorBrush)window.Resources["ScrollThumbHoverBrush"]).Color);
 
                 ApplicationThemeService.Apply(window, "light");
                 Assert.AreEqual(Color.FromRgb(241, 245, 249), ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color);
-                Assert.AreEqual(Color.FromRgb(203, 213, 225), ((SolidColorBrush)window.Resources["ScrollThumbBrush"]).Color);
+                var lightThumb = ((SolidColorBrush)window.Resources["ScrollThumbBrush"]).Color;
+Assert.AreEqual(Color.FromRgb(100, 116, 139), lightThumb);
+Assert.IsTrue(ApplicationThemeService.ContrastRatio(
+    ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color, lightThumb) >= 3.0,
+    "Light-theme scrollbar thumb must have at least 3:1 visual contrast.");
                 Assert.AreEqual(Color.FromRgb(15, 118, 110), ((SolidColorBrush)window.Resources["ScrollThumbHoverBrush"]).Color);
             }
             catch (Exception ex)

@@ -99,7 +99,7 @@ public static class ApplicationThemeService
         window.Resources["ComboDropDownBorderBrush"] = Brush(isDark ? "#475569" : "#CBD5E1");
         window.Resources["ReadOnlySurfaceBrush"] = Brush(isDark ? "#1F2937" : "#F1F5F9");
         window.Resources["ScrollTrackBrush"] = Brush(isDark ? "#0B1220" : "#F1F5F9");
-        window.Resources["ScrollThumbBrush"] = Brush(isDark ? "#475569" : "#CBD5E1");
+        window.Resources["ScrollThumbBrush"] = Brush("#64748B");
         window.Resources["ScrollThumbHoverBrush"] = Brush(isDark ? "#14B8A6" : "#0F766E");
 
         // Establish control templates before theme mapping, so the newly applied
