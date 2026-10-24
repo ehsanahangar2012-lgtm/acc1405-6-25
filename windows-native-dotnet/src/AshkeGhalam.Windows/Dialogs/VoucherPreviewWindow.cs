@@ -51,6 +51,7 @@ public sealed class VoucherPreviewWindow : Window
         var buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 8, 0, 0) };
         var print = new Button { Content = "چاپ حواله", MinWidth = 110, Height = 36, Margin = new Thickness(0, 0, 8, 0) };
         print.Click += Print_Click; buttons.Children.Add(print);
+        DocumentExportService.AddSaveButtons(buttons, this, () => _document, $"AshkeGhalam-Voucher-{_voucher.Number}");
         buttons.Children.Add(new Button { Content = "بستن", MinWidth = 90, Height = 36, IsCancel = true });
         toolbar.Children.Add(buttons);
         var viewer = new FlowDocumentScrollViewer
