@@ -124,8 +124,11 @@ public static class SmartComboBoxSearchService
 
     private static void EditableTextChanged(object sender, TextChangedEventArgs e)
     {
+        // Filter only text changes originating from the editable ComboBox editor. A
+        // keyboard-focus check is intentionally avoided: focus may temporarily move to the
+        // native popup or accessibility/automated input target while the edit is still valid.
         if (sender is not ComboBox combo || !States.TryGetValue(combo, out var state) ||
-            state.IsUpdating || !combo.IsKeyboardFocusWithin) return;
+            state.IsUpdating || e.OriginalSource is not TextBox editBox) return;
 
         var text = combo.Text ?? "";
         if (combo.SelectedItem is object selected && IsExactValue(state, selected, text))
@@ -140,9 +143,8 @@ public static class SmartComboBoxSearchService
             return;
         }
 
-        var editBox = e.OriginalSource as TextBox;
-        var selectionStart = editBox?.SelectionStart ?? text.Length;
-        var selectionLength = editBox?.SelectionLength ?? 0;
+        var selectionStart = editBox.SelectionStart;
+        var selectionLength = editBox.SelectionLength;
         state.IsUpdating = true;
         combo.SelectedItem = null;
         state.Query = text.Trim();

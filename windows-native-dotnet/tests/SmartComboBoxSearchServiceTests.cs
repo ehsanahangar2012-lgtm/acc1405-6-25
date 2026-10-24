@@ -1,5 +1,4 @@
 using System.Windows;
-using System.Windows.Input;
 using System.Threading;
 using AshkeGhalam.Windows.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -118,7 +117,6 @@ public sealed class SmartComboBoxSearchServiceTests
                     }
                 };
                 window.Show();
-                window.Activate();
                 ApplicationThemeService.Apply(window, "dark");
                 combo.ApplyTemplate();
                 window.Dispatcher.Invoke(
@@ -128,14 +126,6 @@ public sealed class SmartComboBoxSearchServiceTests
                 var editor = combo.Template.FindName("PART_EditableTextBox", combo) as System.Windows.Controls.TextBox;
                 Assert.IsNotNull(editor, "The themed searchable ComboBox must retain PART_EditableTextBox.");
                 Assert.AreEqual(2, combo.Items.Count, "The empty search should show all parties.");
-
-                combo.Focus();
-                Keyboard.Focus(editor!);
-                window.Dispatcher.Invoke(
-                    System.Windows.Threading.DispatcherPriority.Input,
-                    new Action(() => { }));
-                Assert.IsTrue(combo.IsKeyboardFocusWithin,
-                    "Typing must begin with focus inside the real ComboBox editor.");
 
                 editor!.Text = "CUS-0042";
                 window.Dispatcher.Invoke(
