@@ -594,7 +594,7 @@ public sealed class InvoicePreviewWindow : Window
         table.Columns.Add(new TableColumn { Width = new GridLength(1.6, GridUnitType.Star) });
         table.Columns.Add(new TableColumn { Width = new GridLength(1.8, GridUnitType.Star) });
 
-        var headerGroup = new TableRowGroup { IsHeader = true };
+        var headerGroup = new TableRowGroup();
         var bodyGroup = new TableRowGroup();
         var header = new TableRow();
         foreach (var label in new[] { "کالا / شرح قلم", "تعداد", "واحد", "قیمت واحد (ریال / تومان)", "جمع (ریال / تومان)" })
