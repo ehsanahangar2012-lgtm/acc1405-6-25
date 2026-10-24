@@ -96,7 +96,7 @@ jobs:
           if ($length -lt 10000000) { throw "Published EXE is unexpectedly small ($length bytes); self-contained packaging may be incomplete." }
           @"
           Ashk Ghalam Accounting - Native Windows WPF
-          Version: 16.55.0
+          Version: 16.57.0
           Target: Windows x64
           Package: self-contained single-file executable
           Source commit: $env:GITHUB_SHA

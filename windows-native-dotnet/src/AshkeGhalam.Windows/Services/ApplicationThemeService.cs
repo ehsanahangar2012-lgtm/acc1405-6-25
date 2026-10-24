@@ -198,7 +198,24 @@ public static class ApplicationThemeService
         // lazily. Synchronize those parts after palette mapping so their first rendered
         // frame uses the same contrast as the owning ComboBox in either theme.
         foreach (var combo in elements.OfType<ComboBox>())
+        {
+            combo.FlowDirection = FlowDirection.RightToLeft;
+            combo.HorizontalContentAlignment = HorizontalAlignment.Right;
             ConfigureComboBoxTheme(combo, isDark);
+            if (combo.Template.FindName("PART_EditableTextBox", combo) is TextBox editor)
+            {
+                editor.FlowDirection = FlowDirection.RightToLeft;
+                editor.TextAlignment = TextAlignment.Right;
+                editor.CaretBrush = Brush(isDark ? "#F8FAFC" : "#0F172A");
+            }
+        }
+
+        // Do not rely on implicit style inheritance for form values: dialog controls often
+        // carry local styles, so enforce the Persian alignment on the actual input element.
+        foreach (var input in elements.OfType<TextBox>())
+            input.TextAlignment = TextAlignment.Right;
+        foreach (var password in elements.OfType<PasswordBox>())
+            password.FlowDirection = FlowDirection.RightToLeft;
 
         foreach (var grid in elements.OfType<DataGrid>())
             ConfigureDataGridTheme(grid, isDark);

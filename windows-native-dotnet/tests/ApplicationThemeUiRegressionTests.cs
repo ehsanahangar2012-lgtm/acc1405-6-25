@@ -30,6 +30,8 @@ public sealed class ApplicationThemeUiRegressionTests
                 var window = new Window { Width = 480, Height = 260, Content = root };
 
                 ApplicationThemeService.Apply(window, "dark");
+                Assert.AreEqual(TextAlignment.Right, input.TextAlignment,
+                    "Native Persian text fields should stay right aligned after theme application.");
                 var darkButtonStyle = button.Style;
                 var darkTextBoxStyle = input.Style;
                 Assert.AreEqual(typeof(Button), darkButtonStyle.TargetType);
@@ -134,6 +136,10 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                 ApplicationThemeService.Apply(window, "dark");
                 var editor = combo.Template.FindName("PART_EditableTextBox", combo) as TextBox;
                 Assert.IsNotNull(editor, "The native ComboBox must retain its editable text part for live search.");
+                Assert.AreEqual(TextAlignment.Right, editor!.TextAlignment,
+                    "Editable dropdown search text must remain right aligned.");
+                Assert.AreEqual(FlowDirection.RightToLeft, editor.FlowDirection,
+                    "Editable dropdown search must use Persian RTL direction.");
                 Assert.IsInstanceOfType(combo.Resources[typeof(ComboBoxItem)], typeof(Style),
                     "The dropdown item style must be available on the ComboBox itself for isolated Popup resource lookup.");
                 Assert.AreEqual(Color.FromRgb(17, 24, 39),
