@@ -316,9 +316,19 @@ public sealed class InvoicePreviewWindow : Window
     {
         var palette = GetPalette(theme);
         var invoiceLines = invoice.Lines ?? [];
+        var isThermal = string.Equals(theme, "thermal", StringComparison.Ordinal);
+        var isMinimal = string.Equals(theme, "minimal", StringComparison.Ordinal);
+        var isOfficial = string.Equals(theme, "official", StringComparison.Ordinal);
+        var isPremium = string.Equals(theme, "premium", StringComparison.Ordinal);
+        var contentWidth = isThermal ? 300d : 660d;
+        var pageWidth = isThermal ? 336d : 794d;
+        var pagePadding = isThermal ? new Thickness(18) : isPremium ? new Thickness(36) :
+            isOfficial ? new Thickness(26) : isMinimal ? new Thickness(28) : new Thickness(32);
+        var showQrInLayout = showQr && !isThermal;
         string BothCurrencies(decimal amount)
         {
             var primary = amount.ToString("#,##0.##", CultureInfo.InvariantCulture);
+            if (isThermal) return $"{primary} {currencyLabel}";
             var otherAmount = string.Equals(currencyLabel, "تومان", StringComparison.Ordinal) ? amount * 10m : amount / 10m;
             var otherCurrency = string.Equals(currencyLabel, "تومان", StringComparison.Ordinal) ? "ریال" : "تومان";
             return $"{primary} {currencyLabel}{Environment.NewLine}{otherAmount.ToString("#,##0.##", CultureInfo.InvariantCulture)} {otherCurrency}";
@@ -333,12 +343,12 @@ public sealed class InvoicePreviewWindow : Window
         var document = new FlowDocument
         {
             FontFamily = CreatePersianFontFamily(),
-            FontSize = 12,
+            FontSize = isThermal ? 9.5 : isOfficial ? 10.5 : isPremium ? 12 : 11.5,
             FlowDirection = FlowDirection.RightToLeft,
-            PageWidth = 794,
-            PageHeight = 1123,
-            PagePadding = new Thickness(32),
-            ColumnWidth = 730,
+            PageWidth = pageWidth,
+            PageHeight = isThermal ? Math.Max(1250, 500 + invoiceLines.Count * 70) : 1123,
+            PagePadding = pagePadding,
+            ColumnWidth = isThermal ? contentWidth : 730,
             Background = Brushes.White,
             Foreground = ink
         };
@@ -349,16 +359,18 @@ public sealed class InvoicePreviewWindow : Window
         var headerBackground = theme switch
         {
             "premium" => Color.FromRgb(41, 37, 36),
-            "official" or "thermal" or "minimal" or "persian" => palette.Soft,
+            "official" => Color.FromRgb(241, 245, 249),
+            "thermal" or "minimal" => Colors.White,
+            "persian" => palette.Soft,
             _ => palette.Accent
         };
         var headerForeground = theme is "official" or "thermal" or "minimal" or "persian"
             ? palette.Ink
             : Colors.White;
-        var roundHeader = theme is not ("official" or "thermal" or "minimal");
+        var roundHeader = theme is not ("official" or "thermal" or "minimal" or "industrial");
         var headerLayout = new Grid
         {
-            Width = 624,
+            Width = isThermal ? contentWidth - 24 : contentWidth - 36,
             FlowDirection = FlowDirection.RightToLeft
         };
         headerLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -371,7 +383,7 @@ public sealed class InvoicePreviewWindow : Window
         headerText.Children.Add(new TextBlock
         {
             Text = invoice.TypeLabel,
-            FontSize = theme == "thermal" ? 20 : 26,
+            FontSize = isThermal ? 16 : isOfficial ? 22 : isPremium ? 29 : isMinimal ? 24 : 26,
             FontWeight = FontWeights.Bold,
             Foreground = new SolidColorBrush(headerForeground),
             TextWrapping = TextWrapping.Wrap
@@ -379,7 +391,7 @@ public sealed class InvoicePreviewWindow : Window
         headerText.Children.Add(new TextBlock
         {
             Text = companyName,
-            FontSize = 14,
+            FontSize = isThermal ? 11 : isPremium ? 16 : 14,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(headerForeground),
             TextWrapping = TextWrapping.Wrap,
@@ -395,7 +407,7 @@ public sealed class InvoicePreviewWindow : Window
         Grid.SetColumn(headerText, 0);
         headerLayout.Children.Add(headerText);
 
-        var logoImage = CreateCompanyImage(company?.LogoDataBase64, 94, 72);
+        var logoImage = CreateCompanyImage(company?.LogoDataBase64, isThermal ? 48 : 94, isThermal ? 38 : 72);
         if (logoImage is not null)
         {
             logoImage.VerticalAlignment = VerticalAlignment.Center;
@@ -405,12 +417,12 @@ public sealed class InvoicePreviewWindow : Window
 
         document.Blocks.Add(new BlockUIContainer(new Border
         {
-            Width = 660,
+            Width = contentWidth,
             Background = new SolidColorBrush(headerBackground),
             BorderBrush = accent,
-            BorderThickness = new Thickness(theme == "minimal" ? 0 : 1),
-            CornerRadius = new CornerRadius(roundHeader ? 14 : 2),
-            Padding = new Thickness(theme == "thermal" ? 12 : 18),
+            BorderThickness = isMinimal ? new Thickness(0, 0, 0, 2) : new Thickness(1),
+            CornerRadius = new CornerRadius(roundHeader ? (isPremium ? 18 : 12) : 2),
+            Padding = isThermal ? new Thickness(9) : isOfficial ? new Thickness(14) : isPremium ? new Thickness(22) : new Thickness(18),
             Margin = new Thickness(0, 0, 0, 12),
             Child = headerLayout
         }));
@@ -479,14 +491,14 @@ public sealed class InvoicePreviewWindow : Window
             });
             return new Border
             {
-                MinWidth = minWidth,
-                MaxWidth = 270,
-                Background = soft,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(220, 226, 234)),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(theme == "official" ? 2 : 8),
-                Padding = new Thickness(8),
-                Margin = new Thickness(0, 0, 6, 6),
+                MinWidth = isThermal ? Math.Min(minWidth, contentWidth - 20) : minWidth,
+                MaxWidth = isThermal ? contentWidth - 20 : 270,
+                Background = isMinimal ? Brushes.White : soft,
+                BorderBrush = isPremium ? accent : new SolidColorBrush(Color.FromRgb(220, 226, 234)),
+                BorderThickness = isMinimal ? new Thickness(0) : new Thickness(1),
+                CornerRadius = new CornerRadius(isOfficial || isThermal || theme == "industrial" ? 2 : isPremium ? 12 : 8),
+                Padding = isThermal ? new Thickness(5) : isPremium ? new Thickness(10) : new Thickness(8),
+                Margin = isThermal ? new Thickness(0, 0, 3, 3) : new Thickness(0, 0, 6, 6),
                 Child = stack
             };
         }
@@ -494,7 +506,7 @@ public sealed class InvoicePreviewWindow : Window
         var invoiceFacts = new WrapPanel
         {
             FlowDirection = FlowDirection.RightToLeft,
-            Width = showQr ? 520 : 660,
+            Width = showQrInLayout ? contentWidth - 140 : contentWidth,
             Margin = new Thickness(0)
         };
         invoiceFacts.Children.Add(MakeInfoCard("طرف حساب", invoice.CustomerName, 210));
@@ -516,11 +528,11 @@ public sealed class InvoicePreviewWindow : Window
 
         var invoiceTopLayout = new Grid
         {
-            Width = 660,
+            Width = contentWidth,
             FlowDirection = FlowDirection.LeftToRight,
             Margin = new Thickness(0, 0, 0, 10)
         };
-        if (showQr)
+        if (showQrInLayout)
         {
             invoiceTopLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(128) });
             invoiceTopLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -586,11 +598,11 @@ public sealed class InvoicePreviewWindow : Window
             invoiceTopLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         }
 
-        Grid.SetColumn(detailsColumn, showQr ? 1 : 0);
+        Grid.SetColumn(detailsColumn, showQrInLayout ? 1 : 0);
         invoiceTopLayout.Children.Add(detailsColumn);
         document.Blocks.Add(new BlockUIContainer(invoiceTopLayout));
 
-        var table = new Table { CellSpacing = 0, Margin = new Thickness(0, 2, 0, 10) };
+        var table = new Table { CellSpacing = 0, Margin = new Thickness(0, isThermal ? 0 : 2, 0, isThermal ? 4 : 10) };
         table.Columns.Add(new TableColumn { Width = new GridLength(5, GridUnitType.Star) });
         table.Columns.Add(new TableColumn { Width = new GridLength(1.2, GridUnitType.Star) });
         table.Columns.Add(new TableColumn { Width = new GridLength(1.2, GridUnitType.Star) });
@@ -600,14 +612,16 @@ public sealed class InvoicePreviewWindow : Window
         var headerGroup = new TableRowGroup();
         var bodyGroup = new TableRowGroup();
         var header = new TableRow();
-        foreach (var label in new[] { "کالا / شرح قلم", "تعداد", "واحد", "قیمت واحد (ریال / تومان)", "جمع (ریال / تومان)" })
+        foreach (var label in isThermal
+                     ? new[] { "کالا", "تعداد", "واحد", "قیمت", "جمع" }
+                     : new[] { "کالا / شرح قلم", "تعداد", "واحد", "قیمت واحد (ریال / تومان)", "جمع (ریال / تومان)" })
         {
             header.Cells.Add(new TableCell(new Paragraph(new Run(label)))
             {
                 FontWeight = FontWeights.Bold,
-                Background = soft,
+                Background = isMinimal ? Brushes.White : soft,
                 Foreground = accent,
-                Padding = new Thickness(7),
+                Padding = isThermal ? new Thickness(3) : isOfficial ? new Thickness(5) : new Thickness(7),
                 BorderBrush = accent,
                 BorderThickness = new Thickness(0.5)
             });
@@ -643,10 +657,10 @@ public sealed class InvoicePreviewWindow : Window
                     }
                 });
             }
-            var background = invoiceRowIndex % 2 == 0 ? Brushes.White : soft;
+            var background = isMinimal || isThermal || invoiceRowIndex % 2 == 0 ? Brushes.White : soft;
             var itemCell = new TableCell
             {
-                Padding = new Thickness(6), Background = background,
+                Padding = isThermal ? new Thickness(3) : isOfficial ? new Thickness(4) : new Thickness(6), Background = background,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
                 BorderThickness = new Thickness(0.5), FontSize = 9
             };
@@ -672,7 +686,7 @@ public sealed class InvoicePreviewWindow : Window
                 };
                 row.Cells.Add(new TableCell(paragraph)
                 {
-                    Padding = new Thickness(theme == "thermal" ? 4 : 6),
+                    Padding = isThermal ? new Thickness(2) : isOfficial ? new Thickness(4) : new Thickness(6),
                     Background = background,
                     BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
                     BorderThickness = new Thickness(0.5),
@@ -722,10 +736,11 @@ public sealed class InvoicePreviewWindow : Window
             var amountText = new TextBlock
             {
                 Text = amount,
-                FontSize = emphasize ? 20 : 11,
+                FontSize = emphasize ? (isThermal ? 14 : isPremium ? 23 : 20) : (isThermal ? 9 : 11),
                 FontWeight = emphasize ? FontWeights.Bold : FontWeights.SemiBold,
                 Foreground = emphasize ? accent : ink,
-                TextAlignment = TextAlignment.Left,
+                TextAlignment = TextAlignment.Right,
+                FlowDirection = FlowDirection.RightToLeft,
                 VerticalAlignment = VerticalAlignment.Center
             };
             Grid.SetColumn(labelText, 0);
@@ -750,12 +765,12 @@ public sealed class InvoicePreviewWindow : Window
         totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — چک", BothCurrencies(invoice.CheckAmount)));
         document.Blocks.Add(new BlockUIContainer(new Border
         {
-            Width = 660,
-            Background = soft,
+            Width = contentWidth,
+            Background = isMinimal ? Brushes.White : soft,
             BorderBrush = accent,
             BorderThickness = new Thickness(1),
-            CornerRadius = new CornerRadius(theme == "official" || theme == "thermal" ? 2 : 12),
-            Padding = new Thickness(16),
+            CornerRadius = new CornerRadius(isOfficial || isThermal || theme == "industrial" || isMinimal ? 2 : isPremium ? 16 : 12),
+            Padding = isThermal ? new Thickness(9) : isOfficial ? new Thickness(12) : isPremium ? new Thickness(20) : new Thickness(16),
             Margin = new Thickness(0, 16, 0, 6),
             Child = totalsStack
         }));

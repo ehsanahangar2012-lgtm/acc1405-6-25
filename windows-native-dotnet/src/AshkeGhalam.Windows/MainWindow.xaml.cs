@@ -4203,8 +4203,11 @@ public partial class MainWindow : Window
 
         var phraseBox = new TextBox
         {
-            MinWidth = 310, Height = 36, Padding = new Thickness(8),
-            FlowDirection = FlowDirection.RightToLeft
+            MinWidth = 310, Height = 42, Padding = new Thickness(10, 7, 10, 7),
+            FlowDirection = FlowDirection.RightToLeft,
+            TextAlignment = TextAlignment.Right,
+            FontSize = 14,
+            ToolTip = "عبارت پاکسازی کامل را بدون تغییر تایپ کنید."
         };
         var confirmButton = new Button
         {
@@ -4215,7 +4218,7 @@ public partial class MainWindow : Window
         var confirmWindow = new Window
         {
             Owner = this, Title = "تأیید دوم پاک‌سازی",
-            Width = 440, Height = 210, MinWidth = 420,
+            Width = 460, Height = 252, MinWidth = 440,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
             ResizeMode = ResizeMode.NoResize, FlowDirection = FlowDirection.RightToLeft,
             Content = new StackPanel
@@ -4223,12 +4226,22 @@ public partial class MainWindow : Window
                 Margin = new Thickness(22),
                 Children =
                 {
-                    new TextBlock { Text = "برای پاک‌سازی، عبارت «پاکسازی کامل» را عیناً وارد کنید.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,0,0,10) },
+                    new TextBlock { Text = "برای ادامه، عبارت زیر را دقیقاً وارد کنید:", TextWrapping = TextWrapping.Wrap, FontSize = 14, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0,0,0,4) },
+                    new TextBlock { Text = "پاکسازی کامل", FontSize = 16, FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(185, 28, 28)), Margin = new Thickness(0,0,0,10), TextAlignment = TextAlignment.Right },
                     phraseBox, confirmButton
                 }
             }
         };
         ApplyCurrentThemeTo(confirmWindow);
+        phraseBox.SetResourceReference(Control.BackgroundProperty, "SurfaceBackground");
+        phraseBox.SetResourceReference(Control.ForegroundProperty, "PrimaryText");
+        phraseBox.SetResourceReference(Control.BorderBrushProperty, "OutlineBrush");
+        phraseBox.SetResourceReference(TextBoxBase.CaretBrushProperty, "PrimaryText");
+        confirmWindow.Loaded += (_, _) =>
+        {
+            phraseBox.Focus();
+            phraseBox.CaretIndex = phraseBox.Text.Length;
+        };
         confirmButton.Click += (_, _) =>
         {
             if (!string.Equals(phraseBox.Text.Trim(), "پاکسازی کامل", StringComparison.Ordinal))

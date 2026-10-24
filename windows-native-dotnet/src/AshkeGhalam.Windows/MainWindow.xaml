@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:services="clr-namespace:AshkeGhalam.Windows.Services"
-        Title="حسابداری اشک قلم — نسخه بومی ویندوز 16.56.0"
+        Title="حسابداری اشک قلم — نسخه بومی ویندوز 16.57.0"
         Width="1360" Height="880" MinWidth="1040" MinHeight="680"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
         Background="#F4F7FB" Foreground="#0F172A" FlowDirection="RightToLeft"

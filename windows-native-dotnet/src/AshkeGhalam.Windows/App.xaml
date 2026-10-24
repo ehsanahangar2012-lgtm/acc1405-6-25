@@ -33,8 +33,10 @@
         <SolidColorBrush x:Key="RadioButtonMarkBrush" Color="#FFFFFF"/>
 
         <Style TargetType="{x:Type TextBlock}">
-            <!-- Foreground inherits from Window/Control so button and navigation labels stay legible. -->
+            <!-- Persian UI defaults are RTL/right aligned; centered/LTR elements override locally. -->
             <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FlowDirection" Value="RightToLeft"/>
+            <Setter Property="TextAlignment" Value="Right"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
         </Style>
 
@@ -90,6 +92,9 @@
             <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Right"/>
+            <Setter Property="FlowDirection" Value="RightToLeft"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource PrimaryText}"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -130,6 +135,8 @@
             <Setter Property="MinHeight" Value="36"/>
             <Setter Property="Padding" Value="9,5"/>
             <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FlowDirection" Value="RightToLeft"/>
+            <Setter Property="HorizontalContentAlignment" Value="Right"/>
             <Setter Property="Background" Value="{DynamicResource SurfaceBackground}"/>
             <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}"/>
@@ -193,6 +200,9 @@
                                              IsReadOnly="{TemplateBinding IsReadOnly}"
                                              Focusable="True"
                                              VerticalContentAlignment="Center"
+                                             TextAlignment="Right"
+                                             FlowDirection="RightToLeft"
+                                             CaretBrush="{TemplateBinding Foreground}"
                                              Text="{Binding Path=Text, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                                     <TextBlock x:Name="EditablePlaceholder"
                                                Text="{TemplateBinding Tag}"
@@ -270,6 +280,7 @@
             <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="FlowDirection" Value="RightToLeft"/>
         </Style>
 
 

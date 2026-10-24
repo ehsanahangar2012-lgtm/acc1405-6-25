@@ -43,9 +43,9 @@ public sealed class InvoiceDialog : Window
         new Choice("PURCHASE", "فاکتور خرید"),
         new Choice("PROFORMA", "پیش‌فاکتور")
     }, SelectedIndex = 0 };
-    private readonly ComboBox _person = new() { Height = 48, MinWidth = 250, Tag = "نام، کد یا تلفن را جست‌وجو کنید…", IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "برای دیدن فهرست، فلش کنار کادر را بزنید؛ نام، کد یا تلفن را جست‌وجو کرده و روی نتیجه کلیک کنید." };
+    private readonly ComboBox _person = new() { Height = 48, MinWidth = 250, Tag = "نام، کد یا تلفن را جست‌وجو کنید…", IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "برای بازشدن فهرست داخل کادر کلیک کنید؛ نام، کد یا تلفن را جست‌وجو کرده و روی نتیجه کلیک کنید." };
     private readonly TextBlock _partyHint = new() { FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 0, 2, 8) };
-    private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300, ToolTip = "نام، کد، بارکد یا سریال کالا را تایپ کنید و از نتایج انتخاب کنید." };
+    private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300, ToolTip = "با کلیک داخل کادر فهرست باز می‌شود؛ نام، کد، بارکد یا سریال کالا را جست‌وجو کنید." };
     private readonly TextBox _quantity = new() { Height = 32, Width = 90, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _price = new() { Height = 32, Width = 130, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _lineDescription = new()
@@ -334,7 +334,7 @@ public sealed class InvoiceDialog : Window
         var preview = new Button { Content = "پیش‌نمایش قبل از ذخیره", MinWidth = 175, Height = 38, Margin = new Thickness(0, 0, 8, 8) };
         preview.Click += (_, _) => PreviewDraft();
         buttons.Children.Add(preview);
-        var save = new Button { Content = "ذخیره سند", Width = 125, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 8) };
+        var save = new Button { Content = "ذخیره سند  ←", Width = 150, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 8) };
         buttons.Children.Add(save);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true, Margin = new Thickness(0, 0, 0, 8) });
         var layout = new Grid { Margin = new Thickness(0) };
@@ -881,25 +881,65 @@ public sealed class InvoiceDialog : Window
 
     private static Border CreateInvoiceHero()
     {
-        var content = new StackPanel();
-        content.Children.Add(new TextBlock
+        var content = new Grid { FlowDirection = FlowDirection.RightToLeft };
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        content.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var copy = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
+        copy.Children.Add(new TextBlock
         {
-            Text = "صدور فاکتور | اشک قلم",
-            FontSize = 22, FontWeight = FontWeights.Bold,
-            Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 4)
+            Text = "صدور فاکتور  |  اشک قلم",
+            FontSize = 23, FontWeight = FontWeights.Bold,
+            Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 6),
+            TextAlignment = TextAlignment.Right
         });
-        content.Children.Add(new TextBlock
+        copy.Children.Add(new TextBlock
         {
-            Text = "ثبت هوشمند طرف حساب، تاریخ شمسی، کالا و مبالغ در یک فرم یکپارچه",
-            FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
-            TextWrapping = TextWrapping.Wrap
+            Text = "ثبت هوشمند طرف حساب، تاریخ شمسی، کالا و مبالغ در یک فضای یکپارچه",
+            FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(219, 234, 244)),
+            TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right
         });
+        copy.Children.Add(new TextBlock
+        {
+            Text = "ثبت سریع  •  محاسبهٔ زنده  •  پیش‌نمایش قابل چاپ",
+            FontSize = 11, FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(Color.FromRgb(94, 234, 212)),
+            Margin = new Thickness(0, 10, 0, 0), TextAlignment = TextAlignment.Right
+        });
+        Grid.SetColumn(copy, 0);
+        content.Children.Add(copy);
+        var mark = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(36, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(86, 255, 255, 255)),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(15, 12, 15, 12), VerticalAlignment = VerticalAlignment.Center,
+            Child = new StackPanel
+            {
+                Children =
+                {
+                    new TextBlock { Text = "ASHK", FontSize = 11, FontWeight = FontWeights.Bold, Foreground = Brushes.White, TextAlignment = TextAlignment.Center },
+                    new TextBlock { Text = "GHALAM", FontSize = 10, Foreground = new SolidColorBrush(Color.FromRgb(153, 246, 228)), TextAlignment = TextAlignment.Center }
+                }
+            }
+        };
+        Grid.SetColumn(mark, 1);
+        content.Children.Add(mark);
         return new Border
         {
-            Background = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
-            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(15),
-            Padding = new Thickness(20), Margin = new Thickness(0, 0, 0, 14),
+            Background = new LinearGradientBrush
+            {
+                StartPoint = new Point(1, 0), EndPoint = new Point(0, 1),
+                GradientStops = new GradientStopCollection
+                {
+                    new GradientStop(Color.FromRgb(10, 25, 47), 0),
+                    new GradientStop(Color.FromRgb(16, 64, 82), 0.55),
+                    new GradientStop(Color.FromRgb(15, 118, 110), 1)
+                }
+            },
+            BorderBrush = new SolidColorBrush(Color.FromRgb(49, 101, 117)),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(18),
+            Padding = new Thickness(21), Margin = new Thickness(0, 0, 0, 14),
+            Effect = new DropShadowEffect { BlurRadius = 18, ShadowDepth = 4, Opacity = 0.16, Color = Color.FromRgb(13, 37, 55) },
             Child = content
         };
     }
@@ -911,13 +951,15 @@ public sealed class InvoiceDialog : Window
         {
             Text = title, FontSize = 16, FontWeight = FontWeights.Bold,
             Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+            TextAlignment = TextAlignment.Right,
             Margin = new Thickness(0, 0, 0, 3)
         });
         panel.Children.Add(new TextBlock
         {
             Text = subtitle, FontSize = 11,
             Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12)
+            TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Right,
+            Margin = new Thickness(0, 0, 0, 12)
         });
         panel.Children.Add(new Border
         {
@@ -989,6 +1031,8 @@ public sealed class InvoiceDialog : Window
             FontSize = 12,
             FontWeight = FontWeights.SemiBold,
             Foreground = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+            TextAlignment = TextAlignment.Right,
+            FlowDirection = FlowDirection.RightToLeft,
             Margin = new Thickness(0, 7, 0, 4)
         });
         field.Margin = new Thickness(0, 0, 0, 4);

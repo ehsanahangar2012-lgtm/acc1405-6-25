@@ -1,9 +1,12 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Media3D;
 using System.Windows.Threading;
 
 namespace AshkeGhalam.Windows.Services;
@@ -40,6 +43,7 @@ public static class SmartComboBoxSearchService
             combo.SelectionChanged += SelectionChanged;
             combo.PreviewTextInput += PreviewTextInput;
             combo.PreviewKeyDown += PreviewKeyDown;
+            combo.PreviewMouseLeftButtonDown += ComboPreviewMouseLeftButtonDown;
         }
 
         state.IsUpdating = true;
@@ -146,6 +150,48 @@ public static class SmartComboBoxSearchService
     {
         if (sender is ComboBox combo)
             BeginNewQueryIfAChoiceWasCommitted(combo);
+    }
+
+    private static void ComboPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not ComboBox combo || !combo.IsEnabled || combo.Items.Count == 0)
+            return;
+
+        // Leave the arrow toggle's own native open/close behavior intact.
+        DependencyObject? current = e.OriginalSource as DependencyObject;
+        for (var depth = 0; current is not null && depth < 32; depth++)
+        {
+            if (current is FrameworkElement { Name: "ToggleButton" })
+                return;
+            if (ReferenceEquals(current, combo))
+                break;
+
+            DependencyObject? parent = null;
+            try
+            {
+                if (current is Visual or Visual3D)
+                    parent = VisualTreeHelper.GetParent(current);
+            }
+            catch (InvalidOperationException) { }
+            parent ??= LogicalTreeHelper.GetParent(current);
+            current = parent;
+        }
+
+        // Open after WPF finishes its pointer/focus transaction; a synchronous assignment can
+        // be reversed by the ComboBox's own mouse handling.
+        combo.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+        {
+            if (!combo.IsLoaded || !combo.IsEnabled)
+                return;
+
+            combo.Focus();
+            combo.IsDropDownOpen = true;
+            if (combo.Template.FindName("PART_EditableTextBox", combo) is TextBox editor)
+            {
+                editor.Focus();
+                editor.CaretIndex = editor.Text.Length;
+            }
+        }));
     }
 
     private static void PreviewKeyDown(object sender, KeyEventArgs e)

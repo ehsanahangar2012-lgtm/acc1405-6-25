@@ -167,6 +167,18 @@ public sealed class SmartComboBoxSearchServiceTests
                     new Action(() => { }));
                 Assert.IsNull(combo.SelectedItem, "A new query must not keep the previous party selected.");
                 Assert.AreEqual(1, combo.Items.Count, "Typing a fresh query after selection must filter the list.");
+
+                combo.IsDropDownOpen = false;
+                combo.RaiseEvent(new System.Windows.Input.MouseButtonEventArgs(
+                    System.Windows.Input.Mouse.PrimaryDevice, 0, System.Windows.Input.MouseButton.Left)
+                {
+                    RoutedEvent = System.Windows.UIElement.PreviewMouseLeftButtonDownEvent
+                });
+                window.Dispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.Background,
+                    new Action(() => { }));
+                Assert.IsTrue(combo.IsDropDownOpen,
+                    "Clicking the editable ComboBox field body should open the dropdown, not just the arrow.");
             }
             catch (Exception ex)
             {
