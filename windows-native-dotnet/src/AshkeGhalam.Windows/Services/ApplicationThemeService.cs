@@ -368,10 +368,10 @@ public static class ApplicationThemeService
             // Keep an original-value snapshot before installing the local binding, so a
             // newly realized header can safely restore its source values on the next theme pass.
             OriginalValues.GetValue(textBlock, CaptureOriginalValues);
-            BindingOperations.SetBinding(textBlock, TextBlock.ForegroundProperty, new Binding(nameof(Control.Foreground)
+            BindingOperations.SetBinding(textBlock, TextBlock.ForegroundProperty, new Binding(nameof(Control.Foreground))
             {
                 RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGridColumnHeader), 1)
-            }));
+            });
         }
     }
 
