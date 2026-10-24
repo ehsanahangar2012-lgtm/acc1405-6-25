@@ -592,7 +592,8 @@ public sealed class InvoicePreviewWindow : Window
         table.Columns.Add(new TableColumn { Width = new GridLength(1.6, GridUnitType.Star) });
         table.Columns.Add(new TableColumn { Width = new GridLength(1.8, GridUnitType.Star) });
 
-        var group = new TableRowGroup();
+        var headerGroup = new TableRowGroup { IsHeader = true };
+        var bodyGroup = new TableRowGroup();
         var header = new TableRow();
         foreach (var label in new[] { "کالا / شرح قلم", "تعداد", "واحد", "قیمت واحد (ریال / تومان)", "جمع (ریال / تومان)" })
         {
@@ -606,7 +607,8 @@ public sealed class InvoicePreviewWindow : Window
                 BorderThickness = new Thickness(0.5)
             });
         }
-        group.Rows.Add(header);
+        headerGroup.Rows.Add(header);
+        table.RowGroups.Add(headerGroup);
 
         var invoiceRowIndex = 0;
         foreach (var line in invoiceLines)
@@ -653,21 +655,33 @@ public sealed class InvoicePreviewWindow : Window
                 BothCurrencies(line.UnitPrice),
                 BothCurrencies(line.LineTotal)
             };
-            foreach (var value in values)
+            for (var valueIndex = 0; valueIndex < values.Length; valueIndex++)
             {
-                row.Cells.Add(new TableCell(new Paragraph(new Run(value)) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
+                var value = values[valueIndex];
+                var numeric = valueIndex is 0 or 2 or 3;
+                var paragraph = new Paragraph(new Run(value))
                 {
-                    Padding = new Thickness(theme == "thermal" ? 4 : 6), Background = background,
+                    Margin = new Thickness(0),
+                    TextAlignment = TextAlignment.Right,
+                    FlowDirection = numeric ? FlowDirection.LeftToRight : FlowDirection.RightToLeft
+                };
+                row.Cells.Add(new TableCell(paragraph)
+                {
+                    Padding = new Thickness(theme == "thermal" ? 4 : 6),
+                    Background = background,
                     BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
-                    BorderThickness = new Thickness(0.5), FontSize = 8.5
+                    BorderThickness = new Thickness(0.5),
+                    FontSize = 8.5
                 });
             }
 
+            bodyGroup.Rows.Add(row);
+            invoiceRowIndex++;
         }
 
         if (invoiceLines.Count == 0)
         {
-            group.Rows.Add(new TableRow
+            bodyGroup.Rows.Add(new TableRow
             {
                 Cells =
                 {
@@ -682,7 +696,7 @@ public sealed class InvoicePreviewWindow : Window
             });
         }
 
-        table.RowGroups.Add(group);
+        table.RowGroups.Add(bodyGroup);
         document.Blocks.Add(table);
         var taxLabel = invoice.TaxIsAmount
             ? "مالیات"
