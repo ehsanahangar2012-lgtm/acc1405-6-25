@@ -429,3 +429,9 @@
 - Extended party lookup to legacy records that store role only in the older Type field; check-party search uses the same compatibility rule.
 - Added the Persian calendar picker to journal-entry dates and the date range in the person financial kardex.
 - Added regression tests for legacy party roles and search matching; Windows CI verifies compilation/test execution. Dynamic interactions still benefit from a manual smoke-test on Windows.
+
+
+## آزمون‌پذیری انتخاب هوشمند — ۲۴ اکتبر ۲۰۲۶
+
+- [x] آزمون‌های مستقل برای جست‌وجوی نام/کد/تلفن، نادیده گرفتن مقدار خالی، پاک‌سازی فاصله‌های اضافی و رفتار جست‌وجوی خالی اضافه شد.
+- [ ] آزمون‌های خودکار، رفتار زندهٔ ComboBox در UI (شروع تایپ، حفظ انتخاب، Enter و جابه‌جایی بین نتایج) را به‌تنهایی اثبات نمی‌کنند؛ بررسی تعاملی در Windows همچنان لازم است.
