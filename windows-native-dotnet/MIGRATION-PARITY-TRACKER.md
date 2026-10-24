@@ -816,3 +816,10 @@
 - [x] ترتیب ستون‌های سه جدول پرکاربرد اصلاح شد: اشخاص ابتدا کد/نام/نقش/تلفن/مانده؛ کالا ابتدا نام/کد/واحد/دسته/موجودی/قیمت‌ها؛ فاکتور ابتدا نوع/شماره/طرف حساب/تاریخ/مبلغ نهایی/وضعیت. تمام ستون‌های جزئی حفظ شده و با پیمایش افقی در دسترس‌اند.
 
 - [x] ارتفاع سرستون به‌گونه‌ای تنظیم شد که مقدار پیش‌فرض WPF یعنی NaN نیز به ۴۸ پیکسل مشخص تبدیل شود؛ آزمون جدول برنامه‌ای و جدول‌های XAML از یک رفتار واحد استفاده می‌کنند.
+
+
+## UI chunk 11 — minimum column width reflects important data
+
+- [x] DataGrid minima now account for common binding fields (name, role, phone, amount, dates and identifiers) as well as the column heading; the horizontal scrollbar remains the overflow mechanism rather than shrinking essential values.
+- [x] UI regression tests cover minimum widths for name, role and phone columns in the WPF theme pass.
+- [ ] The Windows CI build and its refreshed screenshot artifact must confirm the layout after this adjustment.

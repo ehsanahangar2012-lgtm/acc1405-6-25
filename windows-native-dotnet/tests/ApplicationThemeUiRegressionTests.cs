@@ -196,6 +196,16 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                 Assert.IsTrue(grid.Columns[0].MinWidth >= 84d);
                 Assert.IsTrue(grid.Columns[1].MinWidth >= 140d,
                     "Long Persian column headings must reserve enough width instead of collapsing into clipped glyphs.");
+                grid.Columns.Add(new DataGridTextColumn { Header = "نام / شرکت", Binding = new Binding("Name") });
+                grid.Columns.Add(new DataGridTextColumn { Header = "نقش", Binding = new Binding("RoleLabel") });
+                grid.Columns.Add(new DataGridTextColumn { Header = "تلفن", Binding = new Binding("Phone") });
+                ApplicationThemeService.Apply(window, "dark");
+                Assert.IsTrue(grid.Columns[2].MinWidth >= 170d,
+                    "Entity names need a useful minimum width even when their header is short.");
+                Assert.IsTrue(grid.Columns[3].MinWidth >= 118d,
+                    "Role labels must not collapse to the width of a short heading.");
+                Assert.IsTrue(grid.Columns[4].MinWidth >= 130d,
+                    "Phone numbers must remain comfortably readable in narrow tables.");
                 Assert.IsTrue(grid.ColumnHeaderHeight >= 48d,
                     "Wrapped column headings need enough vertical space in both themes.");
                 AssertGridStateHasReadableContrast(grid);

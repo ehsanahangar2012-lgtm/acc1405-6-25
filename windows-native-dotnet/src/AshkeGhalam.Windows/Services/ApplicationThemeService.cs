@@ -275,7 +275,12 @@ public static class ApplicationThemeService
         // Each column gets a minimum width derived from its Persian heading; overflow is handled
         // by the visible horizontal scrollbar instead of crushing glyphs.
         foreach (var column in grid.Columns)
-            column.MinWidth = Math.Max(column.MinWidth, MinimumColumnWidth(column.Header));
+        {
+            var contentMinimum = column is DataGridTextColumn textColumn && textColumn.Binding is Binding binding
+                ? MinimumDataColumnWidth(binding.Path?.Path, column.Header)
+                : MinimumColumnWidth(column.Header);
+            column.MinWidth = Math.Max(column.MinWidth, contentMinimum);
+        }
 
         grid.Background = surface;
         grid.Foreground = text;
@@ -536,6 +541,25 @@ public static class ApplicationThemeService
         }
     }
 
+    private static double MinimumDataColumnWidth(string? bindingPath, object? header)
+    {
+        var property = bindingPath?.Split('.', StringSplitOptions.RemoveEmptyEntries).LastOrDefault() ?? "";
+        var valueMinimum = property.ToUpperInvariant() switch
+        {
+            // Primary identity columns need room for common real-world values, not just their short headings.
+            "NAME" or "CUSTOMERNAME" or "SUPPLIERNAME" or "PERSONNAME" or "PRODUCTNAME" or "TITLE" => 170d,
+            "DESCRIPTION" or "ADDRESS" or "NOTES" => 160d,
+            "EMAIL" or "PHONE" or "BARCODE" or "NATIONALID" or "SERIALNUMBER" or "IMAGEURL" => 130d,
+            "ROLELABEL" or "TYPELABEL" or "CATEGORY" or "STATUS" or "METHOD" or "REFERENCE" => 118d,
+            "BALANCE" or "AMOUNT" or "TOTAL" or "TOTALAMOUNT" or "FINALAMOUNT" or "SELLPRICE" or
+                "BUYPRICE" or "UNITPRICE" or "STOCKQUANTITY" or "RESERVEDSTOCK" or "MINSTOCK" => 125d,
+            "DATE" or "DUEDATE" or "CREATEDAT" or "UPDATEDAT" or "DISPLAYNUMBER" or "NUMBER" => 112d,
+            "CODE" or "UNIT" or "QUANTITY" or "WEIGHT" => 96d,
+            _ => 84d
+        };
+        return Math.Clamp(Math.Max(MinimumColumnWidth(header), valueMinimum), 84d, 220d);
+    }
+
     private static double MinimumColumnWidth(object? header)
     {
         var text = header switch
@@ -545,7 +569,7 @@ public static class ApplicationThemeService
             _ => header?.ToString() ?? ""
         };
         // Short labels still need comfortable room for values; longer Persian labels wrap on
-        // two lines. 180px is enough for the longest common headings without wasting space.
+        // two lines. Keep this as the baseline; semantic data minima are applied separately.
         return Math.Clamp(52d + text.Trim().Length * 6.1d, 84d, 180d);
     }
 
