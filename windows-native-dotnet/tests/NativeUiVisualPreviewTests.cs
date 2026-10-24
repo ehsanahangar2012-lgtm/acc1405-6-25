@@ -156,6 +156,21 @@ public sealed class NativeUiVisualPreviewTests
                     dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
                         new Action(dashboard.UpdateLayout));
                     SaveContent(dashboard, outputDirectory, $"dashboard-{theme}.png");
+
+                    currentStage = $"about page ({theme})";
+                    var mainTabs = dashboard.FindName("MainTabs") as TabControl;
+                    var aboutTab = mainTabs?.Items.OfType<TabItem>()
+                        .FirstOrDefault(tab => string.Equals(tab.Header?.ToString(), "معرفی نرم‌افزار", StringComparison.Ordinal));
+                    if (mainTabs is null || aboutTab is null)
+                        throw new InvalidOperationException("About page tab was not found for UI capture.");
+                    mainTabs.SelectedItem = aboutTab;
+                    var refreshAbout = typeof(MainWindow).GetMethod(
+                        "RefreshAboutCompanyPage", BindingFlags.Instance | BindingFlags.NonPublic);
+                    refreshAbout?.Invoke(dashboard, null);
+                    navigationSelection.Invoke(dashboard, new object?[] { "about", theme });
+                    dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                        new Action(dashboard.UpdateLayout));
+                    SaveContent(dashboard, outputDirectory, $"about-page-{theme}.png");
                     dashboard.Close();
 
                     currentStage = $"people table ({theme})";
@@ -195,7 +210,7 @@ public sealed class NativeUiVisualPreviewTests
 
                 owner.Close();
                 var capturedImages = Directory.GetFiles(outputDirectory, "*.png");
-                Assert.AreEqual(12, capturedImages.Length, "Expected dashboard, people table, person, invoice, voucher and print-preview captures for both themes.");
+                Assert.AreEqual(14, capturedImages.Length, "Expected dashboard, about page, people table, person, invoice, voucher and print-preview captures for both themes.");
             }
             catch (Exception ex)
             {
