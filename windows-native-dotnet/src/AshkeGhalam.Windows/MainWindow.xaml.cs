@@ -1206,7 +1206,8 @@ public partial class MainWindow : Window
     private void AddPersonQuick(bool defaultSupplier)
     {
         if (!RequireWritable() || !ConfirmCanAddCustomer()) return;
-        var suggestedCode = NextCode(_data.Customers.Select(person => person.Code), "CUS-");
+        var codePrefix = defaultSupplier ? "SUP-" : "CUS-";
+        var suggestedCode = NextCode(_data.Customers.Select(person => person.Code), codePrefix);
         var dialog = new CustomerDialog(this, suggestedCode: suggestedCode, defaultSupplier: defaultSupplier, knownPeople: _data.Customers);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is CustomerRecord customer)

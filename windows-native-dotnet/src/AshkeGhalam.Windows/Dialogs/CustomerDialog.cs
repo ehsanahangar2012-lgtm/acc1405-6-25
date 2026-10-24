@@ -34,7 +34,9 @@ public sealed class CustomerDialog : Window
         _existing = existing;
         _knownPeople = knownPeople?.ToList() ?? (existing is null ? [] : [existing]);
         Owner = owner;
-        Title = existing is null ? "ثبت شخص جدید" : "ویرایش پرونده شخص";
+        Title = existing is null
+            ? (defaultSupplier ? "ثبت تأمین‌کننده جدید" : "ثبت شخص جدید")
+            : "ویرایش پرونده شخص";
         Width = 565;
         Height = 735;
         MinHeight = 600;
@@ -123,7 +125,9 @@ public sealed class CustomerDialog : Window
         };
         var save = new Button
         {
-            Content = existing is null ? "ذخیره شخص" : "ثبت تغییرات",
+            Content = existing is null
+                ? (defaultSupplier ? "ذخیره تأمین‌کننده" : "ذخیره شخص")
+                : "ثبت تغییرات",
             Width = 120,
             Height = 36,
             Margin = new Thickness(0, 0, 8, 0),
