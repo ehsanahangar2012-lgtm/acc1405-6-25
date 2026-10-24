@@ -246,7 +246,7 @@ public sealed class InvoicePreviewWindow : Window
             Document = _document,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-            IsToolBarVisible = true,
+            IsToolBarVisible = false,
             Background = Brushes.White,
             Padding = new Thickness(12)
         };
@@ -332,8 +332,10 @@ public sealed class InvoicePreviewWindow : Window
             FontFamily = CreatePersianFontFamily(),
             FontSize = 12,
             FlowDirection = FlowDirection.RightToLeft,
-            PagePadding = new Thickness(36),
-            ColumnWidth = 760,
+            PageWidth = 794,
+            PageHeight = 1123,
+            PagePadding = new Thickness(32),
+            ColumnWidth = 730,
             Background = Brushes.White,
             Foreground = ink
         };
