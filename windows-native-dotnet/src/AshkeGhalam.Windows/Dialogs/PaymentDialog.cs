@@ -83,32 +83,66 @@ public sealed class PaymentDialog : Window
         _customer.SelectedItem = customerChoices.FirstOrDefault(person => person.Id == existingInvoice?.CustomerId)
             ?? customerChoices.FirstOrDefault();
 
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(new TextBlock { Text = title, FontSize = 20, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 12) });
+        var root = new StackPanel { Margin = new Thickness(16) };
         if (_eligibleInvoices.Count == 0)
         {
-            root.Children.Add(new TextBlock
+            var unavailableMessage = invoiceTypeFilter == "SALE"
+                ? "فاکتور فروش قطعی و دارای مانده برای دریافت پیدا نشد."
+                : invoiceTypeFilter == "PURCHASE"
+                    ? "فاکتور خرید قطعی و دارای مانده برای پرداخت پیدا نشد."
+                    : "فاکتور قطعی دارای مانده برای تسویه پیدا نشد.";
+            root.Children.Add(new Border
             {
-                Text = invoiceTypeFilter == "SALE"
-                    ? "فاکتور فروش قطعی و دارای مانده برای دریافت پیدا نشد."
-                    : invoiceTypeFilter == "PURCHASE"
-                        ? "فاکتور خرید قطعی و دارای مانده برای پرداخت پیدا نشد."
-                        : "فاکتور قطعی دارای مانده برای تسویه پیدا نشد.",
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(153, 27, 27)),
-                Margin = new Thickness(0, 0, 0, 8)
+                Background = PaletteBrush("#FEF2F2"),
+                BorderBrush = PaletteBrush("#FECACA"),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(9),
+                Padding = new Thickness(12),
+                Margin = new Thickness(0, 0, 0, 12),
+                Child = new TextBlock
+                {
+                    Text = unavailableMessage,
+                    Foreground = PaletteBrush("#991B1B"),
+                    TextWrapping = TextWrapping.Wrap
+                }
             });
         }
 
-        Add(root, "طرف حساب", _customer);
-        Add(root, "فاکتور قطعی (بر اساس طرف حساب)", _invoice);
-        root.Children.Add(_remainingHint);
-        Add(root, $"مبلغ تسویه ({_currencyLabel})", _amount);
-        Add(root, "روش دریافت / پرداخت", _method);
-        Add(root, "شماره پیگیری / توضیح", _reference);
+        var partySection = new StackPanel();
+        Add(partySection, "طرف حساب", _customer);
+        Add(partySection, "فاکتور قطعی دارای مانده", _invoice);
+        partySection.Children.Add(new Border
+        {
+            Background = PaletteBrush("#F0FDFA"),
+            BorderBrush = PaletteBrush("#99F6E4"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 8, 0, 0),
+            Child = _remainingHint
+        });
+        root.Children.Add(CreateSectionCard(
+            "۱. انتخاب طرف حساب و فاکتور",
+            "فهرست فاکتورها با انتخاب طرف حساب به‌روزرسانی می‌شود و فقط اسناد دارای مانده قابل انتخاب هستند.",
+            partySection));
+
+        var settlementSection = new StackPanel();
+        Add(settlementSection, $"مبلغ تسویه ({_currencyLabel})", _amount);
+        Add(settlementSection, "روش دریافت / پرداخت", _method);
+        Add(settlementSection, "شماره پیگیری / توضیح", _reference);
+        root.Children.Add(CreateSectionCard(
+            "۲. جزئیات تسویه",
+            "مبلغ پیش‌فرض از ماندهٔ فاکتور گرفته می‌شود؛ مقدار بیشتر از مانده مجاز نیست.",
+            settlementSection));
 
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(22, 10, 22, 18) };
-        var ok = new Button { Content = existingPayment is null ? "ثبت عملیات نقدی/مالی" : "ذخیره تغییرات", Width = 150, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0) };
+        var ok = new Button
+        {
+            Content = existingPayment is null ? "ثبت عملیات نقدی/مالی" : "ذخیره تغییرات",
+            Width = 165, Height = 38, IsDefault = true, Margin = new Thickness(0, 0, 8, 0),
+            Background = PaletteBrush("#0F766E"), Foreground = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#0F766E")
+        };
         buttons.Children.Add(ok);
         buttons.Children.Add(new Button { Content = "انصراف", Width = 90, Height = 38, IsCancel = true });
 
@@ -196,6 +230,42 @@ public sealed class PaymentDialog : Window
         if (string.IsNullOrWhiteSpace(field.Text)) return;
         try { field.Text = NumericTextBoxFormatter.Format(PersianNumberParser.ParseDecimal(field.Text, "مبلغ")); }
         catch (InvalidOperationException) { }
+    }
+
+    private static SolidColorBrush PaletteBrush(string value) =>
+        new((Color)ColorConverter.ConvertFromString(value)!);
+
+    private static Border CreateSectionCard(string title, string subtitle, UIElement content)
+    {
+        var heading = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+        heading.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontSize = 15,
+            FontWeight = FontWeights.Bold,
+            Foreground = PaletteBrush("#0F766E")
+        });
+        heading.Children.Add(new TextBlock
+        {
+            Text = subtitle,
+            FontSize = 11,
+            Foreground = PaletteBrush("#64748B"),
+            Margin = new Thickness(0, 3, 0, 0),
+            TextWrapping = TextWrapping.Wrap
+        });
+        var body = new StackPanel();
+        body.Children.Add(heading);
+        body.Children.Add(content);
+        return new Border
+        {
+            Background = PaletteBrush("#FFFFFF"),
+            BorderBrush = PaletteBrush("#CBD5E1"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(14),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = body
+        };
     }
 
     private static void Add(Panel root,string label,Control field)
