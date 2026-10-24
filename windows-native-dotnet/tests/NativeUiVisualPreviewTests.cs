@@ -121,6 +121,65 @@ public sealed class NativeUiVisualPreviewTests
                     Address = "مشهد — نشانی نمونه برای پیش‌نمایش"
                 };
 
+                var sampleVoucher = new VoucherRecord
+                {
+                    Id = "ui-voucher-001",
+                    Number = 42,
+                    TrackingCode = "VCH-0042",
+                    Date = invoice.CreatedAt,
+                    Type = "OUT",
+                    PersonId = person.Id,
+                    PersonName = person.Name,
+                    MovementType = "GOODS_ISSUE",
+                    Items =
+                    [
+                        new VoucherItemRecord
+                        {
+                            ProductId = product.Id,
+                            ProductName = product.Name,
+                            Quantity = 12,
+                            Unit = product.Unit,
+                            Description = "تحویل نمونه برای بازبینی چاپ"
+                        }
+                    ],
+                    EstimatedValue = 12 * product.UnitPrice,
+                    TotalWeight = 24,
+                    Status = "PENDING",
+                    Notes = "دادهٔ نمونهٔ پیش‌نمایش حواله"
+                };
+                var samplePayment = new PaymentRecord
+                {
+                    Id = "ui-payment-001",
+                    InvoiceId = invoice.Id,
+                    InvoiceNumber = invoice.Number,
+                    CustomerName = person.Name,
+                    Amount = 200000,
+                    Method = "نقدی",
+                    Reference = "RCPT-1025",
+                    CreatedAt = invoice.CreatedAt
+                };
+                var sampleCheck = new CheckRecord
+                {
+                    Id = "ui-check-001",
+                    CheckNumber = "12345678",
+                    SayadId = "1234567890123456",
+                    BankName = "بانک نمونه",
+                    Amount = 400000,
+                    IssueDate = invoice.CreatedAt.AddDays(-1),
+                    DueDate = invoice.CreatedAt.AddDays(20),
+                    Status = "PENDING",
+                    HolderName = person.Name,
+                    PersonId = person.Id,
+                    PersonName = person.Name,
+                    CheckType = "RECEIVED",
+                    Description = "چک نمونه برای کنترل خوانایی"
+                };
+                var kardexRows = new List<ProductKardexPrintRow>
+                {
+                    new("1405/08/01", "ورود کالا", "VCH-0041", "موجودی ابتدای دوره", 240, 0, 240),
+                    new("1405/08/02", "حواله خروج", "VCH-0042", "تحویل نمونه", 0, 12, 228)
+                };
+
                 foreach (var theme in new[] { "light", "dark" })
                 {
                     currentStage = $"dashboard ({theme})";
@@ -252,11 +311,73 @@ public sealed class NativeUiVisualPreviewTests
                         owner, invoice, defaultTheme: "modern", showQr: false,
                         company: company, currencyCode: "RIAL");
                     CaptureVisibleWindow(preview, theme, outputDirectory, $"invoice-print-preview-{theme}.png");
+
+                    currentStage = $"voucher print preview ({theme})";
+                    var voucherPreview = new VoucherPreviewWindow(owner, sampleVoucher, company);
+                    CaptureVisibleWindow(voucherPreview, theme, outputDirectory, $"voucher-print-preview-{theme}.png");
+
+                    currentStage = $"payment receipt print preview ({theme})";
+                    var receiptPreview = new PaymentReceiptPreviewWindow(
+                        owner, samplePayment, invoice, company, currencyCode: "RIAL");
+                    CaptureVisibleWindow(receiptPreview, theme, outputDirectory, $"payment-receipt-print-preview-{theme}.png");
+
+                    currentStage = $"check print preview ({theme})";
+                    var checkPreview = new CheckPreviewWindow(owner, sampleCheck, company, currency: "RIAL");
+                    CaptureVisibleWindow(checkPreview, theme, outputDirectory, $"check-print-preview-{theme}.png");
+
+                    currentStage = $"product kardex print preview ({theme})";
+                    var kardexPreview = new ProductKardexPrintPreviewWindow(owner, product, kardexRows, openingBalance: 240);
+                    CaptureVisibleWindow(kardexPreview, theme, outputDirectory, $"product-kardex-print-preview-{theme}.png");
+
+                    // Narrow captures check toolbar wrapping and printable-paper preservation
+                    // close to each preview's supported minimum width.
+                    currentStage = $"narrow invoice print preview ({theme})";
+                    var narrowInvoicePreview = new InvoicePreviewWindow(
+                        owner, invoice, defaultTheme: "modern", showQr: false,
+                        company: company, currencyCode: "RIAL")
+                    {
+                        Width = 780,
+                        Height = 620
+                    };
+                    CaptureVisibleWindow(narrowInvoicePreview, theme, outputDirectory, $"invoice-print-preview-narrow-{theme}.png");
+
+                    currentStage = $"narrow voucher print preview ({theme})";
+                    var narrowVoucherPreview = new VoucherPreviewWindow(owner, sampleVoucher, company)
+                    {
+                        Width = 780,
+                        Height = 620
+                    };
+                    CaptureVisibleWindow(narrowVoucherPreview, theme, outputDirectory, $"voucher-print-preview-narrow-{theme}.png");
+
+                    currentStage = $"narrow payment receipt print preview ({theme})";
+                    var narrowReceiptPreview = new PaymentReceiptPreviewWindow(
+                        owner, samplePayment, invoice, company, currencyCode: "RIAL")
+                    {
+                        Width = 720,
+                        Height = 580
+                    };
+                    CaptureVisibleWindow(narrowReceiptPreview, theme, outputDirectory, $"payment-receipt-print-preview-narrow-{theme}.png");
+
+                    currentStage = $"narrow check print preview ({theme})";
+                    var narrowCheckPreview = new CheckPreviewWindow(owner, sampleCheck, company, currency: "RIAL")
+                    {
+                        Width = 700,
+                        Height = 620
+                    };
+                    CaptureVisibleWindow(narrowCheckPreview, theme, outputDirectory, $"check-print-preview-narrow-{theme}.png");
+
+                    currentStage = $"narrow product kardex print preview ({theme})";
+                    var narrowKardexPreview = new ProductKardexPrintPreviewWindow(owner, product, kardexRows, openingBalance: 240)
+                    {
+                        Width = 780,
+                        Height = 620
+                    };
+                    CaptureVisibleWindow(narrowKardexPreview, theme, outputDirectory, $"product-kardex-print-preview-narrow-{theme}.png");
                 }
 
                 owner.Close();
                 var capturedImages = Directory.GetFiles(outputDirectory, "*.png");
-                Assert.AreEqual(24, capturedImages.Length, "Expected dashboard, About top/details, people table, person, product, expense, payment, check, invoice, voucher and print-preview captures for both themes.");
+                Assert.AreEqual(42, capturedImages.Length, "Expected dashboard, About top/details, people table, person, product, expense, payment, check, invoice, voucher, and standard+narrow print previews for both themes.");
             }
             catch (Exception ex)
             {
