@@ -94,7 +94,7 @@ public sealed class PaymentReceiptPreviewWindow : Window
                 Document = _document,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto,
-                IsToolBarVisible = true,
+                IsToolBarVisible = false,
                 Background = Brushes.White,
                 Padding = new Thickness(12)
             }
@@ -123,8 +123,10 @@ public sealed class PaymentReceiptPreviewWindow : Window
             FontFamily = new FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
             FontSize = 12,
             FlowDirection = FlowDirection.RightToLeft,
+            PageWidth = 794,
+            PageHeight = 1123,
             PagePadding = new Thickness(30),
-            ColumnWidth = 720,
+            ColumnWidth = 734,
             Background = Brushes.White,
             Foreground = ink
         };
