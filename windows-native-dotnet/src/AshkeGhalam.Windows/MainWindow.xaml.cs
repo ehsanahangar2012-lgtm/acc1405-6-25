@@ -53,6 +53,8 @@ public partial class MainWindow : Window
         _uiReady = true;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
+        Loaded += (_, _) => Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
+            new Action(() => PersianDateInputService.AttachNamedDateFields(this)));
         StateChanged += (_, _) => UpdateWindowStateButton();
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         _automaticBackupTimer.Tick += AutomaticBackupTimer_Tick;
@@ -2642,6 +2644,7 @@ public partial class MainWindow : Window
         var interest = new TextBox { Text = "0", FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right };
         var count = new TextBox { Text = "12", FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right };
         var start = new TextBox { Text = FormatPersianDate(DateTimeOffset.Now), FlowDirection = FlowDirection.LeftToRight, HorizontalContentAlignment = HorizontalAlignment.Right };
+        PersianDateInputService.Attach(start);
         var notes = new TextBox { MinHeight = 56, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
         var funding = new ComboBox { MinWidth = 200 };
         funding.Items.Add(new ComboBoxItem { Content = "واریز به بانک", Tag = "1120" });
@@ -2783,6 +2786,7 @@ public partial class MainWindow : Window
             MinWidth = 280, SelectedIndex = 0
         };
         var date = new TextBox { Text = FormatPersianDate(DateTimeOffset.Now), FlowDirection = FlowDirection.LeftToRight };
+        PersianDateInputService.Attach(date);
         var description = new TextBox();
         var direction = new ComboBox();
         direction.Items.Add(new ComboBoxItem { Content = "واریز / ورودی", Tag = "CREDIT" });
