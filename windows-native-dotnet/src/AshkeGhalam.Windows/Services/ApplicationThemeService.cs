@@ -24,6 +24,8 @@ public static class ApplicationThemeService
     }
 
     private static readonly ConditionalWeakTable<DependencyObject, Snapshot> OriginalValues = new();
+    private sealed class GridThemeState { public bool IsDark { get; set; } public bool Hooked { get; set; } }
+    private static readonly ConditionalWeakTable<DataGrid, GridThemeState> GridThemeStates = new();
 
     public static string Normalize(string? theme) =>
         string.Equals(theme, DarkTheme, StringComparison.OrdinalIgnoreCase) ? DarkTheme : LightTheme;
@@ -50,6 +52,7 @@ public static class ApplicationThemeService
     {
         ArgumentNullException.ThrowIfNull(window);
         var elements = EnumerateTree(window).ToList();
+        var isDark = Normalize(theme) == DarkTheme;
 
         foreach (var element in elements)
         {
@@ -57,14 +60,55 @@ public static class ApplicationThemeService
             RestoreOriginalValues(element, snapshot);
         }
 
-        if (Normalize(theme) == LightTheme)
-            return;
+        // Virtualized cells are created after the initial palette pass. Keep their contrast
+        // synchronized when rows load and when selection changes.
+        foreach (var grid in elements.OfType<DataGrid>())
+            ConfigureDataGridTheme(grid, isDark);
 
-        foreach (var element in elements)
+        if (!isDark) return;
+        foreach (var element in EnumerateTree(window))
             ApplyDarkValues(element);
     }
 
-    private static Snapshot CaptureOriginalValues(DependencyObject element)
+    private static void ConfigureDataGridTheme(DataGrid grid, bool isDark)
+    {
+        var state = GridThemeStates.GetValue(grid, _ => new GridThemeState());
+        state.IsDark = isDark;
+        if (!state.Hooked)
+        {
+            state.Hooked = true;
+            grid.LoadingRow += (_, e) => ReapplyRowContrast(e.Row, state);
+            grid.SelectionChanged += (_, _) =>
+                grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
+                    new Action(() => ReapplyGridContrast(grid, state)));
+            grid.Loaded += (_, _) =>
+                grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
+                    new Action(() => ReapplyGridContrast(grid, state)));
+        }
+        if (isDark)
+            grid.Dispatcher.BeginInvoke(DispatcherPriority.Loaded,
+                new Action(() => ReapplyGridContrast(grid, state)));
+    }
+
+    private static void ReapplyGridContrast(DataGrid grid, GridThemeState state)
+    {
+        if (!state.IsDark || !grid.IsLoaded) return;
+        foreach (var element in EnumerateTree(grid))
+            ApplyDarkValues(element);
+    }
+
+    private static void ReapplyRowContrast(DataGridRow row, GridThemeState state)
+    {
+        if (!state.IsDark) return;
+        row.Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+        {
+            if (!state.IsDark || !row.IsLoaded) return;
+            foreach (var element in EnumerateTree(row))
+                ApplyDarkValues(element);
+        }));
+    }
+
+    private static Snapshot CaptureOriginalValues    private static Snapshot CaptureOriginalValues(DependencyObject element)
     {
         var snapshot = new Snapshot();
         foreach (var property in GetBrushProperties(element))
