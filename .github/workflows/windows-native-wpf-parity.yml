@@ -24,9 +24,9 @@ concurrency:
 
 jobs:
   build-test-publish:
-    name: Build and smoke-test native Windows app
+    name: Build, smoke-test and package native Windows app
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Check out the isolated migration branch
         uses: actions/checkout@v4
@@ -69,11 +69,32 @@ jobs:
             }
           }
 
-      - name: Smoke-test locally built WPF executable startup
+      - name: Publish self-contained single-file EXE for Windows x64
         shell: pwsh
         run: |
-          $exe = Join-Path $env:GITHUB_WORKSPACE 'windows-native-dotnet/src/AshkeGhalam.Windows/bin/Release/net10.0-windows/AshkeGhalam.Windows.exe'
-          if (-not (Test-Path -LiteralPath $exe)) { throw "Build output was not found at $exe" }
+          $project = 'windows-native-dotnet/src/AshkeGhalam.Windows/AshkeGhalam.Windows.csproj'
+          $publishDir = Join-Path $env:GITHUB_WORKSPACE 'artifacts/ashkghalam-windows-x64'
+          New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
+          dotnet publish $project --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true -p:EnableCompressionInSingleFile=true -p:DebugType=None -p:DebugSymbols=false --output $publishDir
+          if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed with exit code $LASTEXITCODE" }
+          $exe = Join-Path $publishDir 'AshkeGhalam.Windows.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "Published EXE was not found: $exe" }
+          $length = (Get-Item -LiteralPath $exe).Length
+          if ($length -lt 10000000) { throw "Published EXE is unexpectedly small ($length bytes); self-contained packaging may be incomplete." }
+          @"
+          Ashk Ghalam Accounting - Native Windows WPF
+          Version: 16.55.0
+          Target: Windows x64
+          Package: self-contained single-file executable
+          Source commit: $env:GITHUB_SHA
+          Note: This preview build is unsigned and is not a commercially certified release.
+          "@ | Out-File -FilePath (Join-Path $publishDir 'README.txt') -Encoding utf8
+          Write-Host "Published EXE size: $length bytes"
+
+      - name: Smoke-test the published standalone EXE
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:GITHUB_WORKSPACE 'artifacts/ashkghalam-windows-x64/AshkeGhalam.Windows.exe'
           $startedAt = Get-Date
           $process = Start-Process -FilePath $exe -PassThru
           try {
@@ -87,21 +108,31 @@ jobs:
                   Select-Object -First 3
                 foreach ($event in $events) { $diagnostics += "Event $($event.Id): $($event.Message)" }
               } catch {}
-              throw "WPF exited during its startup smoke test (exit code $($process.ExitCode)). $($diagnostics -join [Environment]::NewLine)"
+              throw "Published WPF EXE exited during startup (exit code $($process.ExitCode)). $($diagnostics -join [Environment]::NewLine)"
             }
-            Write-Host 'Locally built WPF executable stayed alive for the startup smoke-test window.'
+            Write-Host 'Published self-contained WPF EXE stayed alive for the startup smoke-test window.'
           } finally {
             if (-not $process.HasExited) { Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue }
           }
+
+      - name: Upload downloadable Windows EXE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AshkeGhalam-Windows-x64-${{ github.sha }}
+          path: artifacts/ashkghalam-windows-x64/*
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
 
       - name: Report verification scope
         shell: pwsh
         run: |
           @"
-          ## Native WPF validation
+          ## Native WPF validation and package
 
           - Source commit: $env:GITHUB_SHA
           - WPF build and domain tests: passed if this run succeeds.
-          - Startup smoke test: checks that the locally built WPF process remains alive briefly.
-          - No release package, ZIP, screenshot, or download-branch publication is created by this workflow.
+          - Release package: self-contained Windows x64 single-file EXE.
+          - Startup smoke test: checks that the published EXE process remains alive briefly.
+          - This is an unsigned preview build. Visual interaction and physical printer testing are not covered by CI.
           "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
