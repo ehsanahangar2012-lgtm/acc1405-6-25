@@ -125,6 +125,14 @@ public sealed class NativeUiVisualPreviewTests
                 {
                     currentStage = $"dashboard ({theme})";
                     var dashboard = new MainWindow();
+                    var themeOverrideField = typeof(MainWindow).GetField(
+                        "_themePreviewOverride", BindingFlags.Instance | BindingFlags.NonPublic);
+                    themeOverrideField?.SetValue(dashboard, theme);
+                    if (dashboard.FindName("ApplicationThemeSelector") is ComboBox themeSelector)
+                    {
+                        themeSelector.SelectedItem = themeSelector.Items.OfType<ComboBoxItem>()
+                            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), theme, StringComparison.Ordinal));
+                    }
                     SetText(dashboard, "CurrentModuleText", "پیشخوان • تصویر بازبینی رابط");
                     SetText(dashboard, "StorageStatus", "ذخیره‌سازی محلی آماده");
                     SetText(dashboard, "CustomerCount", "۱۲۸");
@@ -164,6 +172,10 @@ public sealed class NativeUiVisualPreviewTests
                     if (mainTabs is null || aboutTab is null)
                         throw new InvalidOperationException("About page tab was not found for UI capture.");
                     mainTabs.SelectedItem = aboutTab;
+                    dashboard.Dispatcher.Invoke(System.Windows.Threading.DispatcherPriority.Render,
+                        new Action(dashboard.UpdateLayout));
+                    Assert.AreEqual(theme, ApplicationThemeService.DetectTheme(dashboard),
+                        "Navigating to the About page must preserve the active theme.");
                     if (aboutTab.Content is not ScrollViewer aboutScroll)
                         throw new InvalidOperationException("About page content is not a ScrollViewer.");
                     var refreshAbout = typeof(MainWindow).GetMethod(

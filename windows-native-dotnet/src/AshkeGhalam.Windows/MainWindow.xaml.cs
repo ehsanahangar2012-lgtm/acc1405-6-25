@@ -32,6 +32,8 @@ public partial class MainWindow : Window
     private string _startupAccountingWarning = "";
     private static bool _textBoxSelectAllHandlersRegistered;
     private string _activeNavigationKey = "dashboard";
+    // Holds the live theme choice until preferences are saved or the application is restarted.
+    private string? _themePreviewOverride;
     private bool _gridMenusConfigured;
     private bool _allowClose;
     private readonly DispatcherTimer _automaticBackupTimer = new() { Interval = TimeSpan.FromMinutes(1) };
@@ -130,18 +132,23 @@ public partial class MainWindow : Window
     {
         if (!_uiReady || !IsLoaded || ApplicationThemeSelector.SelectedItem is not ComboBoxItem selected)
             return;
-        ApplicationThemeService.Apply(this, selected.Tag?.ToString());
-        UpdateNavigationSelection(_activeNavigationKey, selected.Tag?.ToString());
+        _themePreviewOverride = ApplicationThemeService.Normalize(selected.Tag?.ToString());
+        ApplicationThemeService.Apply(this, _themePreviewOverride);
+        UpdateNavigationSelection(_activeNavigationKey, _themePreviewOverride);
         ApplyContextMenuTheme();
     }
 
+    private string CurrentApplicationTheme =>
+        ApplicationThemeService.Normalize(_themePreviewOverride ?? _data.Preferences?.ApplicationTheme);
+
     private void ApplyCurrentThemeTo(Window dialog) =>
-        ApplicationThemeService.ApplyWhenLoaded(dialog, _data.Preferences?.ApplicationTheme ?? "light");
+        ApplicationThemeService.ApplyWhenLoaded(dialog, CurrentApplicationTheme);
 
     private void ApplyMainWindowTheme()
     {
-        ApplicationThemeService.Apply(this, _data.Preferences?.ApplicationTheme ?? "light");
-        UpdateNavigationSelection(_activeNavigationKey);
+        var theme = CurrentApplicationTheme;
+        ApplicationThemeService.Apply(this, theme);
+        UpdateNavigationSelection(_activeNavigationKey, theme);
         ApplyContextMenuTheme();
     }
 
@@ -3407,8 +3414,9 @@ public partial class MainWindow : Window
         SettingsFooterPaymentTerms.IsChecked = (_data.Preferences.SelectedInvoiceFootnotes ?? []).Contains(FooterNotePaymentTerms, StringComparer.Ordinal);
         SettingsFooterDeliveryTerms.IsChecked = (_data.Preferences.SelectedInvoiceFootnotes ?? []).Contains(FooterNoteDeliveryTerms, StringComparer.Ordinal);
 
+        var themeSelection = ApplicationThemeService.Normalize(_themePreviewOverride ?? _data.Preferences.ApplicationTheme);
         ApplicationThemeSelector.SelectedItem = ApplicationThemeSelector.Items.OfType<ComboBoxItem>()
-            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), ApplicationThemeService.Normalize(_data.Preferences.ApplicationTheme), StringComparison.Ordinal))
+            .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), themeSelection, StringComparison.Ordinal))
             ?? ApplicationThemeSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "light", StringComparison.Ordinal));
         InvoiceThemeSelector.SelectedItem = InvoiceThemeSelector.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), _data.Preferences.InvoiceTheme, StringComparison.Ordinal))
@@ -3665,6 +3673,7 @@ public partial class MainWindow : Window
         }
         var theme = (InvoiceThemeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "modern";
         var applicationTheme = ApplicationThemeService.Normalize((ApplicationThemeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString());
+        _themePreviewOverride = applicationTheme;
         var currency = (SettingsCurrencySelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "RIAL";
         Commit(data =>
         {
