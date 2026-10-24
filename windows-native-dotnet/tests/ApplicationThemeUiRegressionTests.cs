@@ -134,6 +134,11 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                 ApplicationThemeService.Apply(window, "dark");
                 var editor = combo.Template.FindName("PART_EditableTextBox", combo) as TextBox;
                 Assert.IsNotNull(editor, "The native ComboBox must retain its editable text part for live search.");
+                Assert.IsInstanceOfType(combo.Resources[typeof(ComboBoxItem)], typeof(Style),
+                    "The dropdown item style must be available on the ComboBox itself for isolated Popup resource lookup.");
+                Assert.AreEqual(Color.FromRgb(17, 24, 39),
+                    ((SolidColorBrush)combo.Resources["ComboDropDownSurfaceBrush"]).Color,
+                    "Popup surface should use the current dark palette.");
                 Assert.AreEqual(Color.FromRgb(17, 24, 39), ((SolidColorBrush)editor!.Background).Color);
                 Assert.AreEqual(Color.FromRgb(243, 244, 246), ((SolidColorBrush)editor.Foreground).Color);
                 Assert.AreEqual(Color.FromRgb(71, 85, 105), ((SolidColorBrush)combo.BorderBrush).Color);
@@ -411,6 +416,62 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
         Assert.AreEqual("\uE716", converter.Convert("customers", typeof(string), null!, CultureInfo.InvariantCulture));
         Assert.AreEqual("\uEA18", converter.Convert("security", typeof(string), null!, CultureInfo.InvariantCulture));
         Assert.AreEqual("\uE71D", converter.Convert("unknown-module", typeof(string), null!, CultureInfo.InvariantCulture));
+    }
+
+    [TestMethod]
+    public void TextOnCardsKeepsReadableContrastAfterBackgroundChangesInBothThemes()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var text = new TextBlock
+                {
+                    Text = "مشخصات فاکتور",
+                    Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42))
+                };
+                var card = new Border
+                {
+                    Background = Brushes.White,
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+                    Padding = new Thickness(14),
+                    Child = text
+                };
+                var window = new Window
+                {
+                    Width = 520,
+                    Height = 260,
+                    Background = new SolidColorBrush(Color.FromRgb(248, 250, 252)),
+                    Content = card
+                };
+
+                ApplicationThemeService.Apply(window, "dark");
+                var darkBackground = ((SolidColorBrush)card.Background).Color;
+                var darkForeground = ((SolidColorBrush)text.Foreground).Color;
+                Assert.IsTrue(ApplicationThemeService.ContrastRatio(darkForeground, darkBackground) >= 4.5,
+                    $"Dark card text contrast must be at least 4.5:1; got {ApplicationThemeService.ContrastRatio(darkForeground, darkBackground):0.00}:1.");
+                Assert.AreEqual(Color.FromRgb(17, 24, 39), darkBackground);
+
+                ApplicationThemeService.Apply(window, "light");
+                var lightBackground = ((SolidColorBrush)card.Background).Color;
+                var lightForeground = ((SolidColorBrush)text.Foreground).Color;
+                Assert.IsTrue(ApplicationThemeService.ContrastRatio(lightForeground, lightBackground) >= 4.5,
+                    $"Light card text contrast must be at least 4.5:1; got {ApplicationThemeService.ContrastRatio(lightForeground, lightBackground):0.00}:1.");
+                Assert.AreEqual(Colors.White, lightBackground);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+            throw new AssertFailedException("Card text did not preserve contrast in both themes.", failure);
     }
 
 }
