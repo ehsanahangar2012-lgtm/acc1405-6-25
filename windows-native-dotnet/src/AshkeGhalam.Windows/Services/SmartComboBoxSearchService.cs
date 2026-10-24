@@ -44,6 +44,7 @@ public static class SmartComboBoxSearchService
             combo.PreviewTextInput += PreviewTextInput;
             combo.PreviewKeyDown += PreviewKeyDown;
             combo.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(ComboPreviewMouseLeftButtonDown), true);
+            combo.Loaded += (_, _) => AttachEditableEditorClickHandler(combo);
         }
 
         state.IsUpdating = true;
@@ -63,6 +64,8 @@ public static class SmartComboBoxSearchService
         combo.SelectedItem = null;
         combo.Text = "";
         state.IsUpdating = false;
+        combo.ApplyTemplate();
+        AttachEditableEditorClickHandler(combo);
     }
 
     /// <summary>A pure search predicate shared by the live filter and regression tests.</summary>
@@ -150,6 +153,34 @@ public static class SmartComboBoxSearchService
     {
         if (sender is ComboBox combo)
             BeginNewQueryIfAChoiceWasCommitted(combo);
+    }
+
+    private static readonly ConditionalWeakTable<TextBox, object> EditableEditorClickHandlers = new();
+
+    private static void AttachEditableEditorClickHandler(ComboBox combo)
+    {
+        if (combo.Template.FindName("PART_EditableTextBox", combo) is not TextBox editor ||
+            EditableEditorClickHandlers.TryGetValue(editor, out _))
+            return;
+
+        // ComboBox's editable textbox is a distinct visual child. Attach directly to the part
+        // so clicks on typed text open the list even when WPF marks the parent's routed event handled.
+        editor.PreviewMouseLeftButtonDown += (_, _) =>
+        {
+            if (!combo.IsEnabled || combo.Items.Count == 0)
+                return;
+
+            combo.Dispatcher.BeginInvoke(DispatcherPriority.Input, new Action(() =>
+            {
+                if (!combo.IsLoaded || !combo.IsEnabled)
+                    return;
+
+                combo.IsDropDownOpen = true;
+                editor.Focus();
+                editor.CaretIndex = editor.Text.Length;
+            }));
+        };
+        EditableEditorClickHandlers.Add(editor, new object());
     }
 
     private static void ComboPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
