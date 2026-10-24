@@ -201,28 +201,42 @@
             <TabItem Header="نمای کلی">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="8">
-                        <TextBlock Text="نمای کلی کسب‌وکار" FontSize="25" FontWeight="Bold" Foreground="#0F172A"/>
-                        <TextBlock Text="خلاصه از اطلاعات ذخیره‌شده در همین رایانه" Style="{StaticResource SectionHint}"/>
-                        <UniformGrid Columns="5" Margin="0,18,0,12">
-                            <Border Background="White" CornerRadius="12" Padding="16" Margin="0,0,10,0" BorderBrush="#E2E8F0" BorderThickness="1">
-                                <StackPanel><TextBlock Text="مشتریان" Foreground="#64748B"/><TextBlock x:Name="CustomerCount" Text="۰" FontSize="26" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0"/></StackPanel>
+                        <Border Background="#0F172A" BorderBrush="#334155" BorderThickness="1" CornerRadius="18" Padding="20" Margin="0,0,0,18">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Margin="0,0,18,0">
+                                    <TextBlock Text="مدیریت مالی اشک قلم" FontSize="24" FontWeight="Bold" Foreground="#F8FAFC"/>
+                                    <TextBlock Text="اطلاعات، اسناد و گردش مالی کسب‌وکار در یک نمای یکپارچه" FontSize="13" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                    <TextBlock Text="نسخهٔ بومی ویندوز  •  ذخیره‌سازی محلی رمزگذاری‌شده" FontSize="11" FontWeight="SemiBold" Foreground="#99F6E4" Margin="0,10,0,0"/>
+                                </StackPanel>
+                                <WrapPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left" MaxWidth="290">
+                                    <Button Content="＋ فاکتور جدید" Click="AddInvoice_Click" Background="#0F766E" Foreground="#FFFFFF" MinWidth="132" MinHeight="42" Margin="0,0,8,8"/>
+                                    <Button Content="＋ ثبت دریافت" Click="AddReceipt_Click" Background="#1F2937" Foreground="#F8FAFC" BorderBrush="#475569" MinWidth="132" MinHeight="42" Margin="0,0,0,8"/>
+                                </WrapPanel>
+                            </Grid>
+                        </Border>
+                        <TextBlock Text="شاخص‌های کلیدی" FontSize="20" FontWeight="Bold" Foreground="#0F172A"/>
+                        <TextBlock Text="خلاصهٔ اطلاعات ذخیره‌شده در همین رایانه" Style="{StaticResource SectionHint}"/>
+                        <UniformGrid Columns="3" Margin="0,14,0,12">
+                            <Border Background="#ECFDF5" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#A7F3D0" BorderThickness="1">
+                                <StackPanel><TextBlock Text="مشتریان" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="CustomerCount" Text="۰" FontSize="27" FontWeight="Bold" Foreground="#047857" Margin="0,10,0,0"/></StackPanel>
                             </Border>
-                            <Border Background="White" CornerRadius="12" Padding="16" Margin="0,0,10,0" BorderBrush="#E2E8F0" BorderThickness="1">
-                                <StackPanel><TextBlock Text="کالاها" Foreground="#64748B"/><TextBlock x:Name="ProductCount" Text="۰" FontSize="26" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0"/></StackPanel>
+                            <Border Background="#EFF6FF" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#BFDBFE" BorderThickness="1">
+                                <StackPanel><TextBlock Text="کالاها" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="ProductCount" Text="۰" FontSize="27" FontWeight="Bold" Foreground="#1D4ED8" Margin="0,10,0,0"/></StackPanel>
                             </Border>
-                            <Border Background="White" CornerRadius="12" Padding="16" Margin="0,0,10,0" BorderBrush="#E2E8F0" BorderThickness="1">
-                                <StackPanel><TextBlock Text="اسناد صادرشده" Foreground="#64748B"/><TextBlock x:Name="InvoiceCount" Text="۰" FontSize="26" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0"/></StackPanel>
+                            <Border Background="#F5F3FF" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#DDD6FE" BorderThickness="1">
+                                <StackPanel><TextBlock Text="اسناد صادرشده" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="InvoiceCount" Text="۰" FontSize="27" FontWeight="Bold" Foreground="#6D28D9" Margin="0,10,0,0"/></StackPanel>
                             </Border>
-                            <Border Background="White" CornerRadius="12" Padding="16" BorderBrush="#E2E8F0" BorderThickness="1">
-                                <StackPanel><TextBlock Text="ارزش فروش" Foreground="#64748B"/><TextBlock x:Name="SalesTotal" Text="۰" FontSize="22" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
+                            <Border Background="#F0FDFA" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#99F6E4" BorderThickness="1">
+                                <StackPanel><TextBlock Text="ارزش فروش" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="SalesTotal" Text="۰" FontSize="22" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
                             </Border>
-                            <Border Background="White" CornerRadius="12" Padding="16" BorderBrush="#E2E8F0" BorderThickness="1">
-                                <StackPanel><TextBlock Text="ارزش خرید" Foreground="#64748B"/><TextBlock x:Name="PurchasesTotal" Text="۰" FontSize="22" FontWeight="Bold" Foreground="#0F766E" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
+                            <Border Background="#FFF7ED" CornerRadius="14" Padding="16" Margin="0,0,10,10" BorderBrush="#FED7AA" BorderThickness="1">
+                                <StackPanel><TextBlock Text="ارزش خرید" Foreground="#475569" FontWeight="SemiBold"/><TextBlock x:Name="PurchasesTotal" Text="۰" FontSize="22" FontWeight="Bold" Foreground="#9A3412" Margin="0,10,0,0" TextWrapping="Wrap"/></StackPanel>
                             </Border>
                         </UniformGrid>
                         <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,4,0,0">
                             <StackPanel>
-                                <TextBlock Text="وضعیت مالی" FontSize="18" FontWeight="Bold"/>
+                                <TextBlock Text="وضعیت مالی" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
                                 <UniformGrid Columns="4" Margin="0,14,0,0">
                                     <StackPanel><TextBlock Text="دریافت ثبت‌شده" Foreground="#64748B"/><TextBlock x:Name="PaymentsTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
                                     <StackPanel><TextBlock Text="مطالبات فروش" Foreground="#64748B"/><TextBlock x:Name="ReceivablesTotal" Text="۰" FontSize="17" FontWeight="SemiBold" Margin="0,5,0,0"/></StackPanel>
@@ -231,7 +245,7 @@
                                 </UniformGrid>
                             </StackPanel>
                         </Border>
-                        <Border Background="White" BorderBrush="#DCE5EF" BorderThickness="1" CornerRadius="12" Padding="16" Margin="0,14,0,0">
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,14,0,0">
                             <StackPanel>
                                 <TextBlock Text="عملیات سریع" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
                                 <TextBlock Text="ثبت اطلاعات پایه و انجام کارهای پرتکرار، بدون جست‌وجو در منوها" Style="{StaticResource SectionHint}" TextWrapping="Wrap"/>
