@@ -868,6 +868,22 @@ public static class ApplicationThemeService
         return style;
     }
 
+    /// <summary>
+    /// Applies a WCAG-readable foreground to live status text using the nearest actual
+    /// surface in the current visual/logical tree. Intended for status labels whose text
+    /// and semantic color are updated after the window's initial theme pass.
+    /// </summary>
+    public static void SetReadableForeground(TextBlock target, Color preferredForeground, string? theme = null)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        var activeTheme = Normalize(theme ?? DetectTheme(Window.GetWindow(target)));
+        var isDark = activeTheme == DarkTheme;
+        var background = FindNearestBackground(target) ??
+            (isDark ? Color.FromRgb(17, 24, 39) : Colors.White);
+        var readable = MapForeground(preferredForeground, isDark, background) ?? preferredForeground;
+        target.Foreground = Brush(EnsureReadableContrast(readable, background));
+    }
+
     /// <summary>Pure contrast resolver used by UI regression tests.</summary>
     public static Color ResolveReadableForeground(Color foreground, Color background, string? theme) =>
         MapForeground(foreground, Normalize(theme) == DarkTheme, background) ?? foreground;

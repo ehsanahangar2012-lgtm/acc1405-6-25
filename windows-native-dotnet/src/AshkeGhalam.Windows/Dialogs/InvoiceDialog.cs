@@ -459,7 +459,7 @@ public sealed class InvoiceDialog : Window
             var details = string.IsNullOrWhiteSpace(person.Phone) ? "" : $" • تلفن: {person.Phone}";
             var balance = BuildPartyBalanceDisplay(person);
             _partyHint.Text = $"طرف حساب انتخاب‌شده: {person.Name}  |  کد: {person.Code}{details}  |  {balance}";
-            _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+            ApplicationThemeService.SetReadableForeground(_partyHint, Color.FromRgb(15, 118, 110));
             return;
         }
 
@@ -469,17 +469,17 @@ public sealed class InvoiceDialog : Window
             if (_person.IsDropDownOpen)
             {
                 _partyHint.Text = "برای ثبت طرف حساب، یکی از نتایج فهرست را انتخاب کنید؛ تایپ متن به‌تنهایی انتخاب محسوب نمی‌شود.";
-                _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+                ApplicationThemeService.SetReadableForeground(_partyHint, Color.FromRgb(15, 118, 110));
             }
             else if (_person.Items.Count > 0)
             {
                 _partyHint.Text = $"برای «{query}» {_person.Items.Count:N0} نتیجه موجود است؛ فهرست را باز کنید و یک مورد را انتخاب کنید.";
-                _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+                ApplicationThemeService.SetReadableForeground(_partyHint, Color.FromRgb(15, 118, 110));
             }
             else
             {
                 _partyHint.Text = $"موردی با عبارت «{query}» پیدا نشد؛ نام، کد یا تلفن را بررسی کنید.";
-                _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(185, 28, 28));
+                ApplicationThemeService.SetReadableForeground(_partyHint, Color.FromRgb(185, 28, 28));
             }
             return;
         }
@@ -487,14 +487,14 @@ public sealed class InvoiceDialog : Window
         if (_person.Items.Count > 0)
         {
             _partyHint.Text = "برای جست‌وجو، نام، کد یا تلفن را تایپ کنید و یک نتیجه را انتخاب کنید.";
-            _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+            ApplicationThemeService.SetReadableForeground(_partyHint, Color.FromRgb(15, 118, 110));
             return;
         }
 
         _partyHint.Text = CurrentType == "PURCHASE"
             ? "تأمین‌کننده‌ای با نقش فعال پیدا نشد؛ شخص جدید ثبت کنید یا نقش تأمین‌کننده را در پروندهٔ او فعال کنید."
             : "مشتری‌ای با نقش فعال پیدا نشد؛ شخص جدید ثبت کنید یا نقش مشتری را در پروندهٔ او فعال کنید.";
-        _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(185, 28, 28));
+        ApplicationThemeService.SetReadableForeground(_partyHint, Color.FromRgb(185, 28, 28));
     }
 
     private string BuildPartyBalanceDisplay(CustomerRecord person)
