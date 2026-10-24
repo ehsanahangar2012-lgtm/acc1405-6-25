@@ -106,4 +106,60 @@ public sealed class PersianDateInputServiceTests
             "Semantic warning/error colors should lighten without losing contrast.");
     }
 
+
+    [TestMethod]
+    public void InvoicePartySelectionSupportsLegacyRoleTypeAndBothRoles()
+    {
+        var legacyCustomer = new AshkeGhalam.Windows.Models.CustomerRecord
+        {
+            Id = "legacy-customer", Name = "مشتری قدیمی", Type = "CUSTOMER",
+            IsCustomer = false, IsSupplier = false
+        };
+        var legacySupplier = new AshkeGhalam.Windows.Models.CustomerRecord
+        {
+            Id = "legacy-supplier", Name = "تأمین‌کننده قدیمی", Type = "VENDOR",
+            IsCustomer = false, IsSupplier = false
+        };
+        var dualRole = new AshkeGhalam.Windows.Models.CustomerRecord
+        {
+            Id = "dual", Name = "طرف حساب مشترک", Type = "CUSTOMER",
+            IsCustomer = true, IsSupplier = true
+        };
+
+        var saleParties = InvoicePartySelectionService.GetSelectableParties(
+            new[] { legacyCustomer, legacySupplier, dualRole }, "SALE");
+        var purchaseParties = InvoicePartySelectionService.GetSelectableParties(
+            new[] { legacyCustomer, legacySupplier, dualRole }, "PURCHASE");
+
+        CollectionAssert.AreEquivalent(new[] { "legacy-customer", "dual" }, saleParties.Select(p => p.Id).ToArray());
+        CollectionAssert.AreEquivalent(new[] { "legacy-supplier", "dual" }, purchaseParties.Select(p => p.Id).ToArray());
+    }
+
+    [TestMethod]
+    public void ThemeForegroundResolutionMeetsWcagForMutedAndSemanticColors()
+    {
+        var lightSurfaces = new[] { Colors.White, Color.FromRgb(248, 250, 252), Color.FromRgb(226, 232, 240) };
+        var darkSurfaces = new[] { Color.FromRgb(17, 24, 39), Color.FromRgb(31, 41, 55), Color.FromRgb(15, 118, 110) };
+        var requestedForegrounds = new[] {
+            Color.FromRgb(148, 163, 184), Color.FromRgb(100, 116, 139),
+            Color.FromRgb(220, 38, 38), Color.FromRgb(22, 163, 74), Colors.White
+        };
+
+        foreach (var surface in lightSurfaces)
+            foreach (var foreground in requestedForegrounds)
+            {
+                var resolved = ApplicationThemeService.ResolveReadableForeground(foreground, surface, "light");
+                Assert.IsTrue(ApplicationThemeService.ContrastRatio(resolved, surface) >= 4.5,
+                    $"Light-theme contrast must be readable for foreground {foreground} on {surface}.");
+            }
+
+        foreach (var surface in darkSurfaces)
+            foreach (var foreground in requestedForegrounds)
+            {
+                var resolved = ApplicationThemeService.ResolveReadableForeground(foreground, surface, "dark");
+                Assert.IsTrue(ApplicationThemeService.ContrastRatio(resolved, surface) >= 4.5,
+                    $"Dark-theme contrast must be readable for foreground {foreground} on {surface}.");
+            }
+    }
+
 }

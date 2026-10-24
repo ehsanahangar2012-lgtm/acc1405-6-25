@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Documents;
+using System.Windows.Data;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -85,6 +87,8 @@ public static class ApplicationThemeService
 
         foreach (var grid in elements.OfType<DataGrid>())
             ConfigureDataGridTheme(grid, isDark);
+
+        PolishControls(window, elements);
     }
 
     private static void ConfigureDataGridTheme(DataGrid grid, bool isDark)
@@ -389,39 +393,163 @@ public static class ApplicationThemeService
             (byte)Math.Clamp((int)Math.Round(color.G + (255 - color.G) * amount), 0, 255),
             (byte)Math.Clamp((int)Math.Round(color.B + (255 - color.B) * amount), 0, 255));
 
+    private static Color EnsureReadableContrast(Color foreground, Color background, double minimumRatio = 4.5)
+    {
+        if (ContrastRatio(foreground, background) >= minimumRatio)
+            return foreground;
+
+        var light = Colors.White;
+        var dark = Color.FromRgb(15, 23, 42);
+        var target = ContrastRatio(light, background) >= ContrastRatio(dark, background) ? light : dark;
+        for (var step = 1; step <= 20; step++)
+        {
+            var amount = step / 20d;
+            var candidate = Color.FromRgb(
+                (byte)Math.Clamp((int)Math.Round(foreground.R + (target.R - foreground.R) * amount), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(foreground.G + (target.G - foreground.G) * amount), 0, 255),
+                (byte)Math.Clamp((int)Math.Round(foreground.B + (target.B - foreground.B) * amount), 0, 255));
+            if (ContrastRatio(candidate, background) >= minimumRatio)
+                return candidate;
+        }
+        return target;
+    }
+
     private static Color? MapForeground(Color color, bool isDark, Color? background)
     {
-        var fgBrightness = Brightness(color);
-        var bgBrightness = background is Color bg ? Brightness(bg) : (isDark ? 0.08 : 0.97);
+        var surface = background ?? (isDark ? Color.FromRgb(17, 24, 39) : Colors.White);
+        Color preferred;
 
         if (isDark)
         {
-            if (fgBrightness > 0.84) return color;
-            if (Saturation(color) > 0.45) return LightenSemanticColor(color);
-            return fgBrightness < 0.42
-                ? Color.FromRgb(243, 244, 246)
-                : Color.FromRgb(203, 213, 225);
+            preferred = Saturation(color) > 0.45
+                ? LightenSemanticColor(color, 0.58)
+                : Brightness(color) > 0.78
+                    ? color
+                    : Color.FromRgb(226, 232, 240);
         }
-
-        // White text cannot remain white on a light card after dark -> light switching.
-        if (fgBrightness > 0.84)
+        else if (Brightness(surface) < 0.28)
         {
-            if (bgBrightness < 0.42) return Colors.White;
-            return Color.FromRgb(15, 23, 42);
+            preferred = Saturation(color) > 0.4
+                ? LightenSemanticColor(color, 0.56)
+                : Color.FromRgb(248, 250, 252);
         }
-
-        // Dark text on a retained dark brand surface must be lifted, not left invisible.
-        if (bgBrightness < 0.28)
+        else if (Brightness(color) > 0.84)
         {
-            if (Saturation(color) > 0.4) return LightenSemanticColor(color);
-            return Color.FromRgb(243, 244, 246);
+            preferred = Color.FromRgb(15, 23, 42);
+        }
+        else if (Brightness(color) > 0.52 && Saturation(color) < 0.42)
+        {
+            preferred = Color.FromRgb(51, 65, 85);
+        }
+        else
+        {
+            preferred = color;
         }
 
-        // Strengthen muted slate text on light surfaces; preserve strongly saturated
-        // semantic colors (warning/error/success) rather than flattening their meaning.
-        if (bgBrightness > 0.75 && fgBrightness < 0.52 && Saturation(color) < 0.42)
-            return Color.FromRgb(51, 65, 85);
-        return color;
+        // Determine the final ink from WCAG relative-luminance contrast, not brightness alone.
+        return EnsureReadableContrast(preferred, surface);
+    }
+
+    private static void PolishControls(Window window, IReadOnlyCollection<DependencyObject> elements)
+    {
+        if (window.GetType().Name != "MainWindow")
+        {
+            var buttonStyle = CreateModernButtonStyle();
+            window.Resources[typeof(Button)] = buttonStyle;
+            foreach (var button in elements.OfType<Button>())
+                if (button.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
+                    button.Style = buttonStyle;
+        }
+
+        foreach (var input in elements.OfType<TextBox>())
+        {
+            input.FontSize = Math.Max(input.FontSize, 13);
+            input.MinHeight = Math.Max(input.MinHeight, input.AcceptsReturn ? 52 : 34);
+            input.BorderThickness = new Thickness(1);
+            if (!input.AcceptsReturn)
+                input.VerticalContentAlignment = VerticalAlignment.Center;
+            if (input.Padding.Left < 6)
+                input.Padding = new Thickness(8, 5, 8, 5);
+        }
+
+        foreach (var combo in elements.OfType<ComboBox>())
+        {
+            combo.FontSize = Math.Max(combo.FontSize, 13);
+            combo.MinHeight = Math.Max(combo.MinHeight, 36);
+            combo.BorderThickness = new Thickness(1);
+            combo.Padding = new Thickness(8, 5, 8, 5);
+            combo.MaxDropDownHeight = Math.Max(combo.MaxDropDownHeight, 280);
+        }
+
+        foreach (var grid in elements.OfType<DataGrid>())
+        {
+            grid.FontSize = Math.Max(grid.FontSize, 12);
+            grid.RowHeight = Math.Max(grid.RowHeight, 36);
+            grid.ColumnHeaderHeight = Math.Max(grid.ColumnHeaderHeight, 40);
+            grid.AlternationCount = Math.Max(grid.AlternationCount, 2);
+            grid.HeadersVisibility = DataGridHeadersVisibility.Column;
+        }
+    }
+
+    private static Style CreateModernButtonStyle()
+    {
+        var style = new Style(typeof(Button));
+        style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(12, 7, 12, 7)));
+        style.Setters.Add(new Setter(Control.MinHeightProperty, 36d));
+        style.Setters.Add(new Setter(Control.FontSizeProperty, 13d));
+        style.Setters.Add(new Setter(Control.FontWeightProperty, FontWeights.SemiBold));
+        style.Setters.Add(new Setter(FrameworkElement.CursorProperty, Cursors.Hand));
+        style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+
+        var template = new ControlTemplate(typeof(Button));
+        var surface = new FrameworkElementFactory(typeof(Border), "Surface");
+        surface.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        surface.SetBinding(Border.BackgroundProperty, new Binding(nameof(Control.Background))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        surface.SetBinding(Border.BorderBrushProperty, new Binding(nameof(Control.BorderBrush))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        surface.SetBinding(Border.BorderThicknessProperty, new Binding(nameof(Control.BorderThickness))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        surface.SetBinding(Border.PaddingProperty, new Binding(nameof(Control.Padding))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
+        presenter.SetBinding(ContentPresenter.ContentProperty, new Binding(nameof(ContentControl.Content))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        presenter.SetBinding(ContentPresenter.ContentTemplateProperty, new Binding(nameof(ContentControl.ContentTemplate))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        presenter.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+        surface.AppendChild(presenter);
+        template.VisualTree = surface;
+        template.Triggers.Add(new Trigger
+        {
+            Property = Button.IsMouseOverProperty, Value = true,
+            Setters = { new Setter(UIElement.OpacityProperty, 0.92, "Surface") }
+        });
+        template.Triggers.Add(new Trigger
+        {
+            Property = Button.IsPressedProperty, Value = true,
+            Setters = { new Setter(UIElement.OpacityProperty, 0.82, "Surface") }
+        });
+        template.Triggers.Add(new Trigger
+        {
+            Property = Button.IsEnabledProperty, Value = false,
+            Setters = { new Setter(UIElement.OpacityProperty, 0.45, "Surface") }
+        });
+        style.Setters.Add(new Setter(Control.TemplateProperty, template));
+        return style;
     }
 
     /// <summary>Pure contrast resolver used by UI regression tests.</summary>

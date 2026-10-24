@@ -41,7 +41,8 @@ public sealed class InvoiceDialog : Window
         new Choice("PURCHASE", "فاکتور خرید"),
         new Choice("PROFORMA", "پیش‌فاکتور")
     }, SelectedIndex = 0 };
-    private readonly ComboBox _person = new() { Height = 34, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 250, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _person = new() { Height = 48, MinWidth = 250, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "برای انتخاب، نام شخص را تایپ کنید یا فهرست را باز کنید." };
+    private readonly TextBlock _partyHint = new() { FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 0, 2, 8) };
     private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
     private readonly TextBox _quantity = new() { Height = 32, Width = 90, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _price = new() { Height = 32, Width = 130, Padding = new Thickness(8, 4, 8, 4) };
@@ -120,6 +121,8 @@ public sealed class InvoiceDialog : Window
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value.Trim()).Distinct(StringComparer.Ordinal).ToList();
         _footerTemplateSelector.ItemsSource = _footerTemplates;
+        _person.ItemTemplate = CreatePartyTemplate();
+        TextSearch.SetTextPath(_person, nameof(CustomerRecord.Name));
         _invoiceFooterText.Text = !string.IsNullOrWhiteSpace(existingInvoice?.InvoiceFooter)
             ? existingInvoice.InvoiceFooter : _invoiceFooter;
         _existingInvoice = existingInvoice;
@@ -159,40 +162,26 @@ public sealed class InvoiceDialog : Window
         _lineList.ItemsSource = _lines;
         _product.ItemsSource = _products;
 
-        var root = new StackPanel { Margin = new Thickness(22) };
-        root.Children.Add(new TextBlock
-        {
-            Text = "صدور سند مالی",
-            FontSize = 24,
-            FontWeight = FontWeights.Bold,
-            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
-            Margin = new Thickness(0, 0, 0, 4)
-        });
-        root.Children.Add(new TextBlock
-        {
-            Text = "سه نوع سند نسخهٔ اصلی پشتیبانی می‌شود: فروش موجودی را کم می‌کند، خرید موجودی را زیاد می‌کند و پیش‌فاکتور تا زمان تبدیل به فروش اثری بر موجودی ندارد.",
-            FontSize = 12,
-            Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 0, 0, 12)
-        });
-        AddField(root, "نوع سند", _type);
-        root.Children.Add(_numberPreview);
-        AddField(root, "طرف حساب (مشتری یا تأمین‌کننده بر اساس نوع سند)", _person);
+        var root = new StackPanel { Margin = new Thickness(18) };
+        root.Children.Add(CreateInvoiceHero());
+
+        var documentSection = new StackPanel();
+        AddField(documentSection, "نوع سند", _type);
+        documentSection.Children.Add(_numberPreview);
+        AddField(documentSection, "مشتری / تأمین‌کننده", _person);
+        documentSection.Children.Add(_partyHint);
         var addPersonInline = new Button
         {
             Content = "＋ ثبت شخص جدید بدون بستن فاکتور",
-            Height = 32,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Padding = new Thickness(12, 4, 12, 4),
-            Margin = new Thickness(0, 3, 0, 8)
+            Height = 36, HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(0, 3, 0, 8)
         };
         addPersonInline.Click += (_, _) => AddPersonInline();
-        root.Children.Add(addPersonInline);
+        documentSection.Children.Add(addPersonInline);
 
-        var dates = new Grid { Margin = new Thickness(0, 2, 0, 0) };
+        var dates = new Grid { Margin = new Thickness(0, 4, 0, 0) };
         dates.ColumnDefinitions.Add(new ColumnDefinition());
-        dates.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+        dates.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
         dates.ColumnDefinitions.Add(new ColumnDefinition());
         var datePanel = new StackPanel();
         AddDateField(datePanel, "تاریخ صدور شمسی", _date, optional: false);
@@ -205,53 +194,61 @@ public sealed class InvoiceDialog : Window
         Grid.SetColumn(dateSpacer, 1);
         dates.Children.Add(dateSpacer);
         dates.Children.Add(duePanel);
-        root.Children.Add(dates);
+        documentSection.Children.Add(dates);
+        root.Children.Add(CreateSectionCard("مشخصات فاکتور", "نوع سند، طرف حساب و تاریخ‌های مرتبط", documentSection));
 
-        root.Children.Add(new TextBlock { Text = "اقلام سند", FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 12, 0, 4) });
-        AddField(root, "اسکن بارکد (اسکنر دستی با ارسال Enter)", _barcodeScan);
-        AddField(root, "کالا", _product);
+        var itemsSection = new StackPanel();
+        AddField(itemsSection, "بارکدخوان (پس از اسکن، کلید Enter)", _barcodeScan);
+        AddField(itemsSection, "کالا", _product);
         var addProductInline = new Button
         {
             Content = "＋ ثبت کالای جدید بدون بستن فاکتور",
-            Height = 32,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Padding = new Thickness(12, 4, 12, 4),
-            Margin = new Thickness(0, 3, 0, 8)
+            Height = 36, HorizontalAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(14, 6, 14, 6), Margin = new Thickness(0, 3, 0, 10)
         };
         addProductInline.Click += (_, _) => AddProductInline();
-        root.Children.Add(addProductInline);
+        itemsSection.Children.Add(addProductInline);
 
-        var lineRow = new WrapPanel { Margin = new Thickness(0, 2, 0, 4), VerticalAlignment = VerticalAlignment.Center };
-        lineRow.Children.Add(_quantity);
-        lineRow.Children.Add(_price);
-        lineRow.Children.Add(_lineDescription);
+        var lineRow = new WrapPanel { Margin = new Thickness(0, 2, 0, 4), VerticalAlignment = VerticalAlignment.Bottom };
+        var quantityPanel = new StackPanel { Width = 100, Margin = new Thickness(0, 0, 8, 0) };
+        AddField(quantityPanel, "تعداد", _quantity);
+        var pricePanel = new StackPanel { Width = 138, Margin = new Thickness(0, 0, 8, 0) };
+        AddField(pricePanel, "قیمت واحد", _price);
+        var descriptionPanel = new StackPanel { Width = 238, Margin = new Thickness(0, 0, 8, 0) };
+        AddField(descriptionPanel, "شرح قلم (اختیاری)", _lineDescription);
+        lineRow.Children.Add(quantityPanel);
+        lineRow.Children.Add(pricePanel);
+        lineRow.Children.Add(descriptionPanel);
+        _addLineButton.MinWidth = 120;
+        _addLineButton.Height = 36;
         lineRow.Children.Add(_addLineButton);
-        root.Children.Add(lineRow);
-        root.Children.Add(new TextBlock
+        itemsSection.Children.Add(lineRow);
+        itemsSection.Children.Add(new TextBlock
         {
-            Text = "ترتیب ستون‌ها: تعداد، قیمت واحد، شرح قلم (اختیاری)",
-            FontSize = 11,
-            Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
-            Margin = new Thickness(0, 0, 0, 4)
+            Text = "قلم انتخاب‌شده را می‌توانید ویرایش یا حذف کنید؛ جمع هر ردیف به‌صورت خودکار محاسبه می‌شود.",
+            FontSize = 11, Foreground = new SolidColorBrush(Color.FromRgb(100, 116, 139)),
+            Margin = new Thickness(0, 0, 0, 6), TextWrapping = TextWrapping.Wrap
         });
-        root.Children.Add(_lineList);
-        var rowActions = new WrapPanel { Margin = new Thickness(0, 6, 0, 5) };
-        var editLine = new Button { Content = "ویرایش ردیف انتخاب‌شده", MinWidth = 160, Height = 32, Margin = new Thickness(0, 0, 8, 0) };
+        itemsSection.Children.Add(_lineList);
+        var rowActions = new WrapPanel { Margin = new Thickness(0, 8, 0, 2) };
+        var editLine = new Button { Content = "ویرایش ردیف انتخاب‌شده", MinWidth = 165, Height = 36, Margin = new Thickness(0, 0, 8, 0) };
         editLine.Click += (_, _) => BeginEditLine();
         rowActions.Children.Add(editLine);
-        var remove = new Button { Content = "حذف قلم انتخاب‌شده", MinWidth = 145, Height = 32 };
+        var remove = new Button { Content = "حذف قلم انتخاب‌شده", MinWidth = 150, Height = 36 };
         rowActions.Children.Add(remove);
-        root.Children.Add(rowActions);
+        itemsSection.Children.Add(rowActions);
+        root.Children.Add(CreateSectionCard("اقلام فاکتور", "جست‌وجوی کالا، افزودن ردیف و اصلاح اقلام", itemsSection));
 
+        var pricingSection = new StackPanel();
         var pricing = new Grid { Margin = new Thickness(0, 4, 0, 0) };
         pricing.ColumnDefinitions.Add(new ColumnDefinition());
-        pricing.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+        pricing.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
         pricing.ColumnDefinitions.Add(new ColumnDefinition());
         var discountPanel = new StackPanel();
         AddField(discountPanel, "تخفیف (مبلغ)", _discount);
         Grid.SetColumn(discountPanel, 0);
         var taxPanel = new StackPanel();
-        AddField(taxPanel, "مالیات (مبلغ یا درصد بر اساس گزینهٔ زیر)", _tax);
+        AddField(taxPanel, "مالیات (مبلغ یا درصد)", _tax);
         taxPanel.Children.Add(_taxIsAmount);
         Grid.SetColumn(taxPanel, 2);
         pricing.Children.Add(discountPanel);
@@ -259,22 +256,25 @@ public sealed class InvoiceDialog : Window
         Grid.SetColumn(pricingSpacer, 1);
         pricing.Children.Add(pricingSpacer);
         pricing.Children.Add(taxPanel);
-        root.Children.Add(pricing);
-        root.Children.Add(_totals);
-        AddField(root, "دریافت/پرداخت نقدی هنگام صدور", _cashAmount);
-        AddField(root, "شرح فاکتور / متن چاپ", _description);
-        AddField(root, "یادداشت داخلی (در چاپ درج نمی‌شود)", _notes);
-        root.Children.Add(new TextBlock
+        pricingSection.Children.Add(pricing);
+        pricingSection.Children.Add(_totals);
+        AddField(pricingSection, "دریافت/پرداخت نقدی هنگام صدور", _cashAmount);
+        root.Children.Add(CreateSectionCard("جمع‌بندی مالی", "تخفیف، مالیات و مانده سند به‌صورت خودکار محاسبه می‌شوند", pricingSection));
+
+        var extraSection = new StackPanel();
+        AddField(extraSection, "شرح فاکتور / متن چاپ", _description);
+        AddField(extraSection, "یادداشت داخلی (در چاپ درج نمی‌شود)", _notes);
+        extraSection.Children.Add(new TextBlock
         {
             Text = "پانویس قابل انتخاب برای چاپ فاکتور",
-            FontWeight = FontWeights.SemiBold,
+            FontWeight = FontWeights.SemiBold, FontSize = 13,
             Margin = new Thickness(0, 12, 0, 5)
         });
         var footerTemplateRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 5) };
         footerTemplateRow.Children.Add(_footerTemplateSelector);
         var insertFooterTemplate = new Button
         {
-            Content = "درج الگو", MinWidth = 95, Height = 34,
+            Content = "درج الگو", MinWidth = 100, Height = 36,
             Margin = new Thickness(8, 0, 0, 0)
         };
         insertFooterTemplate.Click += (_, _) =>
@@ -287,13 +287,13 @@ public sealed class InvoiceDialog : Window
                     ? template : _invoiceFooterText.Text.TrimEnd() + Environment.NewLine + template;
         };
         footerTemplateRow.Children.Add(insertFooterTemplate);
-        root.Children.Add(footerTemplateRow);
-        AddField(root, "زیرنویس دلخواه (فقط روی همین فاکتور چاپ می‌شود)", _invoiceFooterText);
-        root.Children.Add(_saveFooterAsTemplate);
+        extraSection.Children.Add(footerTemplateRow);
+        AddField(extraSection, "زیرنویس دلخواه (فقط روی همین فاکتور چاپ می‌شود)", _invoiceFooterText);
+        extraSection.Children.Add(_saveFooterAsTemplate);
 
         var logistics = new Grid { Margin = new Thickness(0, 2, 0, 0) };
         logistics.ColumnDefinitions.Add(new ColumnDefinition());
-        logistics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+        logistics.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(14) });
         logistics.ColumnDefinitions.Add(new ColumnDefinition());
         var driverPanel = new StackPanel();
         AddField(driverPanel, "نام راننده", _driverName);
@@ -306,10 +306,11 @@ public sealed class InvoiceDialog : Window
         Grid.SetColumn(logisticsSpacer, 1);
         logistics.Children.Add(logisticsSpacer);
         logistics.Children.Add(phonePanel);
-        root.Children.Add(logistics);
-        AddField(root, "شماره پلاک / خودرو", _vehiclePlate);
-        AddField(root, "شناسه مالیاتی ۲۲ نویسه (اختیاری)", _taxId);
-        root.Children.Add(_showPreviousBalance);
+        extraSection.Children.Add(logistics);
+        AddField(extraSection, "شماره پلاک / خودرو", _vehiclePlate);
+        AddField(extraSection, "شناسه مالیاتی ۲۲ نویسه (اختیاری)", _taxId);
+        extraSection.Children.Add(_showPreviousBalance);
+        root.Children.Add(CreateSectionCard("اطلاعات تکمیلی و چاپ", "یادداشت‌ها، اطلاعات ارسال و گزینه‌های چاپ", extraSection));
 
         var buttons = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
         var preview = new Button { Content = "پیش‌نمایش قبل از ذخیره", MinWidth = 175, Height = 38, Margin = new Thickness(0, 0, 8, 8) };
@@ -341,7 +342,7 @@ public sealed class InvoiceDialog : Window
             RefreshNumberPreview();
             RefreshTotals();
         };
-        _person.SelectionChanged += (_, _) => RefreshTotals();
+        _person.SelectionChanged += (_, _) => { RefreshTotals(); UpdatePartyHint(); };
         _product.SelectionChanged += (_, _) => ApplyDefaultPrice();
         _discount.TextChanged += (_, _) => RefreshTotals();
         _tax.TextChanged += (_, _) => RefreshTotals();
@@ -436,13 +437,30 @@ public sealed class InvoiceDialog : Window
     private void RefreshPeople()
     {
         var previousId = (_person.SelectedItem as CustomerRecord)?.Id;
-        var candidates = CurrentType == "PURCHASE"
-            ? _people.Where(p => p.IsSupplier).ToList()
-            : _people.Where(p => p.IsCustomer).ToList();
+        var candidates = InvoicePartySelectionService.GetSelectableParties(_people, CurrentType);
+        _person.ItemsSource = null;
         _person.ItemsSource = candidates;
-        var previous = candidates.FindIndex(p => p.Id == previousId);
+        var previous = candidates.ToList().FindIndex(person => person.Id == previousId);
         _person.SelectedIndex = previous >= 0 ? previous : (candidates.Count > 0 ? 0 : -1);
+        _person.IsEnabled = candidates.Count > 0;
         _numberPreview.Text = BuildNumberPreview(CurrentType);
+        UpdatePartyHint();
+    }
+
+    private void UpdatePartyHint()
+    {
+        if (_person.SelectedItem is CustomerRecord person)
+        {
+            var details = string.IsNullOrWhiteSpace(person.Phone) ? "" : $" • {person.Phone}";
+            _partyHint.Text = $"طرف حساب انتخاب‌شده: {person.Name}  |  کد: {person.Code}{details}";
+            _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+            return;
+        }
+
+        _partyHint.Text = CurrentType == "PURCHASE"
+            ? "تأمین‌کننده‌ای با نقش فعال پیدا نشد؛ شخص جدید ثبت کنید یا نقش تأمین‌کننده را در پروندهٔ او فعال کنید."
+            : "مشتری‌ای با نقش فعال پیدا نشد؛ شخص جدید ثبت کنید یا نقش مشتری را در پروندهٔ او فعال کنید.";
+        _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(185, 28, 28));
     }
 
     private void ApplyDefaultPrice()
@@ -784,6 +802,83 @@ public sealed class InvoiceDialog : Window
     private static string ToText(InvoiceLine line) =>
         $"{line.EntryOrder:N0}. {line.ProductName} | {line.Quantity:#,##0.##} × {line.UnitPrice:#,##0.##} = {line.LineTotal:#,##0.##}" +
         (string.IsNullOrWhiteSpace(line.Description) ? "" : $" | {line.Description}");
+
+    private static Border CreateInvoiceHero()
+    {
+        var content = new StackPanel();
+        content.Children.Add(new TextBlock
+        {
+            Text = "صدور فاکتور | اشک قلم",
+            FontSize = 22, FontWeight = FontWeights.Bold,
+            Foreground = Brushes.White, Margin = new Thickness(0, 0, 0, 4)
+        });
+        content.Children.Add(new TextBlock
+        {
+            Text = "ثبت هوشمند طرف حساب، تاریخ شمسی، کالا و مبالغ در یک فرم یکپارچه",
+            FontSize = 12, Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+            TextWrapping = TextWrapping.Wrap
+        });
+        return new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+            BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(15),
+            Padding = new Thickness(20), Margin = new Thickness(0, 0, 0, 14),
+            Child = content
+        };
+    }
+
+    private static Border CreateSectionCard(string title, string subtitle, UIElement content)
+    {
+        var panel = new StackPanel();
+        panel.Children.Add(new TextBlock
+        {
+            Text = title, FontSize = 16, FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+            Margin = new Thickness(0, 0, 0, 3)
+        });
+        panel.Children.Add(new TextBlock
+        {
+            Text = subtitle, FontSize = 11,
+            Foreground = new SolidColorBrush(Color.FromRgb(71, 85, 105)),
+            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 12)
+        });
+        panel.Children.Add(new Border
+        {
+            Height = 1, Background = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+            Margin = new Thickness(0, 0, 0, 12)
+        });
+        panel.Children.Add(content);
+        return new Border
+        {
+            Background = Brushes.White,
+            BorderBrush = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(14),
+            Padding = new Thickness(18),
+            Margin = new Thickness(0, 0, 0, 12),
+            Child = panel
+        };
+    }
+
+    private static DataTemplate CreatePartyTemplate()
+    {
+        var panel = new FrameworkElementFactory(typeof(StackPanel));
+        panel.SetValue(StackPanel.MarginProperty, new Thickness(2, 4, 2, 4));
+        var name = new FrameworkElementFactory(typeof(TextBlock));
+        name.SetBinding(TextBlock.TextProperty, new Binding(nameof(CustomerRecord.Name)));
+        name.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
+        var details = new FrameworkElementFactory(typeof(TextBlock));
+        details.SetBinding(TextBlock.TextProperty, new Binding(nameof(CustomerRecord.Code))
+        {
+            StringFormat = "کد: {0}"
+        });
+        details.SetValue(TextBlock.FontSizeProperty, 10d);
+        details.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush(Color.FromRgb(100, 116, 139)));
+        panel.AppendChild(name);
+        panel.AppendChild(details);
+        return new DataTemplate(typeof(CustomerRecord)) { VisualTree = panel };
+    }
 
     private static void AddDateField(Panel root, string label, TextBox field, bool optional)
     {

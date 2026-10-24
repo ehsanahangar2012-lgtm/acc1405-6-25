@@ -360,3 +360,10 @@
 - [ ] آخرین اصلاح استثنای پس‌زمینهٔ خودِ `FlowDocumentScrollViewer` پس از ثبت این مورد در انتظار CI است؛ نتیجهٔ CI جدید ملاک تأیید آن خواهد بود.
 - [ ] تکرار خودکار سرستون در صفحات بعدی و عدم برش متن هنوز با چاپ چندصفحه‌ای و چاپگر واقعی آزمایش نشده است؛ گروه سرستون جدا شده، اما تکرار سرستون را نباید تأییدشده تلقی کرد.
 - [ ] مرور دیداری واقعی در دستگاه کاربر، تمام حالت‌های روشن/تاریک، اندازه‌های مختلف پنجره و همهٔ فرم‌ها هنوز انجام نشده است. طراحی همهٔ فرم‌ها با Stitch/Canva نیز تکمیل نشده؛ تغییر فعلی بازطراحی پیشخوان و اصلاحات ساختاری است، نه بازطراحی نهایی همهٔ صفحات.
+
+
+## 2026-10-24 — UI, invoice-party selection, and contrast follow-up
+- Reorganized the native invoice editor into a branded header and separate document, item, financial-summary, and print/details cards; added explicit labels for quantity, unit price, and line description.
+- Added a party-choice resolver that accepts legacy CUSTOMER/VENDOR type values when role booleans are absent, preserves dual-role people, shows the selected person's code/phone, and gives an actionable message when the current invoice type has no eligible party.
+- Replaced brightness-only foreground mapping with a WCAG contrast-ratio fallback targeting at least 4.5:1 when the chosen foreground fails; standardized dynamically created dialog buttons, inputs, and grids.
+- Added regression tests for legacy party filtering and contrast ratios in both themes. Automated Windows CI is the required verification gate; on-device visual review remains separate.
