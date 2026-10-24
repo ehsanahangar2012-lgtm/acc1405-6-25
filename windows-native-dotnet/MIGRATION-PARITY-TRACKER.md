@@ -822,4 +822,12 @@
 
 - [x] DataGrid minima now account for common binding fields (name, role, phone, amount, dates and identifiers) as well as the column heading; the horizontal scrollbar remains the overflow mechanism rather than shrinking essential values.
 - [x] UI regression tests cover minimum widths for name, role and phone columns in the WPF theme pass.
-- [ ] The Windows CI build and its refreshed screenshot artifact must confirm the layout after this adjustment.
+- [x] Windows CI run [40124982855](https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/actions/runs/40124982855) passed build, tests, WPF visual capture generation, self-contained EXE publish and startup smoke-test; fresh artifacts were uploaded.
+
+
+## Functional chunk 1 — dependent voucher movement choices
+
+- [x] گزینه‌های «نوع گردش موجودی» با نوع سند ورود، خروج یا برگشت سازگار شدند؛ هنگام تغییر نوع سند، انتخاب قبلی فقط در صورت معتبر بودن حفظ می‌شود.
+- [x] رکورد تاریخی ناسازگار هنگام ویرایش پنهان نمی‌شود؛ با برچسب اصلاح لازم دیده می‌شود، اما تا انتخاب گردش سازگار ذخیره نخواهد شد.
+- [x] آزمون مستقل نگاشت مجازها، پیش‌فرض‌ها و رد ترکیب‌های ناسازگار اضافه شد.
+- [ ] انتخاب‌های واقعی ماوس/صفحه‌کلید در ویندوز با دادهٔ آزمایشی همچنان باید دستی بررسی شوند.

@@ -287,7 +287,7 @@ public sealed class VoucherDialog : Window
         };
         save.Click += (_, _) => SaveResult();
         if (_existing is null) SetDefaultMovement();
-        else _movementType.SelectedItem = MovementTypes.FirstOrDefault(type => type.Value == _existing.MovementType);
+        else SetDefaultMovement(preserveLegacySelection: true);
         RefreshInvoiceChoices();
         if (_existing is not null)
             _invoice.SelectedItem = _invoice.Items.Cast<InvoiceChoice>()
@@ -370,6 +370,8 @@ public sealed class VoucherDialog : Window
         if (_lines.Count == 0) throw new InvalidOperationException("برای ثبت حواله حداقل یک قلم کالا لازم است.");
         var type = _type.SelectedItem as Choice ?? throw new InvalidOperationException("نوع سند را انتخاب کنید.");
         var movement = _movementType.SelectedItem as Choice ?? throw new InvalidOperationException("نوع گردش را انتخاب کنید.");
+        if (!VoucherMovementPolicy.IsAllowed(type.Value, movement.Value))
+            throw new InvalidOperationException($"نوع گردش «{movement.Label}» با نوع سند «{type.Label}» سازگار نیست. یکی از گزینه‌های سازگار را انتخاب کنید.");
         var date = ParsePersianDate(_date.Text);
         var person = _person.SelectedItem as CustomerRecord;
         var invoiceChoice = _invoice.SelectedItem as InvoiceChoice;
@@ -381,9 +383,6 @@ public sealed class VoucherDialog : Window
             if (requiredInvoiceType is null || invoiceChoice.Invoice.Type != requiredInvoiceType)
                 throw new InvalidOperationException("فاکتور مرتبط باید با نوع گردش انتخاب‌شده سازگار باشد.");
         }
-
-        if (type.Value == "RETURN" && movement.Value is not ("RETURN_RECEIPT" or "RETURN_ISSUE"))
-            throw new InvalidOperationException("برای برگشت کالا، نوع گردش «رسید برگشت از فروش» یا «حواله برگشت از خرید» را انتخاب کنید.");
 
         return new VoucherRecord
         {
@@ -475,17 +474,34 @@ public sealed class VoucherDialog : Window
         _ => null
     };
 
-    private void SetDefaultMovement()
+    private void SetDefaultMovement(bool preserveLegacySelection = false)
     {
-        var type = (_type.SelectedItem as Choice)?.Value;
-        var desired = type switch
+        var documentType = (_type.SelectedItem as Choice)?.Value;
+        var currentValue = (_movementType.SelectedItem as Choice)?.Value;
+        var allowedValues = VoucherMovementPolicy.GetAllowedMovementTypes(documentType);
+        var choices = allowedValues.Count == 0
+            ? MovementTypes.ToList()
+            : MovementTypes.Where(choice => allowedValues.Contains(choice.Value, StringComparer.Ordinal)).ToList();
+
+        // Keep legacy mismatches visible while editing so they can be corrected explicitly.
+        // New selections never offer incompatible movement types.
+        if (preserveLegacySelection && allowedValues.Count > 0 &&
+            !string.IsNullOrWhiteSpace(currentValue) &&
+            !allowedValues.Contains(currentValue, StringComparer.Ordinal))
         {
-            "IN" => "GOODS_RECEIPT",
-            "OUT" => "GOODS_ISSUE",
-            "RETURN" => "RETURN_RECEIPT",
-            _ => "GOODS_ISSUE"
-        };
-        _movementType.SelectedItem = MovementTypes.First(x => x.Value == desired);
+            var legacy = MovementTypes.FirstOrDefault(choice => choice.Value == currentValue);
+            if (legacy is not null)
+                choices.Add(new Choice(legacy.Value, legacy.Label + " — ناسازگار؛ اصلاح لازم"));
+        }
+
+        _movementType.ItemsSource = choices;
+        var preserveCurrent = !string.IsNullOrWhiteSpace(currentValue) &&
+            (allowedValues.Contains(currentValue, StringComparer.Ordinal) || preserveLegacySelection);
+        var selectedValue = preserveCurrent
+            ? currentValue
+            : VoucherMovementPolicy.GetDefaultMovementType(documentType);
+        _movementType.SelectedItem = choices.FirstOrDefault(choice => choice.Value == selectedValue)
+            ?? choices.FirstOrDefault();
     }
 
     private void RefreshTotals()
