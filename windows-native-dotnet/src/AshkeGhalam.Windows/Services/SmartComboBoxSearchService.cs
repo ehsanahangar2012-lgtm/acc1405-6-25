@@ -43,7 +43,7 @@ public static class SmartComboBoxSearchService
             combo.SelectionChanged += SelectionChanged;
             combo.PreviewTextInput += PreviewTextInput;
             combo.PreviewKeyDown += PreviewKeyDown;
-            combo.PreviewMouseLeftButtonDown += ComboPreviewMouseLeftButtonDown;
+            combo.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent, new MouseButtonEventHandler(ComboPreviewMouseLeftButtonDown), true);
         }
 
         state.IsUpdating = true;
