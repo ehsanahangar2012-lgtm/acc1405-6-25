@@ -3197,19 +3197,22 @@ public partial class MainWindow : Window
             return;
         }
         if (!ConfirmCanAddDocuments(receivedChecks.Count)) return;
+        var payeeChoices = InvoicePartySelectionService.GetAllSelectableParties(_data.Customers);
         var payee = new ComboBox
         {
-            IsEditable = true, IsTextSearchEnabled = true, StaysOpenOnEdit = true,
+            IsEditable = true, IsTextSearchEnabled = false, StaysOpenOnEdit = true,
             DisplayMemberPath = nameof(CustomerRecord.Name),
-            ItemsSource = _data.Customers.Where(person => person.IsSupplier || person.IsCustomer).OrderBy(person => person.Name).ToList(),
-            MinWidth = 330, Height = 36
+            MinWidth = 330, Height = 36,
+            ToolTip = "نام، کد، تلفن یا ایمیل شخص را جست‌وجو کنید."
         };
+        SmartComboBoxSearchService.SetItems(payee, payeeChoices,
+            person => new[] { person.Name, person.Code, person.Phone, person.Email });
         var note = new TextBox { MinWidth = 330, Height = 72, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
         var totalAmount = receivedChecks.Sum(check => check.Amount);
         var dialog = new Window
         {
             Owner = this, Title = "خرج / واگذاری گروهی چک‌های دریافتی",
-            Width = 520, Height = 410, MinWidth = 450, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Width = 520, Height = 450, MinWidth = 450, WindowStartupLocation = WindowStartupLocation.CenterOwner,
             FlowDirection = FlowDirection.RightToLeft, ResizeMode = ResizeMode.NoResize,
             FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
             Background = new SolidColorBrush(Color.FromRgb(248, 250, 252))
@@ -3222,6 +3225,11 @@ public partial class MainWindow : Window
             Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)), Margin = new Thickness(0, 0, 0, 12)
         });
         AddLabeledControl(form, "دارنده / ذی‌نفع جدید برای همهٔ چک‌های انتخابی", payee);
+        form.Children.Add(new TextBlock
+        {
+            Text = "نام، کد یا تلفن را جست‌وجو و نتیجه را انتخاب کنید؛ برای شخص ثبت‌نشده نام را دستی وارد کنید.",
+            FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8)
+        });
         AddLabeledControl(form, "شرح خرج / علت واگذاری", note);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 14, 0, 0) };
         var confirm = new Button { Content = $"ثبت واگذاری {receivedChecks.Count:N0} چک", Width = 170, Height = 36, IsDefault = true, Background = new SolidColorBrush(Color.FromRgb(15, 118, 110)), Foreground = Brushes.White };
