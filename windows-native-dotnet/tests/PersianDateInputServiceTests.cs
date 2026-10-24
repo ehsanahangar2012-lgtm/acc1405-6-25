@@ -175,6 +175,26 @@ public sealed class PersianDateInputServiceTests
     }
 
     [TestMethod]
+    public void PopupChoiceAndCalendarPalettesMeetWcagInBothThemes()
+    {
+        // These pairs mirror the runtime ComboBox/ListBox and DatePicker popup palettes.
+        var foregroundBackgroundPairs = new[]
+        {
+            (Color.FromRgb(15, 23, 42), Colors.White),                 // light popup body
+            (Color.FromRgb(15, 23, 42), Color.FromRgb(240, 253, 250)), // light hover
+            (Colors.White, Color.FromRgb(15, 118, 110)),               // light selected
+            (Color.FromRgb(243, 244, 246), Color.FromRgb(17, 24, 39)), // dark popup body
+            (Color.FromRgb(243, 244, 246), Color.FromRgb(39, 52, 71)), // dark hover
+            (Colors.White, Color.FromRgb(17, 94, 89)),                 // dark selected
+            (Color.FromRgb(203, 213, 225), Color.FromRgb(17, 24, 39))  // dark secondary/header ink
+        };
+
+        foreach (var (foreground, background) in foregroundBackgroundPairs)
+            Assert.IsTrue(ApplicationThemeService.ContrastRatio(foreground, background) >= 4.5,
+                $"Popup foreground {foreground} must meet WCAG AA on {background}.");
+    }
+
+    [TestMethod]
     public void ThemeForegroundResolutionMeetsWcagForMutedAndSemanticColors()
     {
         var lightSurfaces = new[] { Colors.White, Color.FromRgb(248, 250, 252), Color.FromRgb(226, 232, 240) };

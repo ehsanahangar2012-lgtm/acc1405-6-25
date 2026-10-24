@@ -9,6 +9,7 @@
         <SolidColorBrush x:Key="WindowBackground" Color="#F4F7FB"/>
         <SolidColorBrush x:Key="SurfaceBackground" Color="#FFFFFF"/>
         <SolidColorBrush x:Key="SurfaceMuted" Color="#F8FAFC"/>
+        <SolidColorBrush x:Key="ReadOnlySurfaceBrush" Color="#F1F5F9"/>
         <SolidColorBrush x:Key="PrimaryText" Color="#0F172A"/>
         <SolidColorBrush x:Key="MutedText" Color="#475569"/>
         <SolidColorBrush x:Key="OutlineBrush" Color="#CBD5E1"/>
@@ -101,7 +102,7 @@
                                 <Setter TargetName="Surface" Property="BorderBrush" Value="#0F766E"/>
                             </Trigger>
                             <Trigger Property="IsReadOnly" Value="True">
-                                <Setter TargetName="Surface" Property="Background" Value="#F1F5F9"/>
+                                <Setter TargetName="Surface" Property="Background" Value="{DynamicResource ReadOnlySurfaceBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="Surface" Property="Opacity" Value="0.55"/>

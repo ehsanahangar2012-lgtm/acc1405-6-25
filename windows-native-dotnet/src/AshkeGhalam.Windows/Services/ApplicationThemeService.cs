@@ -90,6 +90,7 @@ public static class ApplicationThemeService
         // therefore do not reliably appear in the main window's visual-tree enumeration.
         window.Resources[typeof(ComboBoxItem)] = CreateChoiceItemStyle(isDark, isListItem: false);
         window.Resources[typeof(ListBoxItem)] = CreateChoiceItemStyle(isDark, isListItem: true);
+        window.Resources["ReadOnlySurfaceBrush"] = Brush(isDark ? "#1F2937" : "#F1F5F9");
 
         // Establish control templates before theme mapping, so the newly applied
         // style brushes are remapped on the very first dark-theme pass as well.
@@ -373,6 +374,80 @@ public static class ApplicationThemeService
                 RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGridColumnHeader), 1)
             });
         }
+    }
+
+    private static Style CreateCalendarStyle(bool isDark)
+    {
+        var surface = Brush(isDark ? "#111827" : "#FFFFFF");
+        var text = Brush(isDark ? "#F3F4F6" : "#0F172A");
+        var border = Brush(isDark ? "#475569" : "#CBD5E1");
+        var style = new Style(typeof(Calendar));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, surface));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, text));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, border));
+        style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+        style.Resources[typeof(CalendarDayButton)] = CreateCalendarDayButtonStyle(isDark);
+        style.Resources[typeof(CalendarButton)] = CreateCalendarNavigationButtonStyle(isDark);
+        return style;
+    }
+
+    private static Style CreateCalendarDayButtonStyle(bool isDark)
+    {
+        var style = new Style(typeof(CalendarDayButton));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F3F4F6" : "#0F172A")));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
+        style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+        style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(3)));
+        style.Setters.Add(new Setter(FrameworkElement.MarginProperty, new Thickness(1)));
+        style.Triggers.Add(new Trigger
+        {
+            Property = UIElement.IsMouseOverProperty,
+            Value = true,
+            Setters =
+            {
+                new Setter(Control.BackgroundProperty, Brush(isDark ? "#273447" : "#F0FDFA")),
+                new Setter(Control.BorderBrushProperty, Brush(isDark ? "#0D9488" : "#99F6E4"))
+            }
+        });
+        style.Triggers.Add(new Trigger
+        {
+            Property = CalendarDayButton.IsSelectedProperty,
+            Value = true,
+            Setters =
+            {
+                new Setter(Control.BackgroundProperty, Brush(isDark ? "#115E59" : "#0F766E")),
+                new Setter(Control.ForegroundProperty, Brushes.White),
+                new Setter(Control.BorderBrushProperty, Brush("#14B8A6"))
+            }
+        });
+        style.Triggers.Add(new Trigger
+        {
+            Property = CalendarDayButton.IsTodayProperty,
+            Value = true,
+            Setters = { new Setter(Control.BorderBrushProperty, Brush("#14B8A6")) }
+        });
+        return style;
+    }
+
+    private static Style CreateCalendarNavigationButtonStyle(bool isDark)
+    {
+        var style = new Style(typeof(CalendarButton));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F3F4F6" : "#0F172A")));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
+        style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(4, 2, 4, 2)));
+        style.Triggers.Add(new Trigger
+        {
+            Property = UIElement.IsMouseOverProperty,
+            Value = true,
+            Setters =
+            {
+                new Setter(Control.BackgroundProperty, Brush(isDark ? "#273447" : "#F0FDFA")),
+                new Setter(Control.BorderBrushProperty, Brush(isDark ? "#0D9488" : "#99F6E4"))
+            }
+        });
+        return style;
     }
 
     private static Style CreateChoiceItemStyle(bool isDark, bool isListItem)
@@ -755,6 +830,10 @@ public static class ApplicationThemeService
             datePicker.FontSize = Math.Max(datePicker.FontSize, 13);
             datePicker.MinHeight = Math.Max(datePicker.MinHeight, 36);
             datePicker.BorderThickness = new Thickness(1);
+            // DatePicker calendar content lives inside a Popup and is not reliably part of
+            // the owning window visual tree. A theme-specific CalendarStyle keeps the popup
+            // readable even before it has ever been opened.
+            datePicker.CalendarStyle = CreateCalendarStyle(isDark);
         }
 
         foreach (var grid in elements.OfType<DataGrid>())
