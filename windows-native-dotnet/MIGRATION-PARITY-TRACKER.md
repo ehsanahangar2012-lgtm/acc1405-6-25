@@ -852,4 +852,16 @@
 
 - [x] Sorted source snapshots for customers, products, invoices, payments and expenses are rebuilt at data-refresh boundaries; typing filters the cached order without sorting all records for every keypress.
 - [x] Search refresh is debounced by 180 ms, reducing repeated full-list scans and allocations during fast typing while preserving immediate page reset and the same matching rules.
-- [ ] CI and the latest visual-capture run must confirm no UI regression; timed benchmarks with production-sized datasets remain to be measured before making quantitative performance claims.
+- [x] CI run [40130071472](https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/actions/runs/40130071472) at commit `0d87e84a1ce5bf17367007f7e4bf9aa0e1335c13` passed WPF build, domain/UI tests, visual-capture generation, self-contained EXE publish and startup smoke-test.
+- [ ] Timed benchmarks with production-sized datasets remain to be measured before making quantitative performance claims.
+
+
+## Launcher, party selection and document export checkpoint — 2026-10-24
+
+- [x] Root `Run-AshkeGhalam.bat` now launches the native WPF preview using the latest `feature/windows-native-dotnet` source; the previous Edge/web launcher is preserved as `Run-AshkeGhalam-Web-Legacy.bat`.
+- [x] New invoices no longer silently select the first customer. Existing valid parties remain selected when editing; the selector filters by name, code, phone and email, and dropdown choices show code and phone with the selected party's live ledger balance shown below the field.
+- [x] Invoice entry uses a wider desktop layout with party/date details beside the live financial summary and full-width item entry.
+- [x] Added `Save as file (RTF)` and `Save PDF` actions to invoice, voucher, payment receipt, check and person/product kardex print previews. PDF output relies on the Windows `Microsoft Print to PDF` printer being installed/enabled.
+- [x] CI run [40130071472](https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/actions/runs/40130071472) passed the current source build, automatic tests, generated UI screenshots and executable startup smoke-test.
+- [ ] Manual mouse/keyboard workflow and physical printer/PDF save-dialog verification on the user's actual Google Remote Desktop machine remain unverified.
+- [ ] Production-size timed benchmarks and a broader pre-commercial audit of server synchronization, multi-company behavior and tax integration remain separate work items.
