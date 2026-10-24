@@ -172,7 +172,7 @@ public sealed class NativeUiVisualPreviewTests
         thread.Join();
 
         if (failure is not null)
-            throw new AssertFailedException("Native WPF screenshot capture failed.", failure);
+            throw new AssertFailedException($"Native WPF screenshot capture failed: {failure}", failure);
     }
 
     private static void SetText(Window window, string name, string value)
