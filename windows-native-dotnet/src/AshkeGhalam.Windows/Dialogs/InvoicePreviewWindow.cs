@@ -223,6 +223,7 @@ public sealed class InvoicePreviewWindow : Window
         };
         print.Click += Print_Click;
         buttons.Children.Add(print);
+        DocumentExportService.AddSaveButtons(buttons, this, () => _document, $"AshkeGhalam-{_invoice.DisplayNumber}");
         buttons.Children.Add(new Button
         {
             Content = "بستن پیش‌نمایش",
