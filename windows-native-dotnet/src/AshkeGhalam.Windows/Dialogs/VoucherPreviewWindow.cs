@@ -30,9 +30,24 @@ public sealed class VoucherPreviewWindow : Window
         var root = new Grid { Margin = new Thickness(14) };
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 0, 0, 10) };
-        toolbar.Children.Add(new TextBlock { Text = $"پیش‌نمایش حوالهٔ {voucher.Number:N0}", FontSize = 22,
-            FontWeight = FontWeights.Bold, Foreground = new SolidColorBrush(Color.FromRgb(15, 23, 42)), VerticalAlignment = VerticalAlignment.Center });
+        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
+        var titleBlock = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
+        titleBlock.Children.Add(new TextBlock
+        {
+            Text = $"پیش‌نمایش حوالهٔ {voucher.Number:N0}",
+            FontSize = 21,
+            FontWeight = FontWeights.Bold,
+            Foreground = new SolidColorBrush(Color.FromRgb(248, 250, 252))
+        });
+        titleBlock.Children.Add(new TextBlock
+        {
+            Text = "پیش از چاپ، طرف حساب، نوع گردش، تعداد اقلام و جمع‌بندی سند را کنترل کنید.",
+            FontSize = 11,
+            Foreground = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 4, 0, 0)
+        });
+        toolbar.Children.Add(titleBlock);
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
         var print = new Button { Content = "چاپ حواله", MinWidth = 110, Height = 36, Margin = new Thickness(0, 0, 8, 0) };
         print.Click += Print_Click; buttons.Children.Add(print);
@@ -45,7 +60,21 @@ public sealed class VoucherPreviewWindow : Window
             Child = new FlowDocumentScrollViewer { Document = _document, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, IsToolBarVisible = false, Background = Brushes.White, Padding = new Thickness(12) }
         };
-        Grid.SetRow(paper, 1); root.Children.Add(toolbar); root.Children.Add(paper); Content = root;
+        var toolbarFrame = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(12),
+            Margin = new Thickness(0, 0, 0, 10),
+            Child = toolbar
+        };
+        Grid.SetRow(toolbarFrame, 0);
+        Grid.SetRow(paper, 1);
+        root.Children.Add(toolbarFrame);
+        root.Children.Add(paper);
+        Content = root;
     }
 
     private static FlowDocument BuildDocument(VoucherRecord voucher, CompanyProfileRecord? company)

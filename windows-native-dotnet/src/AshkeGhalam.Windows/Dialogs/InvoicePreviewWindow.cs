@@ -168,7 +168,7 @@ public sealed class InvoicePreviewWindow : Window
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 0, 0, 10) };
+        var toolbar = new DockPanel { LastChildFill = false, Margin = new Thickness(0) };
         var title = new StackPanel { Orientation = Orientation.Vertical };
         title.Children.Add(new TextBlock
         {
@@ -252,8 +252,19 @@ public sealed class InvoicePreviewWindow : Window
         };
         _viewer = viewer;
         paper.Child = viewer;
+        var toolbarFrame = new Border
+        {
+            Background = new SolidColorBrush(Color.FromRgb(15, 23, 42)),
+            BorderBrush = new SolidColorBrush(Color.FromRgb(51, 65, 85)),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(12),
+            Padding = new Thickness(12),
+            Margin = new Thickness(0, 0, 0, 10),
+            Child = toolbar
+        };
+        Grid.SetRow(toolbarFrame, 0);
         Grid.SetRow(paper, 1);
-        root.Children.Add(toolbar);
+        root.Children.Add(toolbarFrame);
         root.Children.Add(paper);
         Content = root;
     }

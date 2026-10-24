@@ -431,6 +431,11 @@ public static class ApplicationThemeService
         // remapping FlowDocumentScrollViewer.Background tints the white paper and makes
         // printed table ink/row fills look broken. Only the surrounding preview chrome themes.
         // Grid rows/cells/headers use styles so local values cannot defeat hover/selection.
+        // The Border directly hosting a document viewport is the paper frame, not application chrome.
+        // Keep its white surface intact when the user switches the surrounding preview to dark mode.
+        if (element is Border paperFrame && paperFrame.Child is FlowDocumentScrollViewer)
+            return;
+
         if (element is FlowDocumentScrollViewer or FlowDocument or TextElement or
             DataGridRow or DataGridCell or DataGridColumnHeader)
             return;
