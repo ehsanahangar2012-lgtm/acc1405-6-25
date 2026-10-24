@@ -109,7 +109,8 @@ public sealed class AccountingData
             Id=c.Id, BankName=c.BankName, Amount=c.Amount, DueDate=c.DueDate, IssueDate=c.IssueDate,
             Status=c.Status, SayadId=c.SayadId, CheckNumber=c.CheckNumber, HolderName=c.HolderName,
             PersonId=c.PersonId, PersonName=c.PersonName, RelatedInvoiceId=c.RelatedInvoiceId,
-            ImagePath=c.ImagePath, IsHighPriority=c.IsHighPriority, Description=c.Description,
+            RelatedPaymentId=c.RelatedPaymentId, ImagePath=c.ImagePath, ImageDataBase64=c.ImageDataBase64,
+            IsHighPriority=c.IsHighPriority, Description=c.Description,
             CheckType=c.CheckType, CreatedAt=c.CreatedAt,
             History=c.History.Select(h => new CheckHistoryRecord { ChangedAt=h.ChangedAt, Status=h.Status, Note=h.Note }).ToList()
         }).ToList(),
@@ -390,6 +391,8 @@ public sealed class CheckRecord
     public string PersonId { get; set; } = "";
     public string PersonName { get; set; } = "";
     public string RelatedInvoiceId { get; set; } = "";
+    // Stable link to the exact settlement record; blank for independent and legacy checks.
+    public string RelatedPaymentId { get; set; } = "";
     public string ImagePath { get; set; } = "";
     // Optimized cheque photo stored inside the encrypted local dataset and its backups.
     public string ImageDataBase64 { get; set; } = "";
@@ -1082,6 +1085,20 @@ public static class AccountingDataValidator
                 throw new InvalidDataException("شناسهٔ صیادی تکراری در سوابق چک وجود دارد.");
             if (!string.IsNullOrWhiteSpace(check.RelatedInvoiceId) && !invoiceIds.Contains(check.RelatedInvoiceId))
                 throw new InvalidDataException("چک به فاکتور ناموجود پیوند داده شده است.");
+            if (!string.IsNullOrWhiteSpace(check.RelatedPaymentId))
+            {
+                var payment = data.Payments.SingleOrDefault(item => item.Id == check.RelatedPaymentId);
+                var linkedInvoice = payment is null
+                    ? null
+                    : data.Invoices.SingleOrDefault(item => item.Id == payment.InvoiceId);
+                var expectedType = linkedInvoice?.Type == "SALE" ? "RECEIVED" : "ISSUED";
+                if (payment is null || linkedInvoice is null ||
+                    !string.Equals(payment.Method, "چک", StringComparison.Ordinal) ||
+                    !string.Equals(payment.InvoiceId, check.RelatedInvoiceId, StringComparison.Ordinal) ||
+                    payment.Amount != check.Amount ||
+                    !string.Equals(check.CheckType, expectedType, StringComparison.Ordinal))
+                    throw new InvalidDataException("پیوند چک با دریافت/پرداخت معتبر نیست.");
+            }
         }
 
         var voucherIds = UniqueIds(data.Vouchers.Select(v => v?.Id), "حواله");
