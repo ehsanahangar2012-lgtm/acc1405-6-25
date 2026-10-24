@@ -176,6 +176,7 @@ public sealed class CheckDialog : Window
         _highPriority.IsChecked = existing?.IsHighPriority ?? false;
         _imagePreview.Source = DecodeCheckImage(_imageDataBase64, _imagePath);
         _imageStatus.Text = _imagePreview.Source is null ? "تصویری پیوست نشده است." : "تصویر چک پیوست شده است.";
+        NumericTextBoxFormatter.Attach(_amount);
         _amount.LostFocus += (_, _) => FormatAmount();
         _amount.TextChanged += Amount_TextChanged;
         foreach (var combo in new[] { _bankName, _holderName, _personName })
