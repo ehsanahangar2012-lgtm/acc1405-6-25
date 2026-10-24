@@ -80,22 +80,22 @@ public sealed class ApplicationThemeUiRegressionTests
                 };
 
                 ApplicationThemeService.Apply(window, "dark");
-                Assert.AreEqual(Color.FromRgb(11, 18, 32), ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color);
+                Assert.AreEqual(Color.FromRgb(13, 24, 39), ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color);
                 var darkThumb = ((SolidColorBrush)window.Resources["ScrollThumbBrush"]).Color;
-Assert.AreEqual(Color.FromRgb(100, 116, 139), darkThumb);
+Assert.AreEqual(Color.FromRgb(127, 150, 170), darkThumb);
 Assert.IsTrue(ApplicationThemeService.ContrastRatio(
     ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color, darkThumb) >= 3.0,
     "Dark-theme scrollbar thumb must have at least 3:1 visual contrast.");
-                Assert.AreEqual(Color.FromRgb(20, 184, 166), ((SolidColorBrush)window.Resources["ScrollThumbHoverBrush"]).Color);
+                Assert.AreEqual(Color.FromRgb(96, 215, 196), ((SolidColorBrush)window.Resources["ScrollThumbHoverBrush"]).Color);
 
                 ApplicationThemeService.Apply(window, "light");
-                Assert.AreEqual(Color.FromRgb(241, 245, 249), ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color);
+                Assert.AreEqual(Color.FromRgb(234, 240, 243), ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color);
                 var lightThumb = ((SolidColorBrush)window.Resources["ScrollThumbBrush"]).Color;
-Assert.AreEqual(Color.FromRgb(100, 116, 139), lightThumb);
+Assert.AreEqual(Color.FromRgb(83, 107, 125), lightThumb);
 Assert.IsTrue(ApplicationThemeService.ContrastRatio(
     ((SolidColorBrush)window.Resources["ScrollTrackBrush"]).Color, lightThumb) >= 3.0,
     "Light-theme scrollbar thumb must have at least 3:1 visual contrast.");
-                Assert.AreEqual(Color.FromRgb(15, 118, 110), ((SolidColorBrush)window.Resources["ScrollThumbHoverBrush"]).Color);
+                Assert.AreEqual(Color.FromRgb(11, 124, 114), ((SolidColorBrush)window.Resources["ScrollThumbHoverBrush"]).Color);
             }
             catch (Exception ex)
             {
@@ -142,17 +142,17 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                     "Editable dropdown search must use Persian RTL direction.");
                 Assert.IsInstanceOfType(combo.Resources[typeof(ComboBoxItem)], typeof(Style),
                     "The dropdown item style must be available on the ComboBox itself for isolated Popup resource lookup.");
-                Assert.AreEqual(Color.FromRgb(17, 24, 39),
+                Assert.AreEqual(Color.FromRgb(20, 35, 56),
                     ((SolidColorBrush)combo.Resources["ComboDropDownSurfaceBrush"]).Color,
                     "Popup surface should use the current dark palette.");
-                Assert.AreEqual(Color.FromRgb(17, 24, 39), ((SolidColorBrush)editor!.Background).Color);
-                Assert.AreEqual(Color.FromRgb(243, 244, 246), ((SolidColorBrush)editor.Foreground).Color);
-                Assert.AreEqual(Color.FromRgb(71, 85, 105), ((SolidColorBrush)combo.BorderBrush).Color);
+                Assert.AreEqual(Color.FromRgb(20, 35, 56), ((SolidColorBrush)editor!.Background).Color);
+                Assert.AreEqual(Color.FromRgb(245, 248, 251), ((SolidColorBrush)editor.Foreground).Color);
+                Assert.AreEqual(Color.FromRgb(58, 82, 106), ((SolidColorBrush)combo.BorderBrush).Color);
 
                 ApplicationThemeService.Apply(window, "light");
                 Assert.AreEqual(Colors.White, ((SolidColorBrush)editor.Background).Color);
-                Assert.AreEqual(Color.FromRgb(15, 23, 42), ((SolidColorBrush)editor.Foreground).Color);
-                Assert.AreEqual(Color.FromRgb(203, 213, 225), ((SolidColorBrush)combo.BorderBrush).Color);
+                Assert.AreEqual(Color.FromRgb(23, 45, 61), ((SolidColorBrush)editor.Foreground).Color);
+                Assert.AreEqual(Color.FromRgb(213, 224, 230), ((SolidColorBrush)combo.BorderBrush).Color);
                 Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                     ((SolidColorBrush)editor.Foreground).Color,
                     ((SolidColorBrush)editor.Background).Color) >= 4.5);
@@ -199,8 +199,8 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                 };
 
                 ApplicationThemeService.Apply(window, "dark");
-                Assert.AreEqual(Color.FromRgb(17, 24, 39), ((SolidColorBrush)grid.Background).Color);
-                Assert.AreEqual(Color.FromRgb(243, 244, 246), ((SolidColorBrush)grid.Foreground).Color);
+                Assert.AreEqual(Color.FromRgb(20, 35, 56), ((SolidColorBrush)grid.Background).Color);
+                Assert.AreEqual(Color.FromRgb(245, 248, 251), ((SolidColorBrush)grid.Foreground).Color);
                 Assert.IsInstanceOfType(grid.Resources[typeof(DataGridRow)], typeof(Style));
                 Assert.IsInstanceOfType(grid.Resources[typeof(DataGridCell)], typeof(Style));
                 Assert.IsInstanceOfType(grid.Resources[typeof(DataGridColumnHeader)], typeof(Style));
@@ -223,7 +223,7 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
 
                 ApplicationThemeService.Apply(window, "light");
                 Assert.AreEqual(Colors.White, ((SolidColorBrush)grid.Background).Color);
-                Assert.AreEqual(Color.FromRgb(15, 23, 42), ((SolidColorBrush)grid.Foreground).Color);
+                Assert.AreEqual(Color.FromRgb(23, 45, 61), ((SolidColorBrush)grid.Foreground).Color);
                 Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                     ((SolidColorBrush)grid.Foreground).Color,
                     ((SolidColorBrush)grid.Background).Color) >= 4.5);
@@ -337,7 +337,7 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
 
                 ApplicationThemeService.Apply(window, "dark");
 
-                Assert.AreEqual(Color.FromRgb(11, 18, 32), ((SolidColorBrush)window.Background).Color);
+                Assert.AreEqual(Color.FromRgb(13, 24, 39), ((SolidColorBrush)window.Background).Color);
                 Assert.AreEqual(Colors.White, ((SolidColorBrush)paper.Background).Color);
                 Assert.AreEqual(Colors.White, ((SolidColorBrush)viewer.Background).Color);
                 Assert.AreEqual(Colors.White, ((SolidColorBrush)document.Background).Color);
@@ -457,7 +457,7 @@ Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                 var darkForeground = ((SolidColorBrush)text.Foreground).Color;
                 Assert.IsTrue(ApplicationThemeService.ContrastRatio(darkForeground, darkBackground) >= 4.5,
                     $"Dark card text contrast must be at least 4.5:1; got {ApplicationThemeService.ContrastRatio(darkForeground, darkBackground):0.00}:1.");
-                Assert.AreEqual(Color.FromRgb(17, 24, 39), darkBackground);
+                Assert.AreEqual(Color.FromRgb(20, 35, 56), darkBackground);
 
                 ApplicationThemeService.Apply(window, "light");
                 var lightBackground = ((SolidColorBrush)card.Background).Color;

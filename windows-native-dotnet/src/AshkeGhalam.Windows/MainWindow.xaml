@@ -6,7 +6,7 @@
         Title="حسابداری اشک قلم — نسخه بومی ویندوز 16.57.0"
         Width="1360" Height="880" MinWidth="1040" MinHeight="680"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
-        Background="#F4F7FB" Foreground="#0F172A" FlowDirection="RightToLeft"
+        Background="{DynamicResource WindowBackground}" Foreground="{DynamicResource PrimaryText}" FlowDirection="RightToLeft"
         FontFamily="pack://application:,,,/Assets/Fonts/#Vazirmatn"
         UseLayoutRounding="True" SnapsToDevicePixels="True">
     <shell:WindowChrome.WindowChrome>
@@ -32,7 +32,7 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                                CornerRadius="12" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
                                               RecognizesAccessKey="True"/>
@@ -48,7 +48,7 @@
                                 <Setter TargetName="ButtonSurface" Property="Opacity" Value="0.45"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="ButtonSurface" Property="BorderBrush" Value="#0F766E"/>
+                                <Setter TargetName="ButtonSurface" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -87,7 +87,7 @@
                                 <Setter TargetName="PART_ContentHost" Property="VerticalAlignment" Value="Stretch"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">
-                                <Setter TargetName="Surface" Property="BorderBrush" Value="#0F766E"/>
+                                <Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsReadOnly" Value="True">
                                 <Setter TargetName="Surface" Property="Background" Value="{DynamicResource ReadOnlySurfaceBrush}"/>
@@ -205,6 +205,7 @@
                                 <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}, Converter={StaticResource NavigationIconConverter}}"
                                            FontFamily="Segoe MDL2 Assets" FontSize="16" Width="24" Margin="0,0,8,0"
                                            VerticalAlignment="Center" TextAlignment="Center"/>
+                            <Border.Effect><DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.11" Color="#102338"/></Border.Effect>
                                 <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" RecognizesAccessKey="True"/>
                             </StackPanel>
                         </Border>
@@ -215,7 +216,7 @@
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Surface" Property="Background" Value="#0F766E"/>
+                                <Setter TargetName="Surface" Property="Background" Value="{DynamicResource AccentBrush}"/>
                                 <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsKeyboardFocused" Value="True">

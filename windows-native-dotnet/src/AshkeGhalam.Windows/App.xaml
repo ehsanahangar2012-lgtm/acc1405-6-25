@@ -6,30 +6,30 @@
     <Application.Resources>
         <!-- Ashke Ghalam native design tokens. The theme service applies the selected
              light/dark palette to already-created windows while these remain safe defaults. -->
-        <SolidColorBrush x:Key="WindowBackground" Color="#F4F7FB"/>
+        <SolidColorBrush x:Key="WindowBackground" Color="#F0F5F6"/>
         <SolidColorBrush x:Key="SurfaceBackground" Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="SurfaceMuted" Color="#F8FAFC"/>
-        <SolidColorBrush x:Key="ReadOnlySurfaceBrush" Color="#F1F5F9"/>
-        <SolidColorBrush x:Key="PrimaryText" Color="#0F172A"/>
-        <SolidColorBrush x:Key="MutedText" Color="#475569"/>
-        <SolidColorBrush x:Key="OutlineBrush" Color="#CBD5E1"/>
+        <SolidColorBrush x:Key="SurfaceMuted" Color="#F5F8FA"/>
+        <SolidColorBrush x:Key="ReadOnlySurfaceBrush" Color="#EBF2F4"/>
+        <SolidColorBrush x:Key="PrimaryText" Color="#172D3D"/>
+        <SolidColorBrush x:Key="MutedText" Color="#536B7A"/>
+        <SolidColorBrush x:Key="OutlineBrush" Color="#D5E0E6"/>
         <SolidColorBrush x:Key="ComboDropDownSurfaceBrush" Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="ComboDropDownBorderBrush" Color="#CBD5E1"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="#0F766E"/>
-        <SolidColorBrush x:Key="AccentSoftBrush" Color="#CCFBF1"/>
-        <SolidColorBrush x:Key="DangerBrush" Color="#B91C1C"/>
-        <SolidColorBrush x:Key="WarningBrush" Color="#9A3412"/>
-        <SolidColorBrush x:Key="DarkSurfaceBrush" Color="#0F172A"/>
-        <SolidColorBrush x:Key="ScrollTrackBrush" Color="#F1F5F9"/>
-        <SolidColorBrush x:Key="ScrollThumbBrush" Color="#64748B"/>
-        <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#0F766E"/>
+        <SolidColorBrush x:Key="ComboDropDownBorderBrush" Color="#ADBDC8"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#0B7C72"/>
+        <SolidColorBrush x:Key="AccentSoftBrush" Color="#DDF4EE"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="#B4232A"/>
+        <SolidColorBrush x:Key="WarningBrush" Color="#8A4D16"/>
+        <SolidColorBrush x:Key="DarkSurfaceBrush" Color="#172D3D"/>
+        <SolidColorBrush x:Key="ScrollTrackBrush" Color="#EAF0F3"/>
+        <SolidColorBrush x:Key="ScrollThumbBrush" Color="#536B7D"/>
+        <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#0B7C72"/>
         <SolidColorBrush x:Key="CheckBoxBoxSurfaceBrush" Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="CheckBoxBoxBorderBrush" Color="#64748B"/>
-        <SolidColorBrush x:Key="CheckBoxCheckedSurfaceBrush" Color="#0F766E"/>
+        <SolidColorBrush x:Key="CheckBoxBoxBorderBrush" Color="#607888"/>
+        <SolidColorBrush x:Key="CheckBoxCheckedSurfaceBrush" Color="#0B7C72"/>
         <SolidColorBrush x:Key="CheckBoxMarkBrush" Color="#FFFFFF"/>
         <SolidColorBrush x:Key="RadioButtonSurfaceBrush" Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="RadioButtonBorderBrush" Color="#64748B"/>
-        <SolidColorBrush x:Key="RadioButtonCheckedSurfaceBrush" Color="#0F766E"/>
+        <SolidColorBrush x:Key="RadioButtonBorderBrush" Color="#607888"/>
+        <SolidColorBrush x:Key="RadioButtonCheckedSurfaceBrush" Color="#0B7C72"/>
         <SolidColorBrush x:Key="RadioButtonMarkBrush" Color="#FFFFFF"/>
 
         <Style TargetType="{x:Type TextBlock}">
@@ -61,7 +61,7 @@
                                 CornerRadius="11"
                                 Padding="{TemplateBinding Padding}">
                             <Border.Effect>
-                                <DropShadowEffect BlurRadius="12" ShadowDepth="2" Opacity="0.12" Color="#102338"/>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.13" Color="#102338"/>
                             </Border.Effect>
                             <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                               VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
