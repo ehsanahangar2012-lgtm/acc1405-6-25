@@ -86,17 +86,8 @@ public static class NativeFinancialModuleService
         return AccountingRules.Money(amount * from.RialPerUnit / to.RialPerUnit);
     }
 
-    public static DateTime ParsePersianDate(string text)
-    {
-        var normalized = NativeLedgerService.NormalizeAndValidateDate(text);
-        var parts = normalized.Split('/');
-        var calendar = new PersianCalendar();
-        return calendar.ToDateTime(
-            int.Parse(parts[0], CultureInfo.InvariantCulture),
-            int.Parse(parts[1], CultureInfo.InvariantCulture),
-            int.Parse(parts[2], CultureInfo.InvariantCulture),
-            0, 0, 0, 0, PersianCalendar.PersianEra);
-    }
+    public static DateTime ParsePersianDate(string text) =>
+        PersianDateInputService.Parse(text, "تاریخ مالی").DateTime;
 
     public static string FormatPersianDate(DateTimeOffset value)
     {
