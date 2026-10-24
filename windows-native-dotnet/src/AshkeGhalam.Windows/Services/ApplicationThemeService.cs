@@ -374,9 +374,17 @@ public static class ApplicationThemeService
     private static Color? MapBorder(Color color, bool isDark)
     {
         if (isDark)
-            return Brightness(color) > 0.48 ? Color.FromRgb(71, 85, 105) : color;
-        return Brightness(color) < 0.25 ? Color.FromRgb(148, 163, 184) : Color.FromRgb(203, 213, 225);
+            return Saturation(color) > 0.35
+                ? Color.FromRgb(13, 148, 136)
+                : Color.FromRgb(71, 85, 105);
+        return Color.FromRgb(203, 213, 225);
     }
+
+    private static Color LightenSemanticColor(Color color, double amount = 0.56) =>
+        Color.FromRgb(
+            (byte)Math.Clamp((int)Math.Round(color.R + (255 - color.R) * amount), 0, 255),
+            (byte)Math.Clamp((int)Math.Round(color.G + (255 - color.G) * amount), 0, 255),
+            (byte)Math.Clamp((int)Math.Round(color.B + (255 - color.B) * amount), 0, 255));
 
     private static Color? MapForeground(Color color, bool isDark, Color? background)
     {
@@ -386,7 +394,7 @@ public static class ApplicationThemeService
         if (isDark)
         {
             if (fgBrightness > 0.84) return color;
-            if (Saturation(color) > 0.45) return Color.FromRgb(94, 234, 212);
+            if (Saturation(color) > 0.45) return LightenSemanticColor(color);
             return fgBrightness < 0.42
                 ? Color.FromRgb(243, 244, 246)
                 : Color.FromRgb(203, 213, 225);
@@ -402,7 +410,7 @@ public static class ApplicationThemeService
         // Dark text on a retained dark brand surface must be lifted, not left invisible.
         if (bgBrightness < 0.28)
         {
-            if (Saturation(color) > 0.4) return Color.FromRgb(94, 234, 212);
+            if (Saturation(color) > 0.4) return LightenSemanticColor(color);
             return Color.FromRgb(243, 244, 246);
         }
 
