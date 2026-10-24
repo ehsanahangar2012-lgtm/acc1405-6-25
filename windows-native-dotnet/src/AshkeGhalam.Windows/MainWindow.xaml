@@ -1405,7 +1405,6 @@
                                            TextWrapping="Wrap" Foreground="#7C2D12" Margin="0,6,0,0"/>
                             </StackPanel>
                         </Border>
-                        </Border>
                         <Border x:Name="GuideDebitCreditSection" Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="۷. بدهکار، بستانکار و مانده" FontSize="17" FontWeight="Bold" Foreground="#0F766E"/>
