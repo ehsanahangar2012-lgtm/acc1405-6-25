@@ -148,7 +148,9 @@ public sealed class VoucherDialog : Window
         Grid.SetColumn(documentPrimary, 0);
         Grid.SetColumn(documentSecondary, 2);
         documentGrid.Children.Add(documentPrimary);
-        documentGrid.Children.Add(new Border { Width = 14 });
+        var documentSpacer = new Border { Width = 14 };
+        Grid.SetColumn(documentSpacer, 1);
+        documentGrid.Children.Add(documentSpacer);
         documentGrid.Children.Add(documentSecondary);
         root.Children.Add(CreateSectionCard(
             "۱. مشخصات سند",
@@ -225,7 +227,9 @@ public sealed class VoucherDialog : Window
         Grid.SetColumn(detailsPrimary, 0);
         Grid.SetColumn(detailsSecondary, 2);
         detailsGrid.Children.Add(detailsPrimary);
-        detailsGrid.Children.Add(new Border { Width = 14 });
+        var detailsSpacer = new Border { Width = 14 };
+        Grid.SetColumn(detailsSpacer, 1);
+        detailsGrid.Children.Add(detailsSpacer);
         detailsGrid.Children.Add(detailsSecondary);
         var detailsSection = new StackPanel();
         detailsSection.Children.Add(detailsGrid);

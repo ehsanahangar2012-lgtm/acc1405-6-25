@@ -193,7 +193,9 @@ public sealed class CustomerDialog : Window
         Grid.SetColumn(first, 0);
         Grid.SetColumn(second, 2);
         grid.Children.Add(first);
-        grid.Children.Add(new Border { Width = 14 });
+        var spacer = new Border { Width = 14 };
+        Grid.SetColumn(spacer, 1);
+        grid.Children.Add(spacer);
         grid.Children.Add(second);
         return grid;
     }
