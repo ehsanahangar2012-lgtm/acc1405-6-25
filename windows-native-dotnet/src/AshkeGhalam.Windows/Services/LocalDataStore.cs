@@ -12,6 +12,7 @@ namespace AshkeGhalam.Windows.Services;
 /// </summary>
 public sealed class LocalDataStore
 {
+    internal const int MaxEncryptedFileBytes = 100 * 1024 * 1024;
     private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("AshkeGhalam.WPF.LocalData.v1");
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private readonly string _filePath;
@@ -32,9 +33,18 @@ public sealed class LocalDataStore
         byte[]? json = null;
         try
         {
-            encrypted = File.ReadAllBytes(_filePath);
-            if (encrypted.Length == 0 || encrypted.Length > 100 * 1024 * 1024)
-                throw new InvalidDataException("حجم فایل دادهٔ محلی معتبر نیست.");
+            // Check the file length on the open stream before allocating a byte array.
+            // This prevents a corrupt/oversized local file from consuming unbounded memory at startup.
+            using (var stream = new FileStream(
+                _filePath, FileMode.Open, FileAccess.Read, FileShare.Read,
+                64 * 1024, FileOptions.SequentialScan))
+            {
+                ValidateEncryptedFileSize(stream.Length);
+                encrypted = new byte[checked((int)stream.Length)];
+                stream.ReadExactly(encrypted);
+                if (stream.ReadByte() != -1)
+                    throw new InvalidDataException("فایل داده هنگام خواندن تغییر کرده است.");
+            }
 
             json = ProtectedData.Unprotect(encrypted, Entropy, DataProtectionScope.CurrentUser);
             var data = JsonSerializer.Deserialize<AccountingData>(json);
@@ -55,6 +65,12 @@ public sealed class LocalDataStore
         }
     }
 
+    internal static void ValidateEncryptedFileSize(long length)
+    {
+        if (length <= 0 || length > MaxEncryptedFileBytes)
+            throw new InvalidDataException("حجم فایل دادهٔ محلی معتبر نیست؛ حداکثر اندازهٔ پشتیبانی‌شده ۱۰۰ مگابایت است.");
+    }
+
     public void Save(AccountingData data)
     {
         AccountingDataValidator.Validate(data);
@@ -64,6 +80,9 @@ public sealed class LocalDataStore
         try
         {
             encrypted = ProtectedData.Protect(json, Entropy, DataProtectionScope.CurrentUser);
+            // Use the same bound as Load; never replace the last good data file with a file
+            // that this application would reject on the next launch.
+            ValidateEncryptedFileSize(encrypted.Length);
             var directory = Path.GetDirectoryName(_filePath)
                 ?? throw new InvalidOperationException("مسیر ذخیره‌سازی محلی معتبر نیست.");
             Directory.CreateDirectory(directory);

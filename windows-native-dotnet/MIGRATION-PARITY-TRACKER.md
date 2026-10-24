@@ -837,4 +837,12 @@
 
 - [x] The existing end-to-end test continues to verify customer → sale invoice → receipt → remaining balance → person ledger/kardex → balanced journal.
 - [x] The same saved invoice is now passed through the actual WPF `InvoicePreviewWindow`; the constructed printable document is checked for company, customer, product and final total on an STA thread, without printing or touching user files.
-- [ ] The commit's CI run must confirm the new preview-content assertions; physical printer output remains a separate manual verification.
+- [x] CI run [40125986172](https://github.com/ehsanahangar2012-lgtm/acc1405-6-25/actions/runs/40125986172) passed the extended WPF preview-content assertions; physical printer output remains a separate manual verification.
+
+
+## Safety chunk 1 — bound local encrypted data files
+
+- [x] Loading checks the file length on an opened stream before allocating memory; files above 100 MiB are rejected before reading their contents.
+- [x] Saving applies the exact same size limit before creating/replacing the target file, so an oversized dataset cannot be saved successfully and become unreadable on next startup; the previous valid file remains untouched when rejected.
+- [x] A shared-boundary unit test covers zero, the maximum supported size and one byte over the maximum.
+- [ ] CI must confirm the data-store change; no real customer data or existing local file was touched by this implementation.

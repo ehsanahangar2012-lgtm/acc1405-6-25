@@ -210,6 +210,16 @@ public sealed class AccountingBehaviorTests
     }
 
     [TestMethod]
+    public void LocalStoreFileSizeLimitIsSharedByReadAndWritePaths()
+    {
+        LocalDataStore.ValidateEncryptedFileSize(1);
+        LocalDataStore.ValidateEncryptedFileSize(LocalDataStore.MaxEncryptedFileBytes);
+        Assert.ThrowsException<InvalidDataException>(() => LocalDataStore.ValidateEncryptedFileSize(0));
+        Assert.ThrowsException<InvalidDataException>(() =>
+            LocalDataStore.ValidateEncryptedFileSize((long)LocalDataStore.MaxEncryptedFileBytes + 1));
+    }
+
+    [TestMethod]
     public void NativeCheckRecordDeepCopyPreservesHistory()
     {
         var check = new CheckRecord
