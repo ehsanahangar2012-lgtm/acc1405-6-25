@@ -136,6 +136,27 @@ public sealed class PersianDateInputServiceTests
     }
 
     [TestMethod]
+    public void GridPaletteForegroundsMeetWcagInBothThemesAndSelectionStates()
+    {
+        // These are the real grid palette pairs used by ApplicationThemeService:
+        // body rows, alternate rows, headers, selected rows/cells, and dark-mode headers.
+        var palettePairs = new[]
+        {
+            (Color.FromRgb(15, 23, 42), Colors.White),
+            (Color.FromRgb(15, 23, 42), Color.FromRgb(248, 250, 252)),
+            (Color.FromRgb(51, 65, 85), Color.FromRgb(226, 232, 240)),
+            (Color.FromRgb(203, 213, 225), Color.FromRgb(11, 18, 32)),
+            (Color.FromRgb(243, 244, 246), Color.FromRgb(17, 24, 39)),
+            (Colors.White, Color.FromRgb(17, 94, 89)),
+            (Color.FromRgb(19, 78, 74), Color.FromRgb(204, 251, 241))
+        };
+
+        foreach (var (foreground, background) in palettePairs)
+            Assert.IsTrue(ApplicationThemeService.ContrastRatio(foreground, background) >= 4.5,
+                $"Grid foreground {foreground} must meet WCAG AA on {background}.");
+    }
+
+    [TestMethod]
     public void ThemeForegroundResolutionMeetsWcagForMutedAndSemanticColors()
     {
         var lightSurfaces = new[] { Colors.White, Color.FromRgb(248, 250, 252), Color.FromRgb(226, 232, 240) };

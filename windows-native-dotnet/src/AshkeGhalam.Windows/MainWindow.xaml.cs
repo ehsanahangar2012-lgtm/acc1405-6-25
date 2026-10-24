@@ -4397,7 +4397,10 @@ public partial class MainWindow : Window
         }
         catch (FormatException) { return null; }
         catch (InvalidDataException) { return null; }
+        catch (IOException) { return null; }
         catch (NotSupportedException) { return null; }
+        catch (ArgumentException) { return null; }
+        catch (InvalidOperationException) { return null; }
     }
 
     private void RefreshAboutCompanyPage()
