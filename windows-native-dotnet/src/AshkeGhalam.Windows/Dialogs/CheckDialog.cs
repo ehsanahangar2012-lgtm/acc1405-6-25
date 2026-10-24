@@ -585,6 +585,7 @@ public sealed class CheckDialog : Window
                         : ""),
                 PersonName = _personName.Text.Trim(),
                 RelatedInvoiceId = _existing?.RelatedInvoiceId ?? _relatedInvoiceId,
+                RelatedPaymentId = _existing?.RelatedPaymentId ?? "",
                 ImagePath = _imagePath,
                 ImageDataBase64 = _imageDataBase64,
                 IsHighPriority = _highPriority.IsChecked == true,
