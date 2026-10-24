@@ -35,6 +35,9 @@ public static class ApplicationThemeService
     }
     private static readonly ConditionalWeakTable<DataGrid, GridThemeState> GridThemeStates = new();
     private static readonly ConditionalWeakTable<ScrollViewer, FormCardState> FormCards = new();
+    private sealed class ThemeManagedStyleState { }
+    private static readonly ConditionalWeakTable<Button, ThemeManagedStyleState> ThemeManagedButtons = new();
+    private static readonly ConditionalWeakTable<TextBox, ThemeManagedStyleState> ThemeManagedTextBoxes = new();
     private const string DialogChromeResourceKey = "AshkeGhalam.DialogChromeApplied";
 
     private sealed class FormCardState { }
@@ -777,22 +780,41 @@ public static class ApplicationThemeService
     private static void PolishControls(Window window, IReadOnlyCollection<DependencyObject> elements, bool isDark)
     {
         if (window.GetType().Name != "MainWindow")
-        {
             PolishFormLabels(elements);
-            // Use an implicit window resource, not a local Button.Style assignment. This lets
-            // WPF refresh existing controls when the owner switches between light and dark.
-            window.Resources[typeof(Button)] = CreateModernButtonStyle(isDark);
-            foreach (var button in elements.OfType<Button>())
+
+        // Apply one native interaction language to the main shell and every modal form.
+        // Explicitly styled controls (such as the custom sidebar) retain their own design.
+        var buttonStyle = CreateModernButtonStyle(isDark);
+        var textBoxStyle = CreateModernTextBoxStyle(isDark);
+        window.Resources[typeof(Button)] = buttonStyle;
+        window.Resources[typeof(TextBox)] = textBoxStyle;
+
+        foreach (var button in elements.OfType<Button>())
+        {
+            if (ThemeManagedButtons.TryGetValue(button, out _))
+                button.Style = buttonStyle;
+            else if (button.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
             {
-                button.MinHeight = Math.Max(button.MinHeight, 36);
-                button.FontSize = Math.Max(button.FontSize, 12);
-                if (button.Padding.Left < 8)
-                    button.Padding = new Thickness(12, 7, 12, 7);
+                ThemeManagedButtons.Add(button, new ThemeManagedStyleState());
+                button.Style = buttonStyle;
             }
+
+            button.MinHeight = Math.Max(button.MinHeight, 36);
+            button.FontSize = Math.Max(button.FontSize, 12);
+            if (button.Padding.Left < 8)
+                button.Padding = new Thickness(12, 7, 12, 7);
         }
 
         foreach (var input in elements.OfType<TextBox>())
         {
+            if (ThemeManagedTextBoxes.TryGetValue(input, out _))
+                input.Style = textBoxStyle;
+            else if (input.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
+            {
+                ThemeManagedTextBoxes.Add(input, new ThemeManagedStyleState());
+                input.Style = textBoxStyle;
+            }
+
             input.FontSize = Math.Max(input.FontSize, 13);
             input.MinHeight = Math.Max(input.MinHeight, input.AcceptsReturn ? 52 : 36);
             input.BorderThickness = new Thickness(1);
@@ -800,6 +822,14 @@ public static class ApplicationThemeService
                 input.VerticalContentAlignment = VerticalAlignment.Center;
             if (input.Padding.Left < 6)
                 input.Padding = new Thickness(9, 6, 9, 6);
+        }
+
+        foreach (var password in elements.OfType<PasswordBox>())
+        {
+            password.FontSize = Math.Max(password.FontSize, 13);
+            password.MinHeight = Math.Max(password.MinHeight, 36);
+            password.BorderThickness = new Thickness(1);
+            password.Padding = new Thickness(9, 6, 9, 6);
         }
 
         foreach (var combo in elements.OfType<ComboBox>())
@@ -919,8 +949,8 @@ public static class ApplicationThemeService
             Property = Button.IsKeyboardFocusedProperty, Value = true,
             Setters =
             {
-                new Setter(Border.BorderBrushProperty, Brush("#0F766E"), "Surface"),
-                new Setter(Border.BorderThicknessProperty, new Thickness(2), "Surface")
+                new Setter(Border.BorderBrushProperty, Brush(isDark ? "#2DD4BF" : "#0F766E"), "Surface"),
+                new Setter(Border.BorderThicknessProperty, new Thickness(1.5), "Surface")
             }
         });
         template.Triggers.Add(new Trigger
@@ -935,13 +965,66 @@ public static class ApplicationThemeService
         });
         template.Triggers.Add(new Trigger
         {
-            Property = Button.IsKeyboardFocusedProperty, Value = true,
-            Setters = { new Setter(Border.BorderBrushProperty, Brush("#14B8A6"), "Surface") }
+            Property = Button.IsEnabledProperty, Value = false,
+            Setters = { new Setter(UIElement.OpacityProperty, 0.45, "Surface") }
+        });
+        style.Setters.Add(new Setter(Control.TemplateProperty, template));
+        return style;
+    }
+
+    private static Style CreateModernTextBoxStyle(bool isDark)
+    {
+        var style = new Style(typeof(TextBox));
+        style.Setters.Add(new Setter(Control.BackgroundProperty, Brush(isDark ? "#111827" : "#FFFFFF")));
+        style.Setters.Add(new Setter(Control.ForegroundProperty, Brush(isDark ? "#F3F4F6" : "#0F172A")));
+        style.Setters.Add(new Setter(Control.BorderBrushProperty, Brush(isDark ? "#475569" : "#CBD5E1")));
+        style.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(1)));
+        style.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(9, 6, 9, 6)));
+        style.Setters.Add(new Setter(Control.MinHeightProperty, 36d));
+        style.Setters.Add(new Setter(Control.FontSizeProperty, 13d));
+        style.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+
+        var template = new ControlTemplate(typeof(TextBox));
+        var surface = new FrameworkElementFactory(typeof(Border), "Surface");
+        surface.SetValue(Border.CornerRadiusProperty, new CornerRadius(7));
+        surface.SetBinding(Border.BackgroundProperty, new Binding(nameof(Control.Background))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        surface.SetBinding(Border.BorderBrushProperty, new Binding(nameof(Control.BorderBrush))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        surface.SetBinding(Border.BorderThicknessProperty, new Binding(nameof(Control.BorderThickness))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+        surface.SetBinding(Border.PaddingProperty, new Binding(nameof(Control.Padding))
+        {
+            RelativeSource = new RelativeSource(RelativeSourceMode.TemplatedParent)
+        });
+
+        var contentHost = new FrameworkElementFactory(typeof(ScrollViewer), "PART_ContentHost");
+        contentHost.SetValue(ScrollViewer.HorizontalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
+        contentHost.SetValue(ScrollViewer.VerticalScrollBarVisibilityProperty, ScrollBarVisibility.Hidden);
+        contentHost.SetValue(ScrollViewer.FocusableProperty, false);
+        surface.AppendChild(contentHost);
+        template.VisualTree = surface;
+        template.Triggers.Add(new Trigger
+        {
+            Property = UIElement.IsKeyboardFocusedProperty,
+            Value = true,
+            Setters =
+            {
+                new Setter(Border.BorderBrushProperty, Brush(isDark ? "#2DD4BF" : "#0F766E"), "Surface"),
+                new Setter(Border.BorderThicknessProperty, new Thickness(1.5), "Surface")
+            }
         });
         template.Triggers.Add(new Trigger
         {
-            Property = Button.IsEnabledProperty, Value = false,
-            Setters = { new Setter(UIElement.OpacityProperty, 0.45, "Surface") }
+            Property = UIElement.IsEnabledProperty,
+            Value = false,
+            Setters = { new Setter(UIElement.OpacityProperty, 0.65, "Surface") }
         });
         style.Setters.Add(new Setter(Control.TemplateProperty, template));
         return style;
