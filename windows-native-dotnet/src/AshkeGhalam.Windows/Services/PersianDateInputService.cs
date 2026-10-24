@@ -86,6 +86,8 @@ public static class PersianDateInputService
         if (Inputs.TryGetValue(input,out var existing)) { existing.Optional=optional; return; }
         var state=new State { Optional=optional }; Inputs.Add(input,state);
         input.FlowDirection=FlowDirection.LeftToRight; input.HorizontalContentAlignment=HorizontalAlignment.Right;
+        if (string.IsNullOrWhiteSpace(input.ToolTip?.ToString()))
+            input.ToolTip = "تاریخ شمسی؛ با Ctrl+Space یا F4 تقویم را باز کنید. امروز، فردا و دیروز هم پذیرفته می‌شوند.";
         var menu=new ContextMenu();
         AddMenu(menu,"امروز",()=>SetRelative(input,0)); AddMenu(menu,"فردا",()=>SetRelative(input,1)); AddMenu(menu,"دیروز",()=>SetRelative(input,-1));
         menu.Items.Add(new Separator()); AddMenu(menu,"انتخاب از تقویم شمسی…",()=>OpenPicker(input));
