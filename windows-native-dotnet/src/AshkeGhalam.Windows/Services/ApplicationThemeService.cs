@@ -352,7 +352,7 @@ public static class ApplicationThemeService
                     break;
                 case DataGridColumnHeader header:
                     header.Style = headerStyle;
-                    ApplyGridHeaderTextContrast(header, headerSurface.Color, isDark);
+                    BindGridHeaderTextForeground(header);
                     break;
             }
         }
@@ -361,16 +361,17 @@ public static class ApplicationThemeService
         // Re-evaluate its ink only after the actual light/dark header surface is installed.
     }
 
-    private static void ApplyGridHeaderTextContrast(DataGridColumnHeader header, Color background, bool isDark)
+    private static void BindGridHeaderTextForeground(DataGridColumnHeader header)
     {
         foreach (var textBlock in EnumerateTree(header).OfType<TextBlock>())
         {
-            // The original snapshot was captured before theme mapping. Preserve it so a
-            // later light/dark toggle restores the authored value rather than the adjusted ink.
+            // Keep an original-value snapshot before installing the local binding, so a
+            // newly realized header can safely restore its source values on the next theme pass.
             OriginalValues.GetValue(textBlock, CaptureOriginalValues);
-            var current = textBlock.Foreground as SolidColorBrush;
-            var preferred = current?.Color ?? (isDark ? Color.FromRgb(203, 213, 225) : Color.FromRgb(51, 65, 85));
-            textBlock.Foreground = Brush(EnsureReadableContrast(preferred, background));
+            BindingOperations.SetBinding(textBlock, TextBlock.ForegroundProperty, new Binding(nameof(Control.Foreground)
+            {
+                RelativeSource = new RelativeSource(RelativeSourceMode.FindAncestor, typeof(DataGridColumnHeader), 1)
+            }));
         }
     }
 
@@ -488,6 +489,14 @@ public static class ApplicationThemeService
 
         foreach (var property in GetBrushProperties(element))
         {
+            // Text inside a DataGrid cell/header follows the hosting control's Foreground
+            // through bindings. A local theme color here would take precedence over that
+            // binding and leave stale ink after hover/selection or a theme change.
+            if (element is TextBlock &&
+                property == TextBlock.ForegroundProperty &&
+                IsDataGridCellOrHeaderText(element))
+                continue;
+
             if (element.GetValue(property) is not SolidColorBrush brush || brush.Color.A == 0)
                 continue;
 
@@ -526,6 +535,30 @@ public static class ApplicationThemeService
             grid.Background = Brush(isDark ? "#111827" : "#FFFFFF");
             grid.Foreground = Brush(isDark ? "#F3F4F6" : "#0F172A");
         }
+    }
+
+    private static bool IsDataGridCellOrHeaderText(DependencyObject element)
+    {
+        DependencyObject? current = element;
+        var visited = new HashSet<DependencyObject>(ReferenceEqualityComparer.Instance);
+        for (var depth = 0; current is not null && depth < 40 && visited.Add(current); depth++)
+        {
+            if (current is DataGridCell or DataGridColumnHeader)
+                return true;
+            if (current is DataGrid)
+                return false;
+
+            DependencyObject? parent = null;
+            try
+            {
+                if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+                    parent = VisualTreeHelper.GetParent(current);
+            }
+            catch (InvalidOperationException) { }
+            parent ??= LogicalTreeHelper.GetParent(current);
+            current = parent;
+        }
+        return false;
     }
 
     private static Color? FindNearestBackground(DependencyObject element)
