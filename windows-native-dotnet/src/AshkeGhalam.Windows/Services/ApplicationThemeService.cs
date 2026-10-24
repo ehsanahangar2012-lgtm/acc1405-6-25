@@ -101,6 +101,15 @@ public static class ApplicationThemeService
         window.Resources["ScrollTrackBrush"] = Brush(isDark ? "#0B1220" : "#F1F5F9");
         window.Resources["ScrollThumbBrush"] = Brush("#64748B");
         window.Resources["ScrollThumbHoverBrush"] = Brush(isDark ? "#14B8A6" : "#0F766E");
+        window.Resources["AccentBrush"] = Brush(isDark ? "#14B8A6" : "#0F766E");
+        window.Resources["CheckBoxBoxSurfaceBrush"] = Brush(isDark ? "#111827" : "#FFFFFF");
+        window.Resources["CheckBoxBoxBorderBrush"] = Brush(isDark ? "#94A3B8" : "#64748B");
+        window.Resources["CheckBoxCheckedSurfaceBrush"] = Brush(isDark ? "#0D9488" : "#0F766E");
+        window.Resources["CheckBoxMarkBrush"] = Brushes.White;
+        window.Resources["RadioButtonSurfaceBrush"] = Brush(isDark ? "#111827" : "#FFFFFF");
+        window.Resources["RadioButtonBorderBrush"] = Brush(isDark ? "#94A3B8" : "#64748B");
+        window.Resources["RadioButtonCheckedSurfaceBrush"] = Brush(isDark ? "#0D9488" : "#0F766E");
+        window.Resources["RadioButtonMarkBrush"] = Brushes.White;
 
         // Establish control templates before theme mapping, so the newly applied
         // style brushes are remapped on the very first dark-theme pass as well.

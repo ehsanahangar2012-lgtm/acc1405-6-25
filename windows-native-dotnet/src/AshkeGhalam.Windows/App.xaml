@@ -23,6 +23,14 @@
         <SolidColorBrush x:Key="ScrollTrackBrush" Color="#F1F5F9"/>
         <SolidColorBrush x:Key="ScrollThumbBrush" Color="#64748B"/>
         <SolidColorBrush x:Key="ScrollThumbHoverBrush" Color="#0F766E"/>
+        <SolidColorBrush x:Key="CheckBoxBoxSurfaceBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="CheckBoxBoxBorderBrush" Color="#64748B"/>
+        <SolidColorBrush x:Key="CheckBoxCheckedSurfaceBrush" Color="#0F766E"/>
+        <SolidColorBrush x:Key="CheckBoxMarkBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="RadioButtonSurfaceBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="RadioButtonBorderBrush" Color="#64748B"/>
+        <SolidColorBrush x:Key="RadioButtonCheckedSurfaceBrush" Color="#0F766E"/>
+        <SolidColorBrush x:Key="RadioButtonMarkBrush" Color="#FFFFFF"/>
 
         <Style TargetType="{x:Type TextBlock}">
             <!-- Foreground inherits from Window/Control so button and navigation labels stay legible. -->
@@ -254,16 +262,119 @@
             <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="3,4"/>
-            <Setter Property="Margin" Value="0,3,0,3"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+            <Setter Property="MinHeight" Value="28"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type CheckBox}">
+                        <DockPanel LastChildFill="True"
+                                   FlowDirection="{TemplateBinding FlowDirection}"
+                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                   SnapsToDevicePixels="True">
+                            <Border x:Name="CheckGlyph"
+                                    DockPanel.Dock="Right"
+                                    Width="19" Height="19"
+                                    Margin="0,0,8,0"
+                                    CornerRadius="4"
+                                    Background="{DynamicResource CheckBoxBoxSurfaceBrush}"
+                                    BorderBrush="{DynamicResource CheckBoxBoxBorderBrush}"
+                                    BorderThickness="1.4"
+                                    VerticalAlignment="Center">
+                                <Path x:Name="CheckMark"
+                                      Data="M 3,9 L 7,13 L 15,4"
+                                      Stroke="{DynamicResource CheckBoxMarkBrush}"
+                                      StrokeThickness="2"
+                                      StrokeStartLineCap="Round"
+                                      StrokeEndLineCap="Round"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      Visibility="Collapsed"/>
+                            </Border>
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </DockPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="CheckGlyph" Property="Background" Value="{DynamicResource CheckBoxCheckedSurfaceBrush}"/>
+                                <Setter TargetName="CheckGlyph" Property="BorderBrush" Value="{DynamicResource CheckBoxCheckedSurfaceBrush}"/>
+                                <Setter TargetName="CheckMark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="CheckGlyph" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="CheckGlyph" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="CheckGlyph" Property="BorderThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.48"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="{x:Type RadioButton}">
             <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="Padding" Value="3,4"/>
-            <Setter Property="Margin" Value="0,3,0,3"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+            <Setter Property="MinHeight" Value="28"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type RadioButton}">
+                        <DockPanel LastChildFill="True"
+                                   FlowDirection="{TemplateBinding FlowDirection}"
+                                   VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                   SnapsToDevicePixels="True">
+                            <Grid x:Name="RadioGlyph" DockPanel.Dock="Right"
+                                  Width="19" Height="19" Margin="0,0,8,0"
+                                  VerticalAlignment="Center">
+                                <Ellipse x:Name="RadioOutline"
+                                         Fill="{DynamicResource RadioButtonSurfaceBrush}"
+                                         Stroke="{DynamicResource RadioButtonBorderBrush}"
+                                         StrokeThickness="1.4"/>
+                                <Ellipse x:Name="RadioMark" Width="8" Height="8"
+                                         Fill="{DynamicResource RadioButtonMarkBrush}"
+                                         HorizontalAlignment="Center" VerticalAlignment="Center"
+                                         Visibility="Collapsed"/>
+                            </Grid>
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
+                        </DockPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="RadioOutline" Property="Fill" Value="{DynamicResource RadioButtonCheckedSurfaceBrush}"/>
+                                <Setter TargetName="RadioOutline" Property="Stroke" Value="{DynamicResource RadioButtonCheckedSurfaceBrush}"/>
+                                <Setter TargetName="RadioMark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RadioOutline" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="RadioOutline" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                                <Setter TargetName="RadioOutline" Property="StrokeThickness" Value="2"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.48"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="{x:Type ListBox}">
