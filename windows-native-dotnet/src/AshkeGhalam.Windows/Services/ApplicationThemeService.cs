@@ -42,6 +42,75 @@ public static class ApplicationThemeService
 
     private sealed class FormCardState { }
 
+    private static void ApplyPaletteResources(Window window, bool isDark)
+    {
+        var palette = isDark
+            ? new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["WindowBackground"] = "#0B1220",
+                ["SurfaceBackground"] = "#111827",
+                ["SurfaceMuted"] = "#1F2937",
+                ["ReadOnlySurfaceBrush"] = "#1F2937",
+                ["PrimaryText"] = "#F8FAFC",
+                ["MutedText"] = "#CBD5E1",
+                ["OutlineBrush"] = "#475569",
+                ["ComboDropDownSurfaceBrush"] = "#111827",
+                ["ComboDropDownBorderBrush"] = "#64748B",
+                ["AccentBrush"] = "#14B8A6",
+                ["AccentSoftBrush"] = "#134E4A",
+                ["DangerBrush"] = "#FCA5A5",
+                ["WarningBrush"] = "#FDBA74",
+                ["DarkSurfaceBrush"] = "#0F172A",
+                ["ScrollTrackBrush"] = "#0B1220",
+                ["ScrollThumbBrush"] = "#64748B",
+                ["ScrollThumbHoverBrush"] = "#14B8A6",
+                ["CheckBoxBoxSurfaceBrush"] = "#111827",
+                ["CheckBoxBoxBorderBrush"] = "#94A3B8",
+                ["CheckBoxCheckedSurfaceBrush"] = "#0D9488",
+                ["CheckBoxMarkBrush"] = "#FFFFFF",
+                ["RadioButtonSurfaceBrush"] = "#111827",
+                ["RadioButtonBorderBrush"] = "#94A3B8",
+                ["RadioButtonCheckedSurfaceBrush"] = "#0D9488",
+                ["RadioButtonMarkBrush"] = "#FFFFFF"
+            }
+            : new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                ["WindowBackground"] = "#F4F7FB",
+                ["SurfaceBackground"] = "#FFFFFF",
+                ["SurfaceMuted"] = "#F1F5F9",
+                ["ReadOnlySurfaceBrush"] = "#F1F5F9",
+                ["PrimaryText"] = "#0F172A",
+                ["MutedText"] = "#334155",
+                ["OutlineBrush"] = "#CBD5E1",
+                ["ComboDropDownSurfaceBrush"] = "#FFFFFF",
+                ["ComboDropDownBorderBrush"] = "#94A3B8",
+                ["AccentBrush"] = "#0F766E",
+                ["AccentSoftBrush"] = "#CCFBF1",
+                ["DangerBrush"] = "#B91C1C",
+                ["WarningBrush"] = "#9A3412",
+                ["DarkSurfaceBrush"] = "#0F172A",
+                ["ScrollTrackBrush"] = "#F1F5F9",
+                ["ScrollThumbBrush"] = "#64748B",
+                ["ScrollThumbHoverBrush"] = "#0F766E",
+                ["CheckBoxBoxSurfaceBrush"] = "#FFFFFF",
+                ["CheckBoxBoxBorderBrush"] = "#64748B",
+                ["CheckBoxCheckedSurfaceBrush"] = "#0F766E",
+                ["CheckBoxMarkBrush"] = "#FFFFFF",
+                ["RadioButtonSurfaceBrush"] = "#FFFFFF",
+                ["RadioButtonBorderBrush"] = "#64748B",
+                ["RadioButtonCheckedSurfaceBrush"] = "#0F766E",
+                ["RadioButtonMarkBrush"] = "#FFFFFF"
+            };
+
+        foreach (var entry in palette)
+            window.Resources[entry.Key] = Brush(entry.Value);
+
+        // Window is not a Control; set its shell colors explicitly so no white/black
+        // background leaks through when a new form or popup switches themes.
+        window.Background = Brush(isDark ? "#0B1220" : "#F4F7FB");
+        window.Foreground = Brush(isDark ? "#F8FAFC" : "#0F172A");
+    }
+
     public static string Normalize(string? theme) =>
         string.Equals(theme, DarkTheme, StringComparison.OrdinalIgnoreCase) ? DarkTheme : LightTheme;
 
@@ -90,6 +159,8 @@ public static class ApplicationThemeService
             var snapshot = OriginalValues.GetValue(element, CaptureOriginalValues);
             RestoreOriginalValues(element, snapshot);
         }
+
+        ApplyPaletteResources(window, isDark);
 
         // Explicit styles also theme popup choices, which are hosted in WPF Popup trees and
         // therefore do not reliably appear in the main window's visual-tree enumeration.

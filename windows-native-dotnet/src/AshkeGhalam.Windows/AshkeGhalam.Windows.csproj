@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AshkeGhalam.Windows</RootNamespace>
     <AssemblyName>AshkeGhalam.Windows</AssemblyName>
-    <Version>16.55.0</Version>
+    <Version>16.56.0</Version>
     <Product>Ashke Ghalam Accounting</Product>
     <Description>Native Windows WPF accounting application</Description>
   </PropertyGroup>

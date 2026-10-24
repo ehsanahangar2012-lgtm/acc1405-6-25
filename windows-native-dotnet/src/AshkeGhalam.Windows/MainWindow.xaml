@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         xmlns:services="clr-namespace:AshkeGhalam.Windows.Services"
-        Title="حسابداری اشک قلم — نسخه بومی ویندوز"
+        Title="حسابداری اشک قلم — نسخه بومی ویندوز 16.56.0"
         Width="1360" Height="880" MinWidth="1040" MinHeight="680"
         WindowStartupLocation="CenterScreen" WindowStyle="None" ResizeMode="CanResize"
         Background="#F4F7FB" Foreground="#0F172A" FlowDirection="RightToLeft"
@@ -21,9 +21,9 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="MinHeight" Value="36"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Background" Value="{StaticResource SurfaceBackground}"/>
-            <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -60,9 +60,9 @@
             <Setter Property="MinHeight" Value="36"/>
             <Setter Property="Padding" Value="9,6"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Background" Value="{StaticResource SurfaceBackground}"/>
-            <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
@@ -104,9 +104,9 @@
             <Setter Property="FontFamily" Value="pack://application:,,,/Assets/Fonts/#Vazirmatn"/>
             <Setter Property="MinHeight" Value="36"/>
             <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Background" Value="{StaticResource SurfaceBackground}"/>
-            <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource OutlineBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource SurfaceBackground}"/>
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryText}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource OutlineBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="IsTextSearchEnabled" Value="True"/>
             <Setter Property="IsTextSearchCaseSensitive" Value="False"/>
@@ -244,6 +244,9 @@
                     <TextBlock x:Name="CurrentModuleText" Text="پیشخوان • نسخهٔ بومی در کنار نسخهٔ اصلی" Foreground="#CBD5E1" FontSize="12" Margin="0,3,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border VerticalAlignment="Center" Background="#0F766E" BorderBrush="#14B8A6" BorderThickness="1" CornerRadius="18" Padding="12,7" Margin="0,0,10,0">
+                        <TextBlock Text="WPF • 16.56.0" Foreground="#FFFFFF" FontSize="11" FontWeight="SemiBold"/>
+                    </Border>
                     <Border VerticalAlignment="Center" Background="#1F2937" BorderBrush="#475569" BorderThickness="1" CornerRadius="18" Padding="12,7" Margin="0,0,10,0">
                         <TextBlock x:Name="StorageStatus" Text="در حال بارگذاری..." Foreground="#E2E8F0" FontSize="12"/>
                     </Border>
@@ -1652,7 +1655,7 @@
                         <Border Background="#111827" BorderBrush="#334155" BorderThickness="1" CornerRadius="12" Padding="13" Margin="0,0,0,8">
                             <StackPanel>
                                 <TextBlock Text="اشک قلم" Foreground="#F8FAFC" FontSize="21" FontWeight="Bold"/>
-                                <TextBlock Text="نسخهٔ بومی ویندوز" Foreground="#CBD5E1" FontSize="12" Margin="0,4,0,0"/>
+                                <TextBlock Text="نسخهٔ بومی ویندوز • 16.56.0" Foreground="#CBD5E1" FontSize="12" Margin="0,4,0,0"/>
                                 <TextBlock Text="مهاجرت مستقل از نسخهٔ اصلی" Foreground="#94A3B8" FontSize="10" Margin="0,5,0,0"/>
                             </StackPanel>
                         </Border>

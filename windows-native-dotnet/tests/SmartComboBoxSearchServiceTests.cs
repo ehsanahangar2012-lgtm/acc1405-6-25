@@ -149,6 +149,14 @@ public sealed class SmartComboBoxSearchServiceTests
                     "The selected value must remain the original domain record, not its display text.");
                 Assert.AreEqual(2, combo.Items.Count,
                     "Selecting a party should clear the filter so the next search starts from all parties.");
+                var selectedEditor = combo.Template.FindName("PART_EditableTextBox", combo) as System.Windows.Controls.TextBox;
+                Assert.IsNotNull(selectedEditor);
+                selectedEditor!.Text = "CUS-010";
+                window.Dispatcher.Invoke(
+                    System.Windows.Threading.DispatcherPriority.Background,
+                    new Action(() => { }));
+                Assert.AreSame(otherParty, combo.SelectedItem,
+                    "A stale editable-text update after dropdown selection must not clear the selected party.");
             }
             catch (Exception ex)
             {

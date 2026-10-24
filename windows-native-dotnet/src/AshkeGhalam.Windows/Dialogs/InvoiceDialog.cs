@@ -43,7 +43,7 @@ public sealed class InvoiceDialog : Window
         new Choice("PURCHASE", "فاکتور خرید"),
         new Choice("PROFORMA", "پیش‌فاکتور")
     }, SelectedIndex = 0 };
-    private readonly ComboBox _person = new() { Height = 48, MinWidth = 250, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "نام، کد یا تلفن را تایپ کنید؛ سپس شخص را از فهرست نتایج انتخاب کنید." };
+    private readonly ComboBox _person = new() { Height = 48, MinWidth = 250, Tag = "نام، کد یا تلفن را جست‌وجو کنید…", IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "برای دیدن فهرست، فلش کنار کادر را بزنید؛ نام، کد یا تلفن را جست‌وجو کرده و روی نتیجه کلیک کنید." };
     private readonly TextBlock _partyHint = new() { FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 0, 2, 8) };
     private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300, ToolTip = "نام، کد، بارکد یا سریال کالا را تایپ کنید و از نتایج انتخاب کنید." };
     private readonly TextBox _quantity = new() { Height = 32, Width = 90, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
