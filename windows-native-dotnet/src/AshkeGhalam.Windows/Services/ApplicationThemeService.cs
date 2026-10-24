@@ -587,19 +587,20 @@ public static class ApplicationThemeService
 
     private static void PolishControls(Window window, IReadOnlyCollection<DependencyObject> elements)
     {
-        // Apply consistent labels and base buttons throughout the shell and dialogs.
-        // Explicit styles (such as the right-side navigation) remain untouched.
-        PolishFormLabels(elements);
-        var buttonStyle = CreateModernButtonStyle();
-        window.Resources[typeof(Button)] = buttonStyle;
-        foreach (var button in elements.OfType<Button>())
+        if (window.GetType().Name != "MainWindow")
         {
-            if (button.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
-                button.Style = buttonStyle;
-            button.MinHeight = Math.Max(button.MinHeight, 36);
-            button.FontSize = Math.Max(button.FontSize, 12);
-            if (button.Padding.Left < 8)
-                button.Padding = new Thickness(12, 7, 12, 7);
+            PolishFormLabels(elements);
+            var buttonStyle = CreateModernButtonStyle();
+            window.Resources[typeof(Button)] = buttonStyle;
+            foreach (var button in elements.OfType<Button>())
+            {
+                if (button.ReadLocalValue(FrameworkElement.StyleProperty) == DependencyProperty.UnsetValue)
+                    button.Style = buttonStyle;
+                button.MinHeight = Math.Max(button.MinHeight, 36);
+                button.FontSize = Math.Max(button.FontSize, 12);
+                if (button.Padding.Left < 8)
+                    button.Padding = new Thickness(12, 7, 12, 7);
+            }
         }
 
         foreach (var input in elements.OfType<TextBox>())
