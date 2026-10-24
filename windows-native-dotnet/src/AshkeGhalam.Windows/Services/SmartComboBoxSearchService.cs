@@ -3,7 +3,6 @@ using System.Text;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
-using System.Windows.Threading;
 
 namespace AshkeGhalam.Windows.Services;
 
@@ -19,7 +18,6 @@ public static class SmartComboBoxSearchService
         public ListCollectionView View { get; set; } = new(new List<object>());
         public string Query { get; set; } = "";
         public bool IsUpdating { get; set; }
-        public int EditVersion { get; set; }
     }
 
     private static readonly ConditionalWeakTable<ComboBox, SearchState> States = new();
@@ -126,52 +124,43 @@ public static class SmartComboBoxSearchService
 
     private static void EditableTextChanged(object sender, TextChangedEventArgs e)
     {
-        // Only filter genuine edits in the ComboBox's own editable text box. WPF may raise
-        // the text change just before or just after it commits a popup selection, so process
-        // the latest edit at Background priority and discard stale queued edits.
+        // Filter only text changes originating from the editable ComboBox editor. A
+        // keyboard-focus check is intentionally avoided: focus may temporarily move to
+        // the native popup or accessibility/automated input target while the edit is still valid.
         if (sender is not ComboBox combo || !States.TryGetValue(combo, out var state) ||
             state.IsUpdating || e.OriginalSource is not TextBox editBox) return;
 
+        // Read the editor itself: its Text binding can lag the ComboBox.Text property
+        // when templates are being re-applied or input arrives through automation/accessibility.
         var text = editBox.Text ?? combo.Text ?? "";
-        var selectionStart = editBox.SelectionStart;
-        var selectionLength = editBox.SelectionLength;
-        var editVersion = ++state.EditVersion;
-
-        combo.Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() =>
+        if (combo.SelectedItem is object selected && IsExactValue(state, selected, text))
         {
-            if (state.IsUpdating || editVersion != state.EditVersion) return;
-            var currentEditor = combo.Template.FindName("PART_EditableTextBox", combo) as TextBox;
-            var currentText = currentEditor?.Text ?? combo.Text ?? "";
-
-            // If WPF has just committed a selected record, keep that domain object rather
-            // than letting the selected label trigger another filter and clear the selection.
-            if (combo.SelectedItem is object selected && IsExactValue(state, selected, currentText))
+            if (state.Query.Length > 0)
             {
                 state.IsUpdating = true;
                 state.Query = "";
                 state.View.Refresh();
                 state.IsUpdating = false;
-                return;
             }
+            return;
+        }
 
-            var caret = currentEditor?.SelectionStart ?? selectionStart;
-            var selection = currentEditor?.SelectionLength ?? selectionLength;
-            state.IsUpdating = true;
-            combo.SelectedItem = null;
-            state.Query = currentText.Trim();
-            state.View.Refresh();
-            combo.Text = currentText;
-            state.IsUpdating = false;
+        var selectionStart = editBox.SelectionStart;
+        var selectionLength = editBox.SelectionLength;
+        state.IsUpdating = true;
+        combo.SelectedItem = null;
+        state.Query = text.Trim();
+        state.View.Refresh();
+        combo.Text = text;
+        state.IsUpdating = false;
 
-            if (state.Query.Length == 0) return;
-            combo.IsDropDownOpen = true;
-            currentEditor = combo.Template.FindName("PART_EditableTextBox", combo) as TextBox;
-            if (currentEditor is not null)
-            {
-                currentEditor.SelectionStart = Math.Clamp(caret, 0, currentText.Length);
-                currentEditor.SelectionLength = Math.Clamp(selection, 0, currentText.Length - currentEditor.SelectionStart);
-            }
-        }));
+        if (state.Query.Length == 0) return;
+        combo.IsDropDownOpen = true;
+        if (combo.Template.FindName("PART_EditableTextBox", combo) is TextBox editableTextBox)
+        {
+            editableTextBox.SelectionStart = Math.Clamp(selectionStart, 0, text.Length);
+            editableTextBox.SelectionLength = Math.Clamp(selectionLength, 0, text.Length - editableTextBox.SelectionStart);
+        }
     }
 
     private static bool IsExactValue(SearchState state, object item, string text) =>
