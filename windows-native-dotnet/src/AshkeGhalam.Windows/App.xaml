@@ -20,7 +20,7 @@
         <SolidColorBrush x:Key="DarkSurfaceBrush" Color="#0F172A"/>
 
         <Style TargetType="{x:Type TextBlock}">
-            <Setter Property="Foreground" Value="{StaticResource PrimaryText}"/>
+            <!-- Foreground inherits from Window/Control so button and navigation labels stay legible. -->
             <Setter Property="FontSize" Value="13"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
         </Style>

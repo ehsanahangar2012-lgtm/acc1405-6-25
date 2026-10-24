@@ -95,6 +95,8 @@ public static class ApplicationThemeService
         // therefore do not reliably appear in the main window's visual-tree enumeration.
         window.Resources[typeof(ComboBoxItem)] = CreateChoiceItemStyle(isDark, isListItem: false);
         window.Resources[typeof(ListBoxItem)] = CreateChoiceItemStyle(isDark, isListItem: true);
+        window.Resources["ComboDropDownSurfaceBrush"] = Brush(isDark ? "#111827" : "#FFFFFF");
+        window.Resources["ComboDropDownBorderBrush"] = Brush(isDark ? "#475569" : "#CBD5E1");
         window.Resources["ReadOnlySurfaceBrush"] = Brush(isDark ? "#1F2937" : "#F1F5F9");
 
         // Establish control templates before theme mapping, so the newly applied
@@ -103,6 +105,12 @@ public static class ApplicationThemeService
 
         foreach (var element in elements)
             ApplyThemeValues(element, isDark);
+
+        // Editable ComboBoxes create their inner text editor and drop-down visual tree
+        // lazily. Synchronize those parts after palette mapping so their first rendered
+        // frame uses the same contrast as the owning ComboBox in either theme.
+        foreach (var combo in elements.OfType<ComboBox>())
+            ConfigureComboBoxTheme(combo, isDark);
 
         foreach (var grid in elements.OfType<DataGrid>())
             ConfigureDataGridTheme(grid, isDark);
@@ -453,6 +461,53 @@ public static class ApplicationThemeService
             }
         });
         return style;
+    }
+
+    private static void ConfigureComboBoxTheme(ComboBox combo, bool isDark)
+    {
+        combo.ApplyTemplate();
+
+        var surface = Brush(isDark ? "#111827" : "#FFFFFF");
+        var foreground = Brush(isDark ? "#F3F4F6" : "#0F172A");
+        var border = Brush(isDark ? "#475569" : "#CBD5E1");
+        combo.Background = surface;
+        combo.Foreground = foreground;
+        combo.BorderBrush = border;
+        combo.BorderThickness = new Thickness(1);
+
+        if (combo.Template.FindName("PART_EditableTextBox", combo) is TextBox editor)
+        {
+            editor.Background = surface;
+            editor.Foreground = foreground;
+            editor.BorderBrush = border;
+            editor.BorderThickness = new Thickness(0);
+            editor.Padding = new Thickness(0);
+            editor.CaretBrush = foreground;
+            editor.SelectionBrush = Brush(isDark ? "#115E59" : "#99F6E4");
+        }
+
+        // Most WPF default templates name their arrow button "ToggleButton". The fallback
+        // search keeps this robust for framework templates that use another internal name.
+        var toggle = combo.Template.FindName("ToggleButton", combo) as ToggleButton
+            ?? EnumerateTree(combo).OfType<ToggleButton>().FirstOrDefault();
+        if (toggle is not null)
+        {
+            toggle.Background = surface;
+            toggle.Foreground = foreground;
+            toggle.BorderBrush = border;
+        }
+
+        if (combo.Template.FindName("PART_Popup", combo) is Popup popup)
+        {
+            foreach (var popupBorder in EnumerateTree(popup).OfType<Border>())
+            {
+                if (!string.Equals(popupBorder.Name, "DropDownBorder", StringComparison.Ordinal) &&
+                    !string.Equals(popupBorder.Name, "PopupBorder", StringComparison.Ordinal))
+                    continue;
+                popupBorder.Background = Brush(isDark ? "#111827" : "#FFFFFF");
+                popupBorder.BorderBrush = border;
+            }
+        }
     }
 
     private static Style CreateChoiceItemStyle(bool isDark, bool isListItem)

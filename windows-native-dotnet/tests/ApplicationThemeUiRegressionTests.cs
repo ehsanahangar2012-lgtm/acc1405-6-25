@@ -58,6 +58,57 @@ public sealed class ApplicationThemeUiRegressionTests
     }
 
     [TestMethod]
+    public void EditableComboBoxEditorTracksBothThemePalettes()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var combo = new ComboBox
+                {
+                    IsEditable = true,
+                    ItemsSource = new[] { "شرکت نمونه بسته‌بندی", "تأمین‌کننده نمونه" },
+                    SelectedIndex = 0
+                };
+                var window = new Window
+                {
+                    Width = 560,
+                    Height = 220,
+                    Background = Brushes.White,
+                    Content = combo
+                };
+
+                ApplicationThemeService.Apply(window, "dark");
+                var editor = combo.Template.FindName("PART_EditableTextBox", combo) as TextBox;
+                Assert.IsNotNull(editor, "The native ComboBox must retain its editable text part for live search.");
+                Assert.AreEqual(Color.FromRgb(17, 24, 39), ((SolidColorBrush)editor!.Background).Color);
+                Assert.AreEqual(Color.FromRgb(243, 244, 246), ((SolidColorBrush)editor.Foreground).Color);
+                Assert.AreEqual(Color.FromRgb(71, 85, 105), ((SolidColorBrush)combo.BorderBrush).Color);
+
+                ApplicationThemeService.Apply(window, "light");
+                Assert.AreEqual(Colors.White, ((SolidColorBrush)editor.Background).Color);
+                Assert.AreEqual(Color.FromRgb(15, 23, 42), ((SolidColorBrush)editor.Foreground).Color);
+                Assert.AreEqual(Color.FromRgb(203, 213, 225), ((SolidColorBrush)combo.BorderBrush).Color);
+                Assert.IsTrue(ApplicationThemeService.ContrastRatio(
+                    ((SolidColorBrush)editor.Foreground).Color,
+                    ((SolidColorBrush)editor.Background).Color) >= 4.5);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+            throw new AssertFailedException("Editable ComboBox theme parts did not follow the selected palette.", failure);
+    }
+
+    [TestMethod]
     public void DataGridThemeSwitchRestoresReadableLightPaletteAfterDarkMode()
     {
         Exception? failure = null;
