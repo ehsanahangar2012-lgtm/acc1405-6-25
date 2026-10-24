@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
@@ -57,11 +58,57 @@ public static class SmartComboBoxSearchService
     public static bool MatchesSearch(IEnumerable<string?> searchableValues, string? query)
     {
         ArgumentNullException.ThrowIfNull(searchableValues);
-        if (string.IsNullOrWhiteSpace(query)) return true;
-        var term = query.Trim();
+        var term = NormalizeSearchText(query);
+        if (term.Length == 0) return true;
+
         return searchableValues.Any(value =>
-            !string.IsNullOrWhiteSpace(value) &&
-            value.Contains(term, StringComparison.CurrentCultureIgnoreCase));
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            return NormalizeSearchText(value).Contains(term, StringComparison.CurrentCultureIgnoreCase);
+        });
+    }
+
+    /// <summary>
+    /// Normalizes common Persian/Arabic keyboard variants so a user can find a record even
+    /// when names were imported with Arabic Yeh/Kaf, Persian digits, or zero-width spacing.
+    /// The stored value and displayed record are never rewritten.
+    /// </summary>
+    public static string NormalizeSearchText(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return "";
+
+        var source = value.Normalize(NormalizationForm.FormKC);
+        var result = new StringBuilder(source.Length);
+        var previousWasSpace = true;
+        foreach (var character in source)
+        {
+            if (char.IsWhiteSpace(character) || character is '\u200c' or '\u200d' or '\u00a0')
+            {
+                if (!previousWasSpace)
+                {
+                    result.Append(' ');
+                    previousWasSpace = true;
+                }
+                continue;
+            }
+
+            // Harakat are presentation-only for this lookup; leave stored strings untouched.
+            if (character is >= '\u064b' and <= '\u065f' or '\u0670')
+                continue;
+
+            var normalized = character switch
+            {
+                'ي' or 'ى' => 'ی',
+                'ك' => 'ک',
+                >= '۰' and <= '۹' => (char)('0' + character - '۰'),
+                >= '٠' and <= '٩' => (char)('0' + character - '٠'),
+                _ => character
+            };
+            result.Append(normalized);
+            previousWasSpace = false;
+        }
+
+        return result.ToString().Trim();
     }
 
     private static void SelectionChanged(object sender, SelectionChangedEventArgs e)

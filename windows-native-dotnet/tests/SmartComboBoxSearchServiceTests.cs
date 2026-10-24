@@ -40,4 +40,25 @@ public sealed class SmartComboBoxSearchServiceTests
         Assert.IsFalse(SmartComboBoxSearchService.MatchesSearch(
             new string?[] { null, "کد-۱۲۰" }, "کد-۱۲۱"));
     }
+
+    [TestMethod]
+    public void SearchNormalizesPersianArabicLettersDigitsAndZeroWidthSpacing()
+    {
+        Assert.IsTrue(SmartComboBoxSearchService.MatchesSearch(
+            new string?[] { "مشتري كالا ۱۲۳" }, "مشتری کالا ١٢٣"));
+        Assert.IsTrue(SmartComboBoxSearchService.MatchesSearch(
+            new string?[] { "جعبه‌سازی" }, "جعبه سازی"));
+        Assert.IsTrue(SmartComboBoxSearchService.MatchesSearch(
+            new string?[] { "كد ٤٥٦" }, "کد 456"));
+        Assert.IsFalse(SmartComboBoxSearchService.MatchesSearch(
+            new string?[] { "مشتری کالا 123" }, "مشتری کالا 124"));
+    }
+
+    [TestMethod]
+    public void NormalizeSearchTextTrimsAndCollapsesWhitespaceWithoutChangingStoredValues()
+    {
+        Assert.AreEqual("کالا جعبه", SmartComboBoxSearchService.NormalizeSearchText("  كالا\u200c   جعبه  "));
+        Assert.AreEqual("کد 123", SmartComboBoxSearchService.NormalizeSearchText("کد ۱۲۳"));
+        Assert.AreEqual("", SmartComboBoxSearchService.NormalizeSearchText(" \u200c "));
+    }
 }
