@@ -25,6 +25,12 @@ public sealed class InvoiceDialog : Window
     private readonly decimal _defaultTaxRatePercent;
     private readonly string _currencyLabel;
     private readonly string _invoiceFooter;
+    private readonly IReadOnlyList<string> _footerTemplates;
+    private readonly TextBox _invoiceFooterText = new() { Height = 72, Padding = new Thickness(8), AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+    private readonly ComboBox _footerTemplateSelector = new() { Height = 34, MinWidth = 260, IsTextSearchEnabled = true };
+    private readonly CheckBox _saveFooterAsTemplate = new() { Content = "ذخیرهٔ این متن به‌عنوان الگوی آماده", Margin = new Thickness(0, 5, 0, 8) };
+    public bool SaveFooterAsTemplate { get; private set; }
+    public string FooterTemplateToSave { get; private set; } = "";
     private readonly InvoiceRecord? _existingInvoice;
     private readonly TextBox _barcodeScan = new() { Height = 34, MinWidth = 240, Padding = new Thickness(8, 4, 8, 4), FlowDirection = FlowDirection.LeftToRight };
     private readonly CheckBox _taxIsAmount = new() { Content = "مالیات مبلغی است (خاموش: درصد از جمع کالاها)", IsChecked = true, Margin = new Thickness(0, 6, 0, 0) };
@@ -84,7 +90,8 @@ public sealed class InvoiceDialog : Window
         decimal defaultTaxRatePercent = 0m,
         string? currencyCode = "RIAL",
         string? invoiceFooter = null,
-        InvoiceRecord? existingInvoice = null)
+        InvoiceRecord? existingInvoice = null,
+        IReadOnlyList<string>? footerTemplates = null)
     {
         Owner = owner;
         _people = people.ToList();
@@ -104,6 +111,12 @@ public sealed class InvoiceDialog : Window
             _ => currencyCode.Trim()
         };
         _invoiceFooter = invoiceFooter ?? "";
+        _footerTemplates = (footerTemplates ?? [])
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim()).Distinct(StringComparer.Ordinal).ToList();
+        _footerTemplateSelector.ItemsSource = _footerTemplates;
+        _invoiceFooterText.Text = !string.IsNullOrWhiteSpace(existingInvoice?.InvoiceFooter)
+            ? existingInvoice.InvoiceFooter : _invoiceFooter;
         _existingInvoice = existingInvoice;
         _taxIsAmount.IsChecked = _defaultTaxRatePercent == 0m;
         _tax.Text = _taxIsAmount.IsChecked == true
@@ -135,6 +148,8 @@ public sealed class InvoiceDialog : Window
             _taxId.Text = existingInvoice.TaxId;
             _showPreviousBalance.IsChecked = existingInvoice.ShowPreviousBalance;
         }
+        foreach (var numericField in new[] { _quantity, _price, _discount, _tax, _cashAmount })
+            NumericTextBoxFormatter.Attach(numericField);
         ConfigureLineGrid();
         _lineList.ItemsSource = _lines;
         _product.ItemsSource = _products;
@@ -243,7 +258,33 @@ public sealed class InvoiceDialog : Window
         root.Children.Add(_totals);
         AddField(root, "دریافت/پرداخت نقدی هنگام صدور", _cashAmount);
         AddField(root, "شرح فاکتور / متن چاپ", _description);
-        AddField(root, "یادداشت داخلی", _notes);
+        AddField(root, "یادداشت داخلی (در چاپ درج نمی‌شود)", _notes);
+        root.Children.Add(new TextBlock
+        {
+            Text = "پانویس قابل انتخاب برای چاپ فاکتور",
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 12, 0, 5)
+        });
+        var footerTemplateRow = new WrapPanel { Margin = new Thickness(0, 0, 0, 5) };
+        footerTemplateRow.Children.Add(_footerTemplateSelector);
+        var insertFooterTemplate = new Button
+        {
+            Content = "درج الگو", MinWidth = 95, Height = 34,
+            Margin = new Thickness(8, 0, 0, 0)
+        };
+        insertFooterTemplate.Click += (_, _) =>
+        {
+            if (_footerTemplateSelector.SelectedItem is not string template || string.IsNullOrWhiteSpace(template)) return;
+            var existingLines = _invoiceFooterText.Text.Split(
+                new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (!existingLines.Contains(template, StringComparer.Ordinal))
+                _invoiceFooterText.Text = string.IsNullOrWhiteSpace(_invoiceFooterText.Text)
+                    ? template : _invoiceFooterText.Text.TrimEnd() + Environment.NewLine + template;
+        };
+        footerTemplateRow.Children.Add(insertFooterTemplate);
+        root.Children.Add(footerTemplateRow);
+        AddField(root, "زیرنویس دلخواه (فقط روی همین فاکتور چاپ می‌شود)", _invoiceFooterText);
+        root.Children.Add(_saveFooterAsTemplate);
 
         var logistics = new Grid { Margin = new Thickness(0, 2, 0, 0) };
         logistics.ColumnDefinitions.Add(new ColumnDefinition());
@@ -666,6 +707,7 @@ public sealed class InvoiceDialog : Window
             CashAmount = cash,
             Description = _description.Text.Trim(),
             Notes = _notes.Text.Trim(),
+            InvoiceFooter = _invoiceFooterText.Text.Trim(),
             DriverName = _driverName.Text.Trim(),
             DriverPhone = _driverPhone.Text.Trim(),
             VehiclePlate = _vehiclePlate.Text.Trim(),
@@ -686,6 +728,9 @@ public sealed class InvoiceDialog : Window
         try
         {
             Result = BuildDraft();
+            SaveFooterAsTemplate = _saveFooterAsTemplate.IsChecked == true &&
+                !string.IsNullOrWhiteSpace(_invoiceFooterText.Text);
+            FooterTemplateToSave = SaveFooterAsTemplate ? _invoiceFooterText.Text.Trim() : "";
             DialogResult = true;
         }
         catch (Exception ex)
@@ -699,7 +744,7 @@ public sealed class InvoiceDialog : Window
         try
         {
             var draft = BuildDraft();
-            new InvoicePreviewWindow(this, draft, _people, _invoices, _defaultInvoiceTheme, _showInvoiceQr, _companyProfile, _currencyLabel, _invoiceFooter).ShowDialog();
+            new InvoicePreviewWindow(this, draft, _people, _invoices, _defaultInvoiceTheme, _showInvoiceQr, _companyProfile, _currencyLabel, draft.InvoiceFooter).ShowDialog();
         }
         catch (Exception ex)
         {

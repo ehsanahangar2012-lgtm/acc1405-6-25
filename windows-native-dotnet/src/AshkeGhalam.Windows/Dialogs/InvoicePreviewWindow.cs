@@ -119,6 +119,7 @@ public sealed class InvoicePreviewWindow : Window
             CreatedAt = createdAt,
             DueDate = draft.DueDate,
             Notes = draft.Notes,
+            InvoiceFooter = draft.InvoiceFooter,
             DriverName = draft.DriverName,
             DriverPhone = draft.DriverPhone,
             VehiclePlate = draft.VehiclePlate,
@@ -146,7 +147,7 @@ public sealed class InvoicePreviewWindow : Window
             "RIAL" or "" or null => "ریال",
             _ => currencyCode.Trim()
         };
-        _invoiceFooter = invoiceFooter ?? "";
+        _invoiceFooter = !string.IsNullOrWhiteSpace(invoice.InvoiceFooter) ? invoice.InvoiceFooter : invoiceFooter ?? "";
         _theme = InvoiceThemes.Any(option => string.Equals(option.Key, defaultTheme, StringComparison.Ordinal))
             ? defaultTheme!
             : "modern";
@@ -311,6 +312,13 @@ public sealed class InvoicePreviewWindow : Window
     {
         var palette = GetPalette(theme);
         var invoiceLines = invoice.Lines ?? [];
+        string BothCurrencies(decimal amount)
+        {
+            var primary = amount.ToString("#,##0.##", CultureInfo.InvariantCulture);
+            var otherAmount = string.Equals(currencyLabel, "تومان", StringComparison.Ordinal) ? amount * 10m : amount / 10m;
+            var otherCurrency = string.Equals(currencyLabel, "تومان", StringComparison.Ordinal) ? "ریال" : "تومان";
+            return $"{primary} {currencyLabel}{Environment.NewLine}{otherAmount.ToString("#,##0.##", CultureInfo.InvariantCulture)} {otherCurrency}";
+        }
         var accent = new SolidColorBrush(palette.Accent);
         var soft = new SolidColorBrush(palette.Soft);
         var ink = new SolidColorBrush(palette.Ink);
@@ -585,7 +593,7 @@ public sealed class InvoicePreviewWindow : Window
 
         var group = new TableRowGroup();
         var header = new TableRow();
-        foreach (var label in new[] { "کالا / شرح قلم", "تعداد", "واحد", $"قیمت واحد ({currencyLabel})", $"جمع ({currencyLabel})" })
+        foreach (var label in new[] { "کالا / شرح قلم", "تعداد", "واحد", "قیمت واحد (ریال / تومان)", "جمع (ریال / تومان)" })
         {
             header.Cells.Add(new TableCell(new Paragraph(new Run(label)))
             {
@@ -608,8 +616,8 @@ public sealed class InvoicePreviewWindow : Window
                 string.IsNullOrWhiteSpace(line.Description) ? line.ProductName : $"{line.ProductName}\n{line.Description}",
                 line.Quantity.ToString("#,##0.##", CultureInfo.CurrentCulture),
                 string.IsNullOrWhiteSpace(line.Unit) ? "—" : line.Unit,
-                line.UnitPrice.ToString("#,##0.##", CultureInfo.CurrentCulture) + " " + currencyLabel,
-                line.LineTotal.ToString("#,##0.##", CultureInfo.CurrentCulture) + " " + currencyLabel
+                BothCurrencies(line.UnitPrice),
+                BothCurrencies(line.LineTotal)
             };
 
             foreach (var value in values)
@@ -680,20 +688,18 @@ public sealed class InvoicePreviewWindow : Window
         }
 
         var totalsStack = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
-        totalsStack.Children.Add(MakeAmountRow("جمع کالاها", $"{invoice.Subtotal.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
-        totalsStack.Children.Add(MakeAmountRow("تخفیف", $"{invoice.Discount.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
-        totalsStack.Children.Add(MakeAmountRow(taxLabel, $"{invoice.TaxAmount.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        totalsStack.Children.Add(MakeAmountRow("جمع کالاها", BothCurrencies(invoice.Subtotal)));
+        totalsStack.Children.Add(MakeAmountRow("تخفیف", BothCurrencies(invoice.Discount)));
+        totalsStack.Children.Add(MakeAmountRow(taxLabel, BothCurrencies(invoice.TaxAmount)));
         totalsStack.Children.Add(new Border
         {
             Height = 1, Background = accent, Opacity = 0.65,
             Margin = new Thickness(0, 8, 0, 8)
         });
-        totalsStack.Children.Add(MakeAmountRow("مبلغ نهایی قابل پرداخت",
-            $"{invoice.Total.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}", emphasize: true));
-        totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — نقدی",
-            $"{invoice.CashAmount.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
-        totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — چک",
-            $"{invoice.CheckAmount.ToString("#,##0.##", CultureInfo.CurrentCulture)} {currencyLabel}"));
+        totalsStack.Children.Add(MakeAmountRow("مبلغ نهایی قابل پرداخت (ریال و تومان)",
+            BothCurrencies(invoice.Total), emphasize: true));
+        totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — نقدی", BothCurrencies(invoice.CashAmount)));
+        totalsStack.Children.Add(MakeAmountRow("تسویهٔ اولیه — چک", BothCurrencies(invoice.CheckAmount)));
         document.Blocks.Add(new BlockUIContainer(new Border
         {
             Width = 660,

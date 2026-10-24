@@ -507,6 +507,9 @@ public sealed class CheckDialog : Window
             byte[] bytes;
             if (!string.IsNullOrWhiteSpace(encoded))
                 bytes = Convert.FromBase64String(encoded);
+            else if (!string.IsNullOrWhiteSpace(path) &&
+                     path.Replace('\\', '/').StartsWith("CheckImages/", StringComparison.OrdinalIgnoreCase))
+                bytes = ProtectedCheckImageStore.Read(path);
             else if (!string.IsNullOrWhiteSpace(path) && File.Exists(path))
                 bytes = File.ReadAllBytes(path);
             else

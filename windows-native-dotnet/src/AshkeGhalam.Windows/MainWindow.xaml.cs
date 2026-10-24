@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.IO;
+using System.ComponentModel;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -31,6 +33,7 @@ public partial class MainWindow : Window
     private static bool _textBoxSelectAllHandlersRegistered;
     private string _activeNavigationKey = "dashboard";
     private bool _gridMenusConfigured;
+    private bool _allowClose;
     private readonly DispatcherTimer _automaticBackupTimer = new() { Interval = TimeSpan.FromMinutes(1) };
     private const string FooterNoteNoReturns = "کالای فروخته‌شده پس گرفته نمی‌شود.";
     private const string FooterNotePaymentTerms = "لطفاً هنگام پرداخت شماره فاکتور را ذکر کنید.";
@@ -49,6 +52,7 @@ public partial class MainWindow : Window
         }
         _uiReady = true;
         Loaded += MainWindow_Loaded;
+        Closing += MainWindow_Closing;
         StateChanged += (_, _) => UpdateWindowStateButton();
         PreviewKeyDown += MainWindow_PreviewKeyDown;
         _automaticBackupTimer.Tick += AutomaticBackupTimer_Tick;
@@ -60,6 +64,21 @@ public partial class MainWindow : Window
     private void WindowMaximize_Click(object sender, RoutedEventArgs e) => ToggleWindowState();
 
     private void WindowClose_Click(object sender, RoutedEventArgs e) => Close();
+
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        if (_allowClose || !_canWrite) return;
+        e.Cancel = true;
+        var choice = MessageBox.Show(this,
+            "پیش از خروج یک پشتیبان رمزگذاری‌شده بسازید؟\nبله: ذخیرهٔ پشتیبان و سپس خروج\nخیر: خروج بدون پشتیبان\nلغو: بازگشت به برنامه",
+            "یادآوری پشتیبان‌گیری", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+        if (choice == MessageBoxResult.Cancel) return;
+        if (choice == MessageBoxResult.Yes &&
+            !CreateManualBackupFromDialog("پشتیبان پیش از خروج", "AshkeGhalam-ExitBackup"))
+            return;
+        _allowClose = true;
+        Close();
+    }
 
     private void ToggleWindowState()
     {
@@ -141,7 +160,9 @@ public partial class MainWindow : Window
             var loaded = _store.Load();
             _data = loaded;
             EnsureConfigurationDefaults();
-            if (CompanyWorkspaceService.EnsureInitialized(_data))
+            var checkImagesChanged = ProtectedCheckImageStore.Synchronize(_data.Checks);
+            var companyConfigurationChanged = CompanyWorkspaceService.EnsureInitialized(_data);
+            if (checkImagesChanged || companyConfigurationChanged)
                 _store.Save(_data);
 
             // Safely reconcile legacy operational records on a clone. If the account chart
@@ -229,6 +250,7 @@ public partial class MainWindow : Window
             var previousCompanyId = _data.ActiveCompanyId;
             mutation(next);
             CompanyWorkspaceService.SwitchIfRequested(next, previousCompanyId, next.ActiveCompanyId);
+            ProtectedCheckImageStore.Synchronize(next.Checks);
             NativeOperationalPostingService.Reconcile(next);
             AccountingDataValidator.Validate(next);
             _store.Save(next);
@@ -1524,8 +1546,9 @@ public partial class MainWindow : Window
             AddCustomerInline, AddProductInline,
             _data.Preferences.InvoiceTheme, _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
             _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
-            _data.Preferences.Currency, ConfiguredInvoiceFooter());
-            ApplyCurrentThemeTo(dialog);
+            _data.Preferences.Currency, ConfiguredInvoiceFooter(),
+            footerTemplates: InvoiceFootnoteTemplates());
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() == true && dialog.Result is InvoiceDraft draft)
         {
             var message = draft.Type switch
@@ -1534,7 +1557,11 @@ public partial class MainWindow : Window
                 "PROFORMA" => "پیش‌فاکتور ثبت شد؛ موجودی هنوز تغییر نکرده است",
                 _ => "فاکتور فروش ثبت و موجودی به‌روزرسانی شد"
             };
-            Commit(data => AccountingOperations.CreateInvoice(data, draft), message);
+            Commit(data =>
+            {
+                AccountingOperations.CreateInvoice(data, draft);
+                StoreInvoiceFootnoteTemplate(data, dialog);
+            }, message);
             MainTabs.SelectedIndex = 3;
         }
     }
@@ -1595,8 +1622,9 @@ public partial class MainWindow : Window
             AddCustomerInline, AddProductInline, _data.Preferences.InvoiceTheme,
             _data.Preferences.ShowInvoiceQr, ActiveCompanyProfile(),
             _data.Preferences.SalesInvoicePrefix, _data.Preferences.DefaultTaxRatePercent,
-            _data.Preferences.Currency, ConfiguredInvoiceFooter(), invoice);
-            ApplyCurrentThemeTo(dialog);
+            _data.Preferences.Currency, ConfiguredInvoiceFooter(), invoice,
+            footerTemplates: InvoiceFootnoteTemplates());
+        ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true || dialog.Result is not InvoiceDraft draft) return;
 
         Commit(data =>
@@ -1648,6 +1676,7 @@ public partial class MainWindow : Window
                 movement.ReferenceId = oldId;
                 movement.Description = $"{replacementInvoice.TypeLabel} {replacementInvoice.DisplayNumber} — {movement.Description}";
             }
+            StoreInvoiceFootnoteTemplate(data, dialog);
 
             foreach (var payment in data.Payments.Where(item => string.Equals(item.InvoiceId, generatedId, StringComparison.Ordinal)))
             {
@@ -2059,35 +2088,55 @@ public partial class MainWindow : Window
             Commit(data => AccountingOperations.AddExpense(data, dialog.ExpenseTitle, dialog.Category, dialog.Amount, dialog.Notes), "هزینه ثبت شد");
     }
 
-    private void CreateBackup_Click(object sender, RoutedEventArgs e)
+    private void CreateBackup_Click(object sender, RoutedEventArgs e) =>
+        CreateManualBackupFromDialog("ساخت پشتیبان رمزگذاری‌شده", "AshkeGhalam-Backup");
+
+    private bool CreateManualBackupFromDialog(string title, string fileNamePrefix)
     {
-        var dialog = new BackupPasswordDialog(this, "ساخت پشتیبان رمزگذاری‌شده", confirmPassword: true);
-        ApplyCurrentThemeTo(dialog);
-        if (dialog.ShowDialog() != true) return;
+        var passwordDialog = new BackupPasswordDialog(this, title, confirmPassword: true);
+        ApplyCurrentThemeTo(passwordDialog);
+        if (passwordDialog.ShowDialog() != true) return false;
         var picker = new SaveFileDialog
         {
-            Title = "ذخیره فایل پشتیبان",
-            Filter = "Ashke Ghalam encrypted backup (*.ashkbackup)|*.ashkbackup",
+            Title = "انتخاب محل ذخیرهٔ فایل پشتیبان",
+            Filter = "پشتیبان رمزگذاری‌شده اشک قلم (*.ashkbackup)|*.ashkbackup",
             AddExtension = true,
             DefaultExt = ".ashkbackup",
-            FileName = $"AshkeGhalam-Backup-{DateTime.Now:yyyyMMdd-HHmmss}.ashkbackup"
+            InitialDirectory = Directory.Exists(AutomaticBackupService.BackupDirectory)
+                ? AutomaticBackupService.BackupDirectory : AutomaticBackupService.DefaultBackupDirectory,
+            FileName = $"{fileNamePrefix}-{DateTime.Now:yyyyMMdd-HHmmss}.ashkbackup"
         };
-        if (picker.ShowDialog() != true) return;
+        if (picker.ShowDialog() != true) return false;
         try
         {
-            var bytes = BackupFileService.CreateEncryptedBackup(_data, dialog.Passphrase);
-            File.WriteAllBytes(picker.FileName, bytes);
+            var bytes = BackupFileService.CreateEncryptedBackup(_data, passwordDialog.Passphrase);
+            try
+            {
+                using var stream = new FileStream(picker.FileName, FileMode.Create, FileAccess.Write,
+                    FileShare.None, 64 * 1024, FileOptions.WriteThrough);
+                stream.Write(bytes, 0, bytes.Length);
+                stream.Flush(flushToDisk: true);
+            }
+            finally { CryptographicOperations.ZeroMemory(bytes); }
+
             FooterStatus.Text = "پشتیبان رمزگذاری‌شده ذخیره شد: " + picker.FileName;
-            MessageBox.Show(this, "فایل پشتیبان رمزگذاری و ذخیره شد. رمز آن را جداگانه و امن نگه دارید.",
+            MessageBox.Show(this, "فایل پشتیبان رمزگذاری شد؛ رمز آن را جداگانه و امن نگه دارید.",
                 "پشتیبان موفق", MessageBoxButton.OK, MessageBoxImage.Information);
+            return true;
         }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "خطا در پشتیبان‌گیری", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "خطا در پشتیبان‌گیری", MessageBoxButton.OK, MessageBoxImage.Error);
+            return false;
+        }
     }
 
     private void RestoreBackup_Click(object sender, RoutedEventArgs e)
     {
         var picker = new OpenFileDialog
         {
+            InitialDirectory = Directory.Exists(AutomaticBackupService.BackupDirectory)
+                ? AutomaticBackupService.BackupDirectory : AutomaticBackupService.DefaultBackupDirectory,
             Title = "انتخاب فایل پشتیبان",
             Filter = "Ashke Ghalam encrypted backup (*.ashkbackup)|*.ashkbackup|All files (*.*)|*.*",
             CheckFileExists = true
@@ -2099,6 +2148,7 @@ public partial class MainWindow : Window
         try
         {
             var restored = BackupFileService.ReadEncryptedBackup(File.ReadAllBytes(picker.FileName), dialog.Passphrase);
+            ProtectedCheckImageStore.Synchronize(restored.Checks);
             var choice = MessageBox.Show(this,
                 $"پشتیبان معتبر است: {restored.Customers.Count} مشتری، {restored.Products.Count} کالا و {restored.Invoices.Count} فاکتور.\nاطلاعات فعلی با این پشتیبان جایگزین شود؟",
                 "تأیید بازیابی", MessageBoxButton.YesNo, MessageBoxImage.Warning);
@@ -2186,6 +2236,139 @@ public partial class MainWindow : Window
                 expense.Notes,
                 expense.CreatedAt.ToString("O", CultureInfo.InvariantCulture)
             }));
+
+
+    private void PrintSystemReports_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var report = FinancialReportsService.Build(_data);
+            var cashFlow = CashFlowForecastService.Build(_data, SelectedCashFlowHorizonDays());
+            var activeInvoices = _data.Invoices.Where(invoice => invoice.Status != "لغو شده").ToList();
+            var sales = activeInvoices.Where(invoice => invoice.Type == "SALE").Sum(invoice => invoice.Total);
+            var purchases = activeInvoices.Where(invoice => invoice.Type == "PURCHASE").Sum(invoice => invoice.Total);
+            var receipts = _data.Payments.Where(payment => _data.Invoices.Any(invoice =>
+                invoice.Id == payment.InvoiceId && invoice.Type == "SALE")).Sum(payment => payment.Amount);
+            var supplierPayments = _data.Payments.Where(payment => _data.Invoices.Any(invoice =>
+                invoice.Id == payment.InvoiceId && invoice.Type == "PURCHASE")).Sum(payment => payment.Amount);
+            var expenses = _data.Expenses.Sum(expense => expense.Amount);
+            var unit = CurrencyUnitLabel();
+            string Money(decimal value) => value.ToString("#,##0.##", CultureInfo.InvariantCulture) + " " + unit;
+
+            var document = new FlowDocument
+            {
+                FlowDirection = FlowDirection.RightToLeft,
+                PagePadding = new Thickness(42),
+                FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn"),
+                FontSize = 12,
+                ColumnWidth = 720
+            };
+            document.Blocks.Add(new Paragraph(new Run(ActiveCompanyProfile()?.LegalName ?? "اشک قلم"))
+            {
+                FontSize = 18, FontWeight = FontWeights.Bold,
+                TextAlignment = TextAlignment.Right, Margin = new Thickness(0,0,0,8)
+            });
+            document.Blocks.Add(new Paragraph(new Run("گزارش جامع حسابداری"))
+            {
+                FontSize = 22, FontWeight = FontWeights.Bold,
+                TextAlignment = TextAlignment.Right
+            });
+            document.Blocks.Add(new Paragraph(new Run(
+                $"تاریخ تهیه: {FormatPersianDate(DateTimeOffset.Now)}    •    واحد اصلی ثبت: {unit}"))
+            {
+                TextAlignment = TextAlignment.Right, Margin = new Thickness(0,0,0,14)
+            });
+
+            void AddSection(string title, IEnumerable<(string Label, string Value)> rows)
+            {
+                document.Blocks.Add(new Paragraph(new Run(title))
+                {
+                    FontSize = 15, FontWeight = FontWeights.Bold,
+                    TextAlignment = TextAlignment.Right, Margin = new Thickness(0,12,0,6)
+                });
+                var table = new Table { CellSpacing = 0, FlowDirection = FlowDirection.RightToLeft };
+                table.Columns.Add(new TableColumn { Width = new GridLength(2, GridUnitType.Star) });
+                table.Columns.Add(new TableColumn { Width = new GridLength(3, GridUnitType.Star) });
+                var group = new TableRowGroup();
+                var header = new TableRow();
+                foreach (var label in new[] { "عنوان", "مقدار" })
+                    header.Cells.Add(new TableCell(new Paragraph(new Run(label)))
+                    {
+                        Background = new SolidColorBrush(Color.FromRgb(226, 232, 240)),
+                        FontWeight = FontWeights.Bold,
+                        Padding = new Thickness(7),
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(148, 163, 184)),
+                        BorderThickness = new Thickness(0.5)
+                    });
+                group.Rows.Add(header);
+                var rowNumber = 0;
+                foreach (var row in rows)
+                {
+                    var tableRow = new TableRow();
+                    foreach (var value in new[] { row.Label, row.Value })
+                        tableRow.Cells.Add(new TableCell(new Paragraph(new Run(value)))
+                        {
+                            Background = rowNumber++ % 4 < 2 ? Brushes.White : new SolidColorBrush(Color.FromRgb(248, 250, 252)),
+                            Padding = new Thickness(7),
+                            BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
+                            BorderThickness = new Thickness(0.5)
+                        });
+                    group.Rows.Add(tableRow);
+                }
+                table.RowGroups.Add(group);
+                document.Blocks.Add(table);
+            }
+
+            AddSection("گزارش خلاصه", new (string Label, string Value)[]
+            {
+                ("فروش ثبت‌شده", Money(sales)),
+                ("خرید ثبت‌شده", Money(purchases)),
+                ("دریافت بابت فروش", Money(receipts)),
+                ("پرداخت بابت خرید", Money(supplierPayments)),
+                ("هزینه‌ها", Money(expenses)),
+                ("مطالبات فروش", Money(activeInvoices.Where(invoice => invoice.Type == "SALE").Sum(invoice => AccountingRules.RemainingForInvoice(_data, invoice)))),
+                ("پرداختنی خرید", Money(activeInvoices.Where(invoice => invoice.Type == "PURCHASE").Sum(invoice => AccountingRules.RemainingForInvoice(_data, invoice))))
+            });
+            AddSection("گزارش مالی دفتر", new (string Label, string Value)[]
+            {
+                ("درآمد ثبت‌شده", Money(report.Revenue)),
+                ("بهای تمام‌شده", Money(report.CostOfSales)),
+                ("سود ناخالص", Money(report.GrossProfit)),
+                ("هزینه‌های عملیاتی", Money(report.OperatingExpenses)),
+                ("سود / زیان خالص", Money(report.NetProfit)),
+                ("دارایی‌ها", Money(report.Assets)),
+                ("بدهی‌ها", Money(report.Liabilities)),
+                ("حقوق مالکانه", Money(report.Equity)),
+                ("کنترل اختلاف تراز", Money(report.BalanceSheetDifference))
+            });
+            AddSection("پیش‌بینی جریان نقدینگی", new (string Label, string Value)[]
+            {
+                ("مانده آغازین", Money(cashFlow.OpeningBalance)),
+                ("ورودی پیش‌بینی‌شده", Money(cashFlow.TotalExpectedInflows)),
+                ("خروجی پیش‌بینی‌شده", Money(cashFlow.TotalExpectedOutflows)),
+                ("مانده پایان پیش‌بینی", Money(cashFlow.ProjectedClosingBalance)),
+                ("افق پیش‌بینی", $"{cashFlow.HorizonDays} روز")
+            });
+            document.Blocks.Add(new Paragraph(new Run(
+                "این گزارش از داده‌های محلی ثبت‌شده ساخته شده است؛ تأیید صحت حساب‌ها و اسناد بر عهدهٔ کاربر است."))
+            {
+                FontSize = 9, Foreground = Brushes.DimGray,
+                TextAlignment = TextAlignment.Right, Margin = new Thickness(0,16,0,0)
+            });
+
+            var printDialog = new PrintDialog();
+            if (printDialog.ShowDialog() != true) return;
+            document.PageWidth = printDialog.PrintableAreaWidth;
+            document.PageHeight = printDialog.PrintableAreaHeight;
+            document.ColumnWidth = Math.Max(100, document.PageWidth - document.PagePadding.Left - document.PagePadding.Right);
+            printDialog.PrintDocument(((IDocumentPaginatorSource)document).DocumentPaginator, "گزارش جامع حسابداری اشک قلم");
+            FooterStatus.Text = "گزارش برای چاپ ارسال شد.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "چاپ گزارش", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
 
     private void ExportReport_Click(object sender, RoutedEventArgs e)
     {
@@ -2846,6 +3029,28 @@ public partial class MainWindow : Window
         return string.Join(Environment.NewLine, notes.Distinct(StringComparer.Ordinal));
     }
 
+    private IReadOnlyList<string> InvoiceFootnoteTemplates()
+    {
+        var lines = new List<string>
+        {
+            FooterNoteNoReturns, FooterNotePaymentTerms, FooterNoteDeliveryTerms
+        };
+        lines.AddRange(_data.Preferences?.CustomInvoiceFootnoteOptions ?? []);
+        lines.AddRange((_data.Preferences?.InvoiceFooter ?? "").Split(
+            new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        return lines.Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => value.Trim()).Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    private static void StoreInvoiceFootnoteTemplate(AccountingData data, InvoiceDialog dialog)
+    {
+        if (!dialog.SaveFooterAsTemplate || string.IsNullOrWhiteSpace(dialog.FooterTemplateToSave)) return;
+        data.Preferences.CustomInvoiceFootnoteOptions ??= [];
+        var template = dialog.FooterTemplateToSave.Trim();
+        if (!data.Preferences.CustomInvoiceFootnoteOptions.Contains(template, StringComparer.Ordinal))
+            data.Preferences.CustomInvoiceFootnoteOptions.Add(template);
+    }
+
     private void SaveAccountingPreferences_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
@@ -2970,7 +3175,7 @@ public partial class MainWindow : Window
                 WorkspaceId = ServerWorkspaceId.Text.Trim(),
                 SyncMode = syncMode
             };
-        }, "تنظیمات اتصال امن ذخیره شد؛ همگام‌سازی داده‌های مالی هنوز غیرفعال است.");
+        }, "تنظیمات اتصال امن ذخیره شد. همگام‌سازی دستی در همین صفحه در دسترس است.");
     }
 
     private void ValidateServerConnection_Click(object sender, RoutedEventArgs e)
@@ -3347,6 +3552,169 @@ public partial class MainWindow : Window
         }
     }
 
+
+    private void ResetAllAccountingData_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        var backupChoice = MessageBox.Show(this,
+            "این عملیات تمام داده‌های حسابداری محلی، از جمله اشخاص، کالاها، فاکتورها، دریافت‌ها، هزینه‌ها، چک‌ها و دفتر را پاک می‌کند.\nآیا قبل از پاک‌سازی پشتیبان رمزگذاری‌شده بسازیم؟\nبله: تهیهٔ پشتیبان\nخیر: پاک‌سازی بدون پشتیبان\nلغو: انصراف",
+            "پاک‌سازی کامل داده‌ها", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+        if (backupChoice == MessageBoxResult.Cancel) return;
+        if (backupChoice == MessageBoxResult.Yes &&
+            !CreateManualBackupFromDialog("پشتیبان قبل از پاک‌سازی", "AshkeGhalam-BeforeReset"))
+            return;
+
+        var phraseBox = new TextBox
+        {
+            MinWidth = 310, Height = 36, Padding = new Thickness(8),
+            FlowDirection = FlowDirection.RightToLeft
+        };
+        var confirmButton = new Button
+        {
+            Content = "تأیید پاک‌سازی نهایی", Height = 36, MinWidth = 170,
+            Background = new SolidColorBrush(Color.FromRgb(185, 28, 28)),
+            Foreground = Brushes.White, Margin = new Thickness(0, 12, 0, 0)
+        };
+        var confirmWindow = new Window
+        {
+            Owner = this, Title = "تأیید دوم پاک‌سازی",
+            Width = 440, Height = 210, MinWidth = 420,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize, FlowDirection = FlowDirection.RightToLeft,
+            Content = new StackPanel
+            {
+                Margin = new Thickness(22),
+                Children =
+                {
+                    new TextBlock { Text = "برای پاک‌سازی، عبارت «پاکسازی کامل» را عیناً وارد کنید.", TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0,0,0,10) },
+                    phraseBox, confirmButton
+                }
+            }
+        };
+        ApplyCurrentThemeTo(confirmWindow);
+        confirmButton.Click += (_, _) =>
+        {
+            if (!string.Equals(phraseBox.Text.Trim(), "پاکسازی کامل", StringComparison.Ordinal))
+            {
+                MessageBox.Show(confirmWindow, "عبارت تأیید درست نیست.", "تأیید پاک‌سازی",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            confirmWindow.DialogResult = true;
+        };
+        if (confirmWindow.ShowDialog() != true) return;
+
+        try
+        {
+            var fresh = new AccountingData();
+            var freshCompany = new CompanyProfileRecord { Name = "شرکت جدید", LegalName = "شرکت جدید" };
+            fresh.Companies = [freshCompany];
+            fresh.ActiveCompanyId = freshCompany.Id;
+            CompanyWorkspaceService.EnsureInitialized(fresh);
+            _store.Save(fresh);
+            ProtectedCheckImageStore.ClearAll();
+            _data = fresh;
+            _startupAccountingWarning = "";
+            _canWrite = true;
+            RefreshAll();
+            RefreshFiscalYearPage();
+            RefreshSecurityStatus();
+            RefreshAutoBackupControls();
+            ApplyMainWindowTheme();
+            FooterStatus.Text = "پاک‌سازی انجام شد؛ فضای کاری محلی کاملاً خالی و آمادهٔ شروع است.";
+            MessageBox.Show(this,
+                "داده‌های محلی پاک شدند. لایسنس ذخیره‌شده، خود برنامه و فایل‌های پشتیبان حذف نشدند؛ نسخهٔ سرور نیز تغییری نکرده است.",
+                "پاک‌سازی انجام شد", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "پاک‌سازی انجام نشد: " + ex.Message, "خطا",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private async void SyncAccountingData_Click(object sender, RoutedEventArgs e)
+    {
+        if (!RequireWritable()) return;
+        try
+        {
+            var license = _licenseStore.Load();
+            if (license is null)
+            {
+                ServerConnectionStatusText.Text = "همگام‌سازی متوقف شد؛ ابتدا لایسنس را آنلاین تأیید کنید.";
+                MessageBox.Show(this, "همگام‌سازی فقط پس از تأیید لایسنس و فضای کاری توسط سرور مجاز است.",
+                    "نیاز به لایسنس معتبر", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var settings = new ServerConnectionSettings
+            {
+                BaseUrl = ServerBaseUrl.Text.Trim(),
+                WorkspaceId = string.IsNullOrWhiteSpace(ServerWorkspaceId.Text)
+                    ? license.WorkspaceId : ServerWorkspaceId.Text.Trim(),
+                SyncMode = (ServerSyncModeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "manual"
+            };
+            var sync = new NativeAccountingSyncService();
+            ServerConnectionStatusText.Text = "در حال دریافت نسخهٔ سرور و بررسی تعارض…";
+            var remote = await sync.DownloadAsync(settings, license);
+
+            if (remote is null)
+            {
+                var uploadInitial = MessageBox.Show(this,
+                    "برای این فضای کاری هنوز تصویر دادهٔ حسابداری وجود ندارد. نسخهٔ محلی بارگذاری شود؟",
+                    "شروع همگام‌سازی", MessageBoxButton.YesNo, MessageBoxImage.Question);
+                if (uploadInitial != MessageBoxResult.Yes) return;
+                await sync.UploadAsync(settings, license, _data);
+                ServerConnectionStatusText.Text = "نسخهٔ اولیهٔ محلی روی فضای کاری تأییدشده ذخیره شد.";
+                FooterStatus.Text = "همگام‌سازی اولیه تکمیل شد.";
+                return;
+            }
+
+            var localJson = JsonSerializer.Serialize(_data);
+            var remoteJson = JsonSerializer.Serialize(remote);
+            if (string.Equals(localJson, remoteJson, StringComparison.Ordinal))
+            {
+                ServerConnectionStatusText.Text = "نسخهٔ محلی و سرور یکسان هستند.";
+                FooterStatus.Text = "داده‌ها با سرور همگام هستند.";
+                return;
+            }
+
+            var choice = MessageBox.Show(this,
+                $"نسخهٔ محلی و سرور متفاوت‌اند.\nمحلی: {_data.Customers.Count:N0} شخص، {_data.Invoices.Count:N0} فاکتور، {_data.Products.Count:N0} کالا\nسرور: {remote.Customers.Count:N0} شخص، {remote.Invoices.Count:N0} فاکتور، {remote.Products.Count:N0} کالا\n\nبله: نسخهٔ محلی به سرور ارسال شود\nخیر: نسخهٔ سرور جایگزین محلی شود\nلغو: بدون تغییر خارج شو",
+                "حل تعارض همگام‌سازی", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+            if (choice == MessageBoxResult.Cancel) return;
+
+            if (!CreateManualBackupFromDialog(
+                    choice == MessageBoxResult.Yes ? "پشتیبان قبل از ارسال به سرور" : "پشتیبان قبل از دریافت از سرور",
+                    choice == MessageBoxResult.Yes ? "AshkeGhalam-BeforeCloudUpload" : "AshkeGhalam-BeforeCloudDownload"))
+                return;
+
+            if (choice == MessageBoxResult.Yes)
+            {
+                await sync.UploadAsync(settings, license, _data);
+                ServerConnectionStatusText.Text = "نسخهٔ محلی، با انتخاب شما، روی سرور ذخیره شد.";
+                FooterStatus.Text = "ارسال فضای کاری به سرور تکمیل شد.";
+            }
+            else
+            {
+                _store.Save(remote);
+                ProtectedCheckImageStore.Synchronize(remote.Checks);
+                _data = remote;
+                RefreshAll();
+                RefreshLicensePanel();
+                RefreshAutoBackupControls();
+                ApplyMainWindowTheme();
+                ServerConnectionStatusText.Text = "نسخهٔ سرور با پشتیبان‌گیری قبلی جایگزین نسخهٔ محلی شد.";
+                FooterStatus.Text = "داده‌ها از فضای کاری تأییدشده دریافت شدند.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ServerConnectionStatusText.Text = "همگام‌سازی ناموفق: " + ex.Message;
+            MessageBox.Show(this, ex.Message, "همگام‌سازی حسابداری", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
     private void OpenDataFolder_Click(object sender, RoutedEventArgs e)
     {
         var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AshkeGhalam", "WindowsNative");
@@ -3356,6 +3724,27 @@ public partial class MainWindow : Window
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "\"" + folder + "\"") { UseShellExecute = true });
         }
         catch (Exception ex) { MessageBox.Show(this, ex.Message, "پوشهٔ داده‌ها", MessageBoxButton.OK, MessageBoxImage.Warning); }
+    }
+
+    private void ChooseAutoBackupFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new OpenFolderDialog
+            {
+                Title = "انتخاب پوشهٔ پشتیبان‌گیری خودکار",
+                InitialDirectory = AutomaticBackupService.BackupDirectory,
+                Multiselect = false
+            };
+            if (picker.ShowDialog(this) != true) return;
+            AutomaticBackupService.SetBackupDirectory(picker.FolderName);
+            RefreshAutoBackupControls();
+            FooterStatus.Text = "مسیر پشتیبان خودکار ذخیره شد.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "انتخاب پوشهٔ پشتیبان", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void OpenBackupFolder_Click(object sender, RoutedEventArgs e)
