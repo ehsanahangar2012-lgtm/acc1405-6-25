@@ -69,6 +69,10 @@ public partial class MainWindow : Window
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
         if (_allowClose || !_canWrite) return;
+        var askBeforeExit = true;
+        try { askBeforeExit = AutomaticBackupService.LoadSettings().PromptOnExit; }
+        catch { /* Fail safe: still ask if local backup settings cannot be read. */ }
+        if (!askBeforeExit) return;
         e.Cancel = true;
         var choice = MessageBox.Show(this,
             "پیش از خروج یک پشتیبان رمزگذاری‌شده بسازید؟\nبله: ذخیرهٔ پشتیبان و سپس خروج\nخیر: خروج بدون پشتیبان\nلغو: بازگشت به برنامه",
@@ -2160,23 +2164,61 @@ public partial class MainWindow : Window
         var dialog = new BackupPasswordDialog(this, "رمز فایل پشتیبان", confirmPassword: false);
         ApplyCurrentThemeTo(dialog);
         if (dialog.ShowDialog() != true) return;
+
         try
         {
             var restored = BackupFileService.ReadEncryptedBackup(File.ReadAllBytes(picker.FileName), dialog.Passphrase);
-            ProtectedCheckImageStore.Synchronize(restored.Checks);
             var choice = MessageBox.Show(this,
-                $"پشتیبان معتبر است: {restored.Customers.Count} مشتری، {restored.Products.Count} کالا و {restored.Invoices.Count} فاکتور.\nاطلاعات فعلی با این پشتیبان جایگزین شود؟",
-                "تأیید بازیابی", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                $"پشتیبان رمزگشایی و اعتبارسنجی شد: {restored.Customers.Count:N0} شخص، {restored.Products.Count:N0} کالا، " +
+                $"{restored.Invoices.Count:N0} فاکتور و {restored.Checks.Count:N0} چک.\n\nاطلاعات محلی با این پشتیبان جایگزین شود؟",
+                "تأیید بازیابی پشتیبان", MessageBoxButton.YesNo, MessageBoxImage.Warning);
             if (choice != MessageBoxResult.Yes) return;
+
+            if (_canWrite)
+            {
+                var backupCurrent = MessageBox.Show(this,
+                    "پیش از جایگزینی، از اطلاعات فعلی یک پشتیبان مستقل تهیه شود؟\nبله: پشتیبان و سپس بازیابی\nخیر: بازیابی بدون پشتیبان فعلی\nلغو: انصراف",
+                    "حفاظت از اطلاعات فعلی", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                if (backupCurrent == MessageBoxResult.Cancel) return;
+                if (backupCurrent == MessageBoxResult.Yes &&
+                    !CreateManualBackupFromDialog("پشتیبان پیش از بازیابی", "AshkeGhalam-BeforeRestore"))
+                    return;
+            }
+
+            // Store the self-contained dataset before updating the optional image mirror.
             _store.Save(restored);
+            var imageWarning = "";
+            try
+            {
+                if (ProtectedCheckImageStore.Synchronize(restored.Checks))
+                    _store.Save(restored);
+            }
+            catch (Exception imageEx)
+            {
+                imageWarning = "\n\nهشدار: کپی جداگانهٔ محافظت‌شدهٔ بعضی تصاویر چک ساخته نشد؛ دادهٔ تصویر داخل پایگاه محلی حفظ شده است. " + imageEx.Message;
+            }
+
             _data = restored;
             _canWrite = true;
+            _startupAccountingWarning = "";
             StorageStatus.Text = "ذخیره‌سازی محلی آماده";
             RefreshAll();
-            FooterStatus.Text = "بازیابی پشتیبان با موفقیت انجام شد.";
-            MessageBox.Show(this, "بازیابی انجام شد.", "موفق", MessageBoxButton.OK, MessageBoxImage.Information);
+            RefreshFiscalYearPage();
+            RefreshSecurityStatus();
+            RefreshAutoBackupControls();
+            ApplyMainWindowTheme();
+            FooterStatus.Text = imageWarning.Length == 0
+                ? "بازیابی پشتیبان با موفقیت انجام شد."
+                : "بازیابی انجام شد؛ کپی جداگانهٔ بعضی تصاویر نیازمند بررسی است.";
+            MessageBox.Show(this, "بازیابی انجام شد." + imageWarning,
+                imageWarning.Length == 0 ? "بازیابی موفق" : "بازیابی با هشدار",
+                MessageBoxButton.OK, imageWarning.Length == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "بازیابی انجام نشد", MessageBoxButton.OK, MessageBoxImage.Error); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "بازیابی انجام نشد: " + ex.Message, "خطا در بازیابی",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void ShowPersonKardex_Click(object sender, RoutedEventArgs e)
@@ -4185,38 +4227,20 @@ public partial class MainWindow : Window
     private async void SyncAccountingData_Click(object sender, RoutedEventArgs e)
     {
         if (!RequireWritable()) return;
+        var requestedMode = (ServerSyncModeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "manual";
+        if (string.Equals(requestedMode, "disabled", StringComparison.OrdinalIgnoreCase))
+        {
+            ServerConnectionStatusText.Text = "همگام‌سازی در تنظیمات غیرفعال است؛ گزینهٔ «دستی» را انتخاب و ذخیره کنید.";
+            MessageBox.Show(this, ServerConnectionStatusText.Text, "همگام‌سازی غیرفعال است",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         try
         {
-            var license = _licenseStore.Load();
-            if (license is null)
-            {
-                ServerConnectionStatusText.Text = "همگام‌سازی متوقف شد؛ ابتدا لایسنس را آنلاین تأیید کنید.";
-                MessageBox.Show(this, "همگام‌سازی فقط پس از تأیید لایسنس و فضای کاری توسط سرور مجاز است.",
-                    "نیاز به لایسنس معتبر", MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var currentHardwareId = HardwareIdentityService.GetHardwareId();
-            if (!string.Equals(currentHardwareId, license.HardwareId, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException("شناسهٔ دستگاه با لایسنس ذخیره‌شده یکسان نیست؛ پیش از همگام‌سازی دوباره فعال‌سازی کنید.");
-
-            var onlineLicense = await new ServerLicenseClient().VerifyAsync(
-                license.LicenseKey, license.WorkspaceId, currentHardwareId);
-            if (!onlineLicense.Success || onlineLicense.License is null)
-                throw new InvalidOperationException("لایسنس در بررسی مجدد سرور معتبر شناخته نشد: " + onlineLicense.Message);
-
-            license.Payload = onlineLicense.License.Payload;
-            license.Receipt = onlineLicense.License.Receipt;
-            license.VerifiedAtUtc = DateTimeOffset.UtcNow;
-            _licenseStore.Save(license);
-
-            var settings = new ServerConnectionSettings
-            {
-                BaseUrl = ServerBaseUrl.Text.Trim(),
-                WorkspaceId = string.IsNullOrWhiteSpace(ServerWorkspaceId.Text)
-                    ? license.WorkspaceId : ServerWorkspaceId.Text.Trim(),
-                SyncMode = (ServerSyncModeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "manual"
-            };
+            var license = await LoadFreshSyncLicenseAsync();
+            if (license is null) return;
+            var settings = GetLiveServerConnectionSettings(license);
             var sync = new NativeAccountingSyncService();
             ServerConnectionStatusText.Text = "در حال دریافت نسخهٔ سرور و بررسی تعارض…";
             var remote = await sync.DownloadAsync(settings, license);
@@ -4278,15 +4302,145 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OpenDataFolder_Click(object sender, RoutedEventArgs e)
+    private void CheckLocalDataIntegrity_Click(object sender, RoutedEventArgs e)
     {
-        var folder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "AshkeGhalam", "WindowsNative");
+        if (!_canWrite)
+        {
+            MessageBox.Show(this,
+                "فایل دادهٔ اصلی قابل استفاده شناخته نشده است؛ برای جلوگیری از نتیجهٔ گمراه‌کننده، سلامت فایل روی دیسک تأیید نشده. از فایل پشتیبان معتبر بازیابی کنید.",
+                "بررسی سلامت داده", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         try
         {
-            Directory.CreateDirectory(folder);
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("explorer.exe", "\"" + folder + "\"") { UseShellExecute = true });
+            var checkedData = AccountingDataValidator.Validate(_data.DeepCopy());
+            var imageCount = checkedData.Checks.Count(check =>
+                !string.IsNullOrWhiteSpace(check.ImageDataBase64) || !string.IsNullOrWhiteSpace(check.ImagePath));
+            var summary =
+                $"اعتبار ساختار داده: تأیید شد\nشرکت‌ها: {checkedData.Companies.Count:N0}\nاشخاص: {checkedData.Customers.Count:N0}\n" +
+                $"کالاها: {checkedData.Products.Count:N0}\nفاکتورها: {checkedData.Invoices.Count:N0}\n" +
+                $"دریافت/پرداخت: {checkedData.Payments.Count:N0}\nچک‌ها: {checkedData.Checks.Count:N0} (تصویر/مسیر: {imageCount:N0})\n" +
+                $"اسناد دفتر: {checkedData.JournalEntries.Count:N0}\nپوشهٔ پشتیبان: {AutomaticBackupService.BackupDirectory}";
+            MessageBox.Show(this, summary, "سلامت داده‌های محلی", MessageBoxButton.OK, MessageBoxImage.Information);
+            FooterStatus.Text = "اعتبار ساختاری داده‌های محلی بررسی شد.";
         }
-        catch (Exception ex) { MessageBox.Show(this, ex.Message, "پوشهٔ داده‌ها", MessageBoxButton.OK, MessageBoxImage.Warning); }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, "اعتبارسنجی داده انجام نشد: " + ex.Message, "خطای سلامت داده",
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private void AdvancedOpenTab_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string header } || string.IsNullOrWhiteSpace(header))
+            return;
+        var target = MainTabs.Items.OfType<TabItem>().FirstOrDefault(tab =>
+            string.Equals(tab.Header?.ToString(), header, StringComparison.Ordinal));
+        if (target is null)
+        {
+            MessageBox.Show(this, "صفحهٔ مقصد در نسخهٔ بومی موجود نیست.", "دسترسی به صفحه",
+                MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        MainTabs.Visibility = Visibility.Visible;
+        MigrationPanel.Visibility = Visibility.Collapsed;
+        MainTabs.SelectedItem = target;
+        var route = NativeTabHeaders.FirstOrDefault(pair =>
+            string.Equals(pair.Value, header, StringComparison.Ordinal)).Key;
+        if (!string.IsNullOrWhiteSpace(route)) UpdateNavigationSelection(route);
+        if (FindName("CurrentModuleText") is TextBlock current) current.Text = header + " • نسخهٔ بومی";
+        FooterStatus.Text = "صفحهٔ «" + header + "» باز شد.";
+    }
+
+    private async Task<NativeLicenseState?> LoadFreshSyncLicenseAsync()
+    {
+        NativeLicenseState? license;
+        try { license = _licenseStore.Load(); }
+        catch (Exception ex)
+        {
+            ServerConnectionStatusText.Text = "فایل لایسنس محلی معتبر نیست: " + ex.Message;
+            MessageBox.Show(this, "وضعیت لایسنس قابل خواندن نیست. از دکمهٔ فعال‌سازی، لایسنس را دوباره با سرور بررسی کنید.",
+                "لایسنس مورد نیاز", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
+        }
+
+        if (license is null)
+        {
+            ServerConnectionStatusText.Text = "برای همگام‌سازی، لایسنس ابتدا باید با سرور تأیید شود.";
+            if (MessageBox.Show(this, "لایسنس تأییدشده‌ای ذخیره نشده است. پنجرهٔ فعال‌سازی لایسنس باز شود؟",
+                    "فعال‌سازی لازم است", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+                VerifyLicense_Click(this, new RoutedEventArgs());
+            return null;
+        }
+
+        try
+        {
+            var hardwareId = HardwareIdentityService.GetHardwareId();
+            if (!string.Equals(hardwareId, license.HardwareId, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("شناسهٔ سخت‌افزاری با لایسنس ذخیره‌شده برابر نیست؛ ابتدا لایسنس را دوباره در همین دستگاه فعال کنید.");
+
+            var verified = await _licenseClient.VerifyAsync(license.LicenseKey, license.WorkspaceId, hardwareId);
+            if (!verified.Success || verified.License is null)
+                throw new InvalidOperationException("سرور لایسنس را تأیید نکرد: " + verified.Message);
+
+            license.Payload = verified.License.Payload;
+            license.Receipt = verified.License.Receipt;
+            license.VerifiedAtUtc = DateTimeOffset.UtcNow;
+            _licenseStore.Save(license);
+            _sessionEntitlements = license.Payload;
+            _sessionLicenseFailure = "";
+            RefreshLicensePanel();
+            return license;
+        }
+        catch (Exception ex)
+        {
+            ServerConnectionStatusText.Text = "احراز هویت همگام‌سازی انجام نشد: " + ex.Message;
+            MessageBox.Show(this, ex.Message, "تأیید دسترسی همگام‌سازی",
+                MessageBoxButton.OK, MessageBoxImage.Warning);
+            return null;
+        }
+    }
+
+    private ServerConnectionSettings GetLiveServerConnectionSettings(NativeLicenseState license) => new()
+    {
+        BaseUrl = ServerBaseUrl.Text.Trim(),
+        WorkspaceId = string.IsNullOrWhiteSpace(ServerWorkspaceId.Text)
+            ? license.WorkspaceId : ServerWorkspaceId.Text.Trim(),
+        SyncMode = (ServerSyncModeSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "manual"
+    };
+
+    private async void TestServerStorage_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var license = await LoadFreshSyncLicenseAsync();
+            if (license is null) return;
+            ServerConnectionStatusText.Text = "در حال آزمون واقعی API ذخیره‌سازی با مجوز این فضای کاری…";
+            var remote = await new NativeAccountingSyncService()
+                .DownloadAsync(GetLiveServerConnectionSettings(license), license);
+            if (remote is null)
+            {
+                ServerConnectionStatusText.Text = "اتصال API و مجوز تأیید شد؛ هنوز تصویر داده‌ای برای این فضای کاری ذخیره نشده است.";
+                FooterStatus.Text = "آزمون واقعی اتصال سرور موفق بود؛ داده‌ای از سرور جایگزین نشد.";
+                MessageBox.Show(this, ServerConnectionStatusText.Text, "آزمون اتصال موفق",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            ServerConnectionStatusText.Text =
+                $"اتصال API موفق • اشخاص {remote.Customers.Count:N0} • کالاها {remote.Products.Count:N0} • فاکتورها {remote.Invoices.Count:N0}";
+            FooterStatus.Text = "اتصال فضای کاری آزمون شد؛ داده‌های محلی تغییری نکردند.";
+            MessageBox.Show(this, ServerConnectionStatusText.Text + "\nهیچ داده‌ای دریافت یا جایگزین نشد.",
+                "آزمون اتصال موفق", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            ServerConnectionStatusText.Text = "آزمون واقعی اتصال شکست خورد: " + ex.Message;
+            MessageBox.Show(this, ex.Message, "آزمون API سرور", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     private void ChooseAutoBackupFolder_Click(object sender, RoutedEventArgs e)
@@ -4351,6 +4505,10 @@ public partial class MainWindow : Window
             AutoBackupIntervalSelector.SelectedItem = AutoBackupIntervalSelector.Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), settings.IntervalHours.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
                 ?? AutoBackupIntervalSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "24", StringComparison.Ordinal));
+            AutoBackupRetentionSelector.SelectedItem = AutoBackupRetentionSelector.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(item => string.Equals(item.Tag?.ToString(), settings.RetentionCount.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal))
+                ?? AutoBackupRetentionSelector.Items.OfType<ComboBoxItem>().FirstOrDefault(item => string.Equals(item.Tag?.ToString(), "20", StringComparison.Ordinal));
+            AskBackupOnExit.IsChecked = settings.PromptOnExit;
             AutoBackupPathText.Text = AutomaticBackupService.BackupDirectory;
             AutoBackupStatusText.Text = settings.Enabled
                 ? $"فعال • هر {settings.IntervalHours:N0} ساعت • نگهداری حداکثر {settings.RetentionCount:N0} فایل • آخرین پشتیبان: {(settings.LastBackupUtc is DateTimeOffset last ? FormatPersianDate(last.ToLocalTime()) : "هنوز ساخته نشده")}"
@@ -4384,6 +4542,9 @@ public partial class MainWindow : Window
             var enabled = AutoBackupEnabled.IsChecked == true;
             var interval = int.TryParse((AutoBackupIntervalSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var parsed)
                 ? parsed : 24;
+            var retention = int.TryParse((AutoBackupRetentionSelector.SelectedItem as ComboBoxItem)?.Tag?.ToString(), out var parsedRetention)
+                ? parsedRetention : 20;
+            var promptOnExit = AskBackupOnExit.IsChecked != false;
             if (enabled && !AutomaticBackupService.HasConfiguredPassphrase())
             {
                 var passwordDialog = new BackupPasswordDialog(this, "تنظیم رمز پشتیبان خودکار", confirmPassword: true);
@@ -4391,7 +4552,7 @@ public partial class MainWindow : Window
                 if (passwordDialog.ShowDialog() != true) return;
                 AutomaticBackupService.SetPassphrase(passwordDialog.Passphrase);
             }
-            AutomaticBackupService.SaveSettings(enabled, interval, 20);
+            AutomaticBackupService.SaveSettings(enabled, interval, retention, promptOnExit);
             RefreshAutoBackupControls();
             if (enabled)
             {
@@ -4535,6 +4696,7 @@ public partial class MainWindow : Window
             ["moadian"] = "سامانهٔ مؤدیان",
             ["activation"] = "اتصال و لایسنس",
             ["server"] = "اتصال به سرور اصلی",
+            ["data-sync"] = "اتصال به سرور اصلی",
             ["fiscal-year"] = "سال مالی",
             ["security"] = "امنیت داده‌ها",
             ["advanced-settings"] = "تنظیمات پیشرفته",

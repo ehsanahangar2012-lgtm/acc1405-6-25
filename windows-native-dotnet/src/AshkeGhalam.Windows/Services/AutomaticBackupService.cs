@@ -22,6 +22,7 @@ public static class AutomaticBackupService
         public bool Enabled { get; set; }
         public int IntervalHours { get; set; } = 24;
         public int RetentionCount { get; set; } = DefaultRetention;
+        public bool PromptOnExit { get; set; } = true;
         public string ProtectedPassphrase { get; set; } = "";
         public DateTimeOffset? LastBackupUtc { get; set; }
         public string BackupDirectoryPath { get; set; } = "";
@@ -91,7 +92,11 @@ public static class AutomaticBackupService
         SaveSettings(settings);
     }
 
-    public static void SaveSettings(bool enabled, int intervalHours, int retentionCount = DefaultRetention)
+    public static void SaveSettings(
+        bool enabled,
+        int intervalHours,
+        int retentionCount = DefaultRetention,
+        bool promptOnExit = true)
     {
         if (intervalHours is not (1 or 6 or 12 or 24 or 168))
             throw new ArgumentOutOfRangeException(nameof(intervalHours), "بازه پشتیبان باید ۱، ۶، ۱۲، ۲۴ یا ۱۶۸ ساعت باشد.");
@@ -102,6 +107,7 @@ public static class AutomaticBackupService
         settings.Enabled = enabled;
         settings.IntervalHours = intervalHours;
         settings.RetentionCount = Math.Clamp(retentionCount, 1, DefaultRetention);
+        settings.PromptOnExit = promptOnExit;
         SaveSettings(settings);
     }
 

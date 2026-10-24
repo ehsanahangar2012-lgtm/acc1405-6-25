@@ -566,7 +566,7 @@
                     <Border Background="White" BorderBrush="#E2E8F0" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
                         <StackPanel>
                             <TextBlock Text="بازیابی از پشتیبان" FontSize="16" FontWeight="Bold"/>
-                            <TextBlock Text="قبل از جایگزینی اطلاعات فعلی، فایل انتخابی و رمز آن بررسی می‌شود. پس از موفقیت، داده‌های فعلی با محتوای پشتیبان جایگزین می‌شوند."
+                            <TextBlock Text="فایل و رمز قبل از هر تغییری بررسی می‌شوند. در صورت تأیید، می‌توانید پیش از جایگزینی یک پشتیبان تازه از اطلاعات فعلی بسازید؛ لایسنس و داده‌های سرور حذف نمی‌شوند."
                                        TextWrapping="Wrap" FontSize="12" Foreground="#64748B" Margin="0,5,0,12"/>
                             <Button Content="انتخاب فایل و بازیابی..." Click="RestoreBackup_Click" HorizontalAlignment="Right"/>
                         </StackPanel>
@@ -1053,7 +1053,13 @@
                                 <TextBlock Text="شناسهٔ فضای کاری / شرکت" Margin="0,0,0,5"/><TextBox x:Name="ServerWorkspaceId" MinHeight="34" Padding="8"/>
                                 <TextBlock Text="سیاست همگام‌سازی" Margin="0,12,0,5"/><ComboBox x:Name="ServerSyncModeSelector" MinHeight="34"><ComboBoxItem Content="دستی" Tag="manual"/><ComboBoxItem Content="پس از تأیید" Tag="approval"/><ComboBoxItem Content="غیرفعال" Tag="disabled"/></ComboBox>
                                 <TextBlock x:Name="ServerConnectionStatusText" Text="وضعیت: هنوز بررسی نشده" FontWeight="Bold" Foreground="#475569" Margin="0,12,0,8"/>
-                                <WrapPanel HorizontalAlignment="Right"><Button Content="ذخیره تنظیمات اتصال" Click="SaveServerConnection_Click" Background="#0F766E" Foreground="White" Margin="4"/><Button Content="اعتبارسنجی نشانی HTTPS" Click="ValidateServerConnection_Click" Margin="4"/><Button Content="🔄 همگام‌سازی امن داده‌ها" Click="SyncAccountingData_Click" Background="#0F766E" Foreground="White" Margin="4"/></WrapPanel>
+                                <WrapPanel HorizontalAlignment="Right">
+                                    <Button Content="ذخیره تنظیمات اتصال" Click="SaveServerConnection_Click" Background="#0F766E" Foreground="White" Margin="4"/>
+                                    <Button Content="اعتبارسنجی نشانی HTTPS" Click="ValidateServerConnection_Click" Margin="4"/>
+                                    <Button Content="آزمون واقعی اتصال API" Click="TestServerStorage_Click" Margin="4"/>
+                                    <Button Content="فعال‌سازی لایسنس" Click="VerifyLicense_Click" Margin="4"/>
+                                    <Button Content="🔄 همگام‌سازی امن داده‌ها" Click="SyncAccountingData_Click" Background="#0F766E" Foreground="White" Margin="4"/>
+                                </WrapPanel>
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -1160,17 +1166,58 @@
             </TabItem>
             <TabItem Header="تنظیمات پیشرفته">
                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel Margin="18" MaxWidth="1000" HorizontalAlignment="Right">
-                        <TextBlock x:Name="AdvancedSettingsSection" Text="🎛️  تنظیمات پیشرفتهٔ برنامه" FontSize="26" FontWeight="Bold" Foreground="#0F172A"/>
-                        <TextBlock Text="پیکربندی نگهداری داده، پشتیبان زمان‌بندی‌شده و میانبرهای صفحه‌کلید؛ این صفحه مستقل از تنظیمات حسابداری و چاپ است." Style="{StaticResource SectionHint}" TextWrapping="Wrap" Margin="0,6,0,16"/>
-                        <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="18">
+                    <StackPanel Margin="20" MaxWidth="1180" HorizontalAlignment="Center">
+                        <Border Background="#0F172A" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="18" Padding="24" Margin="0,0,0,16">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="مرکز کنترل و تنظیمات پیشرفته" FontSize="27" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock Text="پشتیبان‌گیری، بازیابی، سلامت داده، اتصال امن، ظاهر برنامه و ابزارهای نگهداری را از یکجا مدیریت کنید."
+                                               FontSize="13" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0,8,0,0"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Left" Margin="20,0,0,0">
+                                    <Button Content="بازیابی از فایل پشتیبان" Click="RestoreBackup_Click" Height="40" Margin="0,0,0,8" Background="#14B8A6" Foreground="#052F2E" FontWeight="Bold"/>
+                                    <Button Content="رفتن به اتصال و همگام‌سازی" Tag="اتصال به سرور اصلی" Click="AdvancedOpenTab_Click" Height="38"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <UniformGrid Columns="2" Margin="0,0,0,14">
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,7,0">
+                                <StackPanel>
+                                    <TextBlock Text="بازیابی و نگهداری اطلاعات" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="فایل پشتیبان رمزگذاری‌شده را بسازید یا برگردانید. پیش از جایگزینی اطلاعات، می‌توانید از داده‌های فعلی نسخهٔ امن تهیه کنید."
+                                               Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,12"/>
+                                    <WrapPanel>
+                                        <Button Content="ساخت پشتیبان دستی" Click="CreateBackup_Click" Height="36" Margin="0,0,8,8" Background="#0F766E" Foreground="White"/>
+                                        <Button Content="بازیابی پشتیبان…" Click="RestoreBackup_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="بازکردن پوشهٔ پشتیبان‌ها" Click="OpenBackupFolder_Click" Height="36" Margin="0,0,8,8"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="7,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="سلامت داده و پوشهٔ محلی" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="اعتبار ساختار حسابداری را بررسی کنید یا پوشهٔ داده را برای نگهداری باز کنید. پاک‌سازی با تأیید دوم انجام می‌شود."
+                                               Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,12"/>
+                                    <WrapPanel>
+                                        <Button Content="بررسی سلامت داده" Click="CheckLocalDataIntegrity_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="بازکردن پوشهٔ داده‌ها" Click="OpenDataFolder_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="پاک‌سازی کامل داده‌ها" Click="ResetAllAccountingData_Click" Height="36" Margin="0,0,8,8" Background="#B91C1C" Foreground="White"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="20" Margin="0,0,0,14">
                             <StackPanel>
-                                <TextBlock Text="پشتیبان‌گیری خودکار رمزگذاری‌شده" FontSize="18" FontWeight="Bold"/>
-                                <TextBlock Text="تمام داده‌های این فضای کاری از جمله مشخصات، لوگو و سایر تصاویر شرکت‌ها در پشتیبان رمزگذاری‌شده ثبت می‌شود." TextWrapping="Wrap" Margin="0,6,0,12" Foreground="#475569"/>
-                                <CheckBox x:Name="AutoBackupEnabled" Content="فعال‌سازی پشتیبان‌گیری خودکار" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10"/>
+                                <TextBlock Text="پشتیبان‌گیری خودکار رمزگذاری‌شده" FontSize="19" FontWeight="Bold" Foreground="#0F172A"/>
+                                <TextBlock Text="رمز پشتیبان خودکار برای حساب کاربری فعلی ویندوز محافظت می‌شود. رمز فایل پشتیبان دستی را جداگانه نگه دارید؛ بازیابی بدون رمز ممکن نیست."
+                                           Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,14"/>
+                                <CheckBox x:Name="AutoBackupEnabled" Content="فعال‌سازی پشتیبان‌گیری زمان‌بندی‌شده" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,12"/>
                                 <Grid Margin="0,0,0,12">
-                                    <Grid.ColumnDefinitions><ColumnDefinition Width="180"/><ColumnDefinition Width="220"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                                    <TextBlock Text="فاصلهٔ پشتیبان‌ها" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="160"/><ColumnDefinition Width="210"/><ColumnDefinition Width="160"/><ColumnDefinition Width="210"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                    <TextBlock Text="فاصلهٔ پشتیبان‌ها" VerticalAlignment="Center" Margin="0,0,8,0"/>
                                     <ComboBox x:Name="AutoBackupIntervalSelector" Grid.Column="1" MinHeight="36" SelectedIndex="3">
                                         <ComboBoxItem Content="هر ۱ ساعت" Tag="1"/>
                                         <ComboBoxItem Content="هر ۶ ساعت" Tag="6"/>
@@ -1178,28 +1225,64 @@
                                         <ComboBoxItem Content="روزانه" Tag="24"/>
                                         <ComboBoxItem Content="هفتگی" Tag="168"/>
                                     </ComboBox>
-                                    <TextBlock Grid.Column="2" Text="حداکثر ۲۰ فایل خودکار؛ فایل‌های قدیمی‌تر خودکار حذف می‌شوند." TextWrapping="Wrap" Foreground="#475569" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    <TextBlock Grid.Column="2" Text="نگهداری نسخه‌ها" VerticalAlignment="Center" Margin="16,0,8,0"/>
+                                    <ComboBox x:Name="AutoBackupRetentionSelector" Grid.Column="3" MinHeight="36" SelectedIndex="3">
+                                        <ComboBoxItem Content="۳ نسخه" Tag="3"/>
+                                        <ComboBoxItem Content="۵ نسخه" Tag="5"/>
+                                        <ComboBoxItem Content="۱۰ نسخه" Tag="10"/>
+                                        <ComboBoxItem Content="۲۰ نسخه" Tag="20"/>
+                                    </ComboBox>
                                 </Grid>
+                                <CheckBox x:Name="AskBackupOnExit" Content="هنگام خروج، پرسش تهیهٔ پشتیبان نمایش داده شود (پیشنهادی)" IsChecked="True" Margin="0,0,0,12"/>
+                                <TextBlock Text="مسیر فعلی پشتیبان خودکار" FontWeight="SemiBold" Margin="0,0,0,5"/>
                                 <TextBlock x:Name="AutoBackupPathText" Text="پوشهٔ پشتیبان در حال بارگذاری..." TextWrapping="Wrap" FontFamily="Consolas" FlowDirection="LeftToRight" Margin="0,0,0,8"/>
-                                <TextBlock x:Name="AutoBackupStatusText" Text="پشتیبان خودکار هنوز پیکربندی نشده است." TextWrapping="Wrap" Foreground="#475569" Margin="0,0,0,10"/>
+                                <TextBlock x:Name="AutoBackupStatusText" Text="پشتیبان خودکار هنوز پیکربندی نشده است." TextWrapping="Wrap" Foreground="#475569" Margin="0,0,0,12"/>
                                 <WrapPanel>
-                                    <Button Content="🔑 تعیین / تغییر رمز پشتیبان" Click="SetAutoBackupPassword_Click" Height="38" Margin="0,0,8,8"/>
-                                    <Button Content="💾 ذخیره زمان‌بندی" Click="SaveAutoBackupSettings_Click" Height="38" Margin="0,0,8,8" Background="#0F766E" Foreground="White"/>
-                                    <Button Content="▶ اجرای پشتیبان همین الان" Click="CreateAutomaticBackupNow_Click" Height="38" Margin="0,0,8,8"/>
-                                    <Button Content="📂 انتخاب پوشهٔ پشتیبان" Click="ChooseAutoBackupFolder_Click" Height="38" Margin="0,0,8,8"/>
-                                    <Button Content="📂 بازکردن پوشه" Click="OpenBackupFolder_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="تعیین / تغییر رمز" Click="SetAutoBackupPassword_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="ذخیرهٔ زمان‌بندی" Click="SaveAutoBackupSettings_Click" Height="38" Margin="0,0,8,8" Background="#0F766E" Foreground="White"/>
+                                    <Button Content="اجرای پشتیبان همین الان" Click="CreateAutomaticBackupNow_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="انتخاب پوشه" Click="ChooseAutoBackupFolder_Click" Height="38" Margin="0,0,8,8"/>
+                                    <Button Content="بازکردن پوشه" Click="OpenBackupFolder_Click" Height="38" Margin="0,0,8,8"/>
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
-                        <Border Background="White" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,14,0,0">
+
+                        <UniformGrid Columns="2" Margin="0,0,0,14">
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="0,0,7,0">
+                                <StackPanel>
+                                    <TextBlock Text="اتصال سرور و همگام‌سازی" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="همگام‌سازی پس از تأیید آنلاین لایسنس مجاز است. آزمون اتصال API دادهٔ محلی را تغییر نمی‌دهد؛ دریافت/ارسال اصلی با انتخاب صریح شما انجام می‌شود."
+                                               Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,12"/>
+                                    <WrapPanel>
+                                        <Button Content="تنظیمات اتصال" Tag="اتصال به سرور اصلی" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8" Background="#0F766E" Foreground="White"/>
+                                        <Button Content="فعال‌سازی / بررسی لایسنس" Click="VerifyLicense_Click" Height="36" Margin="0,0,8,8"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Background="#FFFFFF" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18" Margin="7,0,0,0">
+                                <StackPanel>
+                                    <TextBlock Text="تنظیمات حسابداری و خروجی‌ها" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
+                                    <TextBlock Text="دسترسی سریع به ظاهر برنامه، قالب فاکتور، گزارش‌های چاپی و آماده‌سازی صورتحساب مالیاتی."
+                                               Foreground="#475569" TextWrapping="Wrap" Margin="0,7,0,12"/>
+                                    <WrapPanel>
+                                        <Button Content="ظاهر و تنظیمات شرکت" Tag="تنظیمات و شرکت‌ها" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="گزارش‌های چاپی" Tag="گزارش‌ها" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="سامانهٔ مؤدیان" Tag="سامانهٔ مؤدیان" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8"/>
+                                        <Button Content="قواعد گردش مالی" Tag="قواعد گردش مالی" Click="AdvancedOpenTab_Click" Height="36" Margin="0,0,8,8"/>
+                                    </WrapPanel>
+                                </StackPanel>
+                            </Border>
+                        </UniformGrid>
+
+                        <Border Background="#F8FAFC" BorderBrush="#CBD5E1" BorderThickness="1" CornerRadius="14" Padding="18">
                             <StackPanel>
-                                <TextBlock Text="میانبرهای صفحه‌کلید" FontSize="18" FontWeight="Bold"/>
+                                <TextBlock Text="میانبرهای صفحه‌کلید" FontSize="18" FontWeight="Bold" Foreground="#0F172A"/>
                                 <UniformGrid Columns="2" Margin="0,12,0,0">
-                                    <TextBlock Text="Ctrl + N   •   فاکتور جدید" Margin="0,0,0,8"/>
-                                    <TextBlock Text="Ctrl + Shift + C   •   ثبت چک" Margin="0,0,0,8"/>
-                                    <TextBlock Text="Ctrl + B   •   ساخت پشتیبان رمزگذاری‌شده" Margin="0,0,0,8"/>
-                                    <TextBlock Text="Ctrl + P   •   چاپ / پیش‌نمایش ردیف انتخابی" Margin="0,0,0,8"/>
-                                    <TextBlock Text="Ctrl + 1 تا 6   •   پیشخوان، اشخاص، کالا، فاکتور، دریافت‌ها، هزینه‌ها" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl + N  •  فاکتور جدید" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl + Shift + C  •  ثبت چک" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl + B  •  ساخت پشتیبان رمزگذاری‌شده" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl + P  •  چاپ / پیش‌نمایش ردیف انتخابی" Margin="0,0,0,8"/>
+                                    <TextBlock Text="Ctrl + 1 تا 6  •  پیشخوان، اشخاص، کالا، فاکتور، دریافت‌ها، هزینه‌ها" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                 </UniformGrid>
                             </StackPanel>
                         </Border>
