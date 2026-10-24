@@ -168,13 +168,16 @@ public sealed class VoucherPreviewWindow : Window
         document.Blocks.Add(new BlockUIContainer(facts));
 
         var table = new Table { CellSpacing = 0, Margin = new Thickness(0, 2, 0, 10) };
-        for (var i = 0; i < 4; i++) table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
-        var group = new TableRowGroup();
+        foreach (var width in new[] { 1.8, 0.9, 0.8, 2.5 })
+            table.Columns.Add(new TableColumn { Width = new GridLength(width, GridUnitType.Star) });
+        var headerGroup = new TableRowGroup { IsHeader = true };
+        var bodyGroup = new TableRowGroup();
         var header = new TableRow();
         foreach (var label in new[] { "نام کالا", "مقدار", "واحد", "شرح / قفسه" })
             header.Cells.Add(new TableCell(new Paragraph(new Run(label))) { FontWeight = FontWeights.Bold, Background = soft,
                 Foreground = accent, Padding = new Thickness(7), BorderBrush = accent, BorderThickness = new Thickness(0.5) });
-        group.Rows.Add(header);
+        headerGroup.Rows.Add(header);
+        table.RowGroups.Add(headerGroup);
         var voucherRowIndex = 0;
         foreach (var item in voucher.Items)
         {
@@ -192,7 +195,7 @@ public sealed class VoucherPreviewWindow : Window
             }));
             row.Cells.Add(nameCell);
 
-            row.Cells.Add(new TableCell(new Paragraph(new Run(item.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")))) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right })
+            row.Cells.Add(new TableCell(new Paragraph(new Run(item.Quantity.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))) { FlowDirection = FlowDirection.LeftToRight }) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right, FlowDirection = FlowDirection.LeftToRight })
             {
                 Padding = new Thickness(6), Background = background,
                 BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)), BorderThickness = new Thickness(0.5), FontSize = 9
@@ -222,9 +225,9 @@ public sealed class VoucherPreviewWindow : Window
                 descriptionCell.Blocks.Add(new Paragraph(new Run("—")) { Margin = new Thickness(0) });
             row.Cells.Add(descriptionCell);
             voucherRowIndex++;
-            group.Rows.Add(row);
+            bodyGroup.Rows.Add(row);
         }
-        table.RowGroups.Add(group);
+        table.RowGroups.Add(bodyGroup);
         document.Blocks.Add(table);
         var totals = new StackPanel { FlowDirection = FlowDirection.RightToLeft };
         totals.Children.Add(new TextBlock { Text = $"جمع تعداد اقلام: {voucher.Items.Sum(item => item.Quantity).ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR"))}",
