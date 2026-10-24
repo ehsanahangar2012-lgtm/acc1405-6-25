@@ -2,6 +2,8 @@ using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Media;
 using AshkeGhalam.Windows.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -63,6 +65,11 @@ public sealed class ApplicationThemeUiRegressionTests
             try
             {
                 var grid = new DataGrid { AutoGenerateColumns = false };
+                grid.Columns.Add(new DataGridTextColumn
+                {
+                    Header = "شرح",
+                    Binding = new Binding("Description")
+                });
                 var window = new Window
                 {
                     Width = 800,
@@ -77,6 +84,7 @@ public sealed class ApplicationThemeUiRegressionTests
                 Assert.IsInstanceOfType(grid.Resources[typeof(DataGridRow)], typeof(Style));
                 Assert.IsInstanceOfType(grid.Resources[typeof(DataGridCell)], typeof(Style));
                 Assert.IsInstanceOfType(grid.Resources[typeof(DataGridColumnHeader)], typeof(Style));
+                AssertGridStateHasReadableContrast(grid);
 
                 ApplicationThemeService.Apply(window, "light");
                 Assert.AreEqual(Colors.White, ((SolidColorBrush)grid.Background).Color);
@@ -84,6 +92,7 @@ public sealed class ApplicationThemeUiRegressionTests
                 Assert.IsTrue(ApplicationThemeService.ContrastRatio(
                     ((SolidColorBrush)grid.Foreground).Color,
                     ((SolidColorBrush)grid.Background).Color) >= 4.5);
+                AssertGridStateHasReadableContrast(grid);
             }
             catch (Exception ex)
             {
@@ -98,4 +107,117 @@ public sealed class ApplicationThemeUiRegressionTests
         if (failure is not null)
             throw new AssertFailedException("DataGrid theme switching failed on an STA thread.", failure);
     }
+
+    [TestMethod]
+    public void DarkThemeKeepsInvoiceAndReportPrintPaperWhite()
+    {
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var document = new FlowDocument
+                {
+                    Background = Brushes.White,
+                    Foreground = Brushes.Black
+                };
+                document.Blocks.Add(new Paragraph(new Run("محتوای نمونهٔ پیش‌نمایش چاپ")));
+                var viewer = new FlowDocumentScrollViewer
+                {
+                    Document = document,
+                    Background = Brushes.White,
+                    IsToolBarVisible = false
+                };
+                var paper = new Border
+                {
+                    Background = Brushes.White,
+                    BorderBrush = Brushes.LightGray,
+                    BorderThickness = new Thickness(1),
+                    Child = viewer
+                };
+                var window = new Window
+                {
+                    Width = 800,
+                    Height = 500,
+                    Background = Brushes.White,
+                    Content = paper
+                };
+
+                ApplicationThemeService.Apply(window, "dark");
+
+                Assert.AreEqual(Color.FromRgb(17, 24, 39), ((SolidColorBrush)window.Background).Color);
+                Assert.AreEqual(Colors.White, ((SolidColorBrush)paper.Background).Color);
+                Assert.AreEqual(Colors.White, ((SolidColorBrush)viewer.Background).Color);
+                Assert.AreEqual(Colors.White, ((SolidColorBrush)document.Background).Color);
+                Assert.AreEqual(Colors.Black, ((SolidColorBrush)document.Foreground).Color);
+                Assert.IsTrue(ApplicationThemeService.ContrastRatio(
+                    ((SolidColorBrush)document.Foreground).Color,
+                    ((SolidColorBrush)document.Background).Color) >= 4.5);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+            throw new AssertFailedException("Dark theme changed the printable paper palette.", failure);
+    }
+
+    private static void AssertGridStateHasReadableContrast(DataGrid grid)
+    {
+        var rowStyle = (Style)grid.Resources[typeof(DataGridRow)];
+        var rowSelected = rowStyle.Triggers.OfType<Trigger>()
+            .Single(trigger => trigger.Property == DataGridRow.IsSelectedProperty);
+        AssertContrast(
+            ColorOf(rowSelected.Setters, Control.ForegroundProperty),
+            ColorOf(rowSelected.Setters, Control.BackgroundProperty),
+            "selected row");
+
+        var cellStyle = (Style)grid.Resources[typeof(DataGridCell)];
+        var cellSelected = cellStyle.Triggers.OfType<Trigger>()
+            .Single(trigger => trigger.Property == DataGridCell.IsSelectedProperty);
+        AssertContrast(
+            ColorOf(cellSelected.Setters, Control.ForegroundProperty),
+            ColorOf(cellSelected.Setters, Control.BackgroundProperty),
+            "selected cell");
+
+        var headerStyle = (Style)grid.Resources[typeof(DataGridColumnHeader)];
+        AssertContrast(
+            ColorOf(headerStyle.Setters, Control.ForegroundProperty),
+            ColorOf(headerStyle.Setters, Control.BackgroundProperty),
+            "column header");
+
+        var textColumn = grid.Columns.OfType<DataGridTextColumn>().Single();
+        var textStyle = textColumn.ElementStyle;
+        Assert.IsNotNull(textStyle, "DataGrid text cells should receive the shared text style.");
+        var foregroundSetter = textStyle!.Setters.OfType<Setter>()
+            .Single(setter => setter.Property == TextBlock.ForegroundProperty);
+        Assert.IsInstanceOfType(foregroundSetter.Value, typeof(Binding),
+            "Cell text must inherit the current cell foreground so selection remains readable.");
+        Assert.AreEqual(typeof(DataGridCell), ((Binding)foregroundSetter.Value).RelativeSource?.AncestorType);
+        Assert.IsTrue(textStyle.Setters.OfType<Setter>().Any(setter =>
+            setter.Property == TextBlock.TextTrimmingProperty &&
+            Equals(setter.Value, TextTrimming.CharacterEllipsis)));
+        Assert.IsTrue(textStyle.Setters.OfType<Setter>().Any(setter =>
+            setter.Property == FrameworkElement.ToolTipProperty && setter.Value is Binding),
+            "Truncated cell values must remain inspectable through a tooltip.");
+    }
+
+    private static Color ColorOf(SetterBaseCollection setters, DependencyProperty property)
+    {
+        var setter = setters.OfType<Setter>().Single(item => item.Property == property);
+        return ((SolidColorBrush)setter.Value).Color;
+    }
+
+    private static void AssertContrast(Color foreground, Color background, string state)
+    {
+        Assert.IsTrue(ApplicationThemeService.ContrastRatio(foreground, background) >= 4.5,
+            $"{state} foreground/background contrast must be at least 4.5:1.");
+    }
+
 }
