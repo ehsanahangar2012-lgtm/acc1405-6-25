@@ -420,3 +420,12 @@
 - [x] پس از تعویض مرحلهٔ فرم چک، تم پنجرهٔ مالک دوباره روی محتوای تازه ساخته‌شده اعمال می‌شود تا کارت مرحله در حالت تاریک به رنگ سفید ثابت برنگردد.
 - [x] وضعیت‌های پویا در فعال‌سازی لایسنس (درحال بررسی، موفقیت، خطا و کپی شناسه) از حل‌کنندهٔ کنتراست WCAG استفاده می‌کنند، نه رنگ ثابت وابسته به تم روشن.
 - [ ] آزمون دیداری تعاملی همچنان باید روی Windows در هر دو تم و چند اندازهٔ پنجره انجام شود.
+
+
+## 2026-10-24 — smart selection and dependent data fields
+- Added a reusable live-filter ComboBox service that searches safe fields, clears stale selections while typing, and only yields a domain record after the user chooses a result.
+- Enabled name/code/phone search for invoice parties, name/code/barcode/serial search for invoice and voucher products, and name/number/customer search for linked invoices and payment choices.
+- Made voucher invoice choices depend on person and movement type: purchase-related movements show purchase invoices, sales-related movements show sales invoices, and adjustments/production movements cannot silently link an incompatible invoice.
+- Extended party lookup to legacy records that store role only in the older Type field; check-party search uses the same compatibility rule.
+- Added the Persian calendar picker to journal-entry dates and the date range in the person financial kardex.
+- Added regression tests for legacy party roles and search matching; Windows CI verifies compilation/test execution. Dynamic interactions still benefit from a manual smoke-test on Windows.

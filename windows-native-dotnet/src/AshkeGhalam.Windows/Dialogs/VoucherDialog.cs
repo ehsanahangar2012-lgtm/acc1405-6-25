@@ -50,9 +50,9 @@ public sealed class VoucherDialog : Window
     private readonly CompanyProfileRecord? _companyProfile;
     private readonly ComboBox _type = new() { Height = 34, ItemsSource = Types, DisplayMemberPath = nameof(Choice.Label), SelectedIndex = 1, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
     private readonly ComboBox _movementType = new() { Height = 34, ItemsSource = MovementTypes, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
-    private readonly ComboBox _person = new() { Height = 34, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 260, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
-    private readonly ComboBox _invoice = new() { Height = 34, DisplayMemberPath = nameof(InvoiceChoice.Label), MinWidth = 260, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
-    private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _person = new() { Height = 36, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 260, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "نام، کد یا تلفن شخص را جست‌وجو و سپس انتخاب کنید." };
+    private readonly ComboBox _invoice = new() { Height = 36, DisplayMemberPath = nameof(InvoiceChoice.Label), MinWidth = 260, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "فقط فاکتورهای سازگار با شخص و نوع گردش نمایش داده می‌شوند." };
+    private readonly ComboBox _product = new() { Height = 36, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "نام، کد، بارکد یا سریال کالا را جست‌وجو کنید." };
     private readonly TextBox _quantity = new() { Height = 32, Width = 110, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _barcodeScan = new() { Height = 34, MinWidth = 230, Padding = new Thickness(8, 4, 8, 4), FlowDirection = FlowDirection.LeftToRight };
     private readonly TextBox _date = new() { Height = 32, Padding = new Thickness(8, 4, 8, 4) };
@@ -85,9 +85,11 @@ public sealed class VoucherDialog : Window
         FontFamily = new System.Windows.Media.FontFamily("pack://application:,,,/Assets/Fonts/#Vazirmatn");
         Background = new SolidColorBrush(Color.FromRgb(248, 250, 252));
 
-        _person.ItemsSource = people;
+        SmartComboBoxSearchService.SetItems(_person, InvoicePartySelectionService.GetAllSelectableParties(people),
+            person => new[] { person.Name, person.Code, person.Phone, person.Email });
         _person.SelectedIndex = -1;
-        _product.ItemsSource = products;
+        SmartComboBoxSearchService.SetItems(_product, products,
+            product => new[] { product.Name, product.Code, product.Barcode, product.SerialNumber });
         _movementType.SelectedItem = MovementTypes[1];
         _date.Text = FormatPersianDate(existing?.Date ?? DateTimeOffset.Now);
         if (existing is not null)
@@ -258,6 +260,7 @@ public sealed class VoucherDialog : Window
 
         _person.SelectionChanged += (_, _) => RefreshInvoiceChoices();
         _type.SelectionChanged += (_, _) => SetDefaultMovement();
+        _movementType.SelectionChanged += (_, _) => RefreshInvoiceChoices();
         _lines.CollectionChanged += (_, _) => RefreshTotals();
         NumericTextBoxFormatter.Attach(_quantity);
         _barcodeScan.PreviewKeyDown += BarcodeScan_PreviewKeyDown;
@@ -354,8 +357,14 @@ public sealed class VoucherDialog : Window
         var date = ParsePersianDate(_date.Text);
         var person = _person.SelectedItem as CustomerRecord;
         var invoiceChoice = _invoice.SelectedItem as InvoiceChoice;
-        if (invoiceChoice?.Invoice is not null && (person is null || invoiceChoice.Invoice.CustomerId != person.Id))
-            throw new InvalidOperationException("شخص سند باید با شخص فاکتور مرتبط یکسان باشد.");
+        if (invoiceChoice?.Invoice is not null)
+        {
+            if (person is null || invoiceChoice.Invoice.CustomerId != person.Id)
+                throw new InvalidOperationException("شخص سند باید با شخص فاکتور مرتبط یکسان باشد.");
+            var requiredInvoiceType = RequiredInvoiceTypeForMovement(movement.Value);
+            if (requiredInvoiceType is null || invoiceChoice.Invoice.Type != requiredInvoiceType)
+                throw new InvalidOperationException("فاکتور مرتبط باید با نوع گردش انتخاب‌شده سازگار باشد.");
+        }
 
         if (type.Value == "RETURN" && movement.Value is not ("RETURN_RECEIPT" or "RETURN_ISSUE"))
             throw new InvalidOperationException("برای برگشت کالا، نوع گردش «رسید برگشت از فروش» یا «حواله برگشت از خرید» را انتخاب کنید.");
@@ -403,15 +412,33 @@ public sealed class VoucherDialog : Window
     private void RefreshInvoiceChoices()
     {
         var person = _person.SelectedItem as CustomerRecord;
+        var movementType = (_movementType.SelectedItem as Choice)?.Value;
+        var requiredInvoiceType = RequiredInvoiceTypeForMovement(movementType);
         var choices = new List<InvoiceChoice> { new(null, "بدون فاکتور مرتبط") };
-        if (person is not null)
-            choices.AddRange(_invoices.Where(i => i.CustomerId == person.Id && i.Status != "لغو شده")
-                .OrderByDescending(i => i.Number).Select(i => new InvoiceChoice(i, $"فاکتور {i.Number} — {i.CustomerName}")));
-        _invoice.ItemsSource = choices;
+
+        if (person is not null && requiredInvoiceType is not null)
+            choices.AddRange(_invoices
+                .Where(invoice => invoice.CustomerId == person.Id && invoice.Status != "لغو شده" &&
+                    invoice.Type == requiredInvoiceType && invoice.Type != "PROFORMA")
+                .OrderByDescending(invoice => invoice.Number)
+                .Select(invoice => new InvoiceChoice(invoice, $"{invoice.TypeLabel} {invoice.DisplayNumber} — {invoice.CustomerName}")));
+
+        SmartComboBoxSearchService.SetItems(_invoice, choices, choice => new[]
+        {
+            choice.Label, choice.Invoice?.DisplayNumber, choice.Invoice?.Number.ToString(CultureInfo.InvariantCulture),
+            choice.Invoice?.CustomerName
+        });
         _invoice.SelectedIndex = 0;
     }
 
-    private void SetDefaultMovement()
+    private static string? RequiredInvoiceTypeForMovement(string? movementType) => movementType switch
+    {
+        "GOODS_RECEIPT" or "RETURN_ISSUE" => "PURCHASE",
+        "GOODS_ISSUE" or "RETURN_RECEIPT" => "SALE",
+        _ => null
+    };
+
+
     {
         var type = (_type.SelectedItem as Choice)?.Value;
         var desired = type switch

@@ -11,13 +11,15 @@ public sealed class PaymentDialog : Window
 {
     private readonly ComboBox _customer = new()
     {
-        Height = 34, MinWidth = 280, DisplayMemberPath = nameof(CustomerRecord.Name),
-        IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300
+        Height = 36, MinWidth = 280, DisplayMemberPath = nameof(CustomerRecord.Name),
+        IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320,
+        ToolTip = "نام، کد یا تلفن را جست‌وجو کنید و طرف حساب را انتخاب کنید."
     };
     private readonly ComboBox _invoice = new()
     {
-        Height = 34, MinWidth = 350, IsTextSearchEnabled = true,
-        IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300
+        Height = 36, MinWidth = 350, DisplayMemberPath = nameof(InvoiceOption.Label), IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false,
+        IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320,
+        ToolTip = "شماره، مشتری یا مبلغ مانده را جست‌وجو کنید."
     };
     private readonly TextBlock _remainingHint = new()
     {
@@ -79,7 +81,8 @@ public sealed class PaymentDialog : Window
                 (existingInvoice is not null && existingInvoice.CustomerId == person.Id))
             .OrderBy(person => person.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
-        _customer.ItemsSource = customerChoices;
+        SmartComboBoxSearchService.SetItems(_customer, customerChoices,
+            person => new[] { person.Name, person.Code, person.Phone, person.Email });
         _customer.SelectedItem = customerChoices.FirstOrDefault(person => person.Id == existingInvoice?.CustomerId)
             ?? customerChoices.FirstOrDefault();
 
@@ -200,7 +203,11 @@ public sealed class PaymentDialog : Window
             })
             .ToList();
 
-        _invoice.ItemsSource = options;
+        SmartComboBoxSearchService.SetItems(_invoice, options, option => new[]
+        {
+            option.Label, option.Invoice.DisplayNumber, option.Invoice.Number.ToString(CultureInfo.InvariantCulture),
+            option.Invoice.CustomerName
+        });
         _invoice.SelectedItem = options.FirstOrDefault(option => option.Invoice.Id == previousInvoiceId)
             ?? options.FirstOrDefault(option => option.Invoice.Id == _existingPayment?.InvoiceId)
             ?? options.FirstOrDefault();

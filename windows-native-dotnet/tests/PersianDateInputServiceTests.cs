@@ -162,4 +162,38 @@ public sealed class PersianDateInputServiceTests
             }
     }
 
+
+    [TestMethod]
+    public void AllPartyChoicesIncludeLegacyTypeOnlyRecords()
+    {
+        var legacyCustomer = new AshkeGhalam.Windows.Models.CustomerRecord
+        {
+            Id = "legacy-customer", Name = "مشتری قدیمی", Type = "CUSTOMER",
+            IsCustomer = false, IsSupplier = false
+        };
+        var legacySupplier = new AshkeGhalam.Windows.Models.CustomerRecord
+        {
+            Id = "legacy-supplier", Name = "تأمین‌کننده قدیمی", Type = "VENDOR",
+            IsCustomer = false, IsSupplier = false
+        };
+        var noRole = new AshkeGhalam.Windows.Models.CustomerRecord
+        {
+            Id = "none", Name = "بدون نقش", Type = "", IsCustomer = false, IsSupplier = false
+        };
+
+        var all = InvoicePartySelectionService.GetAllSelectableParties(new[] { legacyCustomer, legacySupplier, noRole });
+        CollectionAssert.AreEquivalent(new[] { "legacy-customer", "legacy-supplier" }, all.Select(person => person.Id).ToArray());
+    }
+
+    [TestMethod]
+    public void SmartComboBoxSearchMatchesNamesCodesPhonesAndEmptyQueries()
+    {
+        var fields = new string?[] { "شرکت نمونه", "CUS-104", "09121234567", null };
+        Assert.IsTrue(SmartComboBoxSearchService.MatchesSearch(fields, "شرکت"));
+        Assert.IsTrue(SmartComboBoxSearchService.MatchesSearch(fields, "cus-10"));
+        Assert.IsTrue(SmartComboBoxSearchService.MatchesSearch(fields, "0912"));
+        Assert.IsTrue(SmartComboBoxSearchService.MatchesSearch(fields, "   "));
+        Assert.IsFalse(SmartComboBoxSearchService.MatchesSearch(fields, "VEND-"));
+    }
+
 }

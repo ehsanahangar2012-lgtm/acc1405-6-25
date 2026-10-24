@@ -41,9 +41,9 @@ public sealed class InvoiceDialog : Window
         new Choice("PURCHASE", "فاکتور خرید"),
         new Choice("PROFORMA", "پیش‌فاکتور")
     }, SelectedIndex = 0 };
-    private readonly ComboBox _person = new() { Height = 48, MinWidth = 250, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "برای انتخاب، نام شخص را تایپ کنید یا فهرست را باز کنید." };
+    private readonly ComboBox _person = new() { Height = 48, MinWidth = 250, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "نام، کد یا تلفن را تایپ کنید؛ سپس شخص را از فهرست نتایج انتخاب کنید." };
     private readonly TextBlock _partyHint = new() { FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(2, 0, 2, 8) };
-    private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _product = new() { Height = 34, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300, ToolTip = "نام، کد، بارکد یا سریال کالا را تایپ کنید و از نتایج انتخاب کنید." };
     private readonly TextBox _quantity = new() { Height = 32, Width = 90, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _price = new() { Height = 32, Width = 130, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _lineDescription = new()
@@ -120,7 +120,7 @@ public sealed class InvoiceDialog : Window
         _footerTemplates = (footerTemplates ?? [])
             .Where(value => !string.IsNullOrWhiteSpace(value))
             .Select(value => value.Trim()).Distinct(StringComparer.Ordinal).ToList();
-        _footerTemplateSelector.ItemsSource = _footerTemplates;
+        SmartComboBoxSearchService.SetItems(_footerTemplateSelector, _footerTemplates, value => new[] { value });
         _person.ItemTemplate = CreatePartyTemplate();
         TextSearch.SetTextPath(_person, nameof(CustomerRecord.Name));
         _invoiceFooterText.Text = !string.IsNullOrWhiteSpace(existingInvoice?.InvoiceFooter)
@@ -160,7 +160,7 @@ public sealed class InvoiceDialog : Window
             NumericTextBoxFormatter.Attach(numericField);
         ConfigureLineGrid();
         _lineList.ItemsSource = _lines;
-        _product.ItemsSource = _products;
+        SmartComboBoxSearchService.SetItems(_product, _products, product => new[] { product.Name, product.Code, product.Barcode, product.SerialNumber });
 
         var root = new StackPanel { Margin = new Thickness(18) };
         root.Children.Add(CreateInvoiceHero());
@@ -426,8 +426,8 @@ public sealed class InvoiceDialog : Window
         if (_products.All(product => product.Id != created.Id))
             _products.Add(created);
 
-        _product.ItemsSource = null;
-        _product.ItemsSource = _products;
+        SmartComboBoxSearchService.SetItems(_product, _products,
+            product => new[] { product.Name, product.Code, product.Barcode, product.SerialNumber });
         _product.SelectedItem = _product.Items.Cast<ProductRecord>().FirstOrDefault(product => product.Id == created.Id);
         ApplyDefaultPrice();
     }
@@ -438,8 +438,8 @@ public sealed class InvoiceDialog : Window
     {
         var previousId = (_person.SelectedItem as CustomerRecord)?.Id;
         var candidates = InvoicePartySelectionService.GetSelectableParties(_people, CurrentType);
-        _person.ItemsSource = null;
-        _person.ItemsSource = candidates;
+        SmartComboBoxSearchService.SetItems(_person, candidates,
+            person => new[] { person.Name, person.Code, person.Phone, person.Email });
         var previous = candidates.ToList().FindIndex(person => person.Id == previousId);
         _person.SelectedIndex = previous >= 0 ? previous : (candidates.Count > 0 ? 0 : -1);
         _person.IsEnabled = candidates.Count > 0;

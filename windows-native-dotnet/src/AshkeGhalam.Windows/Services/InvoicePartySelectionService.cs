@@ -21,6 +21,14 @@ public static class InvoicePartySelectionService
             .ToArray();
     }
 
+    public static IReadOnlyList<CustomerRecord> GetAllSelectableParties(IEnumerable<CustomerRecord>? people) =>
+        (people ?? Enumerable.Empty<CustomerRecord>())
+            .Where(person => person is not null &&
+                !string.IsNullOrWhiteSpace(person.Name) &&
+                (HasCustomerRole(person) || HasSupplierRole(person)))
+            .OrderBy(person => person.Name, StringComparer.CurrentCultureIgnoreCase)
+            .ToArray();
+
     public static bool HasCustomerRole(CustomerRecord person)
     {
         ArgumentNullException.ThrowIfNull(person);

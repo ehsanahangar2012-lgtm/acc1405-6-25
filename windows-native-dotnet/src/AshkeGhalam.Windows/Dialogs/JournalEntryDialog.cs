@@ -84,7 +84,7 @@ public sealed class JournalEntryDialog : Window
         });
 
         var identitySection = new StackPanel();
-        AddField(identitySection, "تاریخ شمسی یا میلادی (سال/ماه/روز)", _date);
+        AddDateField(identitySection, "تاریخ شمسی یا میلادی (سال/ماه/روز)", _date);
         AddField(identitySection, "شرح سند", _description);
         AddField(identitySection, "نوع سند", _documentType);
         root.Children.Add(CreateSectionCard(
@@ -179,6 +179,17 @@ public sealed class JournalEntryDialog : Window
         _credit.SelectedItem = allowed.FirstOrDefault(choice => choice.Value == previousCreditId)
             ?? allowed.FirstOrDefault();
         _refreshingCreditChoices = false;
+    }
+
+    private static void AddDateField(Panel root, string label, TextBox field)
+    {
+        root.Children.Add(new TextBlock
+        {
+            Text = label, FontSize = 12, FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 7, 0, 4)
+        });
+        field.Margin = new Thickness(0, 0, 0, 4);
+        root.Children.Add(PersianDateInputService.CreateDateField(field));
     }
 
     private static void AddField(Panel root, string label, Control field)

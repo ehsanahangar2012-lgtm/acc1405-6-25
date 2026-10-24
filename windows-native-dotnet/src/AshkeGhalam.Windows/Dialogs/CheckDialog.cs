@@ -159,10 +159,14 @@ public sealed class CheckDialog : Window
         _amount.Text = initialAmount.HasValue ? initialAmount.Value.ToString("#,##0.##", CultureInfo.GetCultureInfo("fa-IR")) : "";
         _sayadId.Text = existing?.SayadId ?? "";
         _checkNumber.Text = existing?.CheckNumber ?? "";
-        _holderName.ItemsSource = _people.Select(person => person.Name).Where(name => !string.IsNullOrWhiteSpace(name))
+        var holderChoices = _people.Select(person => person.Name).Where(name => !string.IsNullOrWhiteSpace(name))
             .Distinct(StringComparer.CurrentCultureIgnoreCase).OrderBy(name => name).ToList();
+        SmartComboBoxSearchService.SetItems(_holderName, holderChoices, name => new[] { name });
         _holderName.Text = existing?.HolderName ?? _prefillPersonName;
-        _personName.ItemsSource = _people.Where(person => person.IsCustomer || person.IsSupplier).OrderBy(person => person.Name).ToList();
+        var personChoices = InvoicePartySelectionService.GetAllSelectableParties(_people);
+        SmartComboBoxSearchService.SetItems(_personName, personChoices,
+            person => new[] { person.Name, person.Code, person.Phone, person.Email });
+        TextSearch.SetTextPath(_personName, nameof(CustomerRecord.Name));
         _personName.Text = existing?.PersonName ?? _prefillPersonName;
         if (existing is not null)
         {
