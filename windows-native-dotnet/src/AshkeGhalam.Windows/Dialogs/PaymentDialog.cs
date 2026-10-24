@@ -26,6 +26,11 @@ public sealed class PaymentDialog : Window
         Margin = new Thickness(0, 5, 0, 4), TextWrapping = TextWrapping.Wrap,
         Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(71, 85, 105))
     };
+    private readonly TextBlock _customerInfo = new()
+    {
+        FontSize = 12,
+        TextWrapping = TextWrapping.Wrap
+    };
     private readonly TextBox _amount=new(){Height=34,Text="0",Padding=new Thickness(8,4,8,4)};
     private readonly ComboBox _method=new(){Height=32,ItemsSource=new[]{"نقدی","کارت‌خوان","واریز بانکی","چک","سایر"},SelectedIndex=0,IsTextSearchEnabled=true,IsTextSearchCaseSensitive=false};
     private readonly TextBox _reference=new(){Height=32,Padding=new Thickness(8,4,8,4)};
@@ -83,6 +88,7 @@ public sealed class PaymentDialog : Window
             .ToList();
         SmartComboBoxSearchService.SetItems(_customer, customerChoices,
             person => new[] { person.Name, person.Code, person.Phone, person.Email });
+        PartyComboBoxPresentationService.ApplyPersonItemTemplate(_customer);
         _customer.SelectedItem = customerChoices.FirstOrDefault(person => person.Id == existingInvoice?.CustomerId)
             ?? customerChoices.FirstOrDefault();
 
@@ -113,6 +119,16 @@ public sealed class PaymentDialog : Window
 
         var partySection = new StackPanel();
         Add(partySection, "طرف حساب", _customer);
+        partySection.Children.Add(new Border
+        {
+            Background = PaletteBrush("#F0FDFA"),
+            BorderBrush = PaletteBrush("#99F6E4"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(10, 8, 10, 8),
+            Margin = new Thickness(0, 3, 0, 8),
+            Child = _customerInfo
+        });
         Add(partySection, "فاکتور قطعی دارای مانده", _invoice);
         partySection.Children.Add(new Border
         {
@@ -192,6 +208,7 @@ public sealed class PaymentDialog : Window
     private void RefreshInvoiceChoices()
     {
         var person = _customer.SelectedItem as CustomerRecord;
+        RefreshCustomerInfo(person);
         var previousInvoiceId = (_invoice.SelectedItem as InvoiceOption)?.Invoice.Id;
         var options = _eligibleInvoices
             .Where(invoice => person is not null && invoice.CustomerId == person.Id)
@@ -212,6 +229,23 @@ public sealed class PaymentDialog : Window
             ?? options.FirstOrDefault(option => option.Invoice.Id == _existingPayment?.InvoiceId)
             ?? options.FirstOrDefault();
         RefreshRemainingHint();
+    }
+
+    private void RefreshCustomerInfo(CustomerRecord? person)
+    {
+        if (person is null)
+        {
+            _customerInfo.Text = "طرف حساب را انتخاب کنید تا کد، تلفن و ماندهٔ واقعی دفتر نمایش داده شود.";
+            return;
+        }
+
+        var report = PersonKardexService.GetReport(_data, person);
+        var balance = report.ClosingBalance;
+        var balanceSide = balance > 0m ? "بدهکار" : balance < 0m ? "بستانکار" : "تسویه";
+        var code = string.IsNullOrWhiteSpace(person.Code) ? "ثبت نشده" : person.Code.Trim();
+        var phone = string.IsNullOrWhiteSpace(person.Phone) ? "ثبت نشده" : person.Phone.Trim();
+        _customerInfo.Text =
+            $"کد: {code}  •  تلفن: {phone}  •  ماندهٔ دفتر: {Math.Abs(balance):N2} {_currencyLabel} ({balanceSide})";
     }
 
     private decimal RemainingAmount(InvoiceRecord invoice)

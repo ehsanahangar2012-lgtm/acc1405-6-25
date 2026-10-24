@@ -166,7 +166,7 @@ public sealed class CheckDialog : Window
         var personChoices = InvoicePartySelectionService.GetAllSelectableParties(_people);
         SmartComboBoxSearchService.SetItems(_personName, personChoices,
             person => new[] { person.Name, person.Code, person.Phone, person.Email });
-        TextSearch.SetTextPath(_personName, nameof(CustomerRecord.Name));
+        PartyComboBoxPresentationService.ApplyPersonItemTemplate(_personName);
         _personName.Text = existing?.PersonName ?? _prefillPersonName;
         if (existing is not null)
         {

@@ -51,6 +51,7 @@ public sealed class VoucherDialog : Window
     private readonly ComboBox _type = new() { Height = 34, ItemsSource = Types, DisplayMemberPath = nameof(Choice.Label), SelectedIndex = 1, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
     private readonly ComboBox _movementType = new() { Height = 34, ItemsSource = MovementTypes, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
     private readonly ComboBox _person = new() { Height = 36, DisplayMemberPath = nameof(CustomerRecord.Name), MinWidth = 260, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "نام، کد یا تلفن شخص را جست‌وجو و سپس انتخاب کنید." };
+    private readonly TextBlock _personHint = new() { FontSize = 12, TextWrapping = TextWrapping.Wrap };
     private readonly ComboBox _invoice = new() { Height = 36, DisplayMemberPath = nameof(InvoiceChoice.Label), MinWidth = 260, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "فقط فاکتورهای سازگار با شخص و نوع گردش نمایش داده می‌شوند." };
     private readonly ComboBox _product = new() { Height = 36, DisplayMemberPath = nameof(ProductRecord.Name), MinWidth = 240, IsEditable = true, StaysOpenOnEdit = true, IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320, ToolTip = "نام، کد، بارکد یا سریال کالا را جست‌وجو کنید." };
     private readonly TextBox _quantity = new() { Height = 32, Width = 110, Text = "1", Padding = new Thickness(8, 4, 8, 4) };
@@ -87,6 +88,7 @@ public sealed class VoucherDialog : Window
 
         SmartComboBoxSearchService.SetItems(_person, InvoicePartySelectionService.GetAllSelectableParties(people),
             person => new[] { person.Name, person.Code, person.Phone, person.Email });
+        PartyComboBoxPresentationService.ApplyPersonItemTemplate(_person);
         _person.SelectedIndex = -1;
         SmartComboBoxSearchService.SetItems(_product, products,
             product => new[] { product.Name, product.Code, product.Barcode, product.SerialNumber });
@@ -146,6 +148,16 @@ public sealed class VoucherDialog : Window
         AddDateField(documentPrimary, "تاریخ شمسی", _date, optional: false);
         var documentSecondary = new StackPanel();
         AddField(documentSecondary, "شخص مرتبط (اختیاری)", _person);
+        documentSecondary.Children.Add(new Border
+        {
+            Background = PaletteBrush("#F0FDFA"),
+            BorderBrush = PaletteBrush("#99F6E4"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(9, 7, 9, 7),
+            Margin = new Thickness(0, 0, 0, 8),
+            Child = _personHint
+        });
         AddField(documentSecondary, "فاکتور مرتبط (اختیاری)", _invoice);
         Grid.SetColumn(documentPrimary, 0);
         Grid.SetColumn(documentSecondary, 2);
@@ -412,6 +424,17 @@ public sealed class VoucherDialog : Window
     private void RefreshInvoiceChoices()
     {
         var person = _person.SelectedItem as CustomerRecord;
+        if (person is null)
+        {
+            _personHint.Text = "با انتخاب شخص، کد، تلفن و نقش حسابداری او نمایش داده می‌شود.";
+        }
+        else
+        {
+            var code = string.IsNullOrWhiteSpace(person.Code) ? "بدون کد" : person.Code.Trim();
+            var phone = string.IsNullOrWhiteSpace(person.Phone) ? "تلفن ثبت نشده" : person.Phone.Trim();
+            _personHint.Text = $"{person.Name}  •  کد: {code}  •  {phone}  •  نقش: {person.RoleLabel}";
+        }
+
         var movementType = (_movementType.SelectedItem as Choice)?.Value;
         var requiredInvoiceType = RequiredInvoiceTypeForMovement(movementType);
         var choices = new List<InvoiceChoice> { new(null, "بدون فاکتور مرتبط") };
