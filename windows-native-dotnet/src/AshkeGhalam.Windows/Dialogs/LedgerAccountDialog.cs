@@ -13,7 +13,12 @@ public sealed class LedgerAccountDialog : Window
     private readonly TextBox _name = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
     private readonly ComboBox _type = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
     private readonly ComboBox _level = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
-    private readonly ComboBox _parent = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _parent = new()
+    {
+        Height = 36, DisplayMemberPath = nameof(Choice.Label), IsEditable = true, StaysOpenOnEdit = true,
+        IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320,
+        ToolTip = "کد یا عنوان حساب والد را جست‌وجو و از نتایج انتخاب کنید."
+    };
     private IReadOnlyList<ChartOfAccountRecord> _accounts = [];
 
     public ChartOfAccountRecord? Result { get; private set; }
@@ -146,7 +151,8 @@ public sealed class LedgerAccountDialog : Window
                 .Select(account => new Choice(account.Id, $"{account.Code} — {account.Name}")));
         }
 
-        _parent.ItemsSource = choices;
+        SmartComboBoxSearchService.SetItems(_parent, choices, choice => new[] { choice.Label });
+        TextSearch.SetTextPath(_parent, nameof(Choice.Label));
         _parent.SelectedItem = choices.FirstOrDefault(choice => choice.Value == previousParentId)
             ?? choices[0];
         _parent.IsEnabled = level != "MAIN";

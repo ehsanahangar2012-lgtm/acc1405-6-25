@@ -17,8 +17,18 @@ public sealed class JournalEntryDialog : Window
     private readonly TextBox _fiscalYear = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _referenceId = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
     private readonly TextBox _referenceType = new() { Height = 34, Padding = new Thickness(8, 4, 8, 4) };
-    private readonly ComboBox _debit = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsEditable = true, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
-    private readonly ComboBox _credit = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsEditable = true, IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 300 };
+    private readonly ComboBox _debit = new()
+    {
+        Height = 36, DisplayMemberPath = nameof(Choice.Label), IsEditable = true, StaysOpenOnEdit = true,
+        IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320,
+        ToolTip = "کد یا عنوان حساب بدهکار را بنویسید و از نتایج انتخاب کنید."
+    };
+    private readonly ComboBox _credit = new()
+    {
+        Height = 36, DisplayMemberPath = nameof(Choice.Label), IsEditable = true, StaysOpenOnEdit = true,
+        IsTextSearchEnabled = false, IsTextSearchCaseSensitive = false, MaxDropDownHeight = 320,
+        ToolTip = "کد یا عنوان حساب بستانکار را بنویسید و از نتایج انتخاب کنید."
+    };
     private readonly ComboBox _documentType = new() { Height = 34, DisplayMemberPath = nameof(Choice.Label), IsTextSearchEnabled = true, IsTextSearchCaseSensitive = false };
     private IReadOnlyList<Choice> _accountChoices = [];
     private bool _refreshingCreditChoices;
@@ -43,8 +53,10 @@ public sealed class JournalEntryDialog : Window
             .Select(a => new Choice(a.Id, $"{a.Code} — {a.Name}"))
             .ToList();
         _accountChoices = choices;
-        _debit.ItemsSource = choices;
-        _credit.ItemsSource = choices;
+        SmartComboBoxSearchService.SetItems(_debit, choices, choice => new[] { choice.Label });
+        SmartComboBoxSearchService.SetItems(_credit, choices, choice => new[] { choice.Label });
+        TextSearch.SetTextPath(_debit, nameof(Choice.Label));
+        TextSearch.SetTextPath(_credit, nameof(Choice.Label));
         if (choices.Count > 0) _debit.SelectedIndex = 0;
         if (choices.Count > 1) _credit.SelectedIndex = 1;
         _documentType.ItemsSource = new[]
@@ -175,7 +187,7 @@ public sealed class JournalEntryDialog : Window
         var previousCreditId = (_credit.SelectedItem as Choice)?.Value;
         var allowed = _accountChoices.Where(choice => !string.Equals(choice.Value, debitId, StringComparison.Ordinal)).ToList();
         _refreshingCreditChoices = true;
-        _credit.ItemsSource = allowed;
+        SmartComboBoxSearchService.SetItems(_credit, allowed, choice => new[] { choice.Label });
         _credit.SelectedItem = allowed.FirstOrDefault(choice => choice.Value == previousCreditId)
             ?? allowed.FirstOrDefault();
         _refreshingCreditChoices = false;
