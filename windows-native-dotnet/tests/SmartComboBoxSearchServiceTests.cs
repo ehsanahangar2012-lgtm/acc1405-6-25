@@ -175,7 +175,7 @@ public sealed class SmartComboBoxSearchServiceTests
         var thread = new Thread(() =>
         {
             Window? owner = null;
-            InvoiceDialog? dialog = null;
+            AshkeGhalam.Windows.Dialogs.InvoiceDialog? dialog = null;
             try
             {
                 if (Application.Current is null)
@@ -201,13 +201,13 @@ public sealed class SmartComboBoxSearchServiceTests
                     IsCustomer = true,
                     Type = "CUSTOMER"
                 };
-                dialog = new InvoiceDialog(
+                dialog = new AshkeGhalam.Windows.Dialogs.InvoiceDialog(
                     owner,
                     new[] { customer },
                     Array.Empty<AshkeGhalam.Windows.Models.ProductRecord>(),
                     Array.Empty<AshkeGhalam.Windows.Models.InvoiceRecord>());
 
-                var field = typeof(InvoiceDialog).GetField("_person", BindingFlags.Instance | BindingFlags.NonPublic);
+                var field = typeof(AshkeGhalam.Windows.Dialogs.InvoiceDialog).GetField("_person", BindingFlags.Instance | BindingFlags.NonPublic);
                 Assert.IsNotNull(field, "Invoice dialog should expose its party selector to the test harness.");
                 var combo = (System.Windows.Controls.ComboBox)field!.GetValue(dialog)!;
                 Assert.IsNull(combo.SelectedItem, "A new invoice must not silently choose a party.");
