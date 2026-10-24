@@ -127,6 +127,17 @@ public sealed class SmartComboBoxSearchServiceTests
                 Assert.IsNotNull(editor, "The themed searchable ComboBox must retain PART_EditableTextBox.");
                 Assert.AreEqual(2, combo.Items.Count, "The empty search should show all parties.");
 
+                var textChangedEvents = 0;
+                string? eventSenderType = null;
+                string? eventOriginalSourceType = null;
+                combo.AddHandler(System.Windows.Controls.Primitives.TextBoxBase.TextChangedEvent,
+                    new System.Windows.Controls.TextChangedEventHandler((eventSender, args) =>
+                    {
+                        textChangedEvents++;
+                        eventSenderType = eventSender.GetType().FullName;
+                        eventOriginalSourceType = args.OriginalSource.GetType().FullName;
+                    }), true);
+
                 editor!.Text = "CUS-0042";
                 window.Dispatcher.Invoke(
                     System.Windows.Threading.DispatcherPriority.Background,
@@ -137,7 +148,9 @@ public sealed class SmartComboBoxSearchServiceTests
                 Assert.AreEqual("CUS-0042", combo.Text,
                     "The actual editor value should synchronize back to ComboBox.Text.");
                 Assert.AreEqual(1, combo.Items.Count,
-                    "Code search should filter out non-matching parties.");
+                    $"Code search should filter out non-matching parties. editor='{editor.Text}', " +
+                    $"combo.Text='{combo.Text}', events={textChangedEvents}, sender={eventSenderType}, " +
+                    $"originalSource={eventOriginalSourceType}, itemsSource={combo.ItemsSource?.GetType().FullName}.");
                 Assert.AreSame(selectedParty, combo.Items[0],
                     "Filtering must keep the original CustomerRecord as the item.");
 
