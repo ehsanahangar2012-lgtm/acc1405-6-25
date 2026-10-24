@@ -61,7 +61,7 @@ public sealed class PersonKardexPrintPreviewWindow : Window
         var table = new Table { CellSpacing = 0 };
         foreach (var width in new[] { 1.0, 1.0, 1.0, 2.2, 1.1, 1.1, 1.1 })
             table.Columns.Add(new TableColumn { Width = new GridLength(width, GridUnitType.Star) });
-        var headerGroup = new TableRowGroup();
+        var headerGroup = new TableRowGroup { IsHeader = true };
         var headerRow = new TableRow { Background = accent, Foreground = Brushes.White, FontWeight = FontWeights.Bold };
         foreach (var label in new[] { "تاریخ", "نوع", "شماره", "شرح", "بدهکار", "بستانکار", "مانده" })
             headerRow.Cells.Add(CreateCell(label, Brushes.White, accent, true));
@@ -72,13 +72,14 @@ public sealed class PersonKardexPrintPreviewWindow : Window
         {
             var background = body.Rows.Count % 2 == 0 ? Brushes.White : new SolidColorBrush(Color.FromRgb(248, 250, 252));
             var row = new TableRow();
-            foreach (var value in new[]
+            var values = new[]
             {
                 entry.Date, entry.Type, entry.Reference, entry.Description,
                 NumericTextBoxFormatter.Format(entry.Debit), NumericTextBoxFormatter.Format(entry.Credit),
                 NumericTextBoxFormatter.Format(entry.Balance)
-            })
-                row.Cells.Add(CreateCell(value, ink, background, false));
+            };
+            for (var index = 0; index < values.Length; index++)
+                row.Cells.Add(CreateCell(values[index], ink, background, false, numeric: index >= 4));
             body.Rows.Add(row);
         }
         table.RowGroups.Add(body);
@@ -112,12 +113,17 @@ public sealed class PersonKardexPrintPreviewWindow : Window
         Content = root;
     }
 
-    private static TableCell CreateCell(string text, Brush foreground, Brush background, bool header)
+    private static TableCell CreateCell(string text, Brush foreground, Brush background, bool header, bool numeric = false)
     {
-        var paragraph = new Paragraph(new Run(text)) { Margin = new Thickness(0), TextAlignment = TextAlignment.Right };
+        var paragraph = new Paragraph(new Run(text))
+        {
+            Margin = new Thickness(0),
+            TextAlignment = TextAlignment.Right,
+            FlowDirection = numeric ? FlowDirection.LeftToRight : FlowDirection.RightToLeft
+        };
         return new TableCell(paragraph)
         {
-            Foreground = foreground, Background = background, Padding = new Thickness(5, 4, 5, 4),
+            Foreground = foreground, Background = background, Padding = new Thickness(7, 5, 7, 5),
             BorderBrush = new SolidColorBrush(Color.FromRgb(203, 213, 225)),
             BorderThickness = new Thickness(0, 0, 0.5, 0.5), FontSize = header ? 9 : 8.5
         };
