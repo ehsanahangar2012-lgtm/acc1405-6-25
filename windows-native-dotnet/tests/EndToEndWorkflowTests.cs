@@ -1,3 +1,9 @@
+using System.Reflection;
+using System.Threading;
+using System.Windows;
+using System.Windows.Documents;
+using System.Windows.Media;
+using AshkeGhalam.Windows.Dialogs;
 using AshkeGhalam.Windows.Models;
 using AshkeGhalam.Windows.Services;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -71,6 +77,7 @@ public sealed class EndToEndWorkflowTests
             AccountingOperations.RecordPayment(data, invoice.Id, 141m, "نقدی", "WF-OVERPAYMENT"));
         Assert.AreEqual(1, data.Payments.Count, "A rejected overpayment must not create a second payment.");
         Assert.AreEqual(140m, AccountingRules.RemainingForInvoice(data, invoice));
+        AssertInvoicePreviewContainsSavedWorkflowData(invoice, customer, product);
         AccountingDataValidator.Validate(data);
 
         var report = PersonKardexService.GetReport(data, customer);
@@ -90,4 +97,131 @@ public sealed class EndToEndWorkflowTests
             "The generated ledger must remain balanced after sale and receipt.");
         AccountingDataValidator.Validate(data);
     }
+    private static void AssertInvoicePreviewContainsSavedWorkflowData(
+        InvoiceRecord invoice, CustomerRecord customer, ProductRecord product)
+    {
+        Exception? failure = null;
+        var previewTitle = string.Empty;
+        var previewText = string.Empty;
+        const string companyName = "شرکت آزمون گردش سرتاسری";
+
+        var thread = new Thread(() =>
+        {
+            Window? owner = null;
+            InvoicePreviewWindow? preview = null;
+            try
+            {
+                owner = new Window
+                {
+                    Width = 1000,
+                    Height = 700,
+                    Background = Brushes.White,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.ToolWindow
+                };
+                owner.Show();
+
+                var company = new CompanyProfileRecord
+                {
+                    Name = companyName,
+                    LegalName = companyName,
+                    Phone = "021-55500000",
+                    Address = "نشانی آزمون گردش سرتاسری"
+                };
+                preview = new InvoicePreviewWindow(
+                    owner, invoice, defaultTheme: "modern", showQr: false,
+                    company: company, currencyCode: "RIAL");
+                previewTitle = preview.Title;
+
+                // The preview is a real WPF FlowDocument assembled by InvoicePreviewWindow.
+                // Read the constructed document on its owning STA thread without printing or
+                // touching any user files/printer settings.
+                var field = typeof(InvoicePreviewWindow).GetField(
+                    "_document", BindingFlags.Instance | BindingFlags.NonPublic);
+                if (field?.GetValue(preview) is not FlowDocument document)
+                    throw new AssertFailedException("Invoice preview did not construct its printable FlowDocument.");
+                previewText = CollectPreviewText(document);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+            finally
+            {
+                preview?.Close();
+                owner?.Close();
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null)
+            throw new AssertFailedException("Saved invoice could not be represented in its WPF print preview.", failure);
+
+        StringAssert.Contains(previewTitle, invoice.DisplayNumber,
+            "Preview title must identify the saved invoice number.");
+        StringAssert.Contains(previewText, companyName,
+            "The printable invoice must show the selected company profile.");
+        StringAssert.Contains(previewText, customer.Name,
+            "The printable invoice must show the selected customer.");
+        StringAssert.Contains(previewText, product.Name,
+            "The printable invoice must show the saved product line.");
+        StringAssert.Contains(previewText, invoice.Total.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "The printable invoice must show the final total from the saved invoice.");
+    }
+
+    private static string CollectPreviewText(FlowDocument document)
+    {
+        var values = new List<string>();
+        var visited = new HashSet<DependencyObject>();
+        var pending = new Stack<DependencyObject>();
+        pending.Push(document);
+
+        while (pending.Count > 0)
+        {
+            var current = pending.Pop();
+            if (!visited.Add(current))
+                continue;
+
+            if (current is TextBlock textBlock && !string.IsNullOrWhiteSpace(textBlock.Text))
+                values.Add(textBlock.Text);
+            else if (current is Run run && !string.IsNullOrWhiteSpace(run.Text))
+                values.Add(run.Text);
+
+            // BlockUIContainer is how the print layout embeds its company header, item row,
+            // information cards and totals; explicitly follow that child as well as WPF's
+            // logical/visual tree so the test sees the same printable content.
+            if (current is BlockUIContainer { Child: DependencyObject child })
+                pending.Push(child);
+            if (current is Table table)
+                foreach (var group in table.RowGroups) pending.Push(group);
+            if (current is TableRowGroup rowGroup)
+                foreach (var row in rowGroup.Rows) pending.Push(row);
+            if (current is TableRow row)
+                foreach (var cell in row.Cells) pending.Push(cell);
+            if (current is TableCell cellContent)
+                foreach (var block in cellContent.Blocks) pending.Push(block);
+
+            try
+            {
+                foreach (var childElement in LogicalTreeHelper.GetChildren(current).OfType<DependencyObject>())
+                    pending.Push(childElement);
+            }
+            catch (InvalidOperationException) { }
+
+            if (current is Visual or System.Windows.Media.Media3D.Visual3D)
+            {
+                try
+                {
+                    for (var i = 0; i < VisualTreeHelper.GetChildrenCount(current); i++)
+                        pending.Push(VisualTreeHelper.GetChild(current, i));
+                }
+                catch (InvalidOperationException) { }
+            }
+        }
+
+        return string.Join("\\n", values);
+    }
+
 }

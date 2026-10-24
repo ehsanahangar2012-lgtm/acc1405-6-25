@@ -831,3 +831,10 @@
 - [x] رکورد تاریخی ناسازگار هنگام ویرایش پنهان نمی‌شود؛ با برچسب اصلاح لازم دیده می‌شود، اما تا انتخاب گردش سازگار ذخیره نخواهد شد.
 - [x] آزمون مستقل نگاشت مجازها، پیش‌فرض‌ها و رد ترکیب‌های ناسازگار اضافه شد.
 - [ ] انتخاب‌های واقعی ماوس/صفحه‌کلید در ویندوز با دادهٔ آزمایشی همچنان باید دستی بررسی شوند.
+
+
+## Workflow chunk 1 — saved invoice to WPF print preview
+
+- [x] The existing end-to-end test continues to verify customer → sale invoice → receipt → remaining balance → person ledger/kardex → balanced journal.
+- [x] The same saved invoice is now passed through the actual WPF `InvoicePreviewWindow`; the constructed printable document is checked for company, customer, product and final total on an STA thread, without printing or touching user files.
+- [ ] The commit's CI run must confirm the new preview-content assertions; physical printer output remains a separate manual verification.
