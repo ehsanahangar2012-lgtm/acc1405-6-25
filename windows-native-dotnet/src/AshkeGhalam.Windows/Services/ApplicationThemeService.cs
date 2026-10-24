@@ -115,8 +115,13 @@ public static class ApplicationThemeService
         // style brushes are remapped on the very first dark-theme pass as well.
         PolishControls(window, elements, isDark);
 
+        // Pass 1 maps surfaces and outlines first. Pass 2 maps text against those
+        // final surfaces. Doing both in one tree walk used to calculate dark text against a
+        // card's old white background, then darken the card afterward, making text disappear.
         foreach (var element in elements)
-            ApplyThemeValues(element, isDark);
+            ApplyThemeValues(element, isDark, foregroundOnly: false);
+        foreach (var element in elements)
+            ApplyThemeValues(element, isDark, foregroundOnly: true);
 
         // Editable ComboBoxes create their inner text editor and drop-down visual tree
         // lazily. Synchronize those parts after palette mapping so their first rendered
@@ -670,7 +675,7 @@ public static class ApplicationThemeService
         }
     }
 
-    private static void ApplyThemeValues(DependencyObject element, bool isDark)
+    private static void ApplyThemeValues(DependencyObject element, bool isDark, bool foregroundOnly)
     {
         // Keep the document viewport itself neutral as well as its document children:
         // remapping FlowDocumentScrollViewer.Background tints the white paper and makes
@@ -687,6 +692,14 @@ public static class ApplicationThemeService
 
         foreach (var property in GetBrushProperties(element))
         {
+            var isForegroundProperty =
+                property == Control.ForegroundProperty ||
+                property == Window.ForegroundProperty ||
+                property == TextBlock.ForegroundProperty ||
+                property == TextElement.ForegroundProperty;
+            if (foregroundOnly != isForegroundProperty)
+                continue;
+
             // Text inside a DataGrid cell/header follows the hosting control's Foreground
             // through bindings. A local theme color here would take precedence over that
             // binding and leave stale ink after hover/selection or a theme change.
@@ -698,10 +711,7 @@ public static class ApplicationThemeService
             if (element.GetValue(property) is not SolidColorBrush brush || brush.Color.A == 0)
                 continue;
 
-            Color? mapped = property == Control.ForegroundProperty ||
-                            property == Window.ForegroundProperty ||
-                            property == TextBlock.ForegroundProperty ||
-                            property == TextElement.ForegroundProperty
+            Color? mapped = isForegroundProperty
                 ? MapForeground(brush.Color, isDark, FindNearestBackground(element))
                 : property == Control.BorderBrushProperty || property == Border.BorderBrushProperty
                     ? MapBorder(brush.Color, isDark)
@@ -715,24 +725,22 @@ public static class ApplicationThemeService
             element.SetValue(property, replacement);
         }
 
-        if (element is Control control && element is (TextBox or ComboBox or PasswordBox or DatePicker or ListBox))
+        if (!foregroundOnly &&
+            element is Control control &&
+            element is (TextBox or ComboBox or PasswordBox or DatePicker or ListBox))
         {
             control.Background = Brush(isDark ? "#111827" : "#FFFFFF");
-            control.Foreground = Brush(isDark ? "#F3F4F6" : "#0F172A");
             control.BorderBrush = Brush(isDark ? "#475569" : "#CBD5E1");
         }
 
-        if (element is TextBox input)
+        if (!foregroundOnly && element is TextBox input)
         {
             input.CaretBrush = Brush(isDark ? "#F3F4F6" : "#0F172A");
             input.SelectionBrush = Brush(isDark ? "#115E59" : "#99F6E4");
         }
 
-        if (element is DataGrid grid)
-        {
+        if (!foregroundOnly && element is DataGrid grid)
             grid.Background = Brush(isDark ? "#111827" : "#FFFFFF");
-            grid.Foreground = Brush(isDark ? "#F3F4F6" : "#0F172A");
-        }
     }
 
     private static bool IsDataGridCellOrHeaderText(DependencyObject element)
