@@ -346,6 +346,7 @@ public sealed class InvoiceDialog : Window
             RefreshTotals();
         };
         _person.SelectionChanged += (_, _) => { RefreshTotals(); UpdatePartyHint(); };
+        _person.DropDownClosed += (_, _) => UpdatePartyHint();
         _product.SelectionChanged += (_, _) => ApplyDefaultPrice();
         _discount.TextChanged += (_, _) => RefreshTotals();
         _tax.TextChanged += (_, _) => RefreshTotals();
@@ -458,6 +459,34 @@ public sealed class InvoiceDialog : Window
             var details = string.IsNullOrWhiteSpace(person.Phone) ? "" : $" • تلفن: {person.Phone}";
             var balance = BuildPartyBalanceDisplay(person);
             _partyHint.Text = $"طرف حساب انتخاب‌شده: {person.Name}  |  کد: {person.Code}{details}  |  {balance}";
+            _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+            return;
+        }
+
+        var query = _person.Text?.Trim() ?? "";
+        if (query.Length > 0)
+        {
+            if (_person.IsDropDownOpen)
+            {
+                _partyHint.Text = "برای ثبت طرف حساب، یکی از نتایج فهرست را انتخاب کنید؛ تایپ متن به‌تنهایی انتخاب محسوب نمی‌شود.";
+                _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+            }
+            else if (_person.Items.Count > 0)
+            {
+                _partyHint.Text = $"برای «{query}» {_person.Items.Count:N0} نتیجه موجود است؛ فهرست را باز کنید و یک مورد را انتخاب کنید.";
+                _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
+            }
+            else
+            {
+                _partyHint.Text = $"موردی با عبارت «{query}» پیدا نشد؛ نام، کد یا تلفن را بررسی کنید.";
+                _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(185, 28, 28));
+            }
+            return;
+        }
+
+        if (_person.Items.Count > 0)
+        {
+            _partyHint.Text = "برای جست‌وجو، نام، کد یا تلفن را تایپ کنید و یک نتیجه را انتخاب کنید.";
             _partyHint.Foreground = new SolidColorBrush(Color.FromRgb(15, 118, 110));
             return;
         }
