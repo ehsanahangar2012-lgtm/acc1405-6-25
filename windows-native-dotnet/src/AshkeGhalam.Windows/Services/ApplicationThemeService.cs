@@ -881,7 +881,7 @@ public static class ApplicationThemeService
         var background = FindNearestBackground(target) ??
             (isDark ? Color.FromRgb(17, 24, 39) : Colors.White);
         var readable = MapForeground(preferredForeground, isDark, background) ?? preferredForeground;
-        target.Foreground = Brush(EnsureReadableContrast(readable, background));
+        target.Foreground = new SolidColorBrush(EnsureReadableContrast(readable, background));
     }
 
     /// <summary>Pure contrast resolver used by UI regression tests.</summary>
