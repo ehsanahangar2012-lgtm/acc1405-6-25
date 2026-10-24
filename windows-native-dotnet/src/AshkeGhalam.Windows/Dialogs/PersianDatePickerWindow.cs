@@ -154,5 +154,14 @@ public sealed class PersianDatePickerWindow : Window
             };
             _days.Children.Add(b);
         }
+
+        // RenderDays creates fresh Button instances when month/year changes. They were not
+        // present during the initial Loaded theme pass, so reapply the active palette after
+        // rebuilding the calendar; otherwise dark mode silently falls back to white day cells.
+        if (IsLoaded)
+        {
+            var activeTheme = ApplicationThemeService.DetectTheme(this);
+            ApplicationThemeService.Apply(this, activeTheme);
+        }
     }
 }
