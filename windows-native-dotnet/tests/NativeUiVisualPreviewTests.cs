@@ -30,10 +30,12 @@ public sealed class NativeUiVisualPreviewTests
             return;
 
         Exception? failure = null;
+        var currentStage = "initialization";
         var thread = new Thread(() =>
         {
             try
             {
+                currentStage = "WPF application resources";
                 var app = Application.Current as App;
                 if (app is null)
                 {
@@ -114,6 +116,7 @@ public sealed class NativeUiVisualPreviewTests
 
                 foreach (var theme in new[] { "light", "dark" })
                 {
+                    currentStage = $"dashboard ({theme})";
                     var dashboard = new MainWindow();
                     SetText(dashboard, "CurrentModuleText", "پیشخوان • تصویر بازبینی رابط");
                     SetText(dashboard, "StorageStatus", "ذخیره‌سازی محلی آماده");
@@ -129,10 +132,12 @@ public sealed class NativeUiVisualPreviewTests
                     ApplicationThemeService.Apply(dashboard, theme);
                     SaveContent(dashboard, outputDirectory, $"dashboard-{theme}.png");
 
+                    currentStage = $"person form ({theme})";
                     var personDialog = new CustomerDialog(owner, suggestedCode: "CUS-1002");
                     ApplicationThemeService.Apply(personDialog, theme);
                     SaveContent(personDialog, outputDirectory, $"person-form-{theme}.png");
 
+                    currentStage = $"invoice form ({theme})";
                     var invoiceDialog = new InvoiceDialog(
                         owner, people, products, invoices,
                         defaultInvoiceTheme: "modern",
@@ -148,11 +153,13 @@ public sealed class NativeUiVisualPreviewTests
                     ApplicationThemeService.Apply(invoiceDialog, theme);
                     SaveContent(invoiceDialog, outputDirectory, $"invoice-form-{theme}.png");
 
+                    currentStage = $"voucher form ({theme})";
                     var voucherDialog = new VoucherDialog(
                         owner, people, products, invoices, companyProfile: company);
                     ApplicationThemeService.Apply(voucherDialog, theme);
                     SaveContent(voucherDialog, outputDirectory, $"voucher-form-{theme}.png");
 
+                    currentStage = $"invoice print preview ({theme})";
                     var preview = new InvoicePreviewWindow(
                         owner, invoice, defaultTheme: "modern", showQr: false,
                         company: company, currencyCode: "RIAL");
@@ -164,7 +171,7 @@ public sealed class NativeUiVisualPreviewTests
             }
             catch (Exception ex)
             {
-                failure = ex;
+                failure = new InvalidOperationException($"Visual capture failed at stage: {currentStage}.", ex);
             }
         });
         thread.SetApartmentState(ApartmentState.STA);
@@ -188,13 +195,22 @@ public sealed class NativeUiVisualPreviewTests
         if (window.Content is not FrameworkElement content)
             throw new InvalidOperationException($"{window.GetType().Name} has no renderable content.");
 
+        // Render the window's actual background as a surface behind its content.
+        // Rendering Content directly makes transparent areas opaque black in PNG output,
+        // which can falsely suggest that the light theme has lost its background.
+        var renderSurface = new Border
+        {
+            Background = window.Background ?? Brushes.Transparent,
+            Child = content,
+            SnapsToDevicePixels = true
+        };
         var size = new Size(width, height);
-        content.Measure(size);
-        content.Arrange(new Rect(0, 0, width, height));
-        content.UpdateLayout();
+        renderSurface.Measure(size);
+        renderSurface.Arrange(new Rect(0, 0, width, height));
+        renderSurface.UpdateLayout();
 
         var bitmap = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(content);
+        bitmap.Render(renderSurface);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = File.Create(Path.Combine(folder, fileName));
