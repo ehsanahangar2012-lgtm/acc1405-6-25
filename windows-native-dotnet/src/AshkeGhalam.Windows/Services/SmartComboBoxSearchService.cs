@@ -130,7 +130,9 @@ public static class SmartComboBoxSearchService
         if (sender is not ComboBox combo || !States.TryGetValue(combo, out var state) ||
             state.IsUpdating || e.OriginalSource is not TextBox editBox) return;
 
-        var text = combo.Text ?? "";
+        // Read the editor itself: its Text binding can lag the ComboBox.Text property
+        // when templates are being re-applied or input arrives through automation/accessibility.
+        var text = editBox.Text ?? combo.Text ?? "";
         if (combo.SelectedItem is object selected && IsExactValue(state, selected, text))
         {
             if (state.Query.Length > 0)

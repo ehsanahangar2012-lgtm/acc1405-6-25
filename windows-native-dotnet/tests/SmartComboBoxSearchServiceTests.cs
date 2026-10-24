@@ -134,6 +134,8 @@ public sealed class SmartComboBoxSearchServiceTests
                 // Popup focus/open state is controlled by the native desktop window manager and
                 // is not deterministic in a headless runner. The filter and selected object
                 // below are the stable behavioral contract covered by this test.
+                Assert.AreEqual("CUS-0042", combo.Text,
+                    "The actual editor value should synchronize back to ComboBox.Text.");
                 Assert.AreEqual(1, combo.Items.Count,
                     "Code search should filter out non-matching parties.");
                 Assert.AreSame(selectedParty, combo.Items[0],
